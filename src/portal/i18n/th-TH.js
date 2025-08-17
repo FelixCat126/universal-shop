@@ -136,7 +136,9 @@ export default {
     removeSuccess: 'ลบสินค้าแล้ว',
     removeFailed: 'ลบสินค้าล้มเหลว',
     clearSuccess: 'ล้างตะกร้าแล้ว',
-    clearFailed: 'ล้างตะกร้าล้มเหลว'
+    clearFailed: 'ล้างตะกร้าล้มเหลว',
+    // 简化库存不足提示
+    stockInsufficientSimple: 'เพิ่มล้มเหลว เกินสต็อกสินค้าสูงสุด'
   },
 
   // 用户相关

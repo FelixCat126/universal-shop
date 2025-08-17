@@ -341,9 +341,9 @@ const handleAddToCart = async () => {
     const result = await cartStore.addToCart(product.value, quantity.value)
     
     if (result.success) {
-      showMessageToast(result.message, 'success')
+      showMessageToast(result.message, 'success', result.messageParams || {})
     } else {
-      showMessageToast(result.message, 'error')
+      showMessageToast(result.message || 'addFailed', 'error', result.messageParams || {})
     }
   } catch (error) {
     showMessageToast(t('cart.addFailed'), 'error')
@@ -364,7 +364,7 @@ const handleBuyNow = async () => {
       // 直接跳转到结算页面
       router.push('/checkout')
     } else {
-      showMessageToast(result.message, 'error')
+      showMessageToast(result.message || 'addFailed', 'error', result.messageParams || {})
     }
   } catch (error) {
     showMessageToast(t('cart.addFailed'), 'error')
@@ -374,26 +374,32 @@ const handleBuyNow = async () => {
 }
 
 // 获取国际化消息
-const getTranslatedMessage = (key) => {
+const getTranslatedMessage = (key, params = {}) => {
   const messageMap = {
-    'addSuccess': t('cart.addSuccess'),
-    'addFailed': t('cart.addFailed'),
-    'updateSuccess': t('cart.updateSuccess'),
-    'updateFailed': t('cart.updateFailed'),
-    'removeSuccess': t('cart.removeSuccess'),
-    'removeFailed': t('cart.removeFailed'),
-    'clearSuccess': t('cart.clearSuccess'),
-    'clearFailed': t('cart.clearFailed'),
-    'itemNotFound': t('cart.itemNotFound')
+    'addSuccess': () => t('cart.addSuccess'),
+    'addFailed': () => t('cart.addFailed'),
+    'updateSuccess': () => t('cart.updateSuccess'),
+    'updateFailed': () => t('cart.updateFailed'),
+    'removeSuccess': () => t('cart.removeSuccess'),
+    'removeFailed': () => t('cart.removeFailed'),
+    'clearSuccess': () => t('cart.clearSuccess'),
+    'clearFailed': () => t('cart.clearFailed'),
+    'itemNotFound': () => t('cart.itemNotFound'),
+    // 简化库存不足提示
+    'stockInsufficientSimple': () => t('cart.stockInsufficientSimple')
   }
   
-  return messageMap[key] || key
+  if (messageMap[key]) {
+    return messageMap[key]()
+  }
+  
+  return key
 }
 
 // 显示消息提示
-const showMessageToast = (msg, type = 'success') => {
+const showMessageToast = (msg, type = 'success', params = {}) => {
   // 如果消息是键名，则进行国际化转换
-  const translatedMsg = getTranslatedMessage(msg)
+  const translatedMsg = getTranslatedMessage(msg, params)
   message.value = translatedMsg
   messageType.value = type
   showMessage.value = true

@@ -206,7 +206,7 @@ import config from '../../config/index.js'
 // Home.vue组件已加载
 
 // 国际化
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // 路由和状态管理
 const router = useRouter()
@@ -259,8 +259,8 @@ const getImageUrl = (imagePath) => {
 }
 
 // 显示消息提示
-const showMessageToast = (msg, type = 'success') => {
-  const translatedMsg = getTranslatedMessage(msg)
+const showMessageToast = (msg, type = 'success', params = {}) => {
+  const translatedMsg = getTranslatedMessage(msg, params)
   message.value = translatedMsg
   messageType.value = type
   showMessage.value = true
@@ -271,14 +271,26 @@ const showMessageToast = (msg, type = 'success') => {
 }
 
 // 获取国际化消息
-const getTranslatedMessage = (key) => {
+const getTranslatedMessage = (key, params = {}) => {
   const messageMap = {
-    'addSuccess': t('cart.addSuccess'),
-    'addFailed': t('cart.addFailed'),
-    'outOfStock': t('product.outOfStock')
+    'addSuccess': () => t('cart.addSuccess'),
+    'addFailed': () => t('cart.addFailed'),
+    'updateSuccess': () => t('cart.updateSuccess'),
+    'updateFailed': () => t('cart.updateFailed'),
+    'removeSuccess': () => t('cart.removeSuccess'),
+    'removeFailed': () => t('cart.removeFailed'),
+    'clearSuccess': () => t('cart.clearSuccess'),
+    'clearFailed': () => t('cart.clearFailed'),
+    'outOfStock': () => t('product.outOfStock'),
+    // 简化库存不足提示
+    'stockInsufficientSimple': () => t('cart.stockInsufficientSimple')
   }
   
-  return messageMap[key] || key
+  if (messageMap[key]) {
+    return messageMap[key]()
+  }
+  
+  return key
 }
 
 // 计算消息样式
@@ -378,9 +390,9 @@ const addToCart = async (product) => {
     const result = await cartStore.addToCart(product, 1)
     
     if (result.success) {
-      showMessageToast(result.message, 'success')
+      showMessageToast(result.message, 'success', result.messageParams || {})
     } else {
-      showMessageToast('addFailed', 'error')
+      showMessageToast(result.message || 'addFailed', 'error', result.messageParams || {})
     }
   } catch (error) {
     showMessageToast('addFailed', 'error')
@@ -401,7 +413,7 @@ const buyNow = async (product) => {
       // 直接跳转到结算页面
       router.push('/checkout')
     } else {
-      showMessageToast('addFailed', 'error')
+      showMessageToast(result.message || 'addFailed', 'error', result.messageParams || {})
     }
   } catch (error) {
     showMessageToast('addFailed', 'error')

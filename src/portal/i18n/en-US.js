@@ -187,7 +187,9 @@ export default {
     confirmClearMessage: 'Are you sure you want to clear all items from your cart?',
     confirmClear: 'Clear All',
     clearing: 'Clearing...',
-    itemNotFound: 'Item not found'
+    itemNotFound: 'Item not found',
+    // Simple stock insufficient message
+    stockInsufficientSimple: 'Add failed, exceeds maximum stock'
   },
 
   // 订单

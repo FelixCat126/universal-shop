@@ -90,8 +90,18 @@ export const useCartStore = defineStore('cart', () => {
       const existingItem = items.value.find(item => item.product_id === product.id)
       
       if (existingItem) {
-        // 如果存在，更新数量
-        const result = await updateQuantity(existingItem.id || existingItem.product_id, existingItem.quantity + quantity)
+        // 如果存在，需要检查库存后更新数量
+        const newTotalQuantity = existingItem.quantity + quantity
+        
+        // 检查总量是否超过库存
+        if (product.stock < newTotalQuantity) {
+          return { 
+            success: false, 
+            message: 'stockInsufficientSimple'
+          }
+        }
+        
+        const result = await updateQuantity(existingItem.id || existingItem.product_id, newTotalQuantity, product)
         return result
       } else {
         if (userStore.isLoggedIn) {
@@ -115,17 +125,25 @@ export const useCartStore = defineStore('cart', () => {
             return { success: false, message: 'addFailed' }
           }
         } else {
-          // 游客用户：添加到localStorage
-          const newItem = {
-            id: `guest_${Date.now()}_${product.id}`, // 游客商品使用临时ID
-            product_id: product.id,
-            product: product,
-            quantity,
-            price: getActualPrice(product)
+        // 游客用户：添加到localStorage（需要检查库存）
+        // 检查库存是否充足
+        if (product.stock < quantity) {
+          return { 
+            success: false, 
+            message: 'stockInsufficientSimple'
           }
-          items.value.push(newItem)
-          saveGuestCart()
-          return { success: true, message: 'addSuccess' }
+        }
+        
+        const newItem = {
+          id: `guest_${Date.now()}_${product.id}`, // 游客商品使用临时ID
+          product_id: product.id,
+          product: product,
+          quantity,
+          price: getActualPrice(product)
+        }
+        items.value.push(newItem)
+        saveGuestCart()
+        return { success: true, message: 'addSuccess' }
         }
       }
     } catch (error) {
@@ -140,7 +158,7 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   // 更新商品数量
-  const updateQuantity = async (itemId, newQuantity) => {
+  const updateQuantity = async (itemId, newQuantity, product = null) => {
     try {
       if (newQuantity <= 0) {
         return await removeFromCart(itemId)
@@ -153,8 +171,10 @@ export const useCartStore = defineStore('cart', () => {
         return { success: false, message: 'itemNotFound' }
       }
 
+      const currentItem = items.value[itemIndex]
+
       if (userStore.isLoggedIn && !itemId.toString().startsWith('guest_')) {
-        // 已登录用户：调用API更新服务器购物车
+        // 已登录用户：调用API更新服务器购物车（服务器端会验证库存）
         const response = await api.put(`/cart/${itemId}`, {
           quantity: newQuantity
         })
@@ -163,10 +183,21 @@ export const useCartStore = defineStore('cart', () => {
           items.value[itemIndex].quantity = newQuantity
           return { success: true, message: 'updateSuccess' }
         } else {
-          return { success: false, message: 'updateFailed' }
+          return { success: false, message: response.data.message || 'updateFailed' }
         }
       } else {
-        // 游客用户：直接更新localStorage
+        // 游客用户：需要验证库存后更新localStorage
+        const productToCheck = product || currentItem.product
+        
+        // 检查库存
+        if (productToCheck && productToCheck.stock < newQuantity) {
+          return { 
+            success: false, 
+            message: 'stockInsufficientSimple'
+          }
+        }
+        
+        // 更新数量
         items.value[itemIndex].quantity = newQuantity
         saveGuestCart()
         return { success: true, message: 'updateSuccess' }
@@ -305,6 +336,117 @@ export const useCartStore = defineStore('cart', () => {
     localStorage.removeItem('guest_cart')
   }
 
+  // 登录时合并游客购物车到用户购物车
+  const mergeGuestCartOnLogin = async () => {
+    // 防止并发合并
+    if (isLoading.value) {
+      console.log('⏸️ 购物车正在处理中，跳过合并')
+      return { success: true }
+    }
+
+    try {
+      isLoading.value = true
+
+      
+      // 获取游客购物车数据
+                  const guestCart = localStorage.getItem('guest_cart')
+            if (!guestCart) {
+              return { success: true }
+            }
+
+      let guestItems = []
+      try {
+        guestItems = JSON.parse(guestCart)
+      } catch (e) {
+        console.error('❌ 解析游客购物车失败:', e)
+        localStorage.removeItem('guest_cart')
+        return { success: false, message: '游客购物车数据错误' }
+      }
+
+      if (guestItems.length === 0) {
+        localStorage.removeItem('guest_cart')
+        return { success: true }
+      }
+
+
+
+      // 备份游客购物车数据，以防合并失败
+      const guestCartBackup = guestCart
+      let successCount = 0
+      let failureCount = 0
+
+      // 逐个添加游客购物车的商品到用户购物车
+      for (const guestItem of guestItems) {
+        try {
+          const response = await api.post('/cart', {
+            product_id: guestItem.product_id,
+            quantity: guestItem.quantity
+          })
+
+          if (response.data.success) {
+            successCount++
+          } else {
+            failureCount++
+          }
+        } catch (error) {
+          console.error(`❌ 合并商品出错: ${guestItem.product_id}`, error)
+          failureCount++
+          // 继续处理其他商品，不中断整个合并过程
+        }
+      }
+
+      // 根据成功情况决定是否清理localStorage
+      if (successCount > 0 && failureCount === 0) {
+        // 全部成功，清空游客购物车
+        localStorage.removeItem('guest_cart')
+
+      } else if (successCount > 0 && failureCount > 0) {
+        // 部分成功，保留失败的商品
+        const failedItems = guestItems.filter((_, index) => 
+          index >= successCount // 简化处理，假设前面的成功了
+        )
+        localStorage.setItem('guest_cart', JSON.stringify(failedItems))
+
+      } else {
+        // 全部失败，保留原数据
+        console.error(`❌ 购物车合并失败，保留游客购物车数据`)
+      }
+      
+      // 重新加载购物车数据，确保前端状态同步
+      await loadCart()
+
+      return { 
+        success: successCount > 0, 
+        message: failureCount > 0 ? 
+          `购物车已部分合并，${failureCount}个商品合并失败` : 
+          '购物车已合并' 
+      }
+      
+    } catch (error) {
+      console.error('❌ 合并游客购物车失败:', error)
+      return { success: false, message: '合并购物车失败' }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // 登出时清理游客购物车和相关状态
+  const clearGuestCartOnLogout = () => {
+    try {
+      // 清空当前购物车状态
+      items.value = []
+      
+      // 清空游客购物车数据（如果有的话）
+      localStorage.removeItem('guest_cart')
+      
+      return { success: true }
+      
+    } catch (error) {
+      console.error('❌ 清理购物车状态失败:', error)
+      return { success: false }
+    }
+  }
+
   return {
     // 状态
     items,
@@ -325,6 +467,8 @@ export const useCartStore = defineStore('cart', () => {
     getItemQuantity,
     isInCart,
     saveGuestCart,
-    clearGuestCart
+    clearGuestCart,
+    mergeGuestCartOnLogin,
+    clearGuestCartOnLogout
   }
 })

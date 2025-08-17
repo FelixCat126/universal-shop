@@ -11,9 +11,16 @@ const messages = {
 
 const i18n = createI18n({
   legacy: false,
-  locale: localStorage.getItem('language') || 'th-TH', // 默认泰文
+  locale: localStorage.getItem('language') || 'zh-CN', // 默认中文
   fallbackLocale: 'zh-CN',
   messages
+})
+
+// 添加语言切换监听
+window.addEventListener('storage', (e) => {
+  if (e.key === 'language' && e.newValue) {
+    i18n.global.locale.value = e.newValue
+  }
 })
 
 export default i18n

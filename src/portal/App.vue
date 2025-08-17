@@ -137,19 +137,21 @@ const updatePageTitle = () => {
 // 切换语言
 const changeLanguage = () => {
   localStorage.setItem('language', currentLanguage.value)
+  
+  // 确保vue-i18n的locale与当前语言设置同步
+  locale.value = currentLanguage.value
+  
   // 触发自定义事件，通知其他组件语言变化
   window.dispatchEvent(new CustomEvent('language-changed', { 
     detail: { language: currentLanguage.value } 
   }))
-  // vue-i18n会自动响应locale的变化
 }
 
 // 登出
 const handleLogout = async () => {
   try {
     await userStore.logout()
-    // 清空购物车状态（登出后切换到游客模式）
-    await cartStore.loadCart()
+    // 注意：购物车状态清理现在由watch监听器自动处理
     // 强制跳转到首页并刷新页面以确保状态重置
     window.location.href = '/'
   } catch (error) {
@@ -169,16 +171,41 @@ watch(() => locale.value, () => {
   updatePageTitle()
 })
 
+// 监听用户登录状态变化，处理购物车合并
+watch(() => userStore.isLoggedIn, async (newValue, oldValue) => {
+  // 从未登录变为已登录：合并游客购物车
+  if (!oldValue && newValue) {
+    try {
+      await cartStore.mergeGuestCartOnLogin()
+    } catch (error) {
+      console.error('❌ 购物车合并失败:', error)
+    }
+  }
+  
+  // 从已登录变为未登录：清理购物车状态
+  if (oldValue && !newValue) {
+    try {
+      cartStore.clearGuestCartOnLogout()
+    } catch (error) {
+      console.error('❌ 购物车清理失败:', error)
+    }
+  }
+})
+
 // 初始化
 onMounted(async () => {
-  // 从localStorage恢复语言设置，默认泰文
+  // 从localStorage恢复语言设置，默认中文
   const savedLanguage = localStorage.getItem('language')
+  
   if (savedLanguage) {
     currentLanguage.value = savedLanguage
   } else {
-    currentLanguage.value = 'th-TH'
-    localStorage.setItem('language', 'th-TH')
+    currentLanguage.value = 'zh-CN'
+    localStorage.setItem('language', 'zh-CN')
   }
+  
+  // 确保vue-i18n的locale与当前语言设置同步
+  locale.value = currentLanguage.value
   
   try {
     // 检查用户认证状态
