@@ -138,7 +138,7 @@ export default {
     clearSuccess: '购物车已清空',
     clearFailed: '清空购物车失败',
     // 简化库存不足提示
-    stockInsufficientSimple: '添加失败，超出货物最大库存'
+    stockInsufficientSimple: '库存不足'
   },
 
   // 用户相关

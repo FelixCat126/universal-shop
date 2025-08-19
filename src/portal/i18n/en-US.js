@@ -189,7 +189,7 @@ export default {
     clearing: 'Clearing...',
     itemNotFound: 'Item not found',
     // Simple stock insufficient message
-    stockInsufficientSimple: 'Add failed, exceeds maximum stock'
+    stockInsufficientSimple: 'Out of stock'
   },
 
   // 订单
