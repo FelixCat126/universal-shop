@@ -22,27 +22,93 @@
     <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
       <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
         <form class="space-y-6" @submit.prevent="handleLogin">
-          <!-- 手机号/邮箱 -->
-          <div>
-            <label for="username" class="block text-sm font-medium text-gray-700">
-              {{ t('user.emailOrPhone') }}
+          <!-- 登录方式切换 -->
+          <div class="mb-4">
+            <div class="flex rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                @click="loginType = 'phone'"
+                :class="[
+                  'flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors',
+                  loginType === 'phone' 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                ]"
+              >
+                手机号登录
+              </button>
+              <button
+                type="button"
+                @click="loginType = 'email'"
+                :class="[
+                  'flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors',
+                  loginType === 'email' 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                ]"
+              >
+                邮箱登录
+              </button>
+            </div>
+          </div>
+
+          <!-- 手机号登录 -->
+          <div v-if="loginType === 'phone'">
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+              {{ t('user.phone') }} <span class="text-red-500">*</span>
+            </label>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
+              <!-- 国家选择 -->
+              <div class="sm:col-span-2">
+                <CountrySelector
+                  v-model="formData.countryCode"
+                  placeholder="选择国家"
+                  :error="errors.countryCode"
+                />
+              </div>
+              <!-- 手机号输入 -->
+              <div class="sm:col-span-3">
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <span class="text-gray-500 text-sm">{{ formData.countryCode }}</span>
+                  </div>
+                  <input
+                    id="phone"
+                    v-model="formData.phone"
+                    type="tel"
+                    required
+                    autocomplete="tel"
+                    :maxlength="currentCountry?.phoneLength || 11"
+                    class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    :class="{ 'border-red-500': errors.phone }"
+                    :placeholder="`请输入${currentCountry?.phoneLength || 11}位手机号`"
+                  />
+                </div>
+                <p v-if="errors.phone" class="mt-1 text-xs text-red-600">{{ errors.phone }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 邮箱登录 -->
+          <div v-else>
+            <label for="email" class="block text-sm font-medium text-gray-700">
+              {{ t('user.email') }}
             </label>
             <div class="mt-1 relative">
               <input
-                id="username"
-                v-model="formData.username"
-                type="text"
-                autocomplete="username"
+                id="email"
+                v-model="formData.email"
+                type="email"
+                autocomplete="email"
                 required
                 class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                :class="{ 'border-red-500': errors.username }"
-                :placeholder="t('user.emailOrPhonePlaceholder')"
+                :class="{ 'border-red-500': errors.email }"
+                :placeholder="t('user.emailPlaceholder')"
               />
-              <AtSymbolIcon v-if="isEmail(formData.username)" class="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-              <UserIcon v-else class="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+              <AtSymbolIcon class="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
-            <p v-if="errors.username" class="mt-2 text-sm text-red-600">
-              {{ errors.username }}
+            <p v-if="errors.email" class="mt-2 text-sm text-red-600">
+              {{ errors.email }}
             </p>
           </div>
 
@@ -167,6 +233,8 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/user.js'
+import CountrySelector from '../components/CountrySelector.vue'
+import { validatePhone, getCountryInfo } from '../utils/phoneValidation.js'
 import { 
   UserIcon, 
   AtSymbolIcon, 
@@ -190,10 +258,13 @@ const showPassword = ref(false)
 const showMessage = ref(false)
 const message = ref('')
 const messageType = ref('success')
+const loginType = ref('phone') // 'phone' 或 'email'
 
 // 表单数据
 const formData = ref({
-  username: '',
+  countryCode: '+86',
+  phone: '',
+  email: '',
   password: '',
   rememberMe: false
 })
@@ -208,6 +279,10 @@ const messageClass = computed(() => {
     : 'bg-red-500 text-white'
 })
 
+const currentCountry = computed(() => {
+  return getCountryInfo(formData.value.countryCode)
+})
+
 // 验证是否为邮箱格式
 const isEmail = (value) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -218,11 +293,27 @@ const isEmail = (value) => {
 const validateForm = () => {
   errors.value = {}
   
-  // 验证用户名/邮箱
-  if (!formData.value.username.trim()) {
-    errors.value.username = t('validation.emailOrPhoneRequired')
-  } else if (formData.value.username.length < 3) {
-    errors.value.username = t('validation.accountMinLength')
+  if (loginType.value === 'phone') {
+    // 手机号登录验证
+    if (!formData.value.countryCode) {
+      errors.value.countryCode = '请选择国家'
+    }
+    
+    if (!formData.value.phone) {
+      errors.value.phone = '请输入手机号'
+    } else {
+      const phoneValidation = validatePhone(formData.value.phone, formData.value.countryCode)
+      if (!phoneValidation.isValid) {
+        errors.value.phone = phoneValidation.message
+      }
+    }
+  } else {
+    // 邮箱登录验证
+    if (!formData.value.email.trim()) {
+      errors.value.email = '请输入邮箱地址'
+    } else if (!isEmail(formData.value.email)) {
+      errors.value.email = '邮箱格式不正确'
+    }
   }
   
   // 验证密码
@@ -245,9 +336,15 @@ const handleLogin = async () => {
     isLoading.value = true
     
     const loginData = {
-      email: formData.value.username.trim(), // 兼容：后端将其作为“账号标识”处理（可为邮箱/手机号）
       password: formData.value.password,
       rememberMe: formData.value.rememberMe
+    }
+    
+    if (loginType.value === 'phone') {
+      loginData.country_code = formData.value.countryCode
+      loginData.phone = formData.value.phone
+    } else {
+      loginData.email = formData.value.email.trim()
     }
     
     const result = await userStore.login(loginData)

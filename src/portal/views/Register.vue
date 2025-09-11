@@ -35,23 +35,43 @@
             </div>
           </div>
 
-          <!-- 手机号 -->
+          <!-- 国家和手机号 -->
           <div>
-            <label for="phone" class="block text-sm font-medium text-gray-700">
+            <label class="block text-sm font-medium text-gray-700 mb-3">
               {{ t('user.phone') }} <span class="text-red-500">*</span>
             </label>
-            <div class="mt-1">
-              <input
-                id="phone"
-                v-model="form.phone"
-                type="tel"
-                required
-                class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                :class="{ 'border-red-300': errors.phone }"
-                :placeholder="t('user.phonePlaceholder')"
-              >
-              <p v-if="errors.phone" class="mt-1 text-xs text-red-600">{{ errors.phone }}</p>
-              <p class="mt-1 text-xs text-gray-500">{{ t('user.phoneHint') }}</p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
+              <!-- 国家选择 -->
+              <div class="sm:col-span-2">
+                <CountrySelector
+                  v-model="form.countryCode"
+                  placeholder="选择国家"
+                  :error="errors.countryCode"
+                  @country-change="handleCountryChange"
+                />
+              </div>
+              <!-- 手机号输入 -->
+              <div class="sm:col-span-3">
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <span class="text-gray-500 text-sm">{{ form.countryCode }}</span>
+                  </div>
+                  <input
+                    id="phone"
+                    v-model="form.phone"
+                    type="tel"
+                    required
+                    :maxlength="currentCountry?.phoneLength || 11"
+                    class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    :class="{ 'border-red-300': errors.phone }"
+                    :placeholder="`请输入${currentCountry?.phoneLength || 11}位手机号`"
+                  >
+                </div>
+                <p v-if="errors.phone" class="mt-1 text-xs text-red-600">{{ errors.phone }}</p>
+                <p v-if="currentCountry" class="mt-1 text-xs text-gray-500">
+                  {{ currentCountry.name }}手机号需要{{ currentCountry.phoneLength }}位数字
+                </p>
+              </div>
             </div>
           </div>
 
@@ -149,10 +169,12 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { userAPI } from '../api/users.js'
+import CountrySelector from '../components/CountrySelector.vue'
+import { validatePhone, getCountryInfo } from '../utils/phoneValidation.js'
 
 // 国际化
 const { t } = useI18n()
@@ -162,6 +184,7 @@ const router = useRouter()
 // 表单数据
 const form = reactive({
   nickname: '',
+  countryCode: '+86',
   phone: '',
   email: '',
   password: '',
@@ -175,6 +198,21 @@ const errors = ref({})
 // 状态
 const isSubmitting = ref(false)
 
+// 计算属性：当前选中的国家信息
+const currentCountry = computed(() => {
+  return getCountryInfo(form.countryCode)
+})
+
+// 处理国家变更
+const handleCountryChange = (country) => {
+  // 当国家变更时，清空手机号以避免格式错误
+  form.phone = ''
+  // 清除手机号相关错误
+  if (errors.value.phone) {
+    delete errors.value.phone
+  }
+}
+
 // 表单验证
 const validateForm = () => {
   const newErrors = {}
@@ -186,11 +224,19 @@ const validateForm = () => {
     newErrors.nickname = t('validation.nicknameMaxLength')
   }
 
+  // 国家区号验证
+  if (!form.countryCode) {
+    newErrors.countryCode = '请选择国家'
+  }
+
   // 手机号验证（必填）
   if (!form.phone) {
     newErrors.phone = t('validation.phoneRequired')
-  } else if (!/^[1-9]\d{9,}$/.test(form.phone)) {
-    newErrors.phone = t('validation.phoneFormat')
+  } else {
+    const phoneValidation = validatePhone(form.phone, form.countryCode)
+    if (!phoneValidation.isValid) {
+      newErrors.phone = phoneValidation.message
+    }
   }
 
   // 邮箱验证（可选）
@@ -227,6 +273,7 @@ const handleSubmit = async () => {
 
     const userData = {
       nickname: form.nickname,
+      country_code: form.countryCode,
       phone: form.phone,
       email: form.email || undefined,
       password: form.password,

@@ -206,6 +206,21 @@ export default {
     selectQR: 'เลือก QR Code',
     uploading: 'กำลังอัปโหลด...',
     refreshConfig: 'รีเฟรชการตั้งค่า',
+    
+    // การตั้งค่าอัตราแลกเปลี่ยน
+    exchangeRate: 'การตั้งค่าอัตราแลกเปลี่ยน',
+    exchangeRateSubtitle: 'กำหนดอัตราแลกเปลี่ยนสำหรับการแปลงราคาสินค้า',
+    currentExchangeRate: 'อัตราแลกเปลี่ยนปัจจุบัน',
+    exchangeRateValue: 'อัตราแลกเปลี่ยน',
+    saveExchangeRate: 'บันทึกการตั้งค่า',
+    resetExchangeRate: 'รีเซ็ต',
+    exchangeRateTips: {
+      range: '• อนุญาตให้ใส่ค่าที่มากกว่าหรือเท่ากับ 0 เท่านั้น',
+      precision: '• รองรับทศนิยมสูงสุด 2 ตำแหน่ง',
+      purpose: '• ใช้สำหรับการแปลงอัตราแลกเปลี่ยนราคาสินค้า',
+      example: '• ตัวอย่าง: 1.00 หมายถึงไม่มีการแปลง, 1.50 หมายถึงคูณราคาด้วย 1.5 เท่า'
+    },
+    
     uploadTips: {
       bannerSize: '• ขนาดแนะนำ: 1200x300px หรือใหญ่กว่า',
       bannerFormat: '• รูปแบบที่รองรับ: JPG, PNG, GIF, WebP',
@@ -224,7 +239,10 @@ export default {
       loadConfigFailed: 'โหลดการตั้งค่าล้มเหลว',
       confirmDelete: 'คุณแน่ใจหรือไม่ที่จะลบรายการนี้?',
       fileTooLarge: 'ขนาดไฟล์ใหญ่เกินไป',
-      invalidFileFormat: 'รูปแบบไฟล์ไม่ถูกต้อง'
+      invalidFileFormat: 'รูปแบบไฟล์ไม่ถูกต้อง',
+      exchangeRateSaveSuccess: 'บันทึกอัตราแลกเปลี่ยนสำเร็จ',
+      exchangeRateSaveFailed: 'บันทึกอัตราแลกเปลี่ยนล้มเหลว',
+      invalidExchangeRate: 'กรุณาใส่อัตราแลกเปลี่ยนที่ถูกต้อง (≥0, ทศนิยมสูงสุด 2 ตำแหน่ง)'
     }
   },
 

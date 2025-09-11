@@ -128,10 +128,14 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.phone')" width="160" min-width="150">
+          <el-table-column :label="t('users.phone')" width="180" min-width="160">
             <template #default="scope">
               <div class="user-phone">
-                {{ scope.row.phone || t('common.notSet') }}
+                <div class="phone-display" v-if="scope.row.phone">
+                  <span class="country-code">{{ scope.row.country_code || '+86' }}</span>
+                  <span class="phone-number">{{ scope.row.phone }}</span>
+                </div>
+                <span v-else class="no-phone">{{ t('common.notSet') }}</span>
               </div>
             </template>
           </el-table-column>
@@ -808,5 +812,31 @@ onMounted(() => {
   margin: 0 !important;
   min-width: 60px;
   flex-shrink: 0;
+}
+
+/* 手机号显示样式 */
+.phone-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.country-code {
+  color: #909399;
+  font-size: 12px;
+  background: #f5f7fa;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.phone-number {
+  color: #303133;
+  font-family: monospace;
+}
+
+.no-phone {
+  color: #c0c4cc;
+  font-style: italic;
 }
 </style>

@@ -180,7 +180,9 @@
                   <div class="flex-1">
                     <div class="flex items-center mb-2">
                       <h4 class="font-medium text-gray-900">{{ address.contact_name }}</h4>
-                      <span class="ml-2 text-sm text-gray-600">{{ address.contact_phone }}</span>
+                      <span class="ml-2 text-sm text-gray-600">
+                        {{ formatPhoneDisplay(address.contact_phone, address.contact_country_code || '+86') }}
+                      </span>
                       <span v-if="address.is_default" class="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">{{ t('profile.default') }}</span>
                     </div>
                     <p class="text-sm text-gray-700">
@@ -287,15 +289,34 @@
             />
           </div>
 
+          <!-- 联系人手机号 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700">{{ t('order.contactPhone') }} *</label>
-            <input
-              v-model="addressForm.contact_phone"
-              type="tel"
-              required
-              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              :placeholder="t('order.contactPhonePlaceholder')"
-            />
+            <label class="block text-sm font-medium text-gray-700 mb-3">{{ t('order.contactPhone') }} *</label>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
+              <!-- 国家选择 -->
+              <div class="sm:col-span-2">
+                <CountrySelector
+                  v-model="addressForm.contact_country_code"
+                  placeholder="选择国家"
+                  @country-change="handleAddressCountryChange"
+                />
+              </div>
+              <!-- 手机号输入 -->
+              <div class="sm:col-span-3">
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <span class="text-gray-500 text-sm">{{ addressForm.contact_country_code }}</span>
+                  </div>
+                  <input
+                    v-model="addressForm.contact_phone"
+                    type="tel"
+                    required
+                    class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    :placeholder="`请输入手机号`"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
@@ -395,6 +416,8 @@ import { useUserStore } from '../stores/user.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
 import { getUserOrders } from '../api/orders.js'
 import { userAPI } from '../api/users.js'
+import CountrySelector from '../components/CountrySelector.vue'
+import { validatePhone, formatPhoneDisplay } from '../utils/phoneValidation.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -420,6 +443,7 @@ const addresses = ref([])
 // 地址表单数据
 const addressForm = ref({
   contact_name: '',
+  contact_country_code: '+86',
   contact_phone: '',
   province: '',
   city: '',
@@ -560,6 +584,12 @@ const handleAddAddress = () => {
   showAddressModal.value = true
 }
 
+// 处理地址国家变更
+const handleAddressCountryChange = (country) => {
+  // 当国家变更时，清空手机号以避免格式错误
+  addressForm.value.contact_phone = ''
+}
+
 const editAddress = (address) => {
   if (!address) return
   editingAddress.value = { ...address }
@@ -573,6 +603,7 @@ const editAddress = (address) => {
 const resetAddressForm = () => {
   addressForm.value = {
     contact_name: '',
+    contact_country_code: '+86',
     contact_phone: '',
     province: '',
     city: '',
@@ -592,6 +623,13 @@ const saveAddress = async () => {
     }
     if (!addressForm.value.contact_phone.trim()) {
       alert(t('validation.contactPhoneRequired'))
+      return
+    }
+    
+    // 验证手机号格式
+    const phoneValidation = validatePhone(addressForm.value.contact_phone, addressForm.value.contact_country_code)
+    if (!phoneValidation.isValid) {
+      alert(phoneValidation.message)
       return
     }
     if (!addressForm.value.province.trim() || !addressForm.value.city.trim()) {

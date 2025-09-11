@@ -22,10 +22,50 @@ const Address = sequelize.define('Address', {
     allowNull: false,
     comment: '收货人姓名'
   },
+  contact_country_code: {
+    type: DataTypes.STRING(10),
+    allowNull: false,
+    defaultValue: '+86',
+    validate: {
+      isIn: [['+86', '+66', '+60']],
+      notEmpty: true
+    },
+    comment: '收货人手机号国家区号（+86中国，+66泰国，+60马来西亚）'
+  },
   contact_phone: {
     type: DataTypes.STRING(20),
     allowNull: false,
-    comment: '收货人电话'
+    validate: {
+      notEmpty: true,
+      isPhoneValid(value) {
+        // 验证手机号格式（纯数字，不能以0开头）
+        const phoneRegex = /^[1-9]\d+$/
+        if (!phoneRegex.test(value)) {
+          throw new Error('手机号必须为纯数字且不能以0开头')
+        }
+        
+        // 根据国家区号验证位数
+        const countryCode = this.contact_country_code
+        let expectedLength
+        switch (countryCode) {
+          case '+86': // 中国
+          case '+60': // 马来西亚
+            expectedLength = 11
+            break
+          case '+66': // 泰国
+            expectedLength = 9
+            break
+          default:
+            throw new Error('不支持的国家区号')
+        }
+        
+        if (value.length !== expectedLength) {
+          const countryName = countryCode === '+86' ? '中国' : countryCode === '+66' ? '泰国' : '马来西亚'
+          throw new Error(`${countryName}手机号必须为${expectedLength}位数字`)
+        }
+      }
+    },
+    comment: '收货人电话（不包含区号）'
   },
   province: {
     type: DataTypes.STRING(50),

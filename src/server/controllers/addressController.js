@@ -49,6 +49,7 @@ class AddressController {
 
       const {
         contact_name,
+        contact_country_code = '+86',
         contact_phone,
         province,
         city,
@@ -64,6 +65,49 @@ class AddressController {
         return res.status(400).json({
           success: false,
           message: '收货人姓名、电话和详细地址为必填项'
+        })
+      }
+
+      // 验证国家区号
+      const supportedCountries = ['+86', '+66', '+60']
+      if (!supportedCountries.includes(contact_country_code)) {
+        return res.status(400).json({
+          success: false,
+          message: '不支持的国家区号'
+        })
+      }
+
+      // 验证手机号格式和长度
+      const phoneRegex = /^[1-9]\d+$/
+      if (!phoneRegex.test(contact_phone)) {
+        return res.status(400).json({
+          success: false,
+          message: '手机号必须为纯数字且不能以0开头'
+        })
+      }
+
+      // 根据国家区号验证手机号长度
+      let expectedLength
+      let countryName
+      switch (contact_country_code) {
+        case '+86':
+          expectedLength = 11
+          countryName = '中国'
+          break
+        case '+60':
+          expectedLength = 11
+          countryName = '马来西亚'
+          break
+        case '+66':
+          expectedLength = 9
+          countryName = '泰国'
+          break
+      }
+
+      if (contact_phone.length !== expectedLength) {
+        return res.status(400).json({
+          success: false,
+          message: `${countryName}手机号必须为${expectedLength}位数字`
         })
       }
 
@@ -86,6 +130,7 @@ class AddressController {
       const address = await Address.create({
         user_id: userId,
         contact_name,
+        contact_country_code,
         contact_phone,
         province,
         city,
@@ -133,6 +178,7 @@ class AddressController {
 
       const {
         contact_name,
+        contact_country_code = '+86',
         contact_phone,
         province,
         city,
@@ -148,6 +194,49 @@ class AddressController {
         return res.status(400).json({
           success: false,
           message: '收货人姓名、电话和详细地址为必填项'
+        })
+      }
+
+      // 验证国家区号
+      const supportedCountries = ['+86', '+66', '+60']
+      if (!supportedCountries.includes(contact_country_code)) {
+        return res.status(400).json({
+          success: false,
+          message: '不支持的国家区号'
+        })
+      }
+
+      // 验证手机号格式和长度
+      const phoneRegex = /^[1-9]\d+$/
+      if (!phoneRegex.test(contact_phone)) {
+        return res.status(400).json({
+          success: false,
+          message: '手机号必须为纯数字且不能以0开头'
+        })
+      }
+
+      // 根据国家区号验证手机号长度
+      let expectedLength
+      let countryName
+      switch (contact_country_code) {
+        case '+86':
+          expectedLength = 11
+          countryName = '中国'
+          break
+        case '+60':
+          expectedLength = 11
+          countryName = '马来西亚'
+          break
+        case '+66':
+          expectedLength = 9
+          countryName = '泰国'
+          break
+      }
+
+      if (contact_phone.length !== expectedLength) {
+        return res.status(400).json({
+          success: false,
+          message: `${countryName}手机号必须为${expectedLength}位数字`
         })
       }
 
@@ -181,6 +270,7 @@ class AddressController {
       // 更新地址
       await address.update({
         contact_name,
+        contact_country_code,
         contact_phone,
         province,
         city,

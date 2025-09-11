@@ -96,13 +96,54 @@ class SystemConfigController {
         })
       }
       
-      const config = await SystemConfig.setConfig(key, value, type, description)
-      
-      res.json({
-        success: true,
-        message: '配置设置成功',
-        data: config
-      })
+      // 特殊验证：汇算比例
+      if (key === 'exchange_rate') {
+        const numValue = parseFloat(value)
+        
+        // 检查是否为有效数字
+        if (isNaN(numValue)) {
+          return res.status(400).json({
+            success: false,
+            message: '汇算比例必须是有效的数字'
+          })
+        }
+        
+        // 检查是否为负数
+        if (numValue < 0) {
+          return res.status(400).json({
+            success: false,
+            message: '汇算比例不能为负数'
+          })
+        }
+        
+        // 检查小数位数不超过2位
+        const decimalParts = value.toString().split('.')
+        if (decimalParts.length > 1 && decimalParts[1].length > 2) {
+          return res.status(400).json({
+            success: false,
+            message: '汇算比例小数位数不能超过2位'
+          })
+        }
+        
+        // 格式化为两位小数字符串
+        const formattedValue = numValue.toFixed(2)
+        const config = await SystemConfig.setConfig(key, formattedValue, type, description)
+        
+        res.json({
+          success: true,
+          message: '汇算比例设置成功',
+          data: config
+        })
+      } else {
+        // 其他配置项的常规处理
+        const config = await SystemConfig.setConfig(key, value, type, description)
+        
+        res.json({
+          success: true,
+          message: '配置设置成功',
+          data: config
+        })
+      }
     } catch (error) {
       console.error('设置配置失败:', error)
       res.status(500).json({
@@ -357,7 +398,8 @@ class SystemConfigController {
       // 只返回公开的配置项
       const publicConfigs = {
         home_banner: configs.home_banner?.value || null,
-        payment_qrcode: configs.payment_qrcode?.value || null
+        payment_qrcode: configs.payment_qrcode?.value || null,
+        exchange_rate: configs.exchange_rate?.value || '1.00'
       }
       
       res.json({

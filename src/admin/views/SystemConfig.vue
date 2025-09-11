@@ -107,6 +107,59 @@
           </div>
         </div>
       </el-card>
+
+      <!-- 汇算比例配置 -->
+      <el-card class="config-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3>{{ t('systemConfig.exchangeRate') }}</h3>
+            <span class="card-subtitle">{{ t('systemConfig.exchangeRateSubtitle') }}</span>
+          </div>
+        </template>
+        
+        <div class="config-content">
+          <div class="exchange-rate-section">
+            <h4>{{ t('systemConfig.currentExchangeRate') }}: {{ exchangeRate.toFixed(2) }}</h4>
+            
+            <div class="input-section">
+              <h4>{{ t('systemConfig.exchangeRateValue') }}</h4>
+              <div class="exchange-rate-input">
+                <el-input-number
+                  v-model="exchangeRate"
+                  :min="0"
+                  :precision="2"
+                  :step="0.01"
+                  :controls="true"
+                  size="large"
+                  style="width: 200px"
+                  @change="saveExchangeRate"
+                />
+                <el-button 
+                  type="primary" 
+                  @click="saveExchangeRate(exchangeRate)"
+                  style="margin-left: 15px"
+                >
+                  {{ t('systemConfig.saveExchangeRate') }}
+                </el-button>
+                <el-button 
+                  type="default" 
+                  @click="resetExchangeRate"
+                  style="margin-left: 10px"
+                >
+                  {{ t('systemConfig.resetExchangeRate') }}
+                </el-button>
+              </div>
+            </div>
+            
+            <div class="exchange-rate-tips">
+              <p>{{ t('systemConfig.exchangeRateTips.range') }}</p>
+              <p>{{ t('systemConfig.exchangeRateTips.precision') }}</p>
+              <p>{{ t('systemConfig.exchangeRateTips.purpose') }}</p>
+              <p>{{ t('systemConfig.exchangeRateTips.example') }}</p>
+            </div>
+          </div>
+        </div>
+      </el-card>
     </div>
 
     <!-- 操作按钮 -->
@@ -136,6 +189,7 @@ const adminStore = useAdminStore()
 const loading = ref(false)
 const homeBanner = ref(null)
 const paymentQR = ref(null)
+const exchangeRate = ref(1.00) // 汇算比例，默认1.00
 
 const uploading = reactive({
   homeBanner: false,
@@ -182,6 +236,7 @@ const loadConfigs = async () => {
         const configs = data.data
         homeBanner.value = configs.home_banner?.value || null
         paymentQR.value = configs.payment_qrcode?.value || null
+        exchangeRate.value = parseFloat(configs.exchange_rate?.value || '1.00')
       } else {
         ElMessage.error(data.message || t('systemConfig.messages.loadConfigFailed'))
       }
@@ -370,6 +425,53 @@ const deletePaymentQR = async () => {
   }
 }
 
+// 保存汇算比例
+const saveExchangeRate = async (value) => {
+  try {
+    if (value < 0 || isNaN(value)) {
+      ElMessage.error(t('systemConfig.messages.invalidExchangeRate'))
+      return
+    }
+    
+    // 格式化为两位小数
+    const formattedValue = parseFloat(value).toFixed(2)
+    
+    const response = await adminStore.apiRequest('/api/system-config/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        key: 'exchange_rate',
+        value: formattedValue,
+        type: 'text',
+        description: '汇算比例配置'
+      })
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success) {
+        exchangeRate.value = parseFloat(formattedValue)
+        ElMessage.success(t('systemConfig.messages.exchangeRateSaveSuccess'))
+      } else {
+        ElMessage.error(data.message || t('systemConfig.messages.exchangeRateSaveFailed'))
+      }
+    } else {
+      ElMessage.error(t('systemConfig.messages.exchangeRateSaveFailed'))
+    }
+  } catch (error) {
+    console.error('保存汇算比例失败:', error)
+    ElMessage.error(t('systemConfig.messages.exchangeRateSaveFailed'))
+  }
+}
+
+// 重置汇算比例
+const resetExchangeRate = () => {
+  exchangeRate.value = 1.00
+  saveExchangeRate(1.00)
+}
+
 // 组件挂载时加载配置
 onMounted(() => {
   loadConfigs()
@@ -510,6 +612,45 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
+/* 汇算比例配置 */
+.exchange-rate-section {
+  padding: 20px 0;
+}
+
+.input-section {
+  border-top: 1px solid #ebeef5;
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.exchange-rate-input {
+  display: flex;
+  align-items: center;
+  margin: 15px 0;
+}
+
+.exchange-rate-tips {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.exchange-rate-tips p {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #6c757d;
+}
+
+.exchange-rate-tips p:first-child {
+  margin-top: 0;
+}
+
+.exchange-rate-tips p:last-child {
+  margin-bottom: 0;
+}
+
 /* 操作按钮 */
 .actions {
   text-align: center;
@@ -530,6 +671,16 @@ onMounted(() => {
   
   .image-preview img {
     max-height: 150px;
+  }
+  
+  .exchange-rate-input {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .exchange-rate-input .el-input-number {
+    width: 100% !important;
   }
 }
 </style>

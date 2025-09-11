@@ -204,6 +204,21 @@ export default {
     selectQR: 'Select QR Code',
     uploading: 'Uploading...',
     refreshConfig: 'Refresh Configuration',
+    
+    // Exchange Rate Configuration
+    exchangeRate: 'Exchange Rate Configuration',
+    exchangeRateSubtitle: 'Set the exchange rate for product price conversion',
+    currentExchangeRate: 'Current Exchange Rate',
+    exchangeRateValue: 'Exchange Rate',
+    saveExchangeRate: 'Save Configuration',
+    resetExchangeRate: 'Reset',
+    exchangeRateTips: {
+      range: '• Only allows input of values ≥ 0',
+      precision: '• Supports up to two decimal places',
+      purpose: '• Used for product price exchange rate conversion',
+      example: '• Example: 1.00 means no conversion, 1.50 means multiply price by 1.5'
+    },
+    
     uploadTips: {
       bannerSize: '• Recommended size: 1200x300px or larger',
       bannerFormat: '• Supported formats: JPG, PNG, GIF, WebP',
@@ -222,7 +237,10 @@ export default {
       loadConfigFailed: 'Failed to load configuration',
       confirmDelete: 'Are you sure you want to delete this item?',
       fileTooLarge: 'File size exceeds limit',
-      invalidFileFormat: 'Invalid file format'
+      invalidFileFormat: 'Invalid file format',
+      exchangeRateSaveSuccess: 'Exchange rate saved successfully',
+      exchangeRateSaveFailed: 'Failed to save exchange rate',
+      invalidExchangeRate: 'Please enter a valid exchange rate (≥0, up to 2 decimal places)'
     }
   },
 

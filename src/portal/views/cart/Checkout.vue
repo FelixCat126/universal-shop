@@ -190,19 +190,37 @@
 
                 <!-- 联系电话 -->
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                  <label class="block text-sm font-medium text-gray-700 mb-3">
                     {{ t('order.contactPhone') || '联系电话' }} <span class="text-red-500">*</span>
                   </label>
-                  <input
-                    v-model="orderForm.contact_phone"
-                    type="tel"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    :class="{ 'border-red-500': errors.contact_phone }"
-                    :placeholder="t('order.contactPhonePlaceholder')"
-                  />
-                  <p v-if="errors.contact_phone" class="text-red-500 text-xs mt-1">
-                    {{ errors.contact_phone }}
-                  </p>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
+                    <!-- 国家选择 -->
+                    <div class="sm:col-span-2">
+                      <CountrySelector
+                        v-model="orderForm.contact_country_code"
+                        placeholder="选择国家"
+                        @country-change="handleOrderCountryChange"
+                      />
+                    </div>
+                    <!-- 手机号输入 -->
+                    <div class="sm:col-span-3">
+                      <div class="relative">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                          <span class="text-gray-500 text-sm">{{ orderForm.contact_country_code }}</span>
+                        </div>
+                        <input
+                          v-model="orderForm.contact_phone"
+                          type="tel"
+                          class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          :class="{ 'border-red-500': errors.contact_phone }"
+                          :placeholder="`请输入手机号`"
+                        />
+                      </div>
+                      <p v-if="errors.contact_phone" class="text-red-500 text-xs mt-1">
+                        {{ errors.contact_phone }}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -407,9 +425,18 @@
           <h3 class="text-lg font-medium mb-4">{{ t('payment.scanToPay') }}</h3>
           
           <!-- 订单金额 -->
-          <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div class="text-sm text-gray-600">{{ t('order.amount') }}</div>
-            <div class="text-2xl font-bold text-blue-600">{{ t('common.currency') }}{{ totalAmount.toFixed(2) }}</div>
+          <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+            <!-- CNY金额 -->
+            <div class="mb-3">
+              <div class="text-sm text-gray-600">{{ t('order.amount') }}</div>
+              <div class="text-2xl font-bold text-blue-600">{{ t('common.currency') }}{{ totalAmount.toFixed(2) }}</div>
+            </div>
+            <!-- USDT金额 -->
+            <div class="pt-3 border-t border-gray-200">
+              <div class="text-sm text-gray-600">等值USDT金额</div>
+              <div class="text-xl font-semibold text-green-600">{{ usdtAmount }} USDT</div>
+              <div class="text-xs text-gray-500 mt-1">汇率: 1 CNY = {{ exchangeRate }} USDT</div>
+            </div>
           </div>
           
           <!-- 二维码 -->
@@ -429,6 +456,12 @@
                 <div class="text-6xl mb-2">📱</div>
                 <div class="text-sm text-gray-500">{{ t('payment.scanToPay') }}</div>
                 <div class="text-xs text-gray-400 mt-1">{{ t('payment.supportedMethods') }}</div>
+              </div>
+            </div>
+            <!-- 保存二维码提示 -->
+            <div v-if="paymentQRCode" class="mt-2 text-center">
+              <div class="text-xs text-gray-500 bg-blue-50 px-3 py-2 rounded-md border border-blue-100">
+                💡 提示：右键点击二维码可保存下载
               </div>
             </div>
           </div>
@@ -494,6 +527,8 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/vue/24/outline'
 import getCurrentLanguageValue from '../../utils/language.js'
+import CountrySelector from '../../components/CountrySelector.vue'
+import { validatePhone } from '../../utils/phoneValidation.js'
 
 // 国际化
 const { t } = useI18n()
@@ -508,6 +543,7 @@ const submitting = ref(false)
 const loadingAddresses = ref(false)
 const showPaymentModal = ref(false)
 const paymentQRCode = ref(null)
+const exchangeRate = ref(1.00) // 汇算比例，默认1.00
 
 // 地址数据
 const addresses = ref([])
@@ -519,6 +555,7 @@ const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9
 // 订单表单
 const orderForm = reactive({
   contact_name: '',
+  contact_country_code: '+86',
   contact_phone: '',
   province: '',
   city: '',
@@ -554,6 +591,11 @@ const totalAmount = computed(() => {
   return cartStore.totalAmount
 })
 
+// 计算USDT金额
+const usdtAmount = computed(() => {
+  return (totalAmount.value * exchangeRate.value).toFixed(2)
+})
+
 // 显示消息
 const showMessage = (text, type = 'success') => {
   message.text = text
@@ -578,6 +620,7 @@ const loadSystemConfig = async () => {
       const data = await response.json()
       if (data.success) {
         paymentQRCode.value = data.data.payment_qrcode
+        exchangeRate.value = parseFloat(data.data.exchange_rate || '1.00')
       }
     }
   } catch (error) {
@@ -619,10 +662,17 @@ const loadAddresses = async () => {
   }
 }
 
+// 处理订单国家变更
+const handleOrderCountryChange = (country) => {
+  // 当国家变更时，清空手机号以避免格式错误
+  orderForm.contact_phone = ''
+}
+
 // 选择地址
 const selectAddress = (address) => {
   selectedAddress.value = address
   orderForm.contact_name = address.contact_name
+  orderForm.contact_country_code = address.contact_country_code || '+86'
   orderForm.contact_phone = address.contact_phone
   orderForm.delivery_address = `${address.province}${address.city}${address.district}${address.detail_address}`
 }
@@ -651,9 +701,12 @@ const validateForm = () => {
   if (!orderForm.contact_phone.trim()) {
     errors.contact_phone = t('validation.contactPhoneRequired')
     isValid = false
-  } else if (!/^[1-9]\d{9,}$/.test(orderForm.contact_phone.trim())) {
-    errors.contact_phone = t('validation.phoneFormat')
-    isValid = false
+  } else {
+    const phoneValidation = validatePhone(orderForm.contact_phone.trim(), orderForm.contact_country_code)
+    if (!phoneValidation.isValid) {
+      errors.contact_phone = phoneValidation.message
+      isValid = false
+    }
   }
 
   // 验证省份
@@ -817,6 +870,7 @@ const autoRegisterAndLogin = async () => {
     
     // 准备注册数据
     const registerData = {
+      country_code: orderForm.contact_country_code,
       phone: phone,
       password: password,
       nickname: orderForm.contact_name.trim(),
@@ -829,7 +883,8 @@ const autoRegisterAndLogin = async () => {
     if (registerResponse.data.success) {
       // 注册成功，自动登录
       const loginResponse = await api.post('/auth/login', {
-        email: phone, // 后端使用email字段接收账号标识
+        country_code: orderForm.contact_country_code,
+        phone: phone,
         password: password
       })
       

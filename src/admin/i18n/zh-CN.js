@@ -206,6 +206,21 @@ export default {
     selectQR: '选择二维码',
     uploading: '上传中...',
     refreshConfig: '刷新配置',
+    
+    // 汇算比例配置
+    exchangeRate: '汇算比例配置',
+    exchangeRateSubtitle: '设置商品价格的汇率换算比例',
+    currentExchangeRate: '当前汇算比例',
+    exchangeRateValue: '汇算比例',
+    saveExchangeRate: '保存配置',
+    resetExchangeRate: '重置',
+    exchangeRateTips: {
+      range: '• 仅允许输入不小于0的数值',
+      precision: '• 支持最多两位小数',
+      purpose: '• 用于商品价格汇率换算',
+      example: '• 例如：1.00 表示无汇率转换，1.50 表示价格乘以1.5倍'
+    },
+    
     uploadTips: {
       bannerSize: '• 建议尺寸：1200x300px 或更大',
       bannerFormat: '• 支持格式：JPG、PNG、GIF、WebP',
@@ -224,7 +239,10 @@ export default {
       loadConfigFailed: '加载配置失败',
       confirmDelete: '确定要删除此项吗？',
       fileTooLarge: '文件大小超出限制',
-      invalidFileFormat: '文件格式不正确'
+      invalidFileFormat: '文件格式不正确',
+      exchangeRateSaveSuccess: '汇算比例保存成功',
+      exchangeRateSaveFailed: '汇算比例保存失败',
+      invalidExchangeRate: '请输入有效的汇算比例（≥0，最多两位小数）'
     }
   },
 

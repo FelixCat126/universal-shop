@@ -8,7 +8,7 @@ class UserController {
   // 用户注册
   static async register(req, res) {
     try {
-      const { nickname, phone, email, password, referral_code } = req.body
+      const { nickname, country_code = '+86', phone, email, password, referral_code } = req.body
 
       // 验证必填字段
       if (!nickname || !phone || !password) {
@@ -18,17 +18,56 @@ class UserController {
         })
       }
 
-      // 验证手机号格式
-      const phoneRegex = /^[1-9]\d{9,}$/
-      if (!phoneRegex.test(phone)) {
+      // 验证国家区号
+      const supportedCountries = ['+86', '+66', '+60']
+      if (!supportedCountries.includes(country_code)) {
         return res.status(400).json({
           success: false,
-          message: '手机号必须为不低于10位的纯数字且不能以0开头'
+          message: '不支持的国家区号'
         })
       }
 
-      // 检查手机号是否已存在
-      const existingPhone = await User.findOne({ where: { phone } })
+      // 验证手机号格式和长度
+      const phoneRegex = /^[1-9]\d+$/
+      if (!phoneRegex.test(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: '手机号必须为纯数字且不能以0开头'
+        })
+      }
+
+      // 根据国家区号验证手机号长度
+      let expectedLength
+      let countryName
+      switch (country_code) {
+        case '+86':
+          expectedLength = 11
+          countryName = '中国'
+          break
+        case '+60':
+          expectedLength = 11
+          countryName = '马来西亚'
+          break
+        case '+66':
+          expectedLength = 9
+          countryName = '泰国'
+          break
+      }
+
+      if (phone.length !== expectedLength) {
+        return res.status(400).json({
+          success: false,
+          message: `${countryName}手机号必须为${expectedLength}位数字`
+        })
+      }
+
+      // 检查国家区号+手机号组合是否已存在（新的唯一性检查）
+      const existingPhone = await User.findOne({ 
+        where: { 
+          country_code: country_code,
+          phone: phone 
+        } 
+      })
       if (existingPhone) {
         if (!existingPhone.is_active) {
           return res.status(403).json({
@@ -62,9 +101,10 @@ class UserController {
 
       // 创建用户
       const user = await User.create({
-        username: phone, // 用户名与手机号保持一致
+        username: `${country_code}${phone}`, // 用户名包含区号以保证唯一性
         nickname,
         email: email || null,
+        country_code,
         phone,
         password,
         referred_by_code: referral_code || null
@@ -147,27 +187,60 @@ class UserController {
   // 用户登录
   static async login(req, res) {
     try {
-      const { email, password } = req.body
-      // 兼容“手机号或邮箱”登录：前端沿用email字段传递账号标识
-      const identifier = (email || '').trim()
+      const { email, country_code, phone, password } = req.body
 
-      if (!identifier || !password) {
+      // 支持两种登录方式：
+      // 1. 新方式：country_code + phone + password
+      // 2. 兼容旧方式：email + password
+      
+      let user
+      
+      if (country_code && phone) {
+        // 新的手机号登录方式
+        if (!password) {
+          return res.status(400).json({
+            success: false,
+            message: '密码不能为空'
+          })
+        }
+
+        // 验证国家区号
+        const supportedCountries = ['+86', '+66', '+60']
+        if (!supportedCountries.includes(country_code)) {
+          return res.status(400).json({
+            success: false,
+            message: '不支持的国家区号'
+          })
+        }
+
+        // 根据国家区号+手机号查找用户
+        user = await User.findByCountryAndPhone(country_code, phone)
+      } else if (email) {
+        // 兼容旧的邮箱登录方式
+        const identifier = email.trim()
+
+        if (!identifier || !password) {
+          return res.status(400).json({
+            success: false,
+            message: '账号和密码为必填项'
+          })
+        }
+
+        // 查找用户（支持邮箱/用户名）
+        user = await User.findOne({
+          where: {
+            [Op.or]: [
+              { email: identifier },
+              { username: identifier }
+            ]
+          }
+        })
+      } else {
         return res.status(400).json({
           success: false,
-          message: '账号和密码为必填项'
+          message: '请提供手机号或邮箱进行登录'
         })
       }
-
-      // 查找用户（支持邮箱/用户名/手机号）
-      const user = await User.findOne({
-        where: {
-          [Op.or]: [
-            { email: identifier },
-            { username: identifier },
-            { phone: identifier }
-          ]
-        }
-      })
 
       if (!user) {
         return res.status(401).json({

@@ -30,7 +30,7 @@ class CartController {
           {
             model: Product,
             as: 'product',
-            attributes: ['id', 'name', 'name_th', 'description', 'description_th', 'price', 'discount', 'stock', 'image', 'category']
+            attributes: ['id', 'name', 'description', 'price', 'discount', 'stock', 'image', 'category']
           }
         ],
         order: [['created_at', 'DESC']]
