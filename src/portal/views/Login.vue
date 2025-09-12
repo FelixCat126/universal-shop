@@ -22,38 +22,8 @@
     <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
       <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
         <form class="space-y-6" @submit.prevent="handleLogin">
-          <!-- 登录方式切换 -->
-          <div class="mb-4">
-            <div class="flex rounded-lg bg-gray-100 p-1">
-              <button
-                type="button"
-                @click="loginType = 'phone'"
-                :class="[
-                  'flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors',
-                  loginType === 'phone' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700'
-                ]"
-              >
-                手机号登录
-              </button>
-              <button
-                type="button"
-                @click="loginType = 'email'"
-                :class="[
-                  'flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors',
-                  loginType === 'email' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700'
-                ]"
-              >
-                邮箱登录
-              </button>
-            </div>
-          </div>
-
           <!-- 手机号登录 -->
-          <div v-if="loginType === 'phone'">
+          <div>
             <label class="block text-sm font-medium text-gray-700 mb-3">
               {{ t('user.phone') }} <span class="text-red-500">*</span>
             </label>
@@ -62,7 +32,7 @@
               <div class="sm:col-span-2">
                 <CountrySelector
                   v-model="formData.countryCode"
-                  placeholder="选择国家"
+                  :placeholder="t('common.selectCountry')"
                   :error="errors.countryCode"
                 />
               </div>
@@ -81,35 +51,12 @@
                     :maxlength="currentCountry?.phoneLength || 11"
                     class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     :class="{ 'border-red-500': errors.phone }"
-                    :placeholder="`请输入${currentCountry?.phoneLength || 11}位手机号`"
+                    :placeholder="t('user.phoneInputPlaceholder', { length: currentCountry?.phoneLength || 11 })"
                   />
                 </div>
                 <p v-if="errors.phone" class="mt-1 text-xs text-red-600">{{ errors.phone }}</p>
               </div>
             </div>
-          </div>
-
-          <!-- 邮箱登录 -->
-          <div v-else>
-            <label for="email" class="block text-sm font-medium text-gray-700">
-              {{ t('user.email') }}
-            </label>
-            <div class="mt-1 relative">
-              <input
-                id="email"
-                v-model="formData.email"
-                type="email"
-                autocomplete="email"
-                required
-                class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                :class="{ 'border-red-500': errors.email }"
-                :placeholder="t('user.emailPlaceholder')"
-              />
-              <AtSymbolIcon class="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-            <p v-if="errors.email" class="mt-2 text-sm text-red-600">
-              {{ errors.email }}
-            </p>
           </div>
 
           <!-- 密码 -->
@@ -237,7 +184,6 @@ import CountrySelector from '../components/CountrySelector.vue'
 import { validatePhone, getCountryInfo } from '../utils/phoneValidation.js'
 import { 
   UserIcon, 
-  AtSymbolIcon, 
   EyeIcon, 
   EyeSlashIcon,
   UserPlusIcon,
@@ -258,13 +204,10 @@ const showPassword = ref(false)
 const showMessage = ref(false)
 const message = ref('')
 const messageType = ref('success')
-const loginType = ref('phone') // 'phone' 或 'email'
-
 // 表单数据
 const formData = ref({
   countryCode: '+86',
   phone: '',
-  email: '',
   password: '',
   rememberMe: false
 })
@@ -280,39 +223,34 @@ const messageClass = computed(() => {
 })
 
 const currentCountry = computed(() => {
-  return getCountryInfo(formData.value.countryCode)
+  const countryInfo = getCountryInfo(formData.value.countryCode)
+  if (countryInfo) {
+    return {
+      ...countryInfo,
+      // 翻译国家名称
+      name: t(`country.${countryInfo.name}`),
+      phoneLength: countryInfo.phoneLength
+    }
+  }
+  return null
 })
-
-// 验证是否为邮箱格式
-const isEmail = (value) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(value)
-}
 
 // 表单验证
 const validateForm = () => {
   errors.value = {}
   
-  if (loginType.value === 'phone') {
-    // 手机号登录验证
-    if (!formData.value.countryCode) {
-      errors.value.countryCode = '请选择国家'
-    }
-    
-    if (!formData.value.phone) {
-      errors.value.phone = '请输入手机号'
-    } else {
-      const phoneValidation = validatePhone(formData.value.phone, formData.value.countryCode)
-      if (!phoneValidation.isValid) {
-        errors.value.phone = phoneValidation.message
-      }
-    }
+  // 国家区号验证
+  if (!formData.value.countryCode) {
+    errors.value.countryCode = t('validation.countryRequired')
+  }
+  
+  // 手机号验证
+  if (!formData.value.phone) {
+    errors.value.phone = t('validation.phoneRequired')
   } else {
-    // 邮箱登录验证
-    if (!formData.value.email.trim()) {
-      errors.value.email = '请输入邮箱地址'
-    } else if (!isEmail(formData.value.email)) {
-      errors.value.email = '邮箱格式不正确'
+    const phoneValidation = validatePhone(formData.value.phone, formData.value.countryCode)
+    if (!phoneValidation.isValid) {
+      errors.value.phone = phoneValidation.message
     }
   }
   
@@ -340,12 +278,8 @@ const handleLogin = async () => {
       rememberMe: formData.value.rememberMe
     }
     
-    if (loginType.value === 'phone') {
-      loginData.country_code = formData.value.countryCode
-      loginData.phone = formData.value.phone
-    } else {
-      loginData.email = formData.value.email.trim()
-    }
+    loginData.country_code = formData.value.countryCode
+    loginData.phone = formData.value.phone
     
     const result = await userStore.login(loginData)
     

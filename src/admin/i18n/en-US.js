@@ -366,6 +366,7 @@ export default {
     description: 'Manage all registered users with search and filter support',
     email: 'Email',
     phone: 'Phone',
+    countryCode: 'Country Code',
     referralCode: 'Referral Code',
     enterEmail: 'Please enter email',
     enterPhone: 'Please enter phone',

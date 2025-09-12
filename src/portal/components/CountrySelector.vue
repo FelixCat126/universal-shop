@@ -12,7 +12,7 @@
         ]"
         :disabled="disabled"
       >
-        <option value="" disabled>{{ placeholder }}</option>
+        <option value="" disabled>{{ placeholderText }}</option>
         <option 
           v-for="country in countries" 
           :key="country.code" 
@@ -36,6 +36,10 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+// 国际化
+const { t } = useI18n()
 
 // Props
 const props = defineProps({
@@ -49,7 +53,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: '请选择国家'
+    default: ''
   },
   disabled: {
     type: Boolean,
@@ -72,41 +76,42 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['update:modelValue', 'country-change'])
 
-// 国家数据
-const countries = [
+// 国家数据 - 使用国际化
+const countries = computed(() => [
   {
     code: '+86',
-    name: '中国',
+    name: t('country.china'),
     flag: '🇨🇳',
     phoneLength: 11
   },
   {
     code: '+66', 
-    name: '泰国',
+    name: t('country.thailand'),
     flag: '🇹🇭',
     phoneLength: 9
   },
   {
     code: '+60',
-    name: '马来西亚', 
+    name: t('country.malaysia'), 
     flag: '🇲🇾',
     phoneLength: 11
   }
-]
+])
 
 // 计算属性
 const hasError = computed(() => !!props.error)
 const errorMessage = computed(() => props.error)
+const placeholderText = computed(() => props.placeholder || t('common.selectCountry'))
 
 // 获取选中国家信息
 const selectedCountry = computed(() => {
-  return countries.find(country => country.code === props.modelValue) || countries[0]
+  return countries.value.find(country => country.code === props.modelValue) || countries.value[0]
 })
 
 // 更新国家选择
 const updateCountry = (event) => {
   const countryCode = event.target.value
-  const country = countries.find(c => c.code === countryCode)
+  const country = countries.value.find(c => c.code === countryCode)
   
   emit('update:modelValue', countryCode)
   emit('country-change', {
@@ -121,9 +126,9 @@ const updateCountry = (event) => {
 defineExpose({
   countries,
   selectedCountry,
-  getCountryByCode: (code) => countries.find(c => c.code === code),
+  getCountryByCode: (code) => countries.value.find(c => c.code === code),
   validatePhoneLength: (phone, countryCode) => {
-    const country = countries.find(c => c.code === countryCode)
+    const country = countries.value.find(c => c.code === countryCode)
     return country ? phone.length === country.phoneLength : false
   }
 })

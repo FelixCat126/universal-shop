@@ -433,9 +433,8 @@
             </div>
             <!-- USDT金额 -->
             <div class="pt-3 border-t border-gray-200">
-              <div class="text-sm text-gray-600">等值USDT金额</div>
+              <div class="text-sm text-gray-600">{{ t('payment.usdtAmount') }}</div>
               <div class="text-xl font-semibold text-green-600">{{ usdtAmount }} USDT</div>
-              <div class="text-xs text-gray-500 mt-1">汇率: 1 CNY = {{ exchangeRate }} USDT</div>
             </div>
           </div>
           
@@ -461,7 +460,7 @@
             <!-- 保存二维码提示 -->
             <div v-if="paymentQRCode" class="mt-2 text-center">
               <div class="text-xs text-gray-500 bg-blue-50 px-3 py-2 rounded-md border border-blue-100">
-                💡 提示：右键点击二维码可保存下载
+                💡 {{ t('payment.qrCodeSaveTip') }}
               </div>
             </div>
           </div>
@@ -469,6 +468,7 @@
           <!-- 支付说明 -->
           <div class="mb-6 text-sm text-gray-600">
             <p>{{ t('payment.scanInstruction') }}</p>
+            <p class="mt-1">{{ t('payment.rightClickToSave') }}</p>
             <p class="mt-1">{{ t('payment.confirmAfterPayment') }}</p>
           </div>
           
@@ -528,7 +528,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import getCurrentLanguageValue from '../../utils/language.js'
 import CountrySelector from '../../components/CountrySelector.vue'
-import { validatePhone } from '../../utils/phoneValidation.js'
+import { validatePhoneI18n } from '../../utils/phoneValidation.js'
 
 // 国际化
 const { t } = useI18n()
@@ -702,7 +702,7 @@ const validateForm = () => {
     errors.contact_phone = t('validation.contactPhoneRequired')
     isValid = false
   } else {
-    const phoneValidation = validatePhone(orderForm.contact_phone.trim(), orderForm.contact_country_code)
+    const phoneValidation = validatePhoneI18n(orderForm.contact_phone.trim(), orderForm.contact_country_code, t)
     if (!phoneValidation.isValid) {
       errors.contact_phone = phoneValidation.message
       isValid = false

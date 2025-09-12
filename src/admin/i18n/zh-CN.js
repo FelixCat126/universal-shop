@@ -368,6 +368,7 @@ export default {
     description: '管理所有注册用户，支持搜索和筛选',
     email: '邮箱',
     phone: '手机号',
+    countryCode: '国家区号',
     referralCode: '推荐码',
     enterEmail: '请输入邮箱',
     enterPhone: '请输入手机号',

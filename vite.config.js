@@ -27,7 +27,8 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true
       }
-    }
+    },
+    watch: { usePolling: true, interval: 100 }
   },
   optimizeDeps: {
     force: process.env.NODE_ENV === 'development',

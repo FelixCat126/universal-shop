@@ -1,22 +1,97 @@
 // 国家配置信息
 export const COUNTRIES = {
   '+86': {
-    name: '中国',
+    name: 'china',
     flag: '🇨🇳',
     phoneLength: 11,
     pattern: /^1[3-9]\d{9}$/
   },
   '+66': {
-    name: '泰国', 
+    name: 'thailand', 
     flag: '🇹🇭',
     phoneLength: 9,
     pattern: /^[2-9]\d{8}$/
   },
   '+60': {
-    name: '马来西亚',
+    name: 'malaysia',
     flag: '🇲🇾', 
     phoneLength: 11,
     pattern: /^1[0-9]\d{8,9}$/
+  }
+}
+
+/**
+ * 验证手机号格式（国际化版本）
+ * @param {string} phone - 手机号（不包含区号）
+ * @param {string} countryCode - 国家区号
+ * @param {Function} t - 国际化翻译函数
+ * @returns {Object} 验证结果 { isValid: boolean, message: string }
+ */
+export function validatePhoneI18n(phone, countryCode, t) {
+  // 检查参数
+  if (!phone || !countryCode) {
+    return {
+      isValid: false,
+      message: t('validation.phoneEmptyFields')
+    }
+  }
+
+  // 获取国家配置
+  const country = COUNTRIES[countryCode]
+  if (!country) {
+    return {
+      isValid: false,
+      message: t('validation.unsupportedCountryCode')
+    }
+  }
+
+  // 去除空格和特殊字符
+  const cleanPhone = phone.replace(/[\s-]/g, '')
+
+  // 基本格式验证：必须是纯数字
+  if (!/^\d+$/.test(cleanPhone)) {
+    return {
+      isValid: false,
+      message: t('validation.phoneDigitsOnly')
+    }
+  }
+
+  // 长度验证
+  if (cleanPhone.length !== country.phoneLength) {
+    return {
+      isValid: false,
+      message: t('user.phoneRequirement', { 
+        country: t(`country.${country.name}`), 
+        length: country.phoneLength 
+      })
+    }
+  }
+
+  // 格式模式验证
+  if (!country.pattern.test(cleanPhone)) {
+    let message
+    switch (countryCode) {
+      case '+86':
+        message = t('validation.phonePatternChina')
+        break
+      case '+66':
+        message = t('validation.phonePatternThailand')
+        break
+      case '+60':
+        message = t('validation.phonePatternMalaysia')
+        break
+      default:
+        message = t('validation.phoneInvalidFormat')
+    }
+    return {
+      isValid: false,
+      message
+    }
+  }
+
+  return {
+    isValid: true,
+    message: ''
   }
 }
 

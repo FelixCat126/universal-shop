@@ -41,6 +41,7 @@ export default {
     unit: '件',
     or: '或者',
     optional: '选填',
+    selectCountry: '选择国家',
     submitting: '提交中...'
   },
 
@@ -178,6 +179,8 @@ export default {
     phoneHint: '手机号将作为您的登录账号',
     emailPlaceholder: '请输入邮箱地址（可选）',
     confirmPasswordPlaceholder: '请再次输入密码',
+    phoneInputPlaceholder: '请输入{length}位手机号',
+    phoneRequirement: '{country}手机号需要{length}位数字',
     phoneRegisteredLoginFirst: '该手机号已注册，请先登录后下单',
     accountCreateFailedButOrderSuccess: '账户创建失败，但订单已成功提交',
     creatingAccount: '正在为您创建账户...',
@@ -286,10 +289,13 @@ export default {
     scanToPay: '扫码支付',
     qrCode: '支付二维码',
     supportedMethods: '支持微信、支付宝',
-    scanInstruction: '请使用微信或支付宝扫描上方二维码完成支付',
+    scanInstruction: '请扫描上方二维码完成支付',
+    rightClickToSave: '鼠标右键点击可保存二维码至本地',
     confirmAfterPayment: '支付完成后点击下方按钮确认',
     complete: '完成付款',
-    cancel: '取消支付'
+    cancel: '取消支付',
+    usdtAmount: '等值USDT金额',
+    qrCodeSaveTip: '提示：右键点击二维码可保存下载'
   },
 
   // 表单验证
@@ -300,6 +306,7 @@ export default {
     password: '密码长度至少6位',
     confirmPassword: '两次输入的密码不一致',
     username: '用户名长度为3-20位',
+    usernameRequired: '请输入用户名',
     minLength: '长度不能少于{min}位',
     maxLength: '长度不能超过{max}位',
     emailOrPhoneRequired: '请输入手机号或邮箱',
@@ -313,9 +320,17 @@ export default {
     confirmPasswordRequired: '请确认密码',
     contactNameRequired: '请输入联系人姓名',
     contactPhoneRequired: '请输入联系电话',
+    countryRequired: '请选择国家',
     provinceRequired: '请输入省份',
     cityRequired: '请输入城市',
-    detailAddressRequired: '请输入详细地址'
+    detailAddressRequired: '请输入详细地址',
+    phonePatternChina: '中国手机号必须以1开头，第二位为3-9',
+    phonePatternThailand: '泰国手机号必须以2-9开头',
+    phonePatternMalaysia: '马来西亚手机号必须以1开头',
+    phoneEmptyFields: '手机号和国家区号不能为空',
+    unsupportedCountryCode: '不支持的国家区号',
+    phoneDigitsOnly: '手机号只能包含数字',
+    phoneInvalidFormat: '手机号格式不正确'
   },
 
   // 个人中心
@@ -389,5 +404,12 @@ export default {
     thai: 'ไทย',
     english: 'English',
     switchSuccess: '语言切换成功'
+  },
+
+  // 国家名称
+  country: {
+    china: '中国',
+    thailand: '泰国',
+    malaysia: '马来西亚'
   }
 }

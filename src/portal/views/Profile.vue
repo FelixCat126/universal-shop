@@ -417,7 +417,7 @@ import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddress
 import { getUserOrders } from '../api/orders.js'
 import { userAPI } from '../api/users.js'
 import CountrySelector from '../components/CountrySelector.vue'
-import { validatePhone, formatPhoneDisplay } from '../utils/phoneValidation.js'
+import { validatePhoneI18n, formatPhoneDisplay } from '../utils/phoneValidation.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -627,7 +627,7 @@ const saveAddress = async () => {
     }
     
     // 验证手机号格式
-    const phoneValidation = validatePhone(addressForm.value.contact_phone, addressForm.value.contact_country_code)
+    const phoneValidation = validatePhoneI18n(addressForm.value.contact_phone, addressForm.value.contact_country_code, t)
     if (!phoneValidation.isValid) {
       alert(phoneValidation.message)
       return

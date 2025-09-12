@@ -45,7 +45,7 @@
               <div class="sm:col-span-2">
                 <CountrySelector
                   v-model="form.countryCode"
-                  placeholder="选择国家"
+                  :placeholder="t('common.selectCountry')"
                   :error="errors.countryCode"
                   @country-change="handleCountryChange"
                 />
@@ -64,12 +64,12 @@
                     :maxlength="currentCountry?.phoneLength || 11"
                     class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     :class="{ 'border-red-300': errors.phone }"
-                    :placeholder="`请输入${currentCountry?.phoneLength || 11}位手机号`"
+                    :placeholder="t('user.phoneInputPlaceholder', { length: currentCountry?.phoneLength || 11 })"
                   >
                 </div>
                 <p v-if="errors.phone" class="mt-1 text-xs text-red-600">{{ errors.phone }}</p>
                 <p v-if="currentCountry" class="mt-1 text-xs text-gray-500">
-                  {{ currentCountry.name }}手机号需要{{ currentCountry.phoneLength }}位数字
+                  {{ t('user.phoneRequirement', { country: currentCountry.name, length: currentCountry.phoneLength }) }}
                 </p>
               </div>
             </div>
@@ -174,7 +174,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { userAPI } from '../api/users.js'
 import CountrySelector from '../components/CountrySelector.vue'
-import { validatePhone, getCountryInfo } from '../utils/phoneValidation.js'
+import { validatePhoneI18n, getCountryInfo } from '../utils/phoneValidation.js'
 
 // 国际化
 const { t } = useI18n()
@@ -200,7 +200,16 @@ const isSubmitting = ref(false)
 
 // 计算属性：当前选中的国家信息
 const currentCountry = computed(() => {
-  return getCountryInfo(form.countryCode)
+  const countryInfo = getCountryInfo(form.countryCode)
+  if (countryInfo) {
+    return {
+      ...countryInfo,
+      // 翻译国家名称
+      name: t(`country.${countryInfo.name}`),
+      phoneLength: countryInfo.phoneLength
+    }
+  }
+  return null
 })
 
 // 处理国家变更
@@ -226,14 +235,14 @@ const validateForm = () => {
 
   // 国家区号验证
   if (!form.countryCode) {
-    newErrors.countryCode = '请选择国家'
+    newErrors.countryCode = t('validation.countryRequired')
   }
 
   // 手机号验证（必填）
   if (!form.phone) {
     newErrors.phone = t('validation.phoneRequired')
   } else {
-    const phoneValidation = validatePhone(form.phone, form.countryCode)
+    const phoneValidation = validatePhoneI18n(form.phone, form.countryCode, t)
     if (!phoneValidation.isValid) {
       newErrors.phone = phoneValidation.message
     }
@@ -293,7 +302,7 @@ const handleSubmit = async () => {
       router.push('/')
     }
   } catch (error) {
-    console.error('注册失败:', error)
+    console.error('Registration failed:', error)
     
     if (error.response?.data?.message) {
       alert(t('user.registerFailed') + ': ' + error.response.data.message)

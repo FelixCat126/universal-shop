@@ -41,6 +41,7 @@ export default {
     unit: 'ชิ้น',
     or: 'หรือ',
     optional: 'ไม่จำเป็น',
+    selectCountry: 'เลือกประเทศ',
     submitting: 'กำลังส่ง...'
   },
 
@@ -183,7 +184,9 @@ export default {
     creatingAccount: 'กำลังสร้างบัญชีให้คุณ...',
     accountCreatedPassword: 'สร้างบัญชีสำเร็จ! รหัสผ่านเริ่มต้นของคุณคือ: {password} กรุณาเก็บรักษาไว้อย่างดี',
     accountCreatedLoginFailed: 'สร้างบัญชีสำเร็จ แต่เข้าสู่ระบบอัตโนมัติล้มเหลว กรุณาเข้าสู่ระบบด้วยตนเอง',
-    accountCreateFailed: 'การสร้างบัญชีล้มเหลว'
+    accountCreateFailed: 'การสร้างบัญชีล้มเหลว',
+    phoneInputPlaceholder: 'กรุณาใส่เบอร์โทรศัพท์ {length} หลัก',
+    phoneRequirement: 'เบอร์โทรศัพท์ {country} ต้องใส่ {length} หลัก'
   },
 
   // 推荐码
@@ -286,10 +289,13 @@ export default {
     scanToPay: 'สแกนเพื่อชำระเงิน',
     qrCode: 'QR Code ชำระเงิน',
     supportedMethods: 'รองรับ WeChat, Alipay',
-    scanInstruction: 'กรุณาใช้ WeChat หรือ Alipay สแกน QR Code ด้านบนเพื่อชำระเงิน',
+    scanInstruction: 'กรุณาสแกน QR Code ด้านบนเพื่อชำระเงิน',
+    rightClickToSave: 'คลิกขวาที่ QR Code เพื่อบันทึกไว้ในเครื่อง',
     confirmAfterPayment: 'หลังชำระเงินเสร็จแล้วให้คลิกปุ่มด้านล่างเพื่อยืนยัน',
     complete: 'ชำระเงินเสร็จสิ้น',
-    cancel: 'ยกเลิกการชำระเงิน'
+    cancel: 'ยกเลิกการชำระเงิน',
+    usdtAmount: 'จำนวน USDT เทียบเท่า',
+    qrCodeSaveTip: 'เคล็ดลับ: คลิกขวาที่ QR Code เพื่อบันทึกและดาวน์โหลด'
   },
 
   // 表单验证
@@ -300,6 +306,7 @@ export default {
     password: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
     confirmPassword: 'รหัสผ่านไม่ตรงกัน',
     username: 'ชื่อผู้ใช้ต้องมี 3-20 ตัวอักษร',
+    usernameRequired: 'กรุณาใส่ชื่อผู้ใช้',
     minLength: 'ความยาวต้องไม่น้อยกว่า {min} ตัวอักษร',
     maxLength: 'ความยาวต้องไม่เกิน {max} ตัวอักษร',
     emailOrPhoneRequired: 'กรุณาใส่เบอร์โทรศัพท์หรืออีเมล',
@@ -313,9 +320,17 @@ export default {
     confirmPasswordRequired: 'กรุณายืนยันรหัสผ่าน',
     contactNameRequired: 'กรุณาใส่ชื่อผู้ติดต่อ',
     contactPhoneRequired: 'กรุณาใส่เบอร์โทรศัพท์ติดต่อ',
+    countryRequired: 'กรุณาเลือกประเทศ',
     provinceRequired: 'กรุณาใส่จังหวัด',
     cityRequired: 'กรุณาใส่เมือง',
-    detailAddressRequired: 'กรุณาใส่ที่อยู่รายละเอียด'
+    detailAddressRequired: 'กรุณาใส่ที่อยู่รายละเอียด',
+    phonePatternChina: 'เบอร์โทรศัพท์จีนต้องขึ้นต้นด้วย 1 หลักที่สองเป็น 3-9',
+    phonePatternThailand: 'เบอร์โทรศัพท์ไทยต้องขึ้นต้นด้วย 2-9',
+    phonePatternMalaysia: 'เบอร์โทรศัพท์มาเลเซียต้องขึ้นต้นด้วย 1',
+    phoneEmptyFields: 'เบอร์โทรศัพท์และรหัสประเทศไม่สามารถว่างได้',
+    unsupportedCountryCode: 'ไม่สนับสนุนรหัสประเทศ',
+    phoneDigitsOnly: 'เบอร์โทรศัพท์สามารถมีได้เฉพาะตัวเลข',
+    phoneInvalidFormat: 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง'
   },
 
   // 个人中心
@@ -389,5 +404,12 @@ export default {
     thai: 'ไทย',
     english: 'English',
     switchSuccess: 'เปลี่ยนภาษาสำเร็จ'
+  },
+
+  // 国家名称
+  country: {
+    china: 'จีน',
+    thailand: 'ไทย',
+    malaysia: 'มาเลเซีย'
   }
 }

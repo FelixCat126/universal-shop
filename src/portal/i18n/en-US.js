@@ -36,7 +36,8 @@ export default {
     optional: 'Optional',
     or: 'or',
     free: 'Free',
-    unit: 'item'
+    unit: 'item',
+    selectCountry: 'Select Country'
   },
 
   // 导航
@@ -78,7 +79,9 @@ export default {
     rememberMe: 'Remember me',
     forgotPassword: 'Forgot password?',
     noAccount: 'Don\'t have an account?',
+    alreadyHaveAccount: 'Already have an account?',
     goToRegister: 'Sign up',
+    goToLogin: 'Sign in',
     emailOrPhone: 'Phone or Email',
     emailOrPhonePlaceholder: 'Please enter phone number or email',
     initialPasswordHint: 'Initial password is the last 8 digits of your phone number',
@@ -91,7 +94,9 @@ export default {
     creatingAccount: 'Creating account for you...',
     accountCreatedPassword: 'Account created successfully! Your initial password is: {password}, please keep it safe',
     accountCreatedLoginFailed: 'Account created successfully, but automatic login failed, please log in manually',
-    accountCreateFailed: 'Account creation failed'
+    accountCreateFailed: 'Account creation failed',
+    phoneInputPlaceholder: 'Please enter {length}-digit phone number',
+    phoneRequirement: '{country} phone number requires {length} digits'
   },
 
   // 推荐码
@@ -291,10 +296,13 @@ export default {
     scanToPay: 'Scan to Pay',
     qrCode: 'Payment QR Code',
     supportedMethods: 'Supports WeChat, Alipay',
-    scanInstruction: 'Please use WeChat or Alipay to scan the QR code above to complete payment',
+    scanInstruction: 'Please scan the QR code above to complete payment',
+    rightClickToSave: 'Right-click on the QR code to save it locally',
     confirmAfterPayment: 'Click the button below to confirm after payment is complete',
     complete: 'Complete Payment',
-    cancel: 'Cancel Payment'
+    cancel: 'Cancel Payment',
+    usdtAmount: 'Equivalent USDT Amount',
+    qrCodeSaveTip: 'Tip: Right-click on QR code to save and download'
   },
 
   // 验证消息
@@ -311,6 +319,7 @@ export default {
     nicknameRequired: 'Please enter nickname',
     contactNameRequired: 'Please enter contact name',
     contactPhoneRequired: 'Please enter contact phone',
+    countryRequired: 'Please select a country',
     provinceRequired: 'Please enter province',
     cityRequired: 'Please enter city',
     detailAddressRequired: 'Please enter detailed address',
@@ -319,7 +328,14 @@ export default {
     passwordMinLength: 'Password must be at least 6 characters',
     nicknameMaxLength: 'Nickname cannot exceed 50 characters',
     confirmPasswordRequired: 'Please confirm password',
-    email: 'Please enter a valid email address'
+    email: 'Please enter a valid email address',
+    phonePatternChina: 'China mobile number must start with 1, second digit 3-9',
+    phonePatternThailand: 'Thailand mobile number must start with 2-9',
+    phonePatternMalaysia: 'Malaysia mobile number must start with 1',
+    phoneEmptyFields: 'Phone number and country code cannot be empty',
+    unsupportedCountryCode: 'Unsupported country code',
+    phoneDigitsOnly: 'Phone number can only contain digits',
+    phoneInvalidFormat: 'Invalid phone number format'
   },
 
   // 个人中心
@@ -402,5 +418,12 @@ export default {
     thai: 'ไทย',
     english: 'English',
     switchSuccess: 'Language switched successfully'
+  },
+
+  // 国家名称
+  country: {
+    china: 'China',
+    thailand: 'Thailand',
+    malaysia: 'Malaysia'
   }
 }

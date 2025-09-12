@@ -128,10 +128,11 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.phone')" width="180" min-width="160">
+          <el-table-column :label="t('users.phone')" width="200" min-width="180">
             <template #default="scope">
               <div class="user-phone">
                 <div class="phone-display" v-if="scope.row.phone">
+                  <CountryFlag :country-code="scope.row.country_code || '+86'" />
                   <span class="country-code">{{ scope.row.country_code || '+86' }}</span>
                   <span class="phone-number">{{ scope.row.phone }}</span>
                 </div>
@@ -232,7 +233,12 @@
           <el-descriptions-item :label="t('users.id')">{{ selectedUser.id }}</el-descriptions-item>
           <el-descriptions-item :label="t('users.email')">{{ selectedUser.email }}</el-descriptions-item>
           <el-descriptions-item :label="t('users.phone')">
-            {{ selectedUser.phone || t('common.notSet') }}
+            <div v-if="selectedUser.phone" class="phone-detail">
+              <CountryFlag :country-code="selectedUser.country_code || '+86'" />
+              <span class="country-code">{{ selectedUser.country_code || '+86' }}</span>
+              <span class="phone-number">{{ selectedUser.phone }}</span>
+            </div>
+            <span v-else>{{ t('common.notSet') }}</span>
           </el-descriptions-item>
           <el-descriptions-item :label="t('users.referralCode')">
             <el-tag v-if="selectedUser.referral_code" type="success">{{ selectedUser.referral_code }}</el-tag>
@@ -265,6 +271,7 @@ import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar } from '@e
 import { useI18n } from 'vue-i18n'
 import { userAPI } from '../api/users.js'
 import { useAdminStore } from '../stores/admin.js'
+import CountryFlag from '../components/CountryFlag.vue'
 
 const { t } = useI18n()
 
@@ -815,7 +822,7 @@ onMounted(() => {
 }
 
 /* 手机号显示样式 */
-.phone-display {
+.phone-display, .phone-detail {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -838,5 +845,20 @@ onMounted(() => {
 .no-phone {
   color: #c0c4cc;
   font-style: italic;
+}
+
+/* 用户详情页手机号样式 */
+.phone-detail {
+  gap: 6px;
+}
+
+.phone-detail .country-code {
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
+.phone-detail .phone-number {
+  font-size: 14px;
+  font-weight: 500;
 }
 </style>
