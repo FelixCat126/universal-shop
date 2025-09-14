@@ -6,6 +6,7 @@ import User from '../models/User.js'
 import Cart from '../models/Cart.js'
 import sequelize from '../config/database.js'
 import UserController from './userController.js'
+import { createUserAddress } from '../services/addressService.js'
 
 class OrderController {
   // 创建订单
@@ -13,6 +14,9 @@ class OrderController {
     const transaction = await sequelize.transaction()
     
     try {
+      // 调试：打印原始请求体
+      console.log('🔍 原始 req.body:', JSON.stringify(req.body, null, 2))
+      
       const { 
         items,
         contact_name,
@@ -20,16 +24,29 @@ class OrderController {
         delivery_address,
         payment_method = 'cod', // cod: 货到付款, online: 在线付款
         notes = '',
-        referral_code = null, // 推荐码（可选）
+        referral_code, // 推荐码（可选）
         // 非登录用户的地址字段
         province = '',
         city = '',
         district = '',
-        detail_address = ''
+        detail_address = '',
+        postal_code = ''
       } = req.body
+      
+      // 调试：打印解构后的地址字段
+      console.log('🔍 解构后的地址字段:', {
+        province,
+        city,
+        district,
+        detail_address,
+        postal_code
+      })
       
       let userId = req.user?.userId
       let isGuestOrder = false
+      
+      // 标准化处理推荐码（在所有分支之前定义）
+      const normalizedReferralCode = referral_code && typeof referral_code === 'string' && referral_code.trim() ? referral_code.trim() : null
       
       // 如果用户未登录，检查是否为游客下单
       if (!userId) {
@@ -81,12 +98,37 @@ class OrderController {
           })
         }
         
-        // 尝试自动注册
+        // 调试：打印原始请求体
+        console.log('🔍 原始 req.body:', JSON.stringify(req.body, null, 2))
+        
+        // 特别打印推荐码相关信息
+        console.log('🔍 推荐码信息:', {
+          referral_code_from_req: req.body.referral_code,
+          referral_code_var: referral_code,
+          referral_code_type: typeof referral_code,
+          referral_code_trimmed: referral_code && referral_code.trim ? referral_code.trim() : 'N/A',
+          normalizedReferralCode: normalizedReferralCode
+        })
+        
+        // 调用统一的用户创建服务
         try {
-          const newUser = await UserController.autoRegister(contact_phone, contact_name, referral_code)
+          console.log('🔍 准备调用统一用户创建服务:', {
+            contact_phone,
+            contact_name,
+            referral_code: normalizedReferralCode
+          })
+          
+          const newUser = await UserController.createUserForOrder(contact_phone, contact_name, normalizedReferralCode)
           userId = newUser.id
           isGuestOrder = true
+          
+          console.log('✅ 统一用户创建成功:', {
+            userId: newUser.id,
+            nickname: newUser.nickname,
+            referred_by_code: newUser.referred_by_code
+          })
         } catch (error) {
+          console.error('❌ 统一用户创建失败:', error)
           return res.status(400).json({
             success: false,
             message: error.message
@@ -192,42 +234,36 @@ class OrderController {
         })
       }
 
-      // 为游客用户创建默认地址
+      // 为游客用户创建默认地址（复用统一逻辑）
       if (isGuestOrder) {
-        const Address = (await import('../models/Address.js')).default
-        
-        // 解析contact_phone中的国家区号和手机号
-        let countryCode = '+86' // 默认值
+        // 将完整手机号切分为国家区号与本地号
+        let contact_country_code = '+86'
         let phoneNumber = contact_phone
-        
-        // 检查是否包含国家区号
         const supportedCodes = ['+86', '+66', '+60']
         for (const code of supportedCodes) {
           if (contact_phone.startsWith(code)) {
-            countryCode = code
+            contact_country_code = code
             phoneNumber = contact_phone.substring(code.length)
             break
           }
         }
-        
-        
-        await Address.create({
-          user_id: userId,
-          contact_name,
-          contact_country_code: countryCode,
-          contact_phone: phoneNumber,
-          province: province || '',
-          city: city || '',
-          district: district || '',
-          detail_address: detail_address || '', // 只使用详细地址字段，不使用delivery_address
-          full_address: (() => {
-            const addressParts = [province, city, district].filter(Boolean)
-            const regionPart = addressParts.join(' ')
-            const detailAddr = detail_address || ''
-            return regionPart ? `${regionPart} ${detailAddr}` : detailAddr
-          })(), // 构建完整地址，用空格分隔
-          is_default: true
-        }, { transaction })
+
+        await createUserAddress(
+          {
+            userId,
+            contact_name,
+            contact_country_code,
+            contact_phone: phoneNumber,
+            province,
+            city,
+            district,
+            detail_address,
+            postal_code,
+            is_default: true,
+            address_type: 'home'
+          },
+          transaction
+        )
       }
 
       await transaction.commit()

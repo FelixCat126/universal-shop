@@ -99,30 +99,15 @@ class UserController {
         }
       }
 
-      // 验证推荐码（如果提供了）
-      let validReferralCode = null
-      if (referral_code && referral_code.trim()) {
-        const referrer = await User.findByReferralCode(referral_code.trim())
-        if (referrer) {
-          validReferralCode = referral_code.trim()
-        } else {
-          return res.status(400).json({
-            success: false,
-            message: '推荐码不存在或无效'
-          })
-        }
-      }
-
-      // 创建用户
-      const user = await User.create({
-        username: `${country_code}${phone}`, // 用户名包含区号以保证唯一性
+      // 使用统一的核心创建逻辑
+      const user = await UserController._createUserCore({
         nickname,
-        email: email || null,
         country_code,
         phone,
         password,
-        referred_by_code: validReferralCode
-      })
+        email,
+        referral_code
+      }, false) // false表示是正常注册
 
       // 生成JWT token
       const token = jwt.sign(
@@ -494,9 +479,15 @@ class UserController {
     }
   }
 
-  // 自动注册用户（游客下单时使用）
-  static async autoRegister(fullPhoneWithCode, contactName, referralCode = null) {
+  // 统一的用户创建服务方法（用于订单自动注册）
+  static async createUserForOrder(fullPhoneWithCode, contactName, referralCode = null) {
     try {
+      console.log('🔍 createUserForOrder 开始执行:', {
+        fullPhoneWithCode,
+        contactName,
+        referralCode
+      })
+      
       // 解析完整手机号中的国家区号和手机号
       let countryCode = '+86' // 默认值
       let phoneNumber = fullPhoneWithCode
@@ -511,76 +502,129 @@ class UserController {
         }
       }
       
-      // 验证手机号格式（纯数字，不能以0开头）
-      const phoneRegex = /^[1-9]\d+$/
-      if (!phoneRegex.test(phoneNumber)) {
-        throw new Error('手机号必须为纯数字且不能以0开头')
-      }
-      
-      // 根据国家区号验证手机号长度
-      let minLength
-      let countryName
-      switch (countryCode) {
-        case '+86':
-          minLength = 11
-          countryName = '中国'
-          break
-        case '+60':
-          minLength = 9
-          countryName = '马来西亚'
-          break
-        case '+66':
-          minLength = 9
-          countryName = '泰国'
-          break
-      }
-      
-      if (phoneNumber.length < minLength) {
-        throw new Error(`${countryName}手机号必须不少于${minLength}位数字`)
-      }
-
-      // 检查手机号是否已存在（使用国家区号+手机号组合检查）
-      const existingUser = await User.findOne({ 
-        where: { 
-          country_code: countryCode,
-          phone: phoneNumber 
-        } 
+      console.log('🔍 解析后的手机号信息:', {
+        countryCode,
+        phoneNumber
       })
-      if (existingUser) {
-        if (!existingUser.is_active) {
-          throw new Error('该手机号关联的账户已被禁用，无法下单')
-        }
-        throw new Error('该手机号已被注册，无法自动注册')
-      }
-
+      
       // 生成默认密码（手机号后8位）
       const defaultPassword = phoneNumber.slice(-8)
       
-      // 验证推荐码（如果提供了）
-      let validReferralCode = null
-      if (referralCode && referralCode.trim()) {
-        const referrer = await User.findByReferralCode(referralCode.trim())
-        if (referrer) {
-          validReferralCode = referralCode.trim()
-        }
-        // 注意：在自动注册中，如果推荐码无效，我们不阻止注册，只是不保存推荐码
-      }
-      
-      // 创建用户
-      const user = await User.create({
-        username: phoneNumber, // 用户名与手机号保持一致（不含区号）
+      // 调用统一的用户创建核心逻辑
+      return await UserController._createUserCore({
         nickname: contactName || `用户${phoneNumber.slice(-4)}`,
         country_code: countryCode,
         phone: phoneNumber,
         password: defaultPassword,
         email: null,
-        referred_by_code: validReferralCode
-      })
-
-      return user
+        referral_code: referralCode
+      }, true) // true表示是自动注册
+      
     } catch (error) {
+      console.error('❌ createUserForOrder 执行失败:', error)
       throw error
     }
+  }
+  
+  // 统一的用户创建核心逻辑
+  static async _createUserCore(userData, isAutoRegister = false) {
+    const { nickname, country_code, phone, password, email, referral_code } = userData
+    
+    // 验证手机号格式（纯数字，不能以0开头）
+    const phoneRegex = /^[1-9]\d+$/
+    if (!phoneRegex.test(phone)) {
+      throw new Error('手机号必须为纯数字且不能以0开头')
+    }
+    
+    // 根据国家区号验证手机号长度
+    let minLength
+    let countryName
+    switch (country_code) {
+      case '+86':
+        minLength = 11
+        countryName = '中国'
+        break
+      case '+60':
+        minLength = 9
+        countryName = '马来西亚'
+        break
+      case '+66':
+        minLength = 9
+        countryName = '泰国'
+        break
+    }
+    
+    if (phone.length < minLength) {
+      throw new Error(`${countryName}手机号必须不少于${minLength}位数字`)
+    }
+
+    // 检查手机号是否已存在
+    const existingPhone = await User.findOne({ 
+      where: { 
+        country_code: country_code,
+        phone: phone 
+      } 
+    })
+    if (existingPhone) {
+      if (!existingPhone.is_active) {
+        throw new Error(isAutoRegister ? '该手机号关联的账户已被禁用，无法下单' : '该手机号关联的账户已被禁用，请联系管理员')
+      }
+      throw new Error(isAutoRegister ? '该手机号已被注册，无法自动注册' : '该手机号已被注册')
+    }
+
+    // 如果提供了邮箱，检查邮箱是否已存在
+    if (email) {
+      const existingEmail = await User.findOne({ 
+        where: { 
+          [Op.or]: [
+            { email: email },
+            { username: email }
+          ]
+        }
+      })
+      if (existingEmail) {
+        throw new Error('该邮箱已被注册')
+      }
+    }
+
+    // 处理推荐码（如果提供了）- 自由填写，不需要验证存在性
+    let validReferralCode = null
+    if (referral_code && referral_code.trim()) {
+      const code = referral_code.trim().toUpperCase()
+      validReferralCode = code
+      console.log('🔍 记录推荐码:', {
+        原始推荐码: referral_code,
+        处理后推荐码: code,
+        说明: '推荐码自由填写，无需验证存在性'
+      })
+    } else {
+      console.log('🔍 未提供推荐码')
+    }
+    
+    // 创建用户
+    const finalUserData = {
+      username: isAutoRegister ? phone : `${country_code}${phone}`, // 自动注册时用户名不含区号，正常注册含区号
+      nickname,
+      email: email || null,
+      country_code,
+      phone,
+      password,
+      referred_by_code: validReferralCode
+    }
+    
+    console.log('🔍 准备创建用户:', finalUserData)
+    
+    const user = await User.create(finalUserData)
+    
+    console.log('✅ 用户创建成功:', {
+      用户ID: user.id,
+      昵称: user.nickname,
+      手机号: user.phone,
+      推荐码字段: user.referred_by_code,
+      创建方式: isAutoRegister ? '自动注册' : '正常注册'
+    })
+
+    return user
   }
 
   // 检查手机号是否已注册

@@ -86,6 +86,10 @@
             <span class="font-medium text-gray-700">{{ t('order.shippingAddress') }}:</span>
             <span class="ml-2 text-gray-900">{{ order.delivery_address }}</span>
           </div>
+          <div v-if="order.postal_code">
+            <span class="font-medium text-gray-700">{{ t('address.postalCode') || '邮编' }}:</span>
+            <span class="ml-2 text-gray-900">{{ order.postal_code }}</span>
+          </div>
           <div>
             <span class="font-medium text-gray-700">{{ t('order.deliveryMode') }}:</span>
             <span class="ml-2 text-gray-900">{{ getDeliveryModeText(order.delivery_mode) }}</span>

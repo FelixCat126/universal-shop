@@ -1,6 +1,7 @@
 import Address from '../models/Address.js'
 import User from '../models/User.js'
 import sequelize from '../config/database.js'
+import { createUserAddress } from '../services/addressService.js'
 
 class AddressController {
   // 获取用户地址列表
@@ -116,20 +117,9 @@ class AddressController {
       const regionPart = addressParts.join(' ')
       const full_address = regionPart ? `${regionPart} ${detail_address}` : detail_address
 
-      // 如果设置为默认地址，先取消其他默认地址
-      if (is_default) {
-        await Address.update(
-          { is_default: false },
-          { 
-            where: { user_id: userId, is_default: true },
-            transaction 
-          }
-        )
-      }
-
-      // 创建新地址
-      const address = await Address.create({
-        user_id: userId,
+      // 复用统一地址创建逻辑
+      const address = await createUserAddress({
+        userId,
         contact_name,
         contact_country_code,
         contact_phone,
@@ -137,11 +127,10 @@ class AddressController {
         city,
         district,
         detail_address,
-        full_address,
         postal_code,
         is_default,
         address_type
-      }, { transaction })
+      }, transaction)
 
       await transaction.commit()
 

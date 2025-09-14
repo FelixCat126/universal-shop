@@ -198,7 +198,7 @@
                     <div class="sm:col-span-2">
                       <CountrySelector
                         v-model="orderForm.contact_country_code"
-                        placeholder="选择国家"
+                        :placeholder="t('common.selectCountry')"
                         @country-change="handleOrderCountryChange"
                       />
                     </div>
@@ -672,7 +672,7 @@ const loadAddresses = async () => {
         // 自动填充表单
         orderForm.contact_name = defaultAddress.contact_name
         orderForm.contact_phone = defaultAddress.contact_phone
-        orderForm.delivery_address = `${defaultAddress.province} ${defaultAddress.city} ${defaultAddress.district} ${defaultAddress.detail_address}`.trim()
+        orderForm.delivery_address = `${defaultAddress.province} ${defaultAddress.city} ${defaultAddress.district} ${defaultAddress.detail_address} ${defaultAddress.postal_code || ''}`.trim()
       }
     } else {
       addresses.value = []
@@ -730,7 +730,7 @@ const selectAddress = (address) => {
   orderForm.contact_name = address.contact_name
   orderForm.contact_country_code = address.contact_country_code || '+86'
   orderForm.contact_phone = address.contact_phone
-  orderForm.delivery_address = `${address.province} ${address.city} ${address.district} ${address.detail_address}`.trim()
+  orderForm.delivery_address = `${address.province} ${address.city} ${address.district} ${address.detail_address} ${address.postal_code || ''}`.trim()
 }
 
 // 去添加地址
@@ -867,10 +867,39 @@ const submitOrder = async () => {
         province: orderForm.province.trim(),
         city: orderForm.city.trim(),
         district: orderForm.district ? orderForm.district.trim() : '',
-        detail_address: orderForm.detail_address.trim()
+        detail_address: orderForm.detail_address.trim(),
+        postal_code: orderForm.postal_code ? orderForm.postal_code.trim() : ''
       }),
       // 传递推荐码
-      referral_code: orderForm.referral_code ? orderForm.referral_code.trim() : ''
+      referral_code: orderForm.referral_code && orderForm.referral_code.trim() ? orderForm.referral_code.trim() : null
+    }
+
+    // 调试：打印发送的订单数据
+    if (!userStore.isLoggedIn) {
+      console.log('🔍 前端 orderForm 原始数据:', {
+        province: orderForm.province,
+        city: orderForm.city,
+        district: orderForm.district,
+        detail_address: orderForm.detail_address,
+        referral_code: orderForm.referral_code
+      })
+      
+      console.log('🔍 游客下单发送的数据:', {
+        province: orderData.province,
+        city: orderData.city,
+        district: orderData.district,
+        detail_address: orderData.detail_address,
+        delivery_address: orderData.delivery_address,
+        referral_code: orderData.referral_code
+      })
+      
+      console.log('🔍 数据类型检查:', {
+        province: { value: orderData.province, type: typeof orderData.province },
+        city: { value: orderData.city, type: typeof orderData.city },
+        district: { value: orderData.district, type: typeof orderData.district },
+        detail_address: { value: orderData.detail_address, type: typeof orderData.detail_address },
+        referral_code: { value: orderData.referral_code, type: typeof orderData.referral_code }
+      })
     }
 
 
@@ -898,8 +927,11 @@ const submitOrder = async () => {
           router.push('/profile?tab=orders')
         }, 5000)
       } else if (!userStore.isLoggedIn) {
-        // 如果后端没有自动注册，执行前端注册逻辑（备用方案）
-        await autoRegisterAndLogin()
+        // 后端自动注册失败时，提示用户手动注册
+        showMessage('自动注册失败，请手动注册后再下单', 'error')
+        setTimeout(() => {
+          router.push('/register')
+        }, 2000)
       } else {
         // 已登录用户直接跳转到订单页面
         setTimeout(() => {
@@ -930,70 +962,6 @@ const handleQRCodeError = (event) => {
   console.warn('支付二维码加载失败，显示默认内容')
   paymentQRCode.value = null
 }
-
-// 自动注册并登录
-const autoRegisterAndLogin = async () => {
-  try {
-    showMessage(t('user.creatingAccount'), 'success')
-    
-    // 使用手机号后8位作为密码
-    const phone = orderForm.contact_phone.trim()
-    const password = phone.slice(-8) // 取手机号后8位
-    
-    // 准备注册数据
-    const registerData = {
-      country_code: orderForm.contact_country_code,
-      phone: phone,
-      password: password,
-      nickname: orderForm.contact_name.trim(),
-      auto_register: true, // 标识这是自动注册
-      referral_code: orderForm.referral_code && orderForm.referral_code.trim() ? orderForm.referral_code.trim() : undefined
-    }
-    
-    // 调用注册API
-    const registerResponse = await api.post('/auth/register', registerData)
-    
-    if (registerResponse.data.success) {
-      // 注册成功，自动登录
-      const loginResponse = await api.post('/auth/login', {
-        country_code: orderForm.contact_country_code,
-        phone: phone,
-        password: password
-      })
-      
-      if (loginResponse.data.success) {
-        // 更新用户状态
-        userStore.setAuth(loginResponse.data.data.user, loginResponse.data.data.token)
-        
-        showMessage(t('user.accountCreatedPassword', { password }), 'success')
-        
-        // 延迟跳转到个人中心
-        setTimeout(() => {
-          router.push('/profile?tab=orders')
-        }, 5000) // 给用户更多时间看到密码
-      } else {
-        showMessage(t('user.accountCreatedLoginFailed'), 'error')
-        setTimeout(() => {
-          router.push('/login')
-        }, 3000)
-      }
-    } else {
-      showMessage(registerResponse.data.message || t('user.accountCreateFailed'), 'error')
-      // 即使注册失败，订单已经成功，跳转到首页
-      setTimeout(() => {
-        router.push('/')
-      }, 3000)
-    }
-  } catch (error) {
-    console.error('自动注册失败:', error)
-    showMessage(t('user.accountCreateFailedButOrderSuccess'), 'error')
-    // 跳转到首页
-    setTimeout(() => {
-      router.push('/')
-    }, 3000)
-  }
-}
-
 
 
 // 返回上一页

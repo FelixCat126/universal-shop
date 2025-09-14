@@ -134,7 +134,10 @@
                     </div>
                   </div>
                 </div>
-                <div class="text-sm text-gray-700">{{ order.delivery_address }}</div>
+                <div class="text-sm text-gray-700">
+                  {{ order.delivery_address }}
+                  <span v-if="order.postal_code" class="ml-1">({{ t('address.postalCode') || '邮编' }}: {{ order.postal_code }})</span>
+                </div>
                 <div class="flex justify-end mt-2">
                   <button 
                     @click="viewOrderDetail(order.id)"
@@ -423,7 +426,8 @@ const formatAddress = (address) => {
   // 添加详细地址
   if (address.detail_address && address.detail_address.trim()) {
     if (regionPart) {
-      return `${regionPart} ${address.detail_address.trim()}`
+      const postal = address.postal_code && address.postal_code.trim() ? ` ${address.postal_code.trim()}` : ''
+      return `${regionPart} ${address.detail_address.trim()}${postal}`
     } else {
       return address.detail_address.trim()
     }
@@ -628,7 +632,7 @@ const editAddress = async (address) => {
         params: { locale: 'zh-CN' }
       })
       if (provincesResponse.data.success) {
-        const province = provincesResponse.data.data.find(p => p.name === address.province)
+        const province = provincesResponse.data.data.find(p => p.name === address.province || p.name_alias === address.province)
         if (province) {
           provinceId = province.id
           
@@ -638,7 +642,7 @@ const editAddress = async (address) => {
               params: { locale: 'zh-CN' }
             })
             if (districtsResponse.data.success) {
-              const district = districtsResponse.data.data.find(d => d.name === address.city)
+              const district = districtsResponse.data.data.find(d => d.name === address.city || d.name_alias === address.city)
               if (district) {
                 districtId = district.id
                 
@@ -648,7 +652,7 @@ const editAddress = async (address) => {
                     params: { locale: 'zh-CN' }
                   })
                   if (subDistrictsResponse.data.success) {
-                    const subDistrict = subDistrictsResponse.data.data.find(s => s.name === address.district)
+                    const subDistrict = subDistrictsResponse.data.data.find(s => s.name === address.district || s.name_alias === address.district)
                     if (subDistrict) {
                       subDistrictId = subDistrict.id
                     }
@@ -683,6 +687,8 @@ const editAddress = async (address) => {
 }
 
 const resetAddressForm = () => {
+  console.log('🔍 Profile.vue 重置地址表单')
+  
   addressForm.value = {
     contact_name: '',
     contact_country_code: '+86',
@@ -701,23 +707,45 @@ const resetAddressForm = () => {
     subDistrict: null,
     postalCode: ''
   }
+  
+  console.log('🔍 Profile.vue 重置后的表单数据:', addressForm.value)
 }
 
 // 处理地址区域选择变化
 const handleAddressRegionChange = (regionData) => {
+  console.log('🔍 Profile.vue 地址区域变更:', regionData)
+  
   // 更新表单中的省市区和邮编信息
-  if (regionData.provinceData) {
+  if (regionData.provinceData && regionData.provinceData.name) {
     addressForm.value.province = regionData.provinceData.name
+  } else {
+    addressForm.value.province = ''
   }
-  if (regionData.districtData) {
+  
+  if (regionData.districtData && regionData.districtData.name) {
     addressForm.value.city = regionData.districtData.name
+  } else {
+    addressForm.value.city = ''
   }
-  if (regionData.subDistrictData) {
+  
+  if (regionData.subDistrictData && regionData.subDistrictData.name) {
     addressForm.value.district = regionData.subDistrictData.name
+  } else {
+    addressForm.value.district = ''
   }
+  
   if (regionData.postalCode) {
     addressForm.value.postal_code = regionData.postalCode
+  } else {
+    addressForm.value.postal_code = ''
   }
+  
+  console.log('🔍 Profile.vue 更新后的表单数据:', {
+    province: addressForm.value.province,
+    city: addressForm.value.city,
+    district: addressForm.value.district,
+    postal_code: addressForm.value.postal_code
+  })
 }
 
 const saveAddress = async () => {

@@ -180,6 +180,7 @@
           </template>
         </el-table-column>
 
+
         <el-table-column :label="t('orders.customerInfo')" width="200" min-width="180">
           <template #default="scope">
             <div class="contact-info">
@@ -269,7 +270,11 @@
                   </el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('orders.amount')">
-                  <span class="amount-text">{{ t('common.currency') }}{{ selectedOrder.total_amount }}</span>
+                  <span class="amount-text" v-if="selectedOrder.payment_method === 'online'">
+                    {{ t('common.currency') }}{{ selectedOrder.total_amount }} 
+                    <span class="exchange-rate-info">(汇算后: ฿{{ getExchangedAmount(selectedOrder.total_amount) }})</span>
+                  </span>
+                  <span class="amount-text" v-else>{{ t('common.currency') }}{{ selectedOrder.total_amount }}</span>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('common.paymentMethod')">
                   <el-tag 
@@ -301,6 +306,9 @@
                 <el-descriptions-item :label="t('users.phone')">
                   {{ selectedOrder.user?.phone || t('common.unknown') }}
                 </el-descriptions-item>
+                <el-descriptions-item :label="t('user.referredBy')">
+                  {{ selectedOrder.user?.referrer?.nickname || '-' }}
+                </el-descriptions-item>
               </el-descriptions>
             </el-card>
           </el-col>
@@ -314,14 +322,14 @@
               <span>{{ t('orders.shippingInfo') }}</span>
             </div>
           </template>
-          <el-descriptions :column="3" border>
+          <el-descriptions :column="2" border>
             <el-descriptions-item :label="t('orders.contactName')">
               {{ selectedOrder.contact_name }}
             </el-descriptions-item>
             <el-descriptions-item :label="t('orders.contactPhone')">
               {{ selectedOrder.contact_phone }}
             </el-descriptions-item>
-            <el-descriptions-item :label="t('orders.address')" :span="3">
+            <el-descriptions-item :label="t('orders.address')" :span="2">
               <el-text class="address-text">{{ selectedOrder.delivery_address }}</el-text>
             </el-descriptions-item>
           </el-descriptions>
@@ -404,6 +412,7 @@ const loading = ref(false)
 const isExporting = ref(false)
 const showDetailModal = ref(false)
 const selectedOrder = ref(null)
+const exchangeRate = ref(1.00) // 汇算比例
 
 // 分页数据
 const currentPage = ref(1)
@@ -670,9 +679,34 @@ const getPaymentMethodClass = (method) => {
   return `payment-${method}`
 }
 
+// 获取汇算比例配置
+const loadExchangeRate = async () => {
+  try {
+    const response = await adminStore.apiRequest('/api/admin/system/configs', {
+      method: 'GET'
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success && data.data) {
+        exchangeRate.value = parseFloat(data.data.exchange_rate || '1.00')
+      }
+    }
+  } catch (error) {
+    console.error('加载汇算比例失败:', error)
+    // 使用默认值1.00，不显示错误提示
+  }
+}
+
+// 计算汇算后金额
+const getExchangedAmount = (amount) => {
+  return (parseFloat(amount) * exchangeRate.value).toFixed(2)
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadOrders()
+  loadExchangeRate()
 })
 </script>
 
@@ -983,6 +1017,13 @@ onMounted(() => {
     font-size: 16px;
     font-weight: 600;
     color: #059669;
+  }
+  
+  .exchange-rate-info {
+    font-size: 14px;
+    font-weight: 400;
+    color: #6b7280;
+    margin-left: 8px;
   }
   
   .address-text {

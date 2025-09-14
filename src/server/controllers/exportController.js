@@ -165,6 +165,7 @@ class ExportController {
               '城市': addressInfo.city,
               '区县': addressInfo.district,
               '详细地址': addressInfo.detail,
+              '邮政编码': order.postal_code || '',
               '商品名称': item.product?.name || '',
               '商品单价': item.price,
               '购买数量': item.quantity,
@@ -172,6 +173,7 @@ class ExportController {
               '订单总额': index === 0 ? order.total_amount : '', // 只在第一行显示总额
               '支付方式': index === 0 ? (order.payment_method === 'cod' ? '货到付款' : '在线支付') : '',
               '订单状态': index === 0 ? order.status : '',
+              '推荐码': index === 0 ? (order.referral_code || '') : '',
               '货物重量': '', // 空白字段
               '长': '', // 空白字段
               '宽': '', // 空白字段
@@ -194,6 +196,7 @@ class ExportController {
             '城市': addressInfo.city,
             '区县': addressInfo.district,
             '详细地址': addressInfo.detail,
+            '邮政编码': order.postal_code || '',
             '商品名称': '',
             '商品单价': '',
             '购买数量': '',
@@ -201,6 +204,7 @@ class ExportController {
             '订单总额': order.total_amount,
             '支付方式': order.payment_method === 'cod' ? '货到付款' : '在线支付',
             '订单状态': order.status,
+            '推荐码': order.referral_code || '',
             '货物重量': '', // 空白字段
             '长': '', // 空白字段
             '宽': '', // 空白字段
@@ -228,6 +232,7 @@ class ExportController {
         { width: 12 }, // 城市
         { width: 12 }, // 区县
         { width: 25 }, // 详细地址
+        { width: 12 }, // 邮政编码
         { width: 20 }, // 商品名称
         { width: 10 }, // 商品单价
         { width: 8 },  // 购买数量
@@ -235,6 +240,7 @@ class ExportController {
         { width: 10 }, // 订单总额
         { width: 10 }, // 支付方式
         { width: 10 }, // 订单状态
+        { width: 12 }, // 推荐码
         { width: 10 }, // 货物重量
         { width: 8 },  // 长
         { width: 8 },  // 宽

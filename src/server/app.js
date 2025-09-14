@@ -66,14 +66,18 @@ app.use((req, res, next) => {
 sequelize.authenticate()
   .then(() => {
     console.log('✅ 数据库连接成功')
-    // 使用 alter: true 确保表结构能够自动更新
-    return sequelize.sync({ alter: true })
+    // 暂时使用基础同步模式，避免alter时的验证冲突
+    return sequelize.sync({ alter: false })
   })
   .then(() => {
     console.log('✅ 数据库模型同步成功')
   })
   .catch(err => {
     console.error('❌ 数据库连接或同步失败:', err.message)
+    console.error('📋 详细错误信息:', err)
+    if (err.sql) {
+      console.error('📝 SQL语句:', err.sql)
+    }
   })
 
 // API路由
@@ -92,6 +96,16 @@ app.use('/api/system-config', systemConfigRoutes)
 app.use('/api/auth', userRoutes)
 
 console.log('✅ API路由注册完成')
+
+// 健康检查（必须在API 404处理之前）
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: '服务器运行正常 (HTTP模式)',
+    timestamp: new Date().toISOString(),
+    port: PORT
+  })
+})
 
 // API 404处理
 app.use('/api/*', (req, res) => {
@@ -163,15 +177,6 @@ app.use('/admin', express.static(adminDir, {
   }
 }))
 
-// 健康检查
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: '服务器运行正常 (HTTP模式)',
-    timestamp: new Date().toISOString(),
-    port: PORT
-  })
-})
 
 // SPA路由处理
 app.get('/portal/*', (req, res, next) => {
