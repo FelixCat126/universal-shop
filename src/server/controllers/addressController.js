@@ -87,33 +87,34 @@ class AddressController {
       }
 
       // 根据国家区号验证手机号长度
-      let expectedLength
+      let minLength
       let countryName
       switch (contact_country_code) {
         case '+86':
-          expectedLength = 11
+          minLength = 11
           countryName = '中国'
           break
         case '+60':
-          expectedLength = 11
+          minLength = 9
           countryName = '马来西亚'
           break
         case '+66':
-          expectedLength = 9
+          minLength = 9
           countryName = '泰国'
           break
       }
 
-      if (contact_phone.length !== expectedLength) {
+      if (contact_phone.length < minLength) {
         return res.status(400).json({
           success: false,
-          message: `${countryName}手机号必须为${expectedLength}位数字`
+          message: `${countryName}手机号必须不少于${minLength}位数字`
         })
       }
 
       // 构建完整地址
-      const addressParts = [province, city, district, detail_address].filter(Boolean)
-      const full_address = addressParts.join('')
+      const addressParts = [province, city, district].filter(Boolean)
+      const regionPart = addressParts.join(' ')
+      const full_address = regionPart ? `${regionPart} ${detail_address}` : detail_address
 
       // 如果设置为默认地址，先取消其他默认地址
       if (is_default) {
@@ -216,27 +217,27 @@ class AddressController {
       }
 
       // 根据国家区号验证手机号长度
-      let expectedLength
+      let minLength
       let countryName
       switch (contact_country_code) {
         case '+86':
-          expectedLength = 11
+          minLength = 11
           countryName = '中国'
           break
         case '+60':
-          expectedLength = 11
+          minLength = 9
           countryName = '马来西亚'
           break
         case '+66':
-          expectedLength = 9
+          minLength = 9
           countryName = '泰国'
           break
       }
 
-      if (contact_phone.length !== expectedLength) {
+      if (contact_phone.length < minLength) {
         return res.status(400).json({
           success: false,
-          message: `${countryName}手机号必须为${expectedLength}位数字`
+          message: `${countryName}手机号必须不少于${minLength}位数字`
         })
       }
 
@@ -253,8 +254,9 @@ class AddressController {
       }
 
       // 构建完整地址
-      const addressParts = [province, city, district, detail_address].filter(Boolean)
-      const full_address = addressParts.join('')
+      const addressParts = [province, city, district].filter(Boolean)
+      const regionPart = addressParts.join(' ')
+      const full_address = regionPart ? `${regionPart} ${detail_address}` : detail_address
 
       // 如果设置为默认地址，先取消其他默认地址
       if (is_default && !address.is_default) {
@@ -459,6 +461,47 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '获取地址详情失败',
+        error: error.message
+      })
+    }
+  }
+
+  // 管理员获取指定用户的地址列表
+  static async getAdminUserAddresses(req, res) {
+    try {
+      const { userId } = req.params
+
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: '用户ID不能为空'
+        })
+      }
+
+      // 验证用户是否存在
+      const user = await User.findByPk(userId)
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: '用户不存在'
+        })
+      }
+
+      const addresses = await Address.findAll({
+        where: { user_id: userId },
+        order: [['is_default', 'DESC'], ['created_at', 'DESC']]
+      })
+
+      res.json({
+        success: true,
+        data: addresses
+      })
+
+    } catch (error) {
+      console.error('获取用户地址列表失败:', error)
+      res.status(500).json({
+        success: false,
+        message: '获取用户地址列表失败',
         error: error.message
       })
     }

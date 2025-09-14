@@ -128,11 +128,11 @@
                     <div class="flex-1">
                       <div class="flex items-center mb-1">
                         <span class="font-medium text-gray-900">{{ address.contact_name }}</span>
-                        <span class="ml-2 text-sm text-gray-600">{{ address.contact_phone }}</span>
+                        <span class="ml-2 text-sm text-gray-600">{{ address.contact_country_code }}{{ address.contact_phone }}</span>
                         <span v-if="address.is_default" class="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded">{{ t('address.default') }}</span>
                       </div>
                       <p class="text-sm text-gray-700">
-                        {{ address.province }}{{ address.city }}{{ address.district }}{{ address.detail_address }}
+                        {{ formatAddress(address) }}
                       </p>
                     </div>
                     <div class="ml-3">
@@ -224,55 +224,20 @@
                 </div>
               </div>
 
-              <!-- 地址信息 -->
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
-                <!-- 省份 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">
-                    {{ t('order.province') || '省份' }} <span class="text-red-500">*</span>
-                  </label>
-                  <input
-                    v-model="orderForm.province"
-                    type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    :class="{ 'border-red-500': errors.province }"
-                    :placeholder="t('order.province') || '省份'"
-                  />
-                  <p v-if="errors.province" class="text-red-500 text-xs mt-1">
-                    {{ errors.province }}
-                  </p>
-                </div>
-
-                <!-- 城市 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">
-                    {{ t('order.city') || '城市' }} <span class="text-red-500">*</span>
-                  </label>
-                  <input
-                    v-model="orderForm.city"
-                    type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    :class="{ 'border-red-500': errors.city }"
-                    :placeholder="t('order.city') || '城市'"
-                  />
-                  <p v-if="errors.city" class="text-red-500 text-xs mt-1">
-                    {{ errors.city }}
-                  </p>
-                </div>
-              </div>
-
-              <!-- 区/县 -->
+              <!-- 地址信息 - 泰国三级联动地址选择器 -->
               <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  {{ t('order.district') || '区/县' }}
+                <label class="block text-sm font-medium text-gray-700 mb-3">
+                  {{ t('order.addressRegion') || '省市区选择' }} <span class="text-red-500">*</span>
                 </label>
-                <input
-                  v-model="orderForm.district"
-                  type="text"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  :placeholder="t('order.districtPlaceholder')"
+                <ThailandAddressSelector 
+                  v-model="checkoutAddressRegion"
+                  @change="handleCheckoutAddressRegionChange"
                 />
+                <p v-if="errors.province || errors.city || errors.district" class="text-red-500 text-xs mt-1">
+                  {{ errors.province || errors.city || errors.district }}
+                </p>
               </div>
+
 
               <!-- 详细地址 -->
               <div class="mb-4">
@@ -304,6 +269,22 @@
                   <option value="company">{{ t('order.addressCompany') || '公司' }}</option>
                   <option value="other">{{ t('order.addressOther') || '其他' }}</option>
                 </select>
+              </div>
+
+              <!-- 推荐码（可选） -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  {{ t('referral.code') || '推荐码' }} <span class="text-gray-400 text-xs">({{ t('common.optional') || '可选' }})</span>
+                </label>
+                <input
+                  v-model="orderForm.referral_code"
+                  type="text"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  :placeholder="t('referral.placeholder') || '请输入推荐码'"
+                />
+                <p class="text-gray-500 text-xs mt-1">
+                  {{ t('referral.checkoutHint') || '填写推荐码可享受相关优惠，注册时将自动关联推荐人' }}
+                </p>
               </div>
             </div>
 
@@ -519,6 +500,36 @@ import { createOrder } from '../../api/orders.js'
 import { getAddresses } from '../../api/addresses.js'
 import api from '../../api/index.js'
 import config from '../../../config/index.js'
+
+// 格式化地址显示
+const formatAddress = (address) => {
+  const parts = []
+  
+  // 只添加非空的省市区信息
+  if (address.province && address.province.trim()) {
+    parts.push(address.province.trim())
+  }
+  if (address.city && address.city.trim()) {
+    parts.push(address.city.trim())
+  }
+  if (address.district && address.district.trim()) {
+    parts.push(address.district.trim())
+  }
+  
+  // 组合省市区，用空格分隔
+  let regionPart = parts.join(' ')
+  
+  // 添加详细地址
+  if (address.detail_address && address.detail_address.trim()) {
+    if (regionPart) {
+      return `${regionPart} ${address.detail_address.trim()}`
+    } else {
+      return address.detail_address.trim()
+    }
+  }
+  
+  return regionPart || '地址信息不完整'
+}
 import {
   ArrowLeftIcon,
   ShoppingBagIcon,
@@ -528,6 +539,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import getCurrentLanguageValue from '../../utils/language.js'
 import CountrySelector from '../../components/CountrySelector.vue'
+import ThailandAddressSelector from '../../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n } from '../../utils/phoneValidation.js'
 
 // 国际化
@@ -560,11 +572,21 @@ const orderForm = reactive({
   province: '',
   city: '',
   district: '',
+  postal_code: '',
   detail_address: '',
   address_type: 'home',
   delivery_address: '', // 用于向后兼容，会自动组合生成
   payment_method: 'cod', // cod: 货到付款, online: 在线付款
-  notes: ''
+  notes: '',
+  referral_code: '' // 推荐码（可选）
+})
+
+// 结算页面三级联动地址选择器数据
+const checkoutAddressRegion = ref({
+  province: null,
+  district: null,
+  subDistrict: null,
+  postalCode: ''
 })
 
 // 超过2件禁用货到付款
@@ -576,6 +598,7 @@ const errors = reactive({
   contact_phone: '',
   province: '',
   city: '',
+  district: '',
   detail_address: ''
 })
 
@@ -649,7 +672,7 @@ const loadAddresses = async () => {
         // 自动填充表单
         orderForm.contact_name = defaultAddress.contact_name
         orderForm.contact_phone = defaultAddress.contact_phone
-        orderForm.delivery_address = `${defaultAddress.province}${defaultAddress.city}${defaultAddress.district}${defaultAddress.detail_address}`
+        orderForm.delivery_address = `${defaultAddress.province} ${defaultAddress.city} ${defaultAddress.district} ${defaultAddress.detail_address}`.trim()
       }
     } else {
       addresses.value = []
@@ -668,13 +691,46 @@ const handleOrderCountryChange = (country) => {
   orderForm.contact_phone = ''
 }
 
+// 处理结算页面地址区域选择变化
+const handleCheckoutAddressRegionChange = (regionData) => {
+  // 更新表单中的省市区和邮编信息
+  if (regionData.provinceData) {
+    orderForm.province = regionData.provinceData.name
+  } else {
+    orderForm.province = ''
+  }
+  
+  if (regionData.districtData) {
+    orderForm.city = regionData.districtData.name
+  } else {
+    orderForm.city = ''
+  }
+  
+  if (regionData.subDistrictData) {
+    orderForm.district = regionData.subDistrictData.name
+  } else {
+    orderForm.district = ''
+  }
+  
+  if (regionData.postalCode) {
+    orderForm.postal_code = regionData.postalCode
+  } else {
+    orderForm.postal_code = ''
+  }
+  
+  // 清除相关错误信息
+  errors.province = ''
+  errors.city = ''
+  errors.district = ''
+}
+
 // 选择地址
 const selectAddress = (address) => {
   selectedAddress.value = address
   orderForm.contact_name = address.contact_name
   orderForm.contact_country_code = address.contact_country_code || '+86'
   orderForm.contact_phone = address.contact_phone
-  orderForm.delivery_address = `${address.province}${address.city}${address.district}${address.detail_address}`
+  orderForm.delivery_address = `${address.province} ${address.city} ${address.district} ${address.detail_address}`.trim()
 }
 
 // 去添加地址
@@ -718,6 +774,12 @@ const validateForm = () => {
   // 验证城市
   if (!orderForm.city.trim()) {
     errors.city = t('validation.cityRequired')
+    isValid = false
+  }
+
+  // 验证区县
+  if (!orderForm.district.trim()) {
+    errors.district = t('validation.districtRequired')
     isValid = false
   }
 
@@ -793,14 +855,24 @@ const submitOrder = async () => {
         quantity: item.quantity
       })),
       contact_name: orderForm.contact_name.trim(),
-      contact_phone: orderForm.contact_phone.trim(),
+      contact_phone: `${orderForm.contact_country_code}${orderForm.contact_phone.trim()}`,
       delivery_address: userStore.isLoggedIn 
         ? orderForm.delivery_address.trim() // 登录用户使用已选择的地址
-        : `${orderForm.province.trim()}${orderForm.city.trim()}${orderForm.district ? orderForm.district.trim() : ''}${orderForm.detail_address.trim()}`, // 游客组合地址
+        : `${orderForm.province.trim()} ${orderForm.city.trim()} ${orderForm.district ? orderForm.district.trim() : ''} ${orderForm.detail_address.trim()}`.trim(), // 游客组合地址，用空格分隔
       payment_method: orderForm.payment_method,
       notes: orderForm.notes.trim(),
-      clear_cart: true // 提交订单后清空购物车
+      clear_cart: true, // 提交订单后清空购物车
+      // 为非登录用户传递省市区信息
+      ...(userStore.isLoggedIn ? {} : {
+        province: orderForm.province.trim(),
+        city: orderForm.city.trim(),
+        district: orderForm.district ? orderForm.district.trim() : '',
+        detail_address: orderForm.detail_address.trim()
+      }),
+      // 传递推荐码
+      referral_code: orderForm.referral_code ? orderForm.referral_code.trim() : ''
     }
+
 
     // 调用API创建订单
     const response = await createOrder(orderData)
@@ -874,7 +946,8 @@ const autoRegisterAndLogin = async () => {
       phone: phone,
       password: password,
       nickname: orderForm.contact_name.trim(),
-      auto_register: true // 标识这是自动注册
+      auto_register: true, // 标识这是自动注册
+      referral_code: orderForm.referral_code && orderForm.referral_code.trim() ? orderForm.referral_code.trim() : undefined
     }
     
     // 调用注册API

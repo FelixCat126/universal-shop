@@ -11,6 +11,11 @@ export const userAPI = {
   // 验证推荐码
   verifyReferralCode: (code) => {
     return api.get(`${API_BASE_URL}/verify-referral/${code}`)
+  },
+
+  // 获取用户地址列表（管理端）
+  getUserAddresses: (userId) => {
+    return api.get(`/admin/users/${userId}/addresses`)
   }
 }
 

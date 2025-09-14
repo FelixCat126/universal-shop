@@ -197,13 +197,14 @@ export default {
     optional: '选填',
     copyCode: '复制推荐码',
     copied: '已复制',
-    placeholder: '请输入推荐码（可选）',
+    placeholder: '请输入推荐码',
     hint: '推荐码为可选项，可填写任意内容',
     shareCode: '分享推荐码',
     referralCount: '推荐人数',
     referredBy: '推荐人',
     invalidCode: '推荐码无效',
-    codeVerified: '推荐码验证成功'
+    codeVerified: '推荐码验证成功',
+    checkoutHint: '填写推荐码可享受相关优惠，注册时将自动关联推荐人'
   },
 
   // 订单
@@ -249,6 +250,7 @@ export default {
     province: '省份',
     city: '城市',
     district: '区/县',
+    addressRegion: '省市区选择',
     detailAddress: '详细地址',
     addressType: '地址类型',
     addressHome: '家庭',
@@ -276,7 +278,17 @@ export default {
     pleaseAddFirst: '请先添加收货地址，才能继续下单',
     autoReturn: '添加地址后将自动返回结算页面',
     loading: '加载地址中...',
-    default: '默认'
+    default: '默认',
+    province: '省份',
+    district: '市区',
+    subDistrict: '子区',
+    postalCode: '邮编',
+    selectProvince: '请选择省份',
+    selectDistrict: '请选择市区',
+    selectSubDistrict: '请选择子区',
+    selectProvinceFirst: '请先选择省份',
+    selectDistrictFirst: '请先选择市区',
+    postalCodeAuto: '选择子区后自动填入'
   },
 
   // 支付方式
@@ -323,6 +335,7 @@ export default {
     countryRequired: '请选择国家',
     provinceRequired: '请输入省份',
     cityRequired: '请输入城市',
+    districtRequired: '请输入区县',
     detailAddressRequired: '请输入详细地址',
     phonePatternChina: '中国手机号必须以1开头，第二位为3-9',
     phonePatternThailand: '泰国手机号必须以2-9开头',

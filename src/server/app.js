@@ -13,6 +13,7 @@ import adminRoutes from './routes/adminRoutes.js'
 import exportRoutes from './routes/exportRoutes.js'
 import statisticsRoutes from './routes/statisticsRoutes.js'
 import systemConfigRoutes from './routes/systemConfigRoutes.js'
+import administrativeRegionsRoutes from './routes/administrativeRegions.js'
 
 // 导入模型以确保数据库同步
 import './models/User.js'
@@ -22,6 +23,7 @@ import './models/Order.js'
 import './models/OrderItem.js'
 import './models/Address.js'
 import './models/Administrator.js'
+import './models/AdministrativeRegion.js'
 import './models/OperationLog.js'
 import './models/SystemConfig.js'
 
@@ -64,7 +66,8 @@ app.use((req, res, next) => {
 sequelize.authenticate()
   .then(() => {
     console.log('✅ 数据库连接成功')
-    return sequelize.sync({ alter: false })
+    // 使用 alter: true 确保表结构能够自动更新
+    return sequelize.sync({ alter: true })
   })
   .then(() => {
     console.log('✅ 数据库模型同步成功')
@@ -81,6 +84,7 @@ app.use('/api/users', userRoutes)
 app.use('/api/cart', cartRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/addresses', addressRoutes)
+app.use('/api/administrative-regions', administrativeRegionsRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/admin/export', exportRoutes)
 app.use('/api/admin/statistics', statisticsRoutes)

@@ -225,36 +225,94 @@
     <el-dialog
       v-model="showUserDialog"
       :title="t('users.userDetails')"
-      width="600px"
+      width="800px"
       :before-close="closeUserDialog"
     >
       <div v-if="selectedUser" class="user-detail">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item :label="t('users.id')">{{ selectedUser.id }}</el-descriptions-item>
-          <el-descriptions-item :label="t('users.email')">{{ selectedUser.email }}</el-descriptions-item>
-          <el-descriptions-item :label="t('users.phone')">
-            <div v-if="selectedUser.phone" class="phone-detail">
-              <CountryFlag :country-code="selectedUser.country_code || '+86'" />
-              <span class="country-code">{{ selectedUser.country_code || '+86' }}</span>
-              <span class="phone-number">{{ selectedUser.phone }}</span>
-            </div>
-            <span v-else>{{ t('common.notSet') }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('users.referralCode')">
-            <el-tag v-if="selectedUser.referral_code" type="success">{{ selectedUser.referral_code }}</el-tag>
-            <span v-else class="text-gray">{{ t('common.notSet') }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('users.referredBy')">
-            <el-tag v-if="selectedUser.referred_by_code" type="info">{{ selectedUser.referred_by_code }}</el-tag>
-            <span v-else class="text-gray">{{ t('common.none') }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('users.registrationTime')" :span="2">
-            {{ formatDateTime(selectedUser.created_at) }}
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('common.updateTime')" :span="2">
-            {{ formatDateTime(selectedUser.updated_at) }}
-          </el-descriptions-item>
-        </el-descriptions>
+        <!-- Basic Information -->
+        <div class="detail-section">
+          <h4 class="section-title">{{ t('users.basicInfo') }}</h4>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item :label="t('users.id')">{{ selectedUser.id }}</el-descriptions-item>
+            <el-descriptions-item :label="t('users.email')">{{ selectedUser.email }}</el-descriptions-item>
+            <el-descriptions-item :label="t('users.phone')">
+              <div v-if="selectedUser.phone" class="phone-detail">
+                <CountryFlag :country-code="selectedUser.country_code || '+86'" />
+                <span class="country-code">{{ selectedUser.country_code || '+86' }}</span>
+                <span class="phone-number">{{ selectedUser.phone }}</span>
+              </div>
+              <span v-else>{{ t('common.notSet') }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('users.referredBy')">
+              <el-tag v-if="selectedUser.referred_by_code" type="info">{{ selectedUser.referred_by_code }}</el-tag>
+              <span v-else class="text-gray">{{ t('common.none') }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('users.registrationTime')" :span="2">
+              {{ formatDateTime(selectedUser.created_at) }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('common.updateTime')" :span="2">
+              {{ formatDateTime(selectedUser.updated_at) }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- Address Information -->
+        <div class="detail-section">
+          <h4 class="section-title">
+            {{ t('users.addresses') }}
+            <el-tag v-if="!loadingAddresses" type="info" size="small">
+              {{ t('users.addressCount') }}: {{ userAddresses.length }}
+            </el-tag>
+          </h4>
+          
+          <div v-if="loadingAddresses" class="loading-container">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>{{ t('common.loading') }}</span>
+          </div>
+          
+          <div v-else-if="userAddresses.length === 0" class="no-data">
+            <el-empty :description="t('users.noAddresses')" />
+          </div>
+          
+          <div v-else class="address-list">
+            <el-card 
+              v-for="address in userAddresses" 
+              :key="address.id" 
+              class="address-card"
+              shadow="hover"
+            >
+              <div class="address-header">
+                <div class="contact-info">
+                  <span class="contact-name">{{ address.contact_name }}</span>
+                  <div class="contact-phone">
+                    <CountryFlag :country-code="address.contact_country_code || '+86'" />
+                    <span class="country-code">{{ address.contact_country_code || '+86' }}</span>
+                    <span class="phone-number">{{ address.contact_phone }}</span>
+                  </div>
+                </div>
+                <div class="address-tags">
+                  <el-tag v-if="address.is_default" type="success" size="small">
+                    {{ t('users.defaultAddress') }}
+                  </el-tag>
+                  <el-tag type="info" size="small">
+                    {{ getAddressTypeText(address.address_type) }}
+                  </el-tag>
+                </div>
+              </div>
+              
+              <div class="address-content">
+                <div class="full-address">
+                  <el-icon><Location /></el-icon>
+                  <span>{{ formatAddress(address) }}</span>
+                </div>
+                <div v-if="address.postal_code" class="postal-code">
+                  <span class="label">{{ t('users.postalCode') }}:</span>
+                  <span class="value">{{ address.postal_code }}</span>
+                </div>
+              </div>
+            </el-card>
+          </div>
+        </div>
       </div>
       
       <template #footer>
@@ -267,7 +325,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar } from '@element-plus/icons-vue'
+import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar, Loading, Location } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { userAPI } from '../api/users.js'
 import { useAdminStore } from '../stores/admin.js'
@@ -298,6 +356,8 @@ const searchForm = reactive({
 // 用户详情对话框
 const showUserDialog = ref(false)
 const selectedUser = ref(null)
+const userAddresses = ref([])
+const loadingAddresses = ref(false)
 
 // 统计数据计算
 const todayRegistrations = computed(() => {
@@ -432,15 +492,84 @@ const exportUsers = async () => {
 }
 
 // 查看用户详情
-const viewUserDetail = (user) => {
+const viewUserDetail = async (user) => {
   selectedUser.value = user
   showUserDialog.value = true
+  
+  // 加载用户地址
+  await loadUserAddresses(user.id)
+}
+
+// 加载用户地址
+const loadUserAddresses = async (userId) => {
+  try {
+    loadingAddresses.value = true
+    userAddresses.value = []
+    
+    const response = await userAPI.getUserAddresses(userId)
+    if (response.data.success) {
+      userAddresses.value = response.data.data || []
+    } else {
+      console.error('获取用户地址失败:', response.data.message)
+    }
+  } catch (error) {
+    console.error('获取用户地址失败:', error)
+    ElMessage.error('获取用户地址失败')
+  } finally {
+    loadingAddresses.value = false
+  }
 }
 
 // 关闭用户详情对话框
 const closeUserDialog = () => {
   showUserDialog.value = false
   selectedUser.value = null
+  userAddresses.value = []
+}
+
+// 获取地址类型文本
+const getAddressTypeText = (type) => {
+  const typeMap = {
+    'home': t('users.home'),
+    'office': t('users.office'),
+    'other': t('users.other')
+  }
+  return typeMap[type] || t('users.other')
+}
+
+// 格式化地址显示
+const formatAddress = (address) => {
+  const parts = []
+  
+  // 只添加非空的省市区信息
+  if (address.province && address.province.trim()) {
+    parts.push(address.province.trim())
+  }
+  if (address.city && address.city.trim()) {
+    parts.push(address.city.trim())
+  }
+  if (address.district && address.district.trim()) {
+    parts.push(address.district.trim())
+  }
+  
+  // 组合省市区，用空格分隔
+  let regionPart = parts.join(' ')
+  
+  // 添加详细地址
+  if (address.detail_address && address.detail_address.trim()) {
+    if (regionPart) {
+      return `${regionPart} ${address.detail_address.trim()}`
+    } else {
+      return address.detail_address.trim()
+    }
+  }
+  
+  // 如果没有分离的省市区信息，使用full_address作为后备
+  if (!regionPart && address.full_address) {
+    return address.full_address
+  }
+  
+  return regionPart || '地址信息不完整'
 }
 
 // 切换用户状态（启用/禁用）
@@ -750,8 +879,7 @@ onMounted(() => {
   line-height: 1.4;
 }
 
-.referral-code-row,
-.referred-by-row {
+.referral-code-row {
   margin-bottom: 4px;
   display: flex;
   align-items: center;
@@ -860,5 +988,130 @@ onMounted(() => {
 .phone-detail .phone-number {
   font-size: 14px;
   font-weight: 500;
+}
+
+/* 用户详情页样式 */
+.user-detail {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.detail-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e4e7ed;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  color: #909399;
+}
+
+.no-data {
+  padding: 20px;
+}
+
+.address-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.address-card {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.address-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.address-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.contact-info {
+  flex: 1;
+}
+
+.contact-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.contact-phone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.address-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.address-content {
+  padding-top: 12px;
+  border-top: 1px solid #f0f2f5;
+}
+
+.full-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.5;
+}
+
+.full-address .el-icon {
+  color: #909399;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.postal-code {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.postal-code .label {
+  color: #909399;
+}
+
+.postal-code .value {
+  font-family: monospace;
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #303133;
 }
 </style>

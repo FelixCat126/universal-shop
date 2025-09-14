@@ -197,13 +197,14 @@ export default {
     optional: 'ไม่จำเป็น',
     copyCode: 'คัดลอกรหัส',
     copied: 'คัดลอกแล้ว',
-    placeholder: 'กรุณาใส่รหัสแนะนำ (ไม่จำเป็น)',
+    placeholder: 'กรุณาใส่รหัสแนะนำ',
     hint: 'รหัสแนะนำเป็นตัวเลือก สามารถใส่เนื้อหาใดก็ได้',
     shareCode: 'แชร์รหัสแนะนำ',
     referralCount: 'จำนวนคนที่แนะนำ',
     referredBy: 'ผู้แนะนำ',
     invalidCode: 'รหัสแนะนำไม่ถูกต้อง',
-    codeVerified: 'ตรวจสอบรหัสแนะนำสำเร็จ'
+    codeVerified: 'ตรวจสอบรหัสแนะนำสำเร็จ',
+    checkoutHint: 'ใส่รหัสแนะนำเพื่อรับสิทธิประโยชน์ จะเชื่อมโยงกับบัญชีของคุณเมื่อลงทะเบียน'
   },
 
   // 订单
@@ -249,6 +250,7 @@ export default {
     province: 'จังหวัด',
     city: 'เมือง',
     district: 'อำเภอ/เขต',
+    addressRegion: 'เลือกจังหวัด/อำเภอ/ตำบล',
     detailAddress: 'ที่อยู่รายละเอียด',
     addressType: 'ประเภทที่อยู่',
     addressHome: 'บ้าน',
@@ -276,7 +278,17 @@ export default {
     pleaseAddFirst: 'กรุณาเพิ่มที่อยู่จัดส่งก่อนดำเนินการสั่งซื้อ',
     autoReturn: 'หลังจากเพิ่มที่อยู่แล้วจะกลับไปยังหน้าชำระเงินโดยอัตโนมัติ',
     loading: 'กำลังโหลดที่อยู่...',
-    default: 'ค่าเริ่มต้น'
+    default: 'ค่าเริ่มต้น',
+    province: 'จังหวัด',
+    district: 'อำเภอ',
+    subDistrict: 'ตำบล',
+    postalCode: 'รหัสไปรษณีย์',
+    selectProvince: 'เลือกจังหวัด',
+    selectDistrict: 'เลือกอำเภอ',
+    selectSubDistrict: 'เลือกตำบล',
+    selectProvinceFirst: 'กรุณาเลือกจังหวัดก่อน',
+    selectDistrictFirst: 'กรุณาเลือกอำเภอก่อน',
+    postalCodeAuto: 'จะใส่อัตโนมัติหลังเลือกตำบล'
   },
 
   // 支付方式
@@ -323,6 +335,7 @@ export default {
     countryRequired: 'กรุณาเลือกประเทศ',
     provinceRequired: 'กรุณาใส่จังหวัด',
     cityRequired: 'กรุณาใส่เมือง',
+    districtRequired: 'กรุณาใส่ตำบล',
     detailAddressRequired: 'กรุณาใส่ที่อยู่รายละเอียด',
     phonePatternChina: 'เบอร์โทรศัพท์จีนต้องขึ้นต้นด้วย 1 หลักที่สองเป็น 3-9',
     phonePatternThailand: 'เบอร์โทรศัพท์ไทยต้องขึ้นต้นด้วย 2-9',

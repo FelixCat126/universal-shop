@@ -2,6 +2,7 @@ import express from 'express'
 import OrderController from '../controllers/orderController.js'
 import UserController from '../controllers/userController.js'
 import AdministratorController from '../controllers/administratorController.js'
+import AddressController from '../controllers/addressController.js'
 import { authenticateAdmin, requirePermission, requireSuperAdmin, logOperation } from '../middlewares/adminAuthMiddleware.js'
 
 const router = express.Router()
@@ -36,6 +37,7 @@ router.get('/orders/export', requirePermission('orders'), OrderController.export
 // 管理员用户路由（需要users权限）
 router.get('/users', requirePermission('users'), UserController.getAllUsers)
 router.put('/users/:id/status', requirePermission('users'), logOperation('update_user_status', 'user'), UserController.updateUserStatus)
+router.get('/users/:userId/addresses', requirePermission('users'), AddressController.getAdminUserAddresses)
 
 // 管理员管理路由（需要administrators权限）
 router.get('/administrators', requirePermission('administrators'), AdministratorController.getAllAdministrators)

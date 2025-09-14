@@ -107,11 +107,14 @@ export default {
     optional: 'Optional',
     copyCode: 'Copy Referral Code',
     copied: 'Copied',
-    placeholder: 'Please enter referral code (optional)',
+    placeholder: 'Please enter referral code',
     hint: 'Referral code is optional, you can enter any content',
     shareCode: 'Share Referral Code',
     referralCount: 'Number of Referrals',
-    referredBy: 'Referred by'
+    referredBy: 'Referred by',
+    invalidCode: 'Invalid referral code',
+    codeVerified: 'Referral code verified',
+    checkoutHint: 'Enter referral code for benefits. It will be linked to your account upon registration.'
   },
 
   // 商品相关
@@ -244,6 +247,7 @@ export default {
     province: 'Province',
     city: 'City',
     district: 'District/County',
+    addressRegion: 'Province/City/District',
     detailAddress: 'Detailed Address',
     addressType: 'Address Type',
     addressHome: 'Home',
@@ -283,7 +287,17 @@ export default {
     setDefaultFailed: 'Failed to set default address',
     loading: 'Loading addresses...',
     pleaseAddFirst: 'Please add a shipping address first to continue ordering',
-    autoReturn: 'Will automatically return to checkout page after adding address'
+    autoReturn: 'Will automatically return to checkout page after adding address',
+    province: 'Province',
+    district: 'District',
+    subDistrict: 'Sub-district',
+    postalCode: 'Postal Code',
+    selectProvince: 'Select Province',
+    selectDistrict: 'Select District',
+    selectSubDistrict: 'Select Sub-district',
+    selectProvinceFirst: 'Please select province first',
+    selectDistrictFirst: 'Please select district first',
+    postalCodeAuto: 'Auto-filled after selecting sub-district'
   },
 
   // 支付方式
@@ -322,6 +336,7 @@ export default {
     countryRequired: 'Please select a country',
     provinceRequired: 'Please enter province',
     cityRequired: 'Please enter city',
+    districtRequired: 'Please enter district',
     detailAddressRequired: 'Please enter detailed address',
     emailOrPhoneRequired: 'Please enter phone number or email',
     accountMinLength: 'Account must be at least 3 characters',

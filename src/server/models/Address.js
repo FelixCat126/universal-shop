@@ -46,22 +46,27 @@ const Address = sequelize.define('Address', {
         
         // 根据国家区号验证位数
         const countryCode = this.contact_country_code
-        let expectedLength
+        let minLength
+        let countryName
         switch (countryCode) {
           case '+86': // 中国
+            minLength = 11
+            countryName = '中国'
+            break
           case '+60': // 马来西亚
-            expectedLength = 11
+            minLength = 9
+            countryName = '马来西亚'
             break
           case '+66': // 泰国
-            expectedLength = 9
+            minLength = 9
+            countryName = '泰国'
             break
           default:
             throw new Error('不支持的国家区号')
         }
         
-        if (value.length !== expectedLength) {
-          const countryName = countryCode === '+86' ? '中国' : countryCode === '+66' ? '泰国' : '马来西亚'
-          throw new Error(`${countryName}手机号必须为${expectedLength}位数字`)
+        if (value.length < minLength) {
+          throw new Error(`${countryName}手机号必须不少于${minLength}位数字`)
         }
       }
     },

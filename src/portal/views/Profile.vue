@@ -186,7 +186,7 @@
                       <span v-if="address.is_default" class="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">{{ t('profile.default') }}</span>
                     </div>
                     <p class="text-sm text-gray-700">
-                      {{ address.province }}{{ address.city }}{{ address.district }}{{ address.detail_address }}
+                      {{ formatAddress(address) }}
                     </p>
                                       <p class="text-xs text-gray-500 mt-1">
                     {{ address.address_type === 'home' ? t('order.addressHome') : address.address_type === 'company' ? t('order.addressCompany') : t('order.addressOther') }}
@@ -319,38 +319,15 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">{{ t('order.province') }} *</label>
-              <input
-                v-model="addressForm.province"
-                type="text"
-                required
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                :placeholder="t('order.province')"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">{{ t('order.city') }} *</label>
-              <input
-                v-model="addressForm.city"
-                type="text"
-                required
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                :placeholder="t('order.city')"
-              />
-            </div>
-          </div>
-
+          <!-- 泰国三级联动地址选择器 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700">{{ t('order.district') }}</label>
-            <input
-              v-model="addressForm.district"
-              type="text"
-              class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              :placeholder="t('order.districtPlaceholder')"
+            <label class="block text-sm font-medium text-gray-700 mb-3">{{ t('order.addressRegion') }} *</label>
+            <ThailandAddressSelector 
+              v-model="addressRegion"
+              @change="handleAddressRegionChange"
             />
           </div>
+
 
           <div>
             <label class="block text-sm font-medium text-gray-700">{{ t('order.detailAddress') }} *</label>
@@ -416,12 +393,44 @@ import { useUserStore } from '../stores/user.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
 import { getUserOrders } from '../api/orders.js'
 import { userAPI } from '../api/users.js'
+import api from '../api/index.js'
 import CountrySelector from '../components/CountrySelector.vue'
+import ThailandAddressSelector from '../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n, formatPhoneDisplay } from '../utils/phoneValidation.js'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+
+// 格式化地址显示
+const formatAddress = (address) => {
+  const parts = []
+  
+  // 只添加非空的省市区信息
+  if (address.province && address.province.trim()) {
+    parts.push(address.province.trim())
+  }
+  if (address.city && address.city.trim()) {
+    parts.push(address.city.trim())
+  }
+  if (address.district && address.district.trim()) {
+    parts.push(address.district.trim())
+  }
+  
+  // 组合省市区，用空格分隔
+  let regionPart = parts.join(' ')
+  
+  // 添加详细地址
+  if (address.detail_address && address.detail_address.trim()) {
+    if (regionPart) {
+      return `${regionPart} ${address.detail_address.trim()}`
+    } else {
+      return address.detail_address.trim()
+    }
+  }
+  
+  return regionPart || '地址信息不完整'
+}
 
 // 国际化
 const { t } = useI18n()
@@ -448,9 +457,18 @@ const addressForm = ref({
   province: '',
   city: '',
   district: '',
+  postal_code: '',
   detail_address: '',
   address_type: 'home',
   is_default: false
+})
+
+// 三级联动地址选择器数据
+const addressRegion = ref({
+  province: null,
+  district: null,
+  subDistrict: null,
+  postalCode: ''
 })
 
 // 加载状态
@@ -590,13 +608,77 @@ const handleAddressCountryChange = (country) => {
   addressForm.value.contact_phone = ''
 }
 
-const editAddress = (address) => {
+const editAddress = async (address) => {
   if (!address) return
   editingAddress.value = { ...address }
   // 填充表单数据
   Object.keys(addressForm.value).forEach(key => {
     addressForm.value[key] = address[key] || ''
   })
+  
+  // 根据省市区名称查找对应的ID
+  try {
+    let provinceId = null
+    let districtId = null
+    let subDistrictId = null
+    
+    // 如果有省份名称，查找省份ID
+    if (address.province) {
+      const provincesResponse = await api.get('/administrative-regions/provinces', {
+        params: { locale: 'zh-CN' }
+      })
+      if (provincesResponse.data.success) {
+        const province = provincesResponse.data.data.find(p => p.name === address.province)
+        if (province) {
+          provinceId = province.id
+          
+          // 如果有城市名称，查找城市ID
+          if (address.city) {
+            const districtsResponse = await api.get(`/administrative-regions/provinces/${provinceId}/districts`, {
+              params: { locale: 'zh-CN' }
+            })
+            if (districtsResponse.data.success) {
+              const district = districtsResponse.data.data.find(d => d.name === address.city)
+              if (district) {
+                districtId = district.id
+                
+                // 如果有区县名称，查找区县ID
+                if (address.district) {
+                  const subDistrictsResponse = await api.get(`/administrative-regions/districts/${districtId}/sub-districts`, {
+                    params: { locale: 'zh-CN' }
+                  })
+                  if (subDistrictsResponse.data.success) {
+                    const subDistrict = subDistrictsResponse.data.data.find(s => s.name === address.district)
+                    if (subDistrict) {
+                      subDistrictId = subDistrict.id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // 设置地址选择器的值
+    addressRegion.value = {
+      province: provinceId,
+      district: districtId,
+      subDistrict: subDistrictId,
+      postalCode: address.postal_code || ''
+    }
+  } catch (error) {
+    console.error('查找地址ID失败:', error)
+    // 如果查找失败，至少设置邮编
+    addressRegion.value = {
+      province: null,
+      district: null,
+      subDistrict: null,
+      postalCode: address.postal_code || ''
+    }
+  }
+  
   showAddressModal.value = true
 }
 
@@ -608,9 +690,33 @@ const resetAddressForm = () => {
     province: '',
     city: '',
     district: '',
+    postal_code: '',
     detail_address: '',
     address_type: 'home',
     is_default: false
+  }
+  addressRegion.value = {
+    province: null,
+    district: null,
+    subDistrict: null,
+    postalCode: ''
+  }
+}
+
+// 处理地址区域选择变化
+const handleAddressRegionChange = (regionData) => {
+  // 更新表单中的省市区和邮编信息
+  if (regionData.provinceData) {
+    addressForm.value.province = regionData.provinceData.name
+  }
+  if (regionData.districtData) {
+    addressForm.value.city = regionData.districtData.name
+  }
+  if (regionData.subDistrictData) {
+    addressForm.value.district = regionData.subDistrictData.name
+  }
+  if (regionData.postalCode) {
+    addressForm.value.postal_code = regionData.postalCode
   }
 }
 

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "clean": "node scripts/clean-cache.js",
+    "setup": "node setup.js",
+    "seed": "node src/server/seeds/index.js",
     "dev": "npm run clean && concurrently \"npm run dev:server\" \"npm run dev:portal\" \"npm run dev:admin\"",
     "dev:portal": "vite --force",
     "dev:admin": "vite --config vite.admin.config.js --force",
@@ -18,7 +20,6 @@
     "preview": "vite preview",
     "preview:portal": "vite preview",
     "preview:admin": "vite preview --config vite.admin.config.js",
-    "setup": "node setup.js",
     "test:api": "node test-api.js",
     "start": "node src/server/index.js",
     "start:production": "NODE_ENV=production node start-https-production.js",

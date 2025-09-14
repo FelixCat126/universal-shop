@@ -19,7 +19,13 @@ class OrderController {
         contact_phone,
         delivery_address,
         payment_method = 'cod', // cod: 货到付款, online: 在线付款
-        notes = ''
+        notes = '',
+        referral_code = null, // 推荐码（可选）
+        // 非登录用户的地址字段
+        province = '',
+        city = '',
+        district = '',
+        detail_address = ''
       } = req.body
       
       let userId = req.user?.userId
@@ -27,18 +33,57 @@ class OrderController {
       
       // 如果用户未登录，检查是否为游客下单
       if (!userId) {
-        // 验证手机号格式
-        const phoneRegex = /^[1-9]\d{9,}$/
-        if (!phoneRegex.test(contact_phone)) {
+        // 解析并验证手机号格式（包含国家区号）
+        let countryCode = '+86' // 默认值
+        let phoneNumber = contact_phone
+        
+        // 检查是否包含国家区号并解析
+        const supportedCodes = ['+86', '+66', '+60']
+        for (const code of supportedCodes) {
+          if (contact_phone.startsWith(code)) {
+            countryCode = code
+            phoneNumber = contact_phone.substring(code.length)
+            break
+          }
+        }
+        
+        // 验证手机号格式（纯数字，不能以0开头）
+        const phoneRegex = /^[1-9]\d+$/
+        if (!phoneRegex.test(phoneNumber)) {
           return res.status(400).json({
             success: false,
-            message: '手机号必须为不低于10位的纯数字且不能以0开头'
+            message: '手机号必须为纯数字且不能以0开头'
+          })
+        }
+        
+        // 根据国家区号验证手机号长度
+        let minLength
+        let countryName
+        switch (countryCode) {
+          case '+86':
+            minLength = 11
+            countryName = '中国'
+            break
+          case '+60':
+            minLength = 9
+            countryName = '马来西亚'
+            break
+          case '+66':
+            minLength = 9
+            countryName = '泰国'
+            break
+        }
+        
+        if (phoneNumber.length < minLength) {
+          return res.status(400).json({
+            success: false,
+            message: `${countryName}手机号必须不少于${minLength}位数字`
           })
         }
         
         // 尝试自动注册
         try {
-          const newUser = await UserController.autoRegister(contact_phone, contact_name)
+          const newUser = await UserController.autoRegister(contact_phone, contact_name, referral_code)
           userId = newUser.id
           isGuestOrder = true
         } catch (error) {
@@ -150,15 +195,37 @@ class OrderController {
       // 为游客用户创建默认地址
       if (isGuestOrder) {
         const Address = (await import('../models/Address.js')).default
+        
+        // 解析contact_phone中的国家区号和手机号
+        let countryCode = '+86' // 默认值
+        let phoneNumber = contact_phone
+        
+        // 检查是否包含国家区号
+        const supportedCodes = ['+86', '+66', '+60']
+        for (const code of supportedCodes) {
+          if (contact_phone.startsWith(code)) {
+            countryCode = code
+            phoneNumber = contact_phone.substring(code.length)
+            break
+          }
+        }
+        
+        
         await Address.create({
           user_id: userId,
           contact_name,
-          contact_phone,
-          province: '未设置',
-          city: '未设置', 
-          district: '未设置',
-          detail_address: delivery_address,
-          full_address: `未设置未设置未设置${delivery_address}`, // 构建完整地址
+          contact_country_code: countryCode,
+          contact_phone: phoneNumber,
+          province: province || '',
+          city: city || '',
+          district: district || '',
+          detail_address: detail_address || '', // 只使用详细地址字段，不使用delivery_address
+          full_address: (() => {
+            const addressParts = [province, city, district].filter(Boolean)
+            const regionPart = addressParts.join(' ')
+            const detailAddr = detail_address || ''
+            return regionPart ? `${regionPart} ${detailAddr}` : detailAddr
+          })(), // 构建完整地址，用空格分隔
           is_default: true
         }, { transaction })
       }

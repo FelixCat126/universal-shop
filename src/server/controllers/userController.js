@@ -37,27 +37,27 @@ class UserController {
       }
 
       // 根据国家区号验证手机号长度
-      let expectedLength
+      let minLength
       let countryName
       switch (country_code) {
         case '+86':
-          expectedLength = 11
+          minLength = 11
           countryName = '中国'
           break
         case '+60':
-          expectedLength = 11
+          minLength = 9
           countryName = '马来西亚'
           break
         case '+66':
-          expectedLength = 9
+          minLength = 9
           countryName = '泰国'
           break
       }
 
-      if (phone.length !== expectedLength) {
+      if (phone.length < minLength) {
         return res.status(400).json({
           success: false,
-          message: `${countryName}手机号必须为${expectedLength}位数字`
+          message: `${countryName}手机号必须不少于${minLength}位数字`
         })
       }
 
@@ -99,6 +99,20 @@ class UserController {
         }
       }
 
+      // 验证推荐码（如果提供了）
+      let validReferralCode = null
+      if (referral_code && referral_code.trim()) {
+        const referrer = await User.findByReferralCode(referral_code.trim())
+        if (referrer) {
+          validReferralCode = referral_code.trim()
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: '推荐码不存在或无效'
+          })
+        }
+      }
+
       // 创建用户
       const user = await User.create({
         username: `${country_code}${phone}`, // 用户名包含区号以保证唯一性
@@ -107,7 +121,7 @@ class UserController {
         country_code,
         phone,
         password,
-        referred_by_code: referral_code || null
+        referred_by_code: validReferralCode
       })
 
       // 生成JWT token
@@ -481,16 +495,57 @@ class UserController {
   }
 
   // 自动注册用户（游客下单时使用）
-  static async autoRegister(phone, contactName) {
+  static async autoRegister(fullPhoneWithCode, contactName, referralCode = null) {
     try {
-      // 验证手机号格式
-      const phoneRegex = /^[1-9]\d{9,}$/
-      if (!phoneRegex.test(phone)) {
-        throw new Error('手机号必须为不低于10位的纯数字且不能以0开头')
+      // 解析完整手机号中的国家区号和手机号
+      let countryCode = '+86' // 默认值
+      let phoneNumber = fullPhoneWithCode
+      
+      // 检查是否包含国家区号并解析
+      const supportedCodes = ['+86', '+66', '+60']
+      for (const code of supportedCodes) {
+        if (fullPhoneWithCode.startsWith(code)) {
+          countryCode = code
+          phoneNumber = fullPhoneWithCode.substring(code.length)
+          break
+        }
+      }
+      
+      // 验证手机号格式（纯数字，不能以0开头）
+      const phoneRegex = /^[1-9]\d+$/
+      if (!phoneRegex.test(phoneNumber)) {
+        throw new Error('手机号必须为纯数字且不能以0开头')
+      }
+      
+      // 根据国家区号验证手机号长度
+      let minLength
+      let countryName
+      switch (countryCode) {
+        case '+86':
+          minLength = 11
+          countryName = '中国'
+          break
+        case '+60':
+          minLength = 9
+          countryName = '马来西亚'
+          break
+        case '+66':
+          minLength = 9
+          countryName = '泰国'
+          break
+      }
+      
+      if (phoneNumber.length < minLength) {
+        throw new Error(`${countryName}手机号必须不少于${minLength}位数字`)
       }
 
-      // 检查手机号是否已存在
-      const existingUser = await User.findOne({ where: { phone } })
+      // 检查手机号是否已存在（使用国家区号+手机号组合检查）
+      const existingUser = await User.findOne({ 
+        where: { 
+          country_code: countryCode,
+          phone: phoneNumber 
+        } 
+      })
       if (existingUser) {
         if (!existingUser.is_active) {
           throw new Error('该手机号关联的账户已被禁用，无法下单')
@@ -499,15 +554,27 @@ class UserController {
       }
 
       // 生成默认密码（手机号后8位）
-      const defaultPassword = phone.slice(-8)
+      const defaultPassword = phoneNumber.slice(-8)
+      
+      // 验证推荐码（如果提供了）
+      let validReferralCode = null
+      if (referralCode && referralCode.trim()) {
+        const referrer = await User.findByReferralCode(referralCode.trim())
+        if (referrer) {
+          validReferralCode = referralCode.trim()
+        }
+        // 注意：在自动注册中，如果推荐码无效，我们不阻止注册，只是不保存推荐码
+      }
       
       // 创建用户
       const user = await User.create({
-        username: phone, // 用户名与手机号保持一致
-        nickname: contactName || `用户${phone.slice(-4)}`,
-        phone,
+        username: phoneNumber, // 用户名与手机号保持一致（不含区号）
+        nickname: contactName || `用户${phoneNumber.slice(-4)}`,
+        country_code: countryCode,
+        phone: phoneNumber,
         password: defaultPassword,
-        email: null
+        email: null,
+        referred_by_code: validReferralCode
       })
 
       return user

@@ -170,7 +170,8 @@ const handleLogin = async () => {
       }, 800)
       
     } else {
-      ElMessage.error(result.message || t('login.loginFailed'))
+      // 不使用后端返回的中文消息，统一使用国际化文本
+      ElMessage.error(t('login.loginFailed'))
     }
     
   } catch (error) {
