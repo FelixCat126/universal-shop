@@ -223,6 +223,10 @@
           <el-input v-model="productForm.name" :placeholder="t('products.placeholders.enterName')" />
         </el-form-item>
 
+        <el-form-item :label="t('products.alias')" prop="alias">
+          <el-input v-model="productForm.alias" :placeholder="t('products.placeholders.enterAlias')" />
+        </el-form-item>
+
         <el-form-item :label="t('products.description')" prop="description">
           <el-input
             type="textarea"
@@ -399,6 +403,7 @@ export default {
     const productForm = reactive({
       id: null,
       name: '',
+      alias: '', // 产品别名
       description: '',
       category: '',
       price: 0,
@@ -507,6 +512,7 @@ export default {
       // 深度清空所有表单数据
       productForm.id = null
       productForm.name = ''
+      productForm.alias = ''
       productForm.description = ''
       productForm.category = ''
       productForm.price = null

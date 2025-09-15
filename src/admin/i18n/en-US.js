@@ -447,6 +447,8 @@ export default {
     avgOrderValue: 'Average Order Value',
     orderNumber: 'Order Number',
     customer: 'Customer',
+    user: 'User',
+    recipientInfo: 'Recipient Information',
     amount: 'Amount',
     orderDate: 'Order Date',
     actions: 'Actions',
@@ -477,7 +479,8 @@ export default {
       pending: 'Pending',
       cancelled: 'Cancelled',
       processing: 'Processing',
-      shipped: 'Shipped'
+      shipped: 'Shipped',
+      shipping: 'In Transit'
     },
     // Delivery modes
     deliveryModes: {
@@ -493,6 +496,7 @@ export default {
       statusUpdateFailed: 'Status update failed',
       confirmStatusUpdate: 'Are you sure you want to update this order status?',
       confirmDelete: 'Are you sure you want to delete this order?',
+      deleting: 'Deleting order...',
       deleteSuccess: 'Order deleted successfully',
       deleteFailed: 'Order deletion failed'
     }
@@ -508,6 +512,7 @@ export default {
     selectCategory: 'Select category',
     stockStatus: 'Stock Status',
     name: 'Product Name',
+    alias: 'Product Alias',
     description: 'Product Description',
     category: 'Category',
     price: 'Price',
@@ -542,6 +547,7 @@ export default {
     // Form placeholders
     placeholders: {
       enterName: 'Please enter product name',
+      enterAlias: 'Please enter product alias (optional)',
       enterDescription: 'Please enter product description',
       enterPrice: 'Please enter product price',
       enterStock: 'Please enter stock quantity'

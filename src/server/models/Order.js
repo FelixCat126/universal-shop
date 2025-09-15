@@ -59,6 +59,12 @@ const Order = sequelize.define('Order', {
     type: DataTypes.TEXT,
     allowNull: true,
     comment: '订单备注'
+  },
+  exchange_rate: {
+    type: DataTypes.DECIMAL(10, 4),
+    allowNull: false,
+    defaultValue: 1.0000,
+    comment: '下单时汇率（用于金额显示）'
   }
 }, {
   tableName: 'orders',

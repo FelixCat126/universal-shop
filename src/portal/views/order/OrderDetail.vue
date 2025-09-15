@@ -57,9 +57,13 @@
             >
               {{ getStatusText(order.status) }}
             </span>
-            <p class="text-lg font-bold text-blue-600 mt-2">
-              {{ t('common.currency') }}{{ order.total_amount }}
-            </p>
+            <div class="mt-2">
+              <div v-if="order.payment_method === 'online'" class="text-right">
+                <div class="text-lg font-bold text-blue-600">USDT {{ getExchangedAmount(order.total_amount, order.exchange_rate) }}</div>
+                <div class="text-sm text-gray-500">({{ t('common.currency') }}{{ order.total_amount }})</div>
+              </div>
+              <p v-else class="text-lg font-bold text-blue-600">{{ t('common.currency') }}{{ order.total_amount }}</p>
+            </div>
           </div>
         </div>
 
@@ -145,7 +149,11 @@
         <div class="mt-6 pt-6 border-t border-gray-200">
           <div class="flex justify-between items-center">
             <span class="text-lg font-semibold text-gray-900">{{ t('order.total') }}</span>
-            <span class="text-xl font-bold text-blue-600">{{ t('common.currency') }}{{ order.total_amount }}</span>
+            <div v-if="order.payment_method === 'online'" class="text-right">
+              <div class="text-xl font-bold text-blue-600">USDT {{ getExchangedAmount(order.total_amount, order.exchange_rate) }}</div>
+              <div class="text-sm text-gray-500">({{ t('common.currency') }}{{ order.total_amount }})</div>
+            </div>
+            <span v-else class="text-xl font-bold text-blue-600">{{ t('common.currency') }}{{ order.total_amount }}</span>
           </div>
         </div>
       </div>
@@ -224,15 +232,24 @@ const getStatusStyle = (status) => {
     pending: 'bg-yellow-100 text-yellow-800',
     paid: 'bg-blue-100 text-blue-800',
     shipped: 'bg-purple-100 text-purple-800',
+    shipping: 'bg-blue-100 text-blue-800',
     delivered: 'bg-green-100 text-green-800',
+    completed: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800'
   }
   return styles[status] || 'bg-gray-100 text-gray-800'
 }
 
-// 获取订单状态文本（简化版，所有订单都是已完成）
+// 获取订单状态文本
 const getStatusText = (status) => {
-  return t('profile.completed')
+  const statusMap = {
+    pending: t('order.status.pending'),
+    shipping: t('order.status.shipping'),
+    shipped: t('order.status.shipped'),
+    completed: t('order.status.completed'),
+    cancelled: t('order.status.cancelled')
+  }
+  return statusMap[status] || t('order.status.completed')
 }
 
 // 获取配送方式文本
@@ -265,6 +282,13 @@ const formatDateTime = (dateString) => {
   } else {
     return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()} ${timeStr}`
   }
+}
+
+// 计算汇算后金额
+const getExchangedAmount = (amount, orderExchangeRate = null) => {
+  // 优先使用订单保存的汇率，如果没有则使用默认值1
+  const rate = orderExchangeRate || 1.0000
+  return (parseFloat(amount) * rate).toFixed(2)
 }
 
 // 加载订单详情

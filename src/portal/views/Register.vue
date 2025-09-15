@@ -175,11 +175,13 @@ import { useI18n } from 'vue-i18n'
 import { userAPI } from '../api/users.js'
 import CountrySelector from '../components/CountrySelector.vue'
 import { validatePhoneI18n, getCountryInfo } from '../utils/phoneValidation.js'
+import { useToast } from '../composables/useToast.js'
 
 // 国际化
 const { t } = useI18n()
 
 const router = useRouter()
+const { success, error: showError } = useToast()
 
 // 表单数据
 const form = reactive({
@@ -296,7 +298,7 @@ const handleSubmit = async () => {
       localStorage.setItem('token', response.data.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.data.user))
       
-      alert(t('user.registerSuccess'))
+      success(t('user.registerSuccess'))
       
       // 跳转到首页
       router.push('/')
@@ -305,9 +307,9 @@ const handleSubmit = async () => {
     console.error('Registration failed:', error)
     
     if (error.response?.data?.message) {
-      alert(t('user.registerFailed') + ': ' + error.response.data.message)
+      showError(t('user.registerFailed') + ': ' + error.response.data.message)
     } else {
-      alert(t('user.registerFailed') + '，' + t('error.tryLater'))
+      showError(t('user.registerFailed') + '，' + t('error.tryLater'))
     }
   } finally {
     isSubmitting.value = false

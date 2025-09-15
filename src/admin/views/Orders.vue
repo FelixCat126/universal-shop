@@ -149,7 +149,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.customer')" width="220" min-width="200">
+        <el-table-column :label="t('orders.user')" width="220" min-width="200">
           <template #default="scope">
             <div class="user-info">
               <div class="user-nickname">{{ scope.row.user?.nickname || t('common.unknown') }}</div>
@@ -158,9 +158,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.amount')" width="140" align="center">
+        <el-table-column :label="t('orders.amount')" width="200" align="center">
           <template #default="scope">
-            <div class="amount">{{ t('common.currency') }}{{ scope.row.total_amount }}</div>
+            <div class="amount" v-if="scope.row.payment_method === 'online'">
+              <div class="converted-amount">USDT {{ getExchangedAmount(scope.row.total_amount, scope.row.exchange_rate) }}</div>
+              <div class="original-amount">({{ t('common.currency') }}{{ scope.row.total_amount }})</div>
+            </div>
+            <div class="amount" v-else>{{ t('common.currency') }}{{ scope.row.total_amount }}</div>
           </template>
         </el-table-column>
 
@@ -181,7 +185,7 @@
         </el-table-column>
 
 
-        <el-table-column :label="t('orders.customerInfo')" width="200" min-width="180">
+        <el-table-column :label="t('orders.recipientInfo')" width="200" min-width="180">
           <template #default="scope">
             <div class="contact-info">
               <div class="contact-name">{{ scope.row.contact_name }}</div>
@@ -271,8 +275,8 @@
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('orders.amount')">
                   <span class="amount-text" v-if="selectedOrder.payment_method === 'online'">
-                    {{ t('common.currency') }}{{ selectedOrder.total_amount }} 
-                    <span class="exchange-rate-info">(汇算后: ฿{{ getExchangedAmount(selectedOrder.total_amount) }})</span>
+                    <div class="primary-amount">USDT {{ getExchangedAmount(selectedOrder.total_amount, selectedOrder.exchange_rate) }}</div>
+                    <div class="original-amount-detail">({{ t('common.currency') }}{{ selectedOrder.total_amount }})</div>
                   </span>
                   <span class="amount-text" v-else>{{ t('common.currency') }}{{ selectedOrder.total_amount }}</span>
                 </el-descriptions-item>
@@ -482,6 +486,7 @@ const loadOrders = async () => {
         orders.value = data.data?.orders || []
         pagination.total = data.data?.total || 0
         pagination.totalPages = data.data?.totalPages || 1
+        
       }
     } else {
       const errorData = await response.json()
@@ -510,20 +515,31 @@ const deleteOrder = async (orderId) => {
       }
     )
     
+    // 显示加载状态
+    const loadingMessage = ElMessage({
+      message: t('orders.messages.deleting'),
+      type: 'info',
+      duration: 0
+    })
+    
     const response = await adminStore.apiRequest(`/api/admin/orders/${orderId}`, {
       method: 'DELETE'
     })
+    
+    // 关闭加载消息
+    loadingMessage.close()
     
     if (response.ok) {
       const data = await response.json()
       if (data.success) {
         ElMessage.success(t('orders.messages.deleteSuccess'))
-        loadOrders()
+        // 刷新订单列表
+        await loadOrders()
       } else {
         ElMessage.error(data.message || t('orders.messages.deleteFailed'))
       }
     } else {
-      const errorData = await response.json()
+      const errorData = await response.json().catch(() => ({ message: '网络错误' }))
       ElMessage.error(errorData.message || t('orders.messages.deleteFailed'))
     }
   } catch (error) {
@@ -531,7 +547,7 @@ const deleteOrder = async (orderId) => {
       return // 用户取消操作
     }
     console.error('删除订单失败:', error)
-    ElMessage.error(t('orders.messages.deleteFailed') + '：' + (error.response?.data?.message || error.message))
+    ElMessage.error(t('orders.messages.deleteFailed') + '：' + (error.message || '未知错误'))
   }
 }
 
@@ -653,7 +669,8 @@ const getStatusText = (status) => {
     pending: t('orders.statusOptions.pending'),
     cancelled: t('orders.statusOptions.cancelled'),
     processing: t('orders.statusOptions.processing'),
-    shipped: t('orders.statusOptions.shipped')
+    shipped: t('orders.statusOptions.shipped'),
+    shipping: t('orders.statusOptions.shipping')
   }
   return statusMap[status] || status
 }
@@ -662,7 +679,8 @@ const getStatusTagType = (status) => {
   const tagTypeMap = {
     completed: 'success',
     pending: 'warning',
-    cancelled: 'danger'
+    cancelled: 'danger',
+    shipping: 'info'
   }
   return tagTypeMap[status] || 'info'
 }
@@ -682,14 +700,14 @@ const getPaymentMethodClass = (method) => {
 // 获取汇算比例配置
 const loadExchangeRate = async () => {
   try {
-    const response = await adminStore.apiRequest('/api/admin/system/configs', {
+    const response = await adminStore.apiRequest('/api/system-config/exchange_rate', {
       method: 'GET'
     })
     
     if (response.ok) {
       const data = await response.json()
       if (data.success && data.data) {
-        exchangeRate.value = parseFloat(data.data.exchange_rate || '1.00')
+        exchangeRate.value = parseFloat(data.data.value || '1.00')
       }
     }
   } catch (error) {
@@ -699,8 +717,10 @@ const loadExchangeRate = async () => {
 }
 
 // 计算汇算后金额
-const getExchangedAmount = (amount) => {
-  return (parseFloat(amount) * exchangeRate.value).toFixed(2)
+const getExchangedAmount = (amount, orderExchangeRate = null) => {
+  // 优先使用订单保存的汇率，如果没有则使用当前系统配置的汇率
+  const rate = orderExchangeRate || exchangeRate.value
+  return (parseFloat(amount) * rate).toFixed(2)
 }
 
 // 组件挂载时加载数据
@@ -853,6 +873,20 @@ onMounted(() => {
   font-weight: 600;
   color: #67C23A;
   font-size: 15px;
+}
+
+.converted-amount {
+  font-weight: 600;
+  color: #409EFF;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.original-amount {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
 /* 订单商品样式 */
@@ -1024,6 +1058,19 @@ onMounted(() => {
     font-weight: 400;
     color: #6b7280;
     margin-left: 8px;
+  }
+  
+  .primary-amount {
+    font-size: 18px;
+    font-weight: 600;
+    color: #409EFF;
+    line-height: 1.2;
+  }
+  
+  .original-amount-detail {
+    font-size: 14px;
+    color: #6b7280;
+    margin-top: 4px;
   }
   
   .address-text {

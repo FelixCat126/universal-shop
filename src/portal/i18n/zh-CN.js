@@ -223,7 +223,9 @@ export default {
       pending: '待支付',
       paid: '已支付',
       shipped: '已发货',
+      shipping: '送货中',
       delivered: '已送达',
+      completed: '已完成',
       cancelled: '已取消'
     },
     deliveryMode: '配送方式',

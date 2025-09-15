@@ -449,6 +449,8 @@ export default {
     avgOrderValue: '平均订单价值',
     orderNumber: '订单号',
     customer: '客户',
+    user: '用户',
+    recipientInfo: '收货人信息',
     amount: '金额',
     orderDate: '下单日期',
     actions: '操作',
@@ -479,7 +481,8 @@ export default {
       pending: '待处理',
       cancelled: '已取消',
       processing: '处理中',
-      shipped: '已发货'
+      shipped: '已发货',
+      shipping: '送货中'
     },
     // 配送方式
     deliveryModes: {
@@ -495,6 +498,7 @@ export default {
       statusUpdateFailed: '状态更新失败',
       confirmStatusUpdate: '确定要更新此订单状态吗？',
       confirmDelete: '确定要删除此订单吗？',
+      deleting: '正在删除订单...',
       deleteSuccess: '订单删除成功',
       deleteFailed: '订单删除失败'
     }
@@ -510,6 +514,7 @@ export default {
     selectCategory: '选择分类',
     stockStatus: '库存状态',
     name: '产品名称',
+    alias: '产品别名',
     description: '产品描述',
     category: '分类',
     price: '价格',
@@ -544,6 +549,7 @@ export default {
     // 表单占位符
     placeholders: {
       enterName: '请输入产品名称',
+      enterAlias: '请输入产品别名（可选）',
       enterDescription: '请输入产品描述',
       enterPrice: '请输入产品价格',
       enterStock: '请输入库存数量'

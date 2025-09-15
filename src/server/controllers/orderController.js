@@ -14,9 +14,6 @@ class OrderController {
     const transaction = await sequelize.transaction()
     
     try {
-      // 调试：打印原始请求体
-      console.log('🔍 原始 req.body:', JSON.stringify(req.body, null, 2))
-      
       const { 
         items,
         contact_name,
@@ -32,15 +29,6 @@ class OrderController {
         detail_address = '',
         postal_code = ''
       } = req.body
-      
-      // 调试：打印解构后的地址字段
-      console.log('🔍 解构后的地址字段:', {
-        province,
-        city,
-        district,
-        detail_address,
-        postal_code
-      })
       
       let userId = req.user?.userId
       let isGuestOrder = false
@@ -98,37 +86,13 @@ class OrderController {
           })
         }
         
-        // 调试：打印原始请求体
-        console.log('🔍 原始 req.body:', JSON.stringify(req.body, null, 2))
-        
-        // 特别打印推荐码相关信息
-        console.log('🔍 推荐码信息:', {
-          referral_code_from_req: req.body.referral_code,
-          referral_code_var: referral_code,
-          referral_code_type: typeof referral_code,
-          referral_code_trimmed: referral_code && referral_code.trim ? referral_code.trim() : 'N/A',
-          normalizedReferralCode: normalizedReferralCode
-        })
-        
         // 调用统一的用户创建服务
         try {
-          console.log('🔍 准备调用统一用户创建服务:', {
-            contact_phone,
-            contact_name,
-            referral_code: normalizedReferralCode
-          })
-          
           const newUser = await UserController.createUserForOrder(contact_phone, contact_name, normalizedReferralCode)
           userId = newUser.id
           isGuestOrder = true
-          
-          console.log('✅ 统一用户创建成功:', {
-            userId: newUser.id,
-            nickname: newUser.nickname,
-            referred_by_code: newUser.referred_by_code
-          })
         } catch (error) {
-          console.error('❌ 统一用户创建失败:', error)
+          console.error('创建用户失败:', error)
           return res.status(400).json({
             success: false,
             message: error.message
@@ -195,6 +159,20 @@ class OrderController {
         })
       }
 
+      // 获取当前系统汇率配置
+      let exchangeRate = 1.0000
+      try {
+        const SystemConfig = (await import('../models/SystemConfig.js')).default
+        const rateConfig = await SystemConfig.findOne({
+          where: { config_key: 'exchange_rate' }
+        })
+        if (rateConfig && rateConfig.config_value) {
+          exchangeRate = parseFloat(rateConfig.config_value)
+        }
+      } catch (error) {
+        console.error('获取汇率配置失败，使用默认值1.0000:', error)
+      }
+
       // 生成订单号
       const orderNo = `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
 
@@ -204,11 +182,12 @@ class OrderController {
         user_id: userId,
         total_amount: totalAmount,
         payment_method,
-        status: 'completed', // 订单提交即完成
+        status: 'shipping', // 订单提交后进入送货中状态
         contact_name,
         contact_phone,
         delivery_address,
-        notes
+        notes,
+        exchange_rate: exchangeRate // 保存下单时的汇率
       }, { transaction })
 
       // 创建订单项
@@ -464,13 +443,26 @@ class OrderController {
           {
             model: User,
             as: 'user',
-            attributes: ['id', 'nickname', 'phone']
+            attributes: ['id', 'nickname', 'phone', 'referred_by_code']
           }
         ],
         order: [['created_at', 'DESC']],
         limit: parseInt(limit),
         offset: parseInt(offset)
       })
+
+      // 查询推荐人信息
+      for (const order of orders) {
+        if (order.user?.referred_by_code) {
+          const referrer = await User.findOne({
+            where: { referral_code: order.user.referred_by_code },
+            attributes: ['id', 'nickname', 'phone']
+          })
+          if (referrer) {
+            order.user.dataValues.referrer = referrer
+          }
+        }
+      }
 
       res.json({
         success: true,
@@ -524,11 +516,22 @@ class OrderController {
 
   // 管理员删除订单
   static async deleteOrder(req, res) {
+    const transaction = await sequelize.transaction()
+    
     try {
       const { id } = req.params
 
-      const order = await Order.findByPk(id)
+      const order = await Order.findByPk(id, {
+        include: [
+          {
+            model: OrderItem,
+            as: 'items'
+          }
+        ]
+      })
+      
       if (!order) {
+        await transaction.rollback()
         return res.status(404).json({
           success: false,
           message: '订单不存在'
@@ -541,10 +544,23 @@ class OrderController {
         order_no: order.order_no,
         user_id: order.user_id,
         total_amount: order.total_amount,
-        status: order.status
+        status: order.status,
+        items_count: order.items ? order.items.length : 0
       }
 
-      await order.destroy()
+      // 先删除订单项
+      if (order.items && order.items.length > 0) {
+        await OrderItem.destroy({
+          where: { order_id: id },
+          transaction
+        })
+      }
+
+      // 再删除订单
+      await order.destroy({ transaction })
+
+      // 提交事务
+      await transaction.commit()
 
       res.json({
         success: true,
@@ -557,10 +573,11 @@ class OrderController {
       })
 
     } catch (error) {
+      await transaction.rollback()
       console.error('删除订单失败:', error)
       res.status(500).json({
         success: false,
-        message: '删除订单失败'
+        message: '删除订单失败: ' + error.message
       })
     }
   }

@@ -23,6 +23,9 @@
     "test:api": "node test-api.js",
     "start": "node src/server/index.js",
     "start:production": "NODE_ENV=production node start-https-production.js",
+    "migrate:order-status": "node run-order-status-migration.js migrate",
+    "rollback:order-status": "node run-order-status-migration.js rollback",
+    "migrate:exchange-rate": "node run-exchange-rate-migration.js migrate",
     "install:all": "./install.sh"
   },
   "dependencies": {

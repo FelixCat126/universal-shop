@@ -128,9 +128,13 @@
                     <div class="text-sm text-gray-600">{{ formatDateTime(order.created_at) }}</div>
                   </div>
                   <div class="text-right">
-                    <div class="font-medium">{{ t('common.currency') }}{{ order.total_amount }}</div>
-                    <div class="text-sm text-green-600">
-                      {{ t('profile.completed') }}
+                    <div class="font-medium" v-if="order.payment_method === 'online'">
+                      <div class="text-blue-600">USDT {{ getExchangedAmount(order.total_amount, order.exchange_rate) }}</div>
+                      <div class="text-xs text-gray-500">({{ t('common.currency') }}{{ order.total_amount }})</div>
+                    </div>
+                    <div class="font-medium" v-else>{{ t('common.currency') }}{{ order.total_amount }}</div>
+                    <div :class="['text-sm', getStatusStyle(order.status)]">
+                      {{ getStatusText(order.status) }}
                     </div>
                   </div>
                 </div>
@@ -400,10 +404,13 @@ import api from '../api/index.js'
 import CountrySelector from '../components/CountrySelector.vue'
 import ThailandAddressSelector from '../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n, formatPhoneDisplay } from '../utils/phoneValidation.js'
+import { useToast } from '../composables/useToast.js'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { t } = useI18n()
+const { success, error: showError, warning } = useToast()
 
 // 格式化地址显示
 const formatAddress = (address) => {
@@ -435,9 +442,6 @@ const formatAddress = (address) => {
   
   return regionPart || '地址信息不完整'
 }
-
-// 国际化
-const { t } = useI18n()
 
 // 页面状态
 const activeTab = ref('orders')
@@ -549,6 +553,39 @@ const formatDateTime = (dateString) => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
 }
 
+// 计算汇算后金额
+const getExchangedAmount = (amount, orderExchangeRate = null) => {
+  // 优先使用订单保存的汇率，如果没有则使用默认值1
+  const rate = orderExchangeRate || 1.0000
+  return (parseFloat(amount) * rate).toFixed(2)
+}
+
+// 获取订单状态样式
+const getStatusStyle = (status) => {
+  const styles = {
+    pending: 'text-yellow-600',
+    paid: 'text-blue-600',
+    shipped: 'text-purple-600',
+    shipping: 'text-blue-600',
+    delivered: 'text-green-600',
+    completed: 'text-green-600',
+    cancelled: 'text-red-600'
+  }
+  return styles[status] || 'text-gray-600'
+}
+
+// 获取订单状态文本
+const getStatusText = (status) => {
+  const statusMap = {
+    pending: t('order.status.pending'),
+    shipping: t('order.status.shipping'),
+    shipped: t('order.status.shipped'),
+    completed: t('order.status.completed'),
+    cancelled: t('order.status.cancelled')
+  }
+  return statusMap[status] || t('order.status.completed')
+}
+
 // 订单操作方法
 const viewOrderDetail = (orderId) => {
   router.push(`/orders/${orderId}`)
@@ -573,7 +610,7 @@ const loadOrders = async () => {
   } catch (error) {
     console.error('加载订单失败:', error)
     orders.value = []
-    alert(t('profile.loadOrdersFailed'))
+    showError(t('profile.loadOrdersFailed'))
   } finally {
     loadingOrders.value = false
   }
@@ -593,7 +630,7 @@ const loadAddresses = async () => {
   } catch (error) {
     console.error('加载地址失败:', error)
     addresses.value = []
-    alert(t('profile.loadAddressesFailed'))
+    showError(t('profile.loadAddressesFailed'))
   } finally {
     loadingAddresses.value = false
   }
@@ -752,26 +789,26 @@ const saveAddress = async () => {
   try {
     // 基本表单验证
     if (!addressForm.value.contact_name.trim()) {
-      alert(t('validation.contactNameRequired'))
+      showError(t('validation.contactNameRequired'))
       return
     }
     if (!addressForm.value.contact_phone.trim()) {
-      alert(t('validation.contactPhoneRequired'))
+      showError(t('validation.contactPhoneRequired'))
       return
     }
     
     // 验证手机号格式
     const phoneValidation = validatePhoneI18n(addressForm.value.contact_phone, addressForm.value.contact_country_code, t)
     if (!phoneValidation.isValid) {
-      alert(phoneValidation.message)
+      showError(phoneValidation.message)
       return
     }
     if (!addressForm.value.province.trim() || !addressForm.value.city.trim()) {
-      alert(t('profile.provinceAndCityRequired'))
+      showError(t('profile.provinceAndCityRequired'))
       return
     }
     if (!addressForm.value.detail_address.trim()) {
-      alert(t('validation.detailAddressRequired'))
+      showError(t('validation.detailAddressRequired'))
       return
     }
 
@@ -787,15 +824,15 @@ const saveAddress = async () => {
     }
 
     if (response.data.success) {
-      alert(editingAddress.value ? t('profile.addressUpdated') : t('profile.addressAdded'))
+      success(editingAddress.value ? t('profile.addressUpdated') : t('profile.addressAdded'))
       showAddressModal.value = false
       await loadAddresses() // 重新加载地址列表
     } else {
-      alert(response.data.message || t('profile.saveAddressFailed'))
+      showError(response.data.message || t('profile.saveAddressFailed'))
     }
   } catch (error) {
     console.error('保存地址失败:', error)
-    alert(t('profile.saveAddressFailed'))
+    showError(t('profile.saveAddressFailed'))
   } finally {
     savingAddress.value = false
   }
@@ -814,14 +851,14 @@ const deleteAddress = async (addressId) => {
   try {
     const response = await deleteAddressAPI(addressId)
     if (response.data.success) {
-      alert(t('profile.addressDeleted'))
+      success(t('profile.addressDeleted'))
       await loadAddresses() // 重新加载地址列表
     } else {
-      alert(response.data.message || t('profile.deleteAddressFailed'))
+      showError(response.data.message || t('profile.deleteAddressFailed'))
     }
   } catch (error) {
     console.error('删除地址失败:', error)
-    alert(t('profile.deleteAddressFailed'))
+    showError(t('profile.deleteAddressFailed'))
   }
 }
 
@@ -865,13 +902,13 @@ const handleSaveProfile = async () => {
     if (response.success) {
       // 保存成功后，从数据库重新获取最新的用户信息
       await refreshUserInfo()
-      alert(t('user.profileUpdated'))
+      success(t('user.profileUpdated'))
     } else {
-      alert(response.message || t('profile.saveFailed'))
+      showError(response.message || t('profile.saveFailed'))
     }
   } catch (error) {
     console.error('保存个人资料失败:', error)
-    alert(t('profile.saveFailed'))
+    showError(t('profile.saveFailed'))
   } finally {
     profileSaving.value = false
   }
@@ -883,14 +920,14 @@ const setDefaultAddress = async (addressId) => {
   try {
     const response = await setDefaultAddressAPI(addressId)
     if (response.data.success) {
-      alert(t('profile.defaultAddressSet'))
+      success(t('profile.defaultAddressSet'))
       await loadAddresses() // 重新加载地址列表
     } else {
-      alert(response.data.message || t('profile.setDefaultFailed'))
+      showError(response.data.message || t('profile.setDefaultFailed'))
     }
   } catch (error) {
     console.error('设置默认地址失败:', error)
-    alert(t('profile.setDefaultFailed'))
+    showError(t('profile.setDefaultFailed'))
   }
 }
 

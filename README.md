@@ -6,7 +6,13 @@
 
 ### 本地开发
 ```bash
+# 1. 安装依赖
 npm install
+
+# 2. 初始化数据库（仅首次需要）
+npm run setup
+
+# 3. 启动开发服务器
 npm run dev
 ```
 
@@ -34,7 +40,7 @@ cd universal-shop-v*
 
 ## 默认账户
 
-- **管理员**: admin / admin123
+- **管理员**: admin / 123456
 
 ## 技术栈
 

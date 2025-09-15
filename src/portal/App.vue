@@ -80,6 +80,9 @@
     
     <!-- 路由视图 -->
     <router-view />
+    
+    <!-- Toast 提示容器 -->
+    <ToastContainer />
   </div>
 </template>
 
@@ -89,6 +92,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useCartStore } from './stores/cart.js'
 import { useUserStore } from './stores/user.js'
+import ToastContainer from './components/ui/Toast/ToastContainer.vue'
 
 // 门户端主应用组件已加载
 

@@ -202,6 +202,7 @@ import { useCartStore } from '../stores/cart.js'
 import { useUserStore } from '../stores/user.js'
 import { productAPI } from '../api/products.js'
 import config from '../../config/index.js'
+import { useToast } from '../composables/useToast.js'
 
 // Home.vue组件已加载
 
@@ -212,6 +213,7 @@ const { t, locale } = useI18n()
 const router = useRouter()
 const cartStore = useCartStore()
 const userStore = useUserStore()
+const { showError } = useToast()
 
 // 响应式数据
 const isLoading = ref(false)
@@ -349,16 +351,16 @@ const loadProducts = async () => {
 
     } else {
       console.error('加载产品失败:', response.data.message)
-      alert('加载产品失败: ' + response.data.message)
+      showError('加载产品失败: ' + response.data.message)
     }
   } catch (error) {
     console.error('加载产品失败:', error)
     
     // 如果API失败，显示友好的错误信息
     if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
-      alert('无法连接到服务器，请确保后端服务已启动 (npm run dev:server)')
+      showError('无法连接到服务器，请确保后端服务已启动 (npm run dev:server)')
     } else {
-      alert('加载产品失败: ' + (error.response?.data?.message || error.message))
+      showError('加载产品失败: ' + (error.response?.data?.message || error.message))
     }
   } finally {
     isLoading.value = false

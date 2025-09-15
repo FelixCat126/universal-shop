@@ -223,7 +223,9 @@ export default {
       pending: 'รอชำระเงิน',
       paid: 'ชำระแล้ว',
       shipped: 'จัดส่งแล้ว',
+      shipping: 'กำลังจัดส่ง',
       delivered: 'ส่งแล้ว',
+      completed: 'เสร็จสิ้น',
       cancelled: 'ยกเลิกแล้ว'
     },
     deliveryMode: 'วิธีการจัดส่ง',

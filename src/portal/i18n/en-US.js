@@ -216,7 +216,9 @@ export default {
       pending: 'Pending Payment',
       paid: 'Paid',
       shipped: 'Shipped',
+      shipping: 'In Transit',
       delivered: 'Delivered',
+      completed: 'Completed',
       cancelled: 'Cancelled'
     },
     deliveryMode: 'Delivery Method',

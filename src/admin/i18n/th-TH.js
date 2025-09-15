@@ -449,6 +449,8 @@ export default {
     avgOrderValue: 'มูลค่าเฉลี่ยต่อคำสั่งซื้อ',
     orderNumber: 'หมายเลขคำสั่งซื้อ',
     customer: 'ลูกค้า',
+    user: 'ผู้ใช้',
+    recipientInfo: 'ข้อมูลผู้รับ',
     amount: 'จำนวนเงิน',
     orderDate: 'วันที่สั่งซื้อ',
     actions: 'การดำเนินการ',
@@ -479,7 +481,8 @@ export default {
       pending: 'รอดำเนินการ',
       cancelled: 'ยกเลิก',
       processing: 'กำลังดำเนินการ',
-      shipped: 'จัดส่งแล้ว'
+      shipped: 'จัดส่งแล้ว',
+      shipping: 'กำลังจัดส่ง'
     },
     // 配送方式
     deliveryModes: {
@@ -495,6 +498,7 @@ export default {
       statusUpdateFailed: 'อัปเดตสถานะล้มเหลว',
       confirmStatusUpdate: 'คุณแน่ใจหรือไม่ที่จะอัปเดตสถานะคำสั่งซื้อนี้?',
       confirmDelete: 'คุณแน่ใจหรือไม่ที่จะลบคำสั่งซื้อนี้?',
+      deleting: 'กำลังลบคำสั่งซื้อ...',
       deleteSuccess: 'ลบคำสั่งซื้อสำเร็จ',
       deleteFailed: 'ลบคำสั่งซื้อล้มเหลว'
     }
@@ -510,6 +514,7 @@ export default {
     selectCategory: 'เลือกหมวดหมู่',
     stockStatus: 'สถานะคลังสินค้า',
     name: 'ชื่อสินค้า',
+    alias: 'ชื่อเรียกอื่น',
     description: 'คำอธิบายสินค้า',
     category: 'หมวดหมู่',
     price: 'ราคา',
@@ -544,6 +549,7 @@ export default {
     // 表单占位符
     placeholders: {
       enterName: 'กรุณากรอกชื่อสินค้า',
+      enterAlias: 'กรุณากรอกชื่อเรียกอื่น (ไม่บังคับ)',
       enterDescription: 'กรุณากรอกคำอธิบายสินค้า',
       enterPrice: 'กรุณากรอกราคาสินค้า',
       enterStock: 'กรุณากรอกจำนวนคลังสินค้า'

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
+import { ElMessage } from 'element-plus'
 
 const router = createRouter({
   history: createWebHistory('/admin/'),  // 修复：明确指定base路径
@@ -67,58 +68,45 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const adminStore = useAdminStore()
   
-  console.log('🔍 Admin路由守卫:', {
-    to: to.path,
-    from: from.path,
-    isLoggedIn: adminStore.isLoggedIn,
-    requiresAuth: to.meta.requiresAuth
-  })
   
   // 如果是登录页面，且已经登录，跳转到首页
   if (to.name === 'Login' && adminStore.isLoggedIn) {
-    console.log('✅ 已登录，跳转到dashboard')
     next('/dashboard')
     return
   }
   
   // 如果是登录页面，直接放行
   if (to.name === 'Login') {
-    console.log('✅ 访问登录页面')
     next()
     return
   }
   
   // 如果需要认证但未登录，跳转到登录页
   if (to.meta.requiresAuth && !adminStore.isLoggedIn) {
-    console.log('❌ 需要认证但未登录，跳转到登录页')
     next('/login')
     return
   }
   
   // 如果访问根路径且未登录，跳转到登录页
   if (to.path === '/' && !adminStore.isLoggedIn) {
-    console.log('❌ 访问根路径但未登录，跳转到登录页')
     next('/login')
     return
   }
   
   // 如果需要超级管理员权限
   if (to.meta.requiresSuperAdmin && !adminStore.isSuperAdmin) {
-    console.log('❌ 需要超级管理员权限')
-    alert('需要超级管理员权限')
+    ElMessage.error('需要超级管理员权限')
     next(false)
     return
   }
   
   // 如果需要特定权限
   if (to.meta.permission && !adminStore.hasPermission(to.meta.permission)) {
-    console.log('❌ 权限不足')
-    alert('权限不足')
+    ElMessage.error('权限不足')
     next(false)
     return
   }
   
-  console.log('✅ 路由验证通过')
   next()
 })
 

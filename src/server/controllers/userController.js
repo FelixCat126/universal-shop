@@ -482,12 +482,6 @@ class UserController {
   // 统一的用户创建服务方法（用于订单自动注册）
   static async createUserForOrder(fullPhoneWithCode, contactName, referralCode = null) {
     try {
-      console.log('🔍 createUserForOrder 开始执行:', {
-        fullPhoneWithCode,
-        contactName,
-        referralCode
-      })
-      
       // 解析完整手机号中的国家区号和手机号
       let countryCode = '+86' // 默认值
       let phoneNumber = fullPhoneWithCode
@@ -501,11 +495,6 @@ class UserController {
           break
         }
       }
-      
-      console.log('🔍 解析后的手机号信息:', {
-        countryCode,
-        phoneNumber
-      })
       
       // 生成默认密码（手机号后8位）
       const defaultPassword = phoneNumber.slice(-8)
@@ -521,7 +510,7 @@ class UserController {
       }, true) // true表示是自动注册
       
     } catch (error) {
-      console.error('❌ createUserForOrder 执行失败:', error)
+      console.error('createUserForOrder 执行失败:', error)
       throw error
     }
   }
@@ -592,13 +581,6 @@ class UserController {
     if (referral_code && referral_code.trim()) {
       const code = referral_code.trim().toUpperCase()
       validReferralCode = code
-      console.log('🔍 记录推荐码:', {
-        原始推荐码: referral_code,
-        处理后推荐码: code,
-        说明: '推荐码自由填写，无需验证存在性'
-      })
-    } else {
-      console.log('🔍 未提供推荐码')
     }
     
     // 创建用户
@@ -612,17 +594,7 @@ class UserController {
       referred_by_code: validReferralCode
     }
     
-    console.log('🔍 准备创建用户:', finalUserData)
-    
     const user = await User.create(finalUserData)
-    
-    console.log('✅ 用户创建成功:', {
-      用户ID: user.id,
-      昵称: user.nickname,
-      手机号: user.phone,
-      推荐码字段: user.referred_by_code,
-      创建方式: isAutoRegister ? '自动注册' : '正常注册'
-    })
 
     return user
   }

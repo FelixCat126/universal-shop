@@ -122,6 +122,7 @@ class ProductController {
     try {
       const {
         name,
+        alias,
         description,
         category,
         price,
@@ -140,6 +141,7 @@ class ProductController {
 
       const product = await Product.create({
         name,
+        alias: alias || null,
         description,
         category,
         price: parseFloat(price),
@@ -169,6 +171,7 @@ class ProductController {
       const { id } = req.params
       const {
         name,
+        alias,
         description,
         category,
         price,
@@ -188,6 +191,7 @@ class ProductController {
       // 更新产品信息
       await product.update({
         name: name || product.name,
+        alias: alias !== undefined ? (alias || null) : product.alias,
         description: description !== undefined ? description : product.description,
         category: category || product.category,
         price: price !== undefined ? parseFloat(price) : product.price,

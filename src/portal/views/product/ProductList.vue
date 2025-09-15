@@ -242,11 +242,13 @@ import {
   ShoppingBagIcon,
   MagnifyingGlassIcon
 } from '@heroicons/vue/24/outline'
+import { useToast } from '../../composables/useToast.js'
 
 const router = useRouter()
 const userStore = useUserStore()
 const cartStore = useCartStore()
 const { t } = useI18n()
+const { showError } = useToast()
 
 // 简化版本 - 用于调试
 // ProductList组件已加载
@@ -374,7 +376,7 @@ const loadProducts = async () => {
     totalPages.value = Math.ceil(products.value.length / pageSize)
   } catch (error) {
     console.error('加载产品失败:', error)
-    alert('加载产品失败')
+    showError('加载产品失败')
   } finally {
     isLoading.value = false
   }

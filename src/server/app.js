@@ -180,7 +180,6 @@ app.use('/admin', express.static(adminDir, {
 
 // SPA路由处理
 app.get('/portal/*', (req, res, next) => {
-  console.log('🔍 Portal路由检查:', req.path)
   
   if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$/)) {
     console.log('📄 静态资源，跳过SPA处理')
@@ -192,7 +191,6 @@ app.get('/portal/*', (req, res, next) => {
 })
 
 app.get('/admin/*', (req, res, next) => {
-  console.log('🔍 Admin路由检查:', req.path)
   
   if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$/)) {
     console.log('📄 静态资源，跳过SPA处理')
