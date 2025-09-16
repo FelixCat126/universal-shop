@@ -186,6 +186,10 @@ class OrderController {
         contact_name,
         contact_phone,
         delivery_address,
+        province: province || '', // 保存分字段地址信息
+        city: city || '',
+        district: district || '',
+        postal_code: postal_code || '',
         notes,
         exchange_rate: exchangeRate // 保存下单时的汇率
       }, { transaction })

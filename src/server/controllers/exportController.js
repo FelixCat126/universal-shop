@@ -84,7 +84,7 @@ class ExportController {
             include: [{
               model: Product,
               as: 'product',
-              attributes: ['name', 'price']
+              attributes: ['name', 'alias', 'price']
             }]
           }
         ],
@@ -145,75 +145,94 @@ class ExportController {
         return { province, city, district, detail }
       }
 
-      // 准备Excel数据
-      const excelData = []
+      // 三语言表头字段定义：泰文（中文、英文）
+      const getTrilingualHeaders = () => {
+        return {
+          'หมายเลขคำสั่งซื้อ（电商订单号、Order Number）': '电商订单号',
+          'น้ำหนักสินค้า（货物重量(kg)、Weight(kg)）': '货物重量(kg)',
+          'ชื่อผู้รับ（收件人姓名、Recipient Name）': '收件人姓名',
+          'เบอร์โทรผู้รับ（收件人手机、Recipient Mobile）': '收件人手机',
+          'เบอร์โทรศัพท์ผู้รับ（收件人电话、Recipient Phone）': '收件人电话',
+          'จังหวัด（目的府、Province）': '目的府',
+          'อำเภอ/เขต（目的区县、District）': '目的区县',
+          'ตำบล/แขวง（目的镇、Sub-district）': '目的镇',
+          'รหัสไปรษณีย์（目的邮编、Postal Code）': '目的邮编',
+          'ที่อยู่ผู้รับ（收件地址、Delivery Address）': '收件地址',
+          'ชื่อสินค้า（物品名称、Product Name）': '物品名称',
+          'มูลค่าสินค้า（物品价值、Product Value）': '物品价值',
+          'หมายเหตุ（备注、Remarks）': '备注',
+          'เก็บเงินปลายทาง（代收货款、Cash on Delivery）': '代收货款',
+          'สถานะคำสั่งซื้อ（订单状态、Order Status）': '订单状态',
+          'ยาว（长(cm)、Length(cm)）': '长(cm)',
+          'กว้าง（宽(cm)、Width(cm)）': '宽(cm)',
+          'สูง（高(cm)、Height(cm)）': '高(cm)',
+          'ค่าบรรจุภัณฑ์（包装费、Packaging Fee）': '包装费'
+        }
+      }
       
-      orders.forEach(order => {
-        // 解析地址
-        const addressInfo = parseAddress(order.delivery_address)
+      // 准备Excel数据 - 按照模板字段格式
+      const excelData = orders.map(order => {
+        // 合并所有商品名称，优先使用别名
+        const productNames = order.items && order.items.length > 0 
+          ? order.items.map(item => {
+              // 优先使用别名，如果没有别名则使用商品名称
+              const productName = item.product?.alias || item.product?.name || ''
+              return productName
+            }).filter(name => name).join(', ')
+          : ''
         
-        // 如果订单有多个商品，每个商品一行
-        if (order.items && order.items.length > 0) {
-          order.items.forEach((item, index) => {
-            excelData.push({
-              '订单ID': order.id,
-              '订单号': order.order_no,
-              '用户昵称': order.user?.nickname || '',
-              '联系电话': order.contact_phone,
-              '收货人': order.contact_name,
-              '省份': addressInfo.province,
-              '城市': addressInfo.city,
-              '区县': addressInfo.district,
-              '详细地址': addressInfo.detail,
-              '邮政编码': order.postal_code || '',
-              '商品名称': item.product?.name || '',
-              '商品单价': item.price,
-              '购买数量': item.quantity,
-              '小计金额': (item.price * item.quantity).toFixed(2),
-              '订单总额': index === 0 ? order.total_amount : '', // 只在第一行显示总额
-              '支付方式': index === 0 ? (order.payment_method === 'cod' ? '货到付款' : '在线支付') : '',
-              '订单状态': index === 0 ? order.status : '',
-              '推荐码': index === 0 ? (order.referral_code || '') : '',
-              '货物重量': '', // 空白字段
-              '长': '', // 空白字段
-              '宽': '', // 空白字段
-              '高': '', // 空白字段
-              '代收货款': index === 0 ? order.total_amount : '', // 自动填写订单金额
-              '包装费': '', // 空白字段
-              '备注': index === 0 ? (order.notes || '') : '',
-              '下单时间': index === 0 ? (order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '') : ''
-            })
-          })
-        } else {
-          // 没有商品的订单
-          excelData.push({
-            '订单ID': order.id,
-            '订单号': order.order_no,
-            '用户昵称': order.user?.nickname || '',
-            '联系电话': order.contact_phone,
-            '收货人': order.contact_name,
-            '省份': addressInfo.province,
-            '城市': addressInfo.city,
-            '区县': addressInfo.district,
-            '详细地址': addressInfo.detail,
-            '邮政编码': order.postal_code || '',
-            '商品名称': '',
-            '商品单价': '',
-            '购买数量': '',
-            '小计金额': '',
-            '订单总额': order.total_amount,
-            '支付方式': order.payment_method === 'cod' ? '货到付款' : '在线支付',
-            '订单状态': order.status,
-            '推荐码': order.referral_code || '',
-            '货物重量': '', // 空白字段
-            '长': '', // 空白字段
-            '宽': '', // 空白字段
-            '高': '', // 空白字段
-            '代收货款': order.total_amount, // 自动填写订单金额
-            '包装费': '', // 空白字段
-            '备注': order.notes || '',
-            '下单时间': order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : ''
-          })
+        // 计算代收货款：货到付款=订单金额，在线付款=0
+        const codAmount = order.payment_method === 'cod' ? order.total_amount : '0'
+        
+        // 订单状态中文转换
+        const getStatusText = (status) => {
+          const statusMap = {
+            'pending': '待支付',
+            'paid': '已支付', 
+            'shipping': '送货中',
+            'shipped': '已发货',
+            'delivered': '已送达',
+            'completed': '已完成',
+            'cancelled': '已取消'
+          }
+          return statusMap[status] || status
+        }
+        
+        // 优先使用分字段数据，回退到地址解析
+        let province = order.province || ''
+        let city = order.city || ''
+        let district = order.district || ''
+        let detailAddress = order.delivery_address || ''
+        
+        // 如果分字段为空，尝试解析完整地址
+        if (!province && !city && !district && order.delivery_address) {
+          const addressInfo = parseAddress(order.delivery_address)
+          province = addressInfo.province
+          city = addressInfo.city
+          district = addressInfo.district
+          detailAddress = addressInfo.detail
+        }
+        
+        return {
+          'หมายเลขคำสั่งซื้อ（电商订单号、Order Number）': order.order_no || '',
+          'น้ำหนักสินค้า（货物重量(kg)、Weight(kg)）': '', // 暂时留空
+          'ชื่อผู้รับ（收件人姓名、Recipient Name）': order.contact_name || '',
+          'เบอร์โทรผู้รับ（收件人手机、Recipient Mobile）': order.contact_phone || '',
+          'เบอร์โทรศัพท์ผู้รับ（收件人电话、Recipient Phone）': order.contact_phone || '', // 复用手机号
+          'จังหวัด（目的府、Province）': province,
+          'อำเภอ/เขต（目的区县、District）': city,
+          'ตำบล/แขวง（目的镇、Sub-district）': district,
+          'รหัสไปรษณีย์（目的邮编、Postal Code）': order.postal_code || '',
+          'ที่อยู่ผู้รับ（收件地址、Delivery Address）': detailAddress,
+          'ชื่อสินค้า（物品名称、Product Name）': productNames,
+          'มูลค่าสินค้า（物品价值、Product Value）': order.total_amount || '',
+          'หมายเหตุ（备注、Remarks）': order.notes || '',
+          'เก็บเงินปลายทาง（代收货款、Cash on Delivery）': codAmount,
+          'สถานะคำสั่งซื้อ（订单状态、Order Status）': getStatusText(order.status),
+          'ยาว（长(cm)、Length(cm)）': '', // 留空
+          'กว้าง（宽(cm)、Width(cm)）': '', // 留空
+          'สูง（高(cm)、Height(cm)）': '', // 留空
+          'ค่าบรรจุภัณฑ์（包装费、Packaging Fee）': '' // 留空
         }
       })
 
@@ -221,35 +240,54 @@ class ExportController {
       const workbook = XLSX.utils.book_new()
       const worksheet = XLSX.utils.json_to_sheet(excelData)
 
-      // 设置列宽
+      // 设置列宽 - 按三语言表头字段调整（表头较长需要更宽的列宽）
       worksheet['!cols'] = [
-        { width: 8 },  // 订单ID
-        { width: 20 }, // 订单号
-        { width: 15 }, // 用户昵称
-        { width: 15 }, // 联系电话
-        { width: 12 }, // 收货人
-        { width: 12 }, // 省份
-        { width: 12 }, // 城市
-        { width: 12 }, // 区县
-        { width: 25 }, // 详细地址
-        { width: 12 }, // 邮政编码
-        { width: 20 }, // 商品名称
-        { width: 10 }, // 商品单价
-        { width: 8 },  // 购买数量
-        { width: 10 }, // 小计金额
-        { width: 10 }, // 订单总额
-        { width: 10 }, // 支付方式
-        { width: 10 }, // 订单状态
-        { width: 12 }, // 推荐码
-        { width: 10 }, // 货物重量
-        { width: 8 },  // 长
-        { width: 8 },  // 宽
-        { width: 8 },  // 高
-        { width: 12 }, // 代收货款
-        { width: 10 }, // 包装费
-        { width: 20 }, // 备注
-        { width: 20 }  // 下单时间
+        { width: 35 }, // หมายเลขคำสั่งซื้อ（电商订单号、Order Number）
+        { width: 30 }, // น้ำหนักสินค้า（货物重量(kg)、Weight(kg)）
+        { width: 32 }, // ชื่อผู้รับ（收件人姓名、Recipient Name）
+        { width: 35 }, // เบอร์โทรผู้รับ（收件人手机、Recipient Mobile）
+        { width: 35 }, // เบอร์โทรศัพท์ผู้รับ（收件人电话、Recipient Phone）
+        { width: 25 }, // จังหวัด（目的府、Province）
+        { width: 30 }, // อำเภอ/เขต（目的区县、District）
+        { width: 35 }, // ตำบล/แขวง（目的镇、Sub-district）
+        { width: 30 }, // รหัสไปรษณีย์（目的邮编、Postal Code）
+        { width: 40 }, // ที่อยู่ผู้รับ（收件地址、Delivery Address）
+        { width: 32 }, // ชื่อสินค้า（物品名称、Product Name）
+        { width: 30 }, // มูลค่าสินค้า（物品价值、Product Value）
+        { width: 25 }, // หมายเหตุ（备注、Remarks）
+        { width: 40 }, // เก็บเงินปลายทาง（代收货款、Cash on Delivery）
+        { width: 35 }, // สถานะคำสั่งซื้อ（订单状态、Order Status）
+        { width: 25 }, // ยาว（长(cm)、Length(cm)）
+        { width: 25 }, // กว้าง（宽(cm)、Width(cm)）
+        { width: 25 }, // สูง（高(cm)、Height(cm)）
+        { width: 35 }  // ค่าบรรจุภัณฑ์（包装费、Packaging Fee）
       ]
+
+      // 设置表头行样式 - 灰色背景
+      const headerRowIndex = 1 // Excel中行号从1开始
+      const totalColumns = 19 // 总列数（包含新增的订单状态列）
+      
+      // 为表头行的每一列设置灰色背景
+      for (let col = 0; col < totalColumns; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col }) // 第0行（表头行）
+        if (!worksheet[cellAddress]) {
+          worksheet[cellAddress] = { v: '', t: 's' }
+        }
+        if (!worksheet[cellAddress].s) {
+          worksheet[cellAddress].s = {}
+        }
+        worksheet[cellAddress].s.fill = {
+          patternType: 'solid',
+          fgColor: { rgb: 'D0D0D0' } // 灰色背景
+        }
+        worksheet[cellAddress].s.font = {
+          bold: true // 表头字体加粗
+        }
+        worksheet[cellAddress].s.alignment = {
+          horizontal: 'center', // 水平居中
+          vertical: 'center'    // 垂直居中
+        }
+      }
 
       // 添加工作表到工作簿
       XLSX.utils.book_append_sheet(workbook, worksheet, '订单列表')

@@ -55,6 +55,26 @@ const Order = sequelize.define('Order', {
     allowNull: true,
     comment: '收货地址'
   },
+  province: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: '省份'
+  },
+  city: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: '城市'
+  },
+  district: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: '区县'
+  },
+  postal_code: {
+    type: DataTypes.STRING(10),
+    allowNull: true,
+    comment: '邮政编码'
+  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,

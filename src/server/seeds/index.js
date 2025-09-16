@@ -107,6 +107,32 @@ class DataSeeder {
         `)
       }
       
+      // 检查orders表是否有地址分字段
+      const hasProvince = orderColumns.some(col => col.name === 'province')
+      const hasCity = orderColumns.some(col => col.name === 'city')
+      const hasDistrict = orderColumns.some(col => col.name === 'district')
+      const hasPostalCode = orderColumns.some(col => col.name === 'postal_code')
+      
+      if (!hasProvince) {
+        console.log('➕ 为orders表添加province字段')
+        await sequelize.query(`ALTER TABLE orders ADD COLUMN province VARCHAR(50)`)
+      }
+      
+      if (!hasCity) {
+        console.log('➕ 为orders表添加city字段')
+        await sequelize.query(`ALTER TABLE orders ADD COLUMN city VARCHAR(50)`)
+      }
+      
+      if (!hasDistrict) {
+        console.log('➕ 为orders表添加district字段')
+        await sequelize.query(`ALTER TABLE orders ADD COLUMN district VARCHAR(50)`)
+      }
+      
+      if (!hasPostalCode) {
+        console.log('➕ 为orders表添加postal_code字段')
+        await sequelize.query(`ALTER TABLE orders ADD COLUMN postal_code VARCHAR(10)`)
+      }
+      
       console.log('✅ 数据库列检查完成')
     } catch (error) {
       console.warn('⚠️  添加缺失列时出现错误:', error.message)

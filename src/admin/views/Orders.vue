@@ -149,7 +149,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.user')" width="220" min-width="200">
+        <el-table-column :label="t('orders.user')" width="180" min-width="160">
           <template #default="scope">
             <div class="user-info">
               <div class="user-nickname">{{ scope.row.user?.nickname || t('common.unknown') }}</div>
@@ -311,7 +311,7 @@
                   {{ selectedOrder.user?.phone || t('common.unknown') }}
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('user.referredBy')">
-                  {{ selectedOrder.user?.referrer?.nickname || '-' }}
+                  {{ selectedOrder.user?.referrer?.nickname || selectedOrder.user?.dataValues?.referrer?.nickname || '-' }}
                 </el-descriptions-item>
               </el-descriptions>
             </el-card>
@@ -559,7 +559,6 @@ const viewOrderDetail = (order) => {
     
     // 暂时只显示基本信息，避免API调用导致的路由问题
     // 后续可以在API稳定后再添加详细信息获取
-    console.log('显示订单详情:', order)
   } catch (error) {
     console.error('显示订单详情失败:', error)
     ElMessage.error(t('orders.messages.loadFailed'))
