@@ -724,7 +724,6 @@ const editAddress = async (address) => {
 }
 
 const resetAddressForm = () => {
-  console.log('🔍 Profile.vue 重置地址表单')
   
   addressForm.value = {
     contact_name: '',
@@ -745,12 +744,10 @@ const resetAddressForm = () => {
     postalCode: ''
   }
   
-  console.log('🔍 Profile.vue 重置后的表单数据:', addressForm.value)
 }
 
 // 处理地址区域选择变化
 const handleAddressRegionChange = (regionData) => {
-  console.log('🔍 Profile.vue 地址区域变更:', regionData)
   
   // 更新表单中的省市区和邮编信息
   if (regionData.provinceData && regionData.provinceData.name) {
@@ -777,12 +774,6 @@ const handleAddressRegionChange = (regionData) => {
     addressForm.value.postal_code = ''
   }
   
-  console.log('🔍 Profile.vue 更新后的表单数据:', {
-    province: addressForm.value.province,
-    city: addressForm.value.city,
-    district: addressForm.value.district,
-    postal_code: addressForm.value.postal_code
-  })
 }
 
 const saveAddress = async () => {

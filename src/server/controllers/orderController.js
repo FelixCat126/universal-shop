@@ -4,6 +4,7 @@ import OrderItem from '../models/OrderItem.js'
 import Product from '../models/Product.js'
 import User from '../models/User.js'
 import Cart from '../models/Cart.js'
+import Address from '../models/Address.js'
 import sequelize from '../config/database.js'
 import UserController from './userController.js'
 import { createUserAddress } from '../services/addressService.js'
@@ -22,6 +23,8 @@ class OrderController {
         payment_method = 'cod', // cod: 货到付款, online: 在线付款
         notes = '',
         referral_code, // 推荐码（可选）
+        // 登录用户的地址ID
+        address_id,
         // 非登录用户的地址字段
         province = '',
         city = '',
@@ -173,8 +176,62 @@ class OrderController {
         console.error('获取汇率配置失败，使用默认值1.0000:', error)
       }
 
+      // 获取完整的地址信息（省市区邮编）
+      let orderProvince = province
+      let orderCity = city  
+      let orderDistrict = district
+      let orderPostalCode = postal_code
+      // 对于游客下单，优先使用分字段信息组装完整地址（确保包含邮编）
+      let orderDeliveryAddress = delivery_address
+      if (!userId && province && city && detail_address) {
+        // 游客下单：重新组装地址确保包含邮编
+        const addressParts = [province.trim(), city.trim()]
+        if (district && district.trim()) {
+          addressParts.push(district.trim())
+        }
+        addressParts.push(detail_address.trim())
+        if (postal_code && postal_code.trim()) {
+          addressParts.push(postal_code.trim())
+        }
+        orderDeliveryAddress = addressParts.join(' ')
+      }
+      let orderContactName = contact_name
+      let orderContactPhone = contact_phone
+
+
+      // 如果是登录用户且提供了地址ID，查询地址信息
+      if (userId && address_id) {
+        
+        const address = await Address.findOne({
+          where: {
+            id: address_id,
+            user_id: userId
+          }
+        })
+        
+        if (!address) {
+          return res.status(400).json({
+            success: false,
+            message: '选择的收货地址不存在或不属于当前用户'
+          })
+        }
+        
+        // 使用地址表中的完整信息
+        orderProvince = address.province || ''
+        orderCity = address.city || ''
+        orderDistrict = address.district || ''
+        orderPostalCode = address.postal_code || ''
+        // 组装完整的配送地址（确保包含邮编）
+        const baseAddress = address.full_address || `${address.province} ${address.city} ${address.district} ${address.detail_address}`.trim()
+        orderDeliveryAddress = address.postal_code ? `${baseAddress} ${address.postal_code}` : baseAddress
+        orderContactName = address.contact_name
+        orderContactPhone = `${address.contact_country_code}${address.contact_phone}`
+
+      }
+
       // 生成订单号
       const orderNo = `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+
 
       // 创建订单
       const order = await Order.create({
@@ -183,13 +240,13 @@ class OrderController {
         total_amount: totalAmount,
         payment_method,
         status: 'shipping', // 订单提交后进入送货中状态
-        contact_name,
-        contact_phone,
-        delivery_address,
-        province: province || '', // 保存分字段地址信息
-        city: city || '',
-        district: district || '',
-        postal_code: postal_code || '',
+        contact_name: orderContactName,
+        contact_phone: orderContactPhone,
+        delivery_address: orderDeliveryAddress,
+        province: orderProvince, // 保存分字段地址信息
+        city: orderCity,
+        district: orderDistrict,
+        postal_code: orderPostalCode,
         notes,
         exchange_rate: exchangeRate // 保存下单时的汇率
       }, { transaction })

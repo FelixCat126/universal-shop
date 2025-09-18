@@ -1,0 +1,21 @@
+{
+  "watch": [
+    "src/server"
+  ],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules/",
+    "dist/",
+    "database/",
+    "uploads/",
+    "logs/",
+    "*.log",
+    "*.db",
+    "*.sqlite",
+    ".git/"
+  ],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000
+}

@@ -184,18 +184,18 @@ class ExportController {
         // 计算代收货款：货到付款=订单金额，在线付款=0
         const codAmount = order.payment_method === 'cod' ? order.total_amount : '0'
         
-        // 订单状态中文转换
+        // 订单状态三语言转换：泰文（中文、英文）
         const getStatusText = (status) => {
           const statusMap = {
-            'pending': '待支付',
-            'paid': '已支付', 
-            'shipping': '送货中',
-            'shipped': '已发货',
-            'delivered': '已送达',
-            'completed': '已完成',
-            'cancelled': '已取消'
+            'pending': 'รอการชำระเงิน（待支付、Pending Payment）',
+            'paid': 'ชำระเงินแล้ว（已支付、Paid）', 
+            'shipping': 'กำลังจัดส่ง（送货中、Shipping）',
+            'shipped': 'จัดส่งแล้ว（已发货、Shipped）',
+            'delivered': 'ส่งถึงแล้ว（已送达、Delivered）',
+            'completed': 'เสร็จสิ้น（已完成、Completed）',
+            'cancelled': 'ยกเลิกแล้ว（已取消、Cancelled）'
           }
-          return statusMap[status] || status
+          return statusMap[status] || `${status}（${status}、${status}）`
         }
         
         // 优先使用分字段数据，回退到地址解析

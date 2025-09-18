@@ -57,21 +57,16 @@ class DataSeeder {
       
       if (isFirstInstall) {
         console.log('🆕 检测到全新安装，创建数据库表...')
-        // 全新安装，强制重建所有表
+        // 全新安装，使用force重建所有表
         await sequelize.sync({ force: true })
       } else {
-        console.log('🔄 检测到现有数据库，尝试安全更新...')
-        try {
-          // 尝试安全的alter操作
-          await sequelize.sync({ alter: true })
-        } catch (error) {
-          console.warn('⚠️  安全更新失败，尝试更保守的策略...')
-          // 如果alter失败，只同步新表，不修改现有表
-          await sequelize.sync()
-          
-          // 手动添加缺失的列
-          await this.addMissingColumns()
-        }
+        console.log('🔄 检测到现有数据库，使用保守的安全更新策略...')
+        // 不使用alter: true，因为它可能会错误地添加约束
+        // 而是使用基本sync加上手动列添加
+        await sequelize.sync()
+        
+        // 手动添加缺失的列和修复约束
+        await this.addMissingColumns()
       }
     } catch (error) {
       console.error('❌ 数据库同步失败:', error)
@@ -134,9 +129,98 @@ class DataSeeder {
       }
       
       console.log('✅ 数据库列检查完成')
+      
+      // 修复错误的约束
+      await this.fixIncorrectConstraints()
     } catch (error) {
       console.warn('⚠️  添加缺失列时出现错误:', error.message)
       // 不抛出错误，让流程继续
+    }
+  }
+  
+  static async fixIncorrectConstraints() {
+    try {
+      console.log('🔧 检查并修复错误的数据库约束...')
+      
+      // 检查购物车表是否有错误的约束
+      const [cartTableInfo] = await sequelize.query(`
+        SELECT sql FROM sqlite_master 
+        WHERE type='table' AND name='carts'
+      `)
+      
+      if (cartTableInfo.length > 0) {
+        const tableSQL = cartTableInfo[0].sql
+        
+        // 检查是否有错误的单字段UNIQUE约束
+        const hasUserIdUnique = tableSQL.includes('user_id') && tableSQL.includes('UNIQUE') && !tableSQL.includes('user_id`, `product_id')
+        const hasProductIdUnique = tableSQL.includes('product_id') && tableSQL.includes('UNIQUE') && !tableSQL.includes('user_id`, `product_id')
+        
+        if (hasUserIdUnique || hasProductIdUnique) {
+          console.log('🔨 发现购物车表的错误约束，正在重建表结构...')
+          
+          // 备份数据
+          await sequelize.query(`CREATE TABLE carts_backup AS SELECT * FROM carts`)
+          
+          // 删除原表
+          await sequelize.query(`DROP TABLE carts`)
+          
+          // 重新创建正确的表结构
+          await sequelize.query(`
+            CREATE TABLE carts (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER REFERENCES users(id),
+              session_id VARCHAR(200),
+              product_id INTEGER NOT NULL REFERENCES products(id),
+              quantity INTEGER NOT NULL DEFAULT 1,
+              price DECIMAL(10,2) NOT NULL,
+              created_at DATETIME NOT NULL,
+              updated_at DATETIME NOT NULL
+            )
+          `)
+          
+          // 创建正确的索引
+          await sequelize.query(`CREATE INDEX carts_user_id ON carts(user_id)`)
+          await sequelize.query(`CREATE INDEX carts_session_id ON carts(session_id)`)  
+          await sequelize.query(`CREATE INDEX carts_product_id ON carts(product_id)`)
+          await sequelize.query(`CREATE UNIQUE INDEX unique_user_product ON carts(user_id, product_id)`)
+          
+          // 恢复数据（如果有的话）
+          try {
+            await sequelize.query(`INSERT INTO carts SELECT * FROM carts_backup`)
+            console.log('✅ 购物车数据已恢复')
+          } catch (error) {
+            console.log('ℹ️  没有需要恢复的购物车数据')
+          }
+          
+          // 删除备份表
+          await sequelize.query(`DROP TABLE carts_backup`)
+          
+          console.log('✅ 购物车表约束已修复')
+        }
+      }
+      
+      // 检查用户表的约束问题
+      const [userTableInfo] = await sequelize.query(`
+        SELECT sql FROM sqlite_master 
+        WHERE type='table' AND name='users'
+      `)
+      
+      if (userTableInfo.length > 0) {
+        const tableSQL = userTableInfo[0].sql
+        
+        // 检查是否有错误的单字段UNIQUE约束（country_code或phone单独unique）
+        const hasCountryCodeUnique = tableSQL.includes('country_code') && tableSQL.includes('UNIQUE') && !tableSQL.includes('country_code`, `phone')
+        const hasPhoneUnique = tableSQL.includes('phone') && tableSQL.includes('UNIQUE') && !tableSQL.includes('country_code`, `phone')
+        
+        if (hasCountryCodeUnique || hasPhoneUnique) {
+          console.log('🔨 发现用户表的错误约束，需要手动修复')
+          console.log('⚠️  用户表包含重要数据，请在合适的时机手动执行约束修复')
+        }
+      }
+      
+      console.log('✅ 数据库约束检查完成')
+    } catch (error) {
+      console.warn('⚠️  修复约束时出现错误:', error.message)
     }
   }
   

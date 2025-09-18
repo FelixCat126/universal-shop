@@ -858,12 +858,14 @@ const submitOrder = async () => {
       contact_phone: `${orderForm.contact_country_code}${orderForm.contact_phone.trim()}`,
       delivery_address: userStore.isLoggedIn 
         ? orderForm.delivery_address.trim() // 登录用户使用已选择的地址
-        : `${orderForm.province.trim()} ${orderForm.city.trim()} ${orderForm.district ? orderForm.district.trim() : ''} ${orderForm.detail_address.trim()}`.trim(), // 游客组合地址，用空格分隔
+        : `${orderForm.province.trim()} ${orderForm.city.trim()} ${orderForm.district ? orderForm.district.trim() : ''} ${orderForm.detail_address.trim()} ${orderForm.postal_code ? orderForm.postal_code.trim() : ''}`.trim(), // 游客组合地址（包含邮编）
       payment_method: orderForm.payment_method,
       notes: orderForm.notes.trim(),
       clear_cart: true, // 提交订单后清空购物车
-      // 为非登录用户传递省市区信息
-      ...(userStore.isLoggedIn ? {} : {
+      // 登录用户传递地址ID，游客用户传递省市区信息
+      ...(userStore.isLoggedIn ? {
+        address_id: selectedAddress.value?.id // 传递选中的地址ID
+      } : {
         province: orderForm.province.trim(),
         city: orderForm.city.trim(),
         district: orderForm.district ? orderForm.district.trim() : '',
@@ -872,34 +874,6 @@ const submitOrder = async () => {
       }),
       // 传递推荐码
       referral_code: orderForm.referral_code && orderForm.referral_code.trim() ? orderForm.referral_code.trim() : null
-    }
-
-    // 调试：打印发送的订单数据
-    if (!userStore.isLoggedIn) {
-      console.log('🔍 前端 orderForm 原始数据:', {
-        province: orderForm.province,
-        city: orderForm.city,
-        district: orderForm.district,
-        detail_address: orderForm.detail_address,
-        referral_code: orderForm.referral_code
-      })
-      
-      console.log('🔍 游客下单发送的数据:', {
-        province: orderData.province,
-        city: orderData.city,
-        district: orderData.district,
-        detail_address: orderData.detail_address,
-        delivery_address: orderData.delivery_address,
-        referral_code: orderData.referral_code
-      })
-      
-      console.log('🔍 数据类型检查:', {
-        province: { value: orderData.province, type: typeof orderData.province },
-        city: { value: orderData.city, type: typeof orderData.city },
-        district: { value: orderData.district, type: typeof orderData.district },
-        detail_address: { value: orderData.detail_address, type: typeof orderData.detail_address },
-        referral_code: { value: orderData.referral_code, type: typeof orderData.referral_code }
-      })
     }
 
 
