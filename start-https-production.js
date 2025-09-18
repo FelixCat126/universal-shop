@@ -13,6 +13,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import compression from 'compression'
 import sequelize from './src/server/config/database.js'
+import DataSeeder from './src/server/seeds/index.js'
 
 // 导入后端路由
 import productRoutes from './src/server/routes/productRoutes.js'
@@ -168,13 +169,10 @@ function loadSSLCertificates() {
 // 启动服务器
 async function startServer() {
   try {
-    // 数据库连接测试
-    await sequelize.authenticate()
-    console.log('✅ 数据库连接成功')
-
-    // 同步数据库表
-    await sequelize.sync({ force: false })
-    console.log('✅ 数据库表同步成功')
+    // 初始化数据库和基础数据
+    console.log('🌱 正在初始化数据库...')
+    await DataSeeder.run()
+    console.log('✅ 数据库初始化完成')
 
     // 加载SSL证书
     const sslOptions = loadSSLCertificates()

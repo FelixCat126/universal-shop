@@ -1,6 +1,6 @@
 {
   "name": "universal-shop",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "轻量化商城系统 - 支持域名和IP访问的双端商城",
   "type": "module",
   "scripts": {

@@ -8,7 +8,7 @@
 set -e
 
 PROJECT_NAME="universal-shop"
-VERSION="1.0.0"
+VERSION="1.2.0"
 PACKAGE_DIR="${PROJECT_NAME}-v${VERSION}"
 
 echo "📦 Universal Shop 打包"
@@ -39,8 +39,15 @@ cp setup.js "${PACKAGE_DIR}/"
 cp env.example "${PACKAGE_DIR}/"
 cp vite.config.js vite.admin.config.js "${PACKAGE_DIR}/"
 cp tailwind.config.js postcss.config.js "${PACKAGE_DIR}/" 2>/dev/null || true
+cp nodemon.json "${PACKAGE_DIR}/" 2>/dev/null || true
 cp start-https-production.js "${PACKAGE_DIR}/"
 cp README.md DEPLOYMENT_GUIDE.md "${PACKAGE_DIR}/" 2>/dev/null || true
+
+# 复制文档目录
+cp -r docs "${PACKAGE_DIR}/" 2>/dev/null || true
+
+# 复制脚本目录
+cp -r scripts "${PACKAGE_DIR}/" 2>/dev/null || true
 
 # 生成PM2配置文件
 cat > "${PACKAGE_DIR}/ecosystem.config.js" << 'EOF'
@@ -100,7 +107,7 @@ npm run setup
 echo "✅ 安装完成！"
 echo ""
 echo "🚀 启动服务: ./start.sh"
-echo "🔑 默认管理员: admin / admin123"
+echo "🔑 默认管理员: admin / 123456"
 EOF
 
 # 生成启动脚本
@@ -170,7 +177,7 @@ chmod +x "${PACKAGE_DIR}"/*.sh
 
 # 生成部署指南
 cat > "${PACKAGE_DIR}/DEPLOY.md" << 'EOF'
-# Universal Shop 部署指南
+# Universal Shop 部署指南 (v1.2)
 
 ## 🚀 快速部署 (推荐PM2)
 
@@ -190,8 +197,16 @@ npm install -g pm2
 # 3. 访问系统
 # 用户端: http://your-server:3000/portal/
 # 管理端: http://your-server:3000/admin/
-# 账户: admin / admin123
+# 账户: admin / 123456
 ```
+
+## ✨ v1.2版本新特性
+- ✅ 推荐码系统完全修复 - 游客下单推荐码正确写入
+- ✅ 订单地址系统全面优化 - 完整地址信息管理  
+- ✅ 购物车多商品支持 - 数据库约束优化
+- ✅ 智能数据库管理 - 开箱即用，自动修复约束
+- ✅ 开发体验提升 - 热重载支持（仅开发环境）
+- ✅ 订单状态国际化 - 三语言导出支持
 
 ## 📊 PM2 管理命令
 ```bash
@@ -265,4 +280,4 @@ echo "2. 解压: tar -xzf ${PACKAGE_DIR}.tar.gz"
 echo "3. 安装: cd ${PACKAGE_DIR} && ./install.sh (自动初始化管理员)"
 echo "4. 启动: ./start.sh"
 echo ""
-echo "📋 管理员: admin / admin123"
+echo "📋 管理员: admin / 123456"
