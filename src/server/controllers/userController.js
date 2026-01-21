@@ -2,7 +2,14 @@ import User from '../models/User.js'
 import jwt from 'jsonwebtoken'
 import { Op } from 'sequelize'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET || JWT_SECRET === 'your-secret-key-here' || JWT_SECRET.length < 32) {
+  console.error('❌ 安全警告: JWT_SECRET未正确配置!')
+  console.error('请在.env文件中设置安全的JWT_SECRET（至少32个字符）')
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1)
+  }
+}
 
 class UserController {
   // 用户注册
@@ -27,37 +34,12 @@ class UserController {
         })
       }
 
-      // 验证手机号格式和长度
-      const phoneRegex = /^[1-9]\d+$/
-      if (!phoneRegex.test(phone)) {
+      // 验证手机号格式 - 更精确的验证
+      const phoneValidation = this._validatePhoneNumber(phone, country_code)
+      if (!phoneValidation.isValid) {
         return res.status(400).json({
           success: false,
-          message: '手机号必须为纯数字且不能以0开头'
-        })
-      }
-
-      // 根据国家区号验证手机号长度
-      let minLength
-      let countryName
-      switch (country_code) {
-        case '+86':
-          minLength = 11
-          countryName = '中国'
-          break
-        case '+60':
-          minLength = 9
-          countryName = '马来西亚'
-          break
-        case '+66':
-          minLength = 9
-          countryName = '泰国'
-          break
-      }
-
-      if (phone.length < minLength) {
-        return res.status(400).json({
-          success: false,
-          message: `${countryName}手机号必须不少于${minLength}位数字`
+          message: phoneValidation.message
         })
       }
 
@@ -519,32 +501,10 @@ class UserController {
   static async _createUserCore(userData, isAutoRegister = false) {
     const { nickname, country_code, phone, password, email, referral_code } = userData
     
-    // 验证手机号格式（纯数字，不能以0开头）
-    const phoneRegex = /^[1-9]\d+$/
-    if (!phoneRegex.test(phone)) {
-      throw new Error('手机号必须为纯数字且不能以0开头')
-    }
-    
-    // 根据国家区号验证手机号长度
-    let minLength
-    let countryName
-    switch (country_code) {
-      case '+86':
-        minLength = 11
-        countryName = '中国'
-        break
-      case '+60':
-        minLength = 9
-        countryName = '马来西亚'
-        break
-      case '+66':
-        minLength = 9
-        countryName = '泰国'
-        break
-    }
-    
-    if (phone.length < minLength) {
-      throw new Error(`${countryName}手机号必须不少于${minLength}位数字`)
+    // 验证手机号格式 - 使用统一的验证逻辑
+    const phoneValidation = UserController._validatePhoneNumber(phone, country_code)
+    if (!phoneValidation.isValid) {
+      throw new Error(phoneValidation.message)
     }
 
     // 检查手机号是否已存在
@@ -671,6 +631,58 @@ class UserController {
         error: error.message
       })
     }
+  }
+
+  // 手机号验证方法 - 更精确的验证逻辑
+  static _validatePhoneNumber(phone, countryCode) {
+    // 基础检查：必须是纯数字
+    if (!/^\d+$/.test(phone)) {
+      return {
+        isValid: false,
+        message: '手机号必须为纯数字'
+      }
+    }
+
+    // 根据国家区号进行具体验证
+    switch (countryCode) {
+      case '+86': // 中国
+        // 中国手机号：11位，以1开头，第二位为3-9
+        if (!/^1[3-9]\d{9}$/.test(phone)) {
+          return {
+            isValid: false,
+            message: '中国手机号格式错误，应为11位数字，以1开头'
+          }
+        }
+        break
+        
+      case '+66': // 泰国
+        // 泰国手机号：9-10位，以6、8、9开头
+        if (!/^[689]\d{8,9}$/.test(phone)) {
+          return {
+            isValid: false,
+            message: '泰国手机号格式错误，应为9-10位数字，以6、8或9开头'
+          }
+        }
+        break
+        
+      case '+60': // 马来西亚  
+        // 马来西亚手机号：9-10位，以1开头
+        if (!/^1\d{8,9}$/.test(phone)) {
+          return {
+            isValid: false,
+            message: '马来西亚手机号格式错误，应为9-10位数字，以1开头'
+          }
+        }
+        break
+        
+      default:
+        return {
+          isValid: false,
+          message: '不支持的国家区号'
+        }
+    }
+
+    return { isValid: true }
   }
 }
 

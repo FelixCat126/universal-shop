@@ -93,17 +93,41 @@ const Order = sequelize.define('Order', {
   updatedAt: 'updated_at',
   comment: '订单表',
   indexes: [
+    // 用户ID索引（用于用户订单查询）
     {
-      fields: ['user_id']
+      fields: ['user_id'],
+      name: 'idx_order_user_id'
     },
+    // 订单号唯一索引（用于订单查找）
     {
-      fields: ['order_no']
+      unique: true,
+      fields: ['order_no'],
+      name: 'idx_order_no'
     },
+    // 订单状态索引（用于状态筛选）
     {
-      fields: ['status']
+      fields: ['status'],
+      name: 'idx_order_status'
     },
+    // 创建时间索引（用于时间排序）
     {
-      fields: ['created_at']
+      fields: ['created_at'],
+      name: 'idx_order_created_at'
+    },
+    // 复合索引：用户ID+创建时间（用户订单列表查询）
+    {
+      fields: ['user_id', 'created_at'],
+      name: 'idx_order_user_created'
+    },
+    // 复合索引：状态+创建时间（管理端订单列表）
+    {
+      fields: ['status', 'created_at'],
+      name: 'idx_order_status_created'
+    },
+    // 联系电话索引（用于查找订单）
+    {
+      fields: ['contact_phone'],
+      name: 'idx_order_contact_phone'
     }
   ]
 })

@@ -132,6 +132,26 @@ const User = sequelize.define('User', {
       unique: true,
       fields: ['country_code', 'phone'],
       name: 'unique_country_phone'
+    },
+    // 邮箱索引（用于登录查询）
+    {
+      fields: ['email'],
+      name: 'idx_user_email'
+    },
+    // 推荐码索引（用于推荐统计查询）
+    {
+      fields: ['referral_code'],
+      name: 'idx_user_referral_code'
+    },
+    // 用户状态索引（用于管理端筛选）
+    {
+      fields: ['is_active'],
+      name: 'idx_user_is_active'
+    },
+    // 创建时间索引（用于统计和排序）
+    {
+      fields: ['created_at'],
+      name: 'idx_user_created_at'
     }
   ],
   hooks: {
@@ -143,7 +163,7 @@ const User = sequelize.define('User', {
       }
       // 生成唯一推荐码
       if (!user.referral_code) {
-        user.referral_code = generateReferralCode()
+        user.referral_code = await generateReferralCode()
       }
     },
     beforeUpdate: async (user) => {
@@ -155,14 +175,36 @@ const User = sequelize.define('User', {
   }
 })
 
-// 生成推荐码
-function generateReferralCode() {
+// 生成推荐码 - 带冲突检测
+async function generateReferralCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let result = ''
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  let attempts = 0
+  const maxAttempts = 10
+  
+  while (attempts < maxAttempts) {
+    // 生成推荐码
+    let result = ''
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    
+    // 检查是否已存在
+    const existingUser = await User.findOne({
+      where: { referral_code: result }
+    })
+    
+    // 如果不存在，返回这个推荐码
+    if (!existingUser) {
+      return result
+    }
+    
+    attempts++
   }
-  return result
+  
+  // 如果多次尝试都冲突，使用时间戳确保唯一性
+  const timestamp = Date.now().toString(36).toUpperCase()
+  const randomPart = Math.random().toString(36).substr(2, 4).toUpperCase()
+  return `${timestamp}${randomPart}`.substr(0, 8)
 }
 
 // 实例方法：验证密码
