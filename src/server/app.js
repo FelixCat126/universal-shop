@@ -206,24 +206,11 @@ app.get('/', (req, res) => {
   res.redirect('/portal/')
 })
 
-// 404处理
-app.use('*', (req, res) => {
-  console.log('❌ 404:', req.originalUrl)
-  res.status(404).json({
-    success: false,
-    message: '页面未找到',
-    path: req.originalUrl
-  })
-})
+// 404处理和统一错误处理
+import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js'
 
-// 错误处理
-app.use((err, req, res, next) => {
-  console.error('💥 服务器错误:', err.stack || err.message)
-  res.status(500).json({
-    success: false,
-    message: '服务器内部错误: ' + err.message
-  })
-})
+app.use('*', notFoundHandler)
+app.use(errorHandler)
 
 // 启动服务器函数
 export function startServer() {

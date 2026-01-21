@@ -122,9 +122,21 @@ class OrderController {
       let totalAmount = 0
       const orderItems = []
 
+      // 批量查询商品信息（避免N+1查询）
+      const productIds = items.map(item => item.product_id)
+      const products = await Product.findAll({
+        where: { id: productIds }
+      })
+
+      // 创建商品ID到商品对象的映射
+      const productMap = new Map()
+      products.forEach(product => {
+        productMap.set(product.id, product)
+      })
+
       // 验证商品库存和计算总价
       for (const item of items) {
-        const product = await Product.findByPk(item.product_id)
+        const product = productMap.get(item.product_id)
         if (!product) {
           await transaction.rollback()
           return res.status(400).json({
@@ -137,7 +149,7 @@ class OrderController {
           await transaction.rollback()
           return res.status(400).json({
             success: false,
-            message: `商品 ${product.name_zh} 库存不足，当前库存：${product.stock}`
+            message: `商品 ${product.name} 库存不足，当前库存：${product.stock}`
           })
         }
 

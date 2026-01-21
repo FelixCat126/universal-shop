@@ -33,11 +33,25 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true)
-    } else {
-      cb(new Error('只允许上传图片文件 (JPEG, PNG, GIF, WebP)'))
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    
+    // 检查MIME类型
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('只允许上传图片文件 (JPEG, PNG, GIF, WebP)'), false)
     }
+    
+    // 检查文件扩展名
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (!allowedExts.includes(ext)) {
+      return cb(new Error('不支持的文件扩展名'), false)
+    }
+    
+    // 检查文件名安全性（防止路径遍历）
+    if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+      return cb(new Error('文件名包含非法字符'), false)
+    }
+    
+    cb(null, true)
   }
 })
 

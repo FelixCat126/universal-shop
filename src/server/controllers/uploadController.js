@@ -24,14 +24,37 @@ const storage = multer.diskStorage({
   }
 })
 
-// 文件过滤器
+// 文件过滤器 - 增强安全检查
 const fileFilter = (req, file, cb) => {
-  // 检查文件类型
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true)
-  } else {
-    cb(new Error('只允许上传图片文件！'), false)
+  // 允许的MIME类型
+  const allowedMimes = [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ]
+  
+  // 允许的文件扩展名
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+  
+  // 检查MIME类型
+  if (!allowedMimes.includes(file.mimetype)) {
+    return cb(new Error('不支持的文件类型，仅支持 JPG, PNG, GIF, WebP 格式图片'), false)
   }
+  
+  // 检查文件扩展名
+  const ext = path.extname(file.originalname).toLowerCase()
+  if (!allowedExts.includes(ext)) {
+    return cb(new Error('不支持的文件扩展名'), false)
+  }
+  
+  // 检查文件名安全性（防止路径遍历）
+  if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+    return cb(new Error('文件名包含非法字符'), false)
+  }
+  
+  cb(null, true)
 }
 
 // 创建multer实例
@@ -83,6 +106,20 @@ class UploadController {
   static async deleteProductImage(req, res) {
     try {
       const { filename } = req.params
+      
+      // 验证文件名安全性，防止路径遍历攻击
+      if (!filename || 
+          filename.includes('..') || 
+          filename.includes('/') || 
+          filename.includes('\\') ||
+          filename.startsWith('.') ||
+          !/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
+        return res.status(400).json({
+          success: false,
+          message: '无效的文件名'
+        })
+      }
+      
       const filePath = path.join(__dirname, '../../../public/uploads/products', filename)
 
       // 检查文件是否存在

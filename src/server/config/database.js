@@ -5,8 +5,10 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// 数据库文件路径
-const dbPath = path.join(__dirname, '../../../database/shop.sqlite')
+// 数据库文件路径 - 支持测试环境
+const dbPath = (process.env.NODE_ENV === 'test' && process.env.DATABASE_PATH)
+  ? process.env.DATABASE_PATH
+  : path.join(__dirname, '../../../database/shop.sqlite')
 
 // 创建Sequelize实例
 const sequelize = new Sequelize({

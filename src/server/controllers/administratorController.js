@@ -3,7 +3,11 @@ import jwt from 'jsonwebtoken'
 import Administrator from '../models/Administrator.js'
 import OperationLog from '../models/OperationLog.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here'
+// 使用安全的JWT密钥
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET环境变量未设置')
+}
 
 class AdministratorController {
   // 管理员登录

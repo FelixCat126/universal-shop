@@ -1,7 +1,11 @@
 import jwt from 'jsonwebtoken'
 import Administrator from '../models/Administrator.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here'
+// 使用安全的JWT密钥
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET环境变量未设置')
+}
 
 // 验证管理员JWT token
 export const authenticateAdmin = async (req, res, next) => {

@@ -1,7 +1,15 @@
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here'
+// 确保JWT密钥在生产环境中是安全的
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET || JWT_SECRET === 'your-secret-key-here' || JWT_SECRET.length < 32) {
+  console.error('❌ 安全警告: JWT_SECRET未正确配置!')
+  console.error('请运行: node scripts/generate-jwt-secret.js 生成安全密钥')
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1)
+  }
+}
 
 // 验证JWT token
 export const authenticateToken = async (req, res, next) => {

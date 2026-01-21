@@ -128,23 +128,12 @@ app.get('/', (req, res) => {
   res.redirect('/portal')
 })
 
-// 404处理
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: '页面未找到',
-    path: req.originalUrl
-  })
-})
+// 导入统一错误处理中间件
+import { errorHandler, notFoundHandler } from './src/server/middlewares/errorHandler.js'
 
-// 错误处理
-app.use((err, req, res, next) => {
-  console.error('服务器错误:', err)
-  res.status(500).json({
-    success: false,
-    message: '服务器内部错误'
-  })
-})
+// 404处理和统一错误处理
+app.use('*', notFoundHandler)
+app.use(errorHandler)
 
 // 读取SSL证书
 function loadSSLCertificates() {
