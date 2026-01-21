@@ -1,0 +1,205 @@
+name: 持续集成 (CI)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    services:
+      # 如果需要数据库服务，可以添加这里
+      # sqlite: 使用文件数据库，不需要服务
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+    
+    - name: 🔧 设置 Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: 📦 安装依赖
+      run: npm ci
+    
+    - name: 🔍 代码风格检查
+      run: npm run lint
+      continue-on-error: true
+    
+    - name: 🏗️ 构建项目
+      run: |
+        npm run build:portal
+        npm run build:admin
+    
+    - name: 🧪 运行单元测试
+      run: npm run test:unit
+    
+    - name: 🔗 运行集成测试
+      run: npm run test:integration
+    
+    - name: 🌐 运行API测试
+      run: npm run test:api
+    
+    - name: 🎭 运行E2E测试
+      run: npm run test:e2e
+      env:
+        NODE_ENV: test
+    
+    - name: 📊 生成测试覆盖率报告
+      run: npm run test:coverage
+    
+    - name: 📈 上传覆盖率报告到 Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+      continue-on-error: true
+    
+    - name: 💾 保存测试报告
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-reports
+        path: |
+          coverage/
+          test-reports/
+        retention-days: 30
+    
+    - name: 📋 生成测试报告摘要
+      if: always()
+      run: |
+        echo "## 🧪 测试结果摘要" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 覆盖率统计" >> $GITHUB_STEP_SUMMARY
+        if [ -f "coverage/coverage-summary.json" ]; then
+          node -e "
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+            const total = coverage.total;
+            console.log('| 指标 | 覆盖率 | 状态 |');
+            console.log('|------|--------|------|');
+            console.log(\`| 语句 | \${total.statements.pct}% | \${total.statements.pct >= 80 ? '✅' : '❌'} |\`);
+            console.log(\`| 分支 | \${total.branches.pct}% | \${total.branches.pct >= 70 ? '✅' : '❌'} |\`);
+            console.log(\`| 函数 | \${total.functions.pct}% | \${total.functions.pct >= 75 ? '✅' : '❌'} |\`);
+            console.log(\`| 行数 | \${total.lines.pct}% | \${total.lines.pct >= 80 ? '✅' : '❌'} |\`);
+          " >> $GITHUB_STEP_SUMMARY
+        else
+          echo "覆盖率报告生成失败" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+    
+    - name: 🔧 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: 📦 安装依赖
+      run: npm ci
+    
+    - name: 🔐 运行安全扫描
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+    
+    - name: 🛡️ 检查依赖漏洞
+      run: |
+        npx audit-ci --moderate
+      continue-on-error: true
+
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+    
+    - name: 🔧 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: 📦 安装依赖
+      run: npm ci
+    
+    - name: ⚡ 运行性能基准测试
+      run: |
+        npm run test:performance
+      continue-on-error: true
+    
+    - name: 📊 性能报告
+      if: always()
+      run: |
+        echo "## ⚡ 性能测试结果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -f "performance-results.json" ]; then
+          echo "性能测试已完成，详细结果请查看artifacts" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "性能测试未完成或失败" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  deploy-preview:
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+    
+    - name: 🔧 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: 📦 安装依赖
+      run: npm ci
+    
+    - name: 🏗️ 构建生产版本
+      run: |
+        npm run build:both
+      env:
+        NODE_ENV: production
+    
+    - name: 📋 构建摘要
+      run: |
+        echo "## 🏗️ 构建结果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ 生产构建完成" >> $GITHUB_STEP_SUMMARY
+        echo "📦 构建产物大小:" >> $GITHUB_STEP_SUMMARY
+        du -sh dist/ >> $GITHUB_STEP_SUMMARY || echo "构建目录不存在" >> $GITHUB_STEP_SUMMARY
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: always()
+    
+    steps:
+    - name: 📬 通知结果
+      run: |
+        if [ "${{ needs.test.result }}" == "success" ] && [ "${{ needs.security-scan.result }}" == "success" ]; then
+          echo "✅ 所有检查通过"
+        else
+          echo "❌ 部分检查失败"
+          exit 1
+        fi
