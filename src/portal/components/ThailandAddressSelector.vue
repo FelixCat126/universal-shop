@@ -8,7 +8,7 @@
       <select 
         v-model="selectedProvince" 
         @change="handleProvinceChange"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         :disabled="loading"
       >
         <option value="">{{ t('address.selectProvince') }}</option>
@@ -30,7 +30,7 @@
       <select 
         v-model="selectedDistrict" 
         @change="handleDistrictChange"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         :disabled="!selectedProvince || loading"
       >
         <option value="">
@@ -54,7 +54,7 @@
       <select 
         v-model="selectedSubDistrict" 
         @change="handleSubDistrictChange"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         :disabled="!selectedDistrict || loading"
       >
         <option value="">
@@ -79,7 +79,7 @@
         v-model="postalCode"
         type="text"
         readonly
-        class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+        class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 bg-gray-50 text-gray-600"
         :placeholder="t('address.postalCodeAuto')"
       />
     </div>

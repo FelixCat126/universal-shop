@@ -32,8 +32,8 @@ class DataSeeder {
       // 3. 创建默认系统配置
       await this.createDefaultSystemConfig()
       
-      // 4. 创建默认管理员
-      await this.createDefaultAdmin()
+      // 4. 创建默认管理员（本地/首次安装：允许重置为默认密码）
+      await this.createDefaultAdmin({ allowPasswordReset: true })
       
       // 5. 导入泰国行政区数据
       await this.importAdministrativeRegions()
@@ -45,6 +45,35 @@ class DataSeeder {
       
     } catch (error) {
       console.error('❌ 数据种子初始化失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 生产环境增量部署：仅同步表结构、补默认配置与参考数据，不修改已有业务数据与管理员密码
+   */
+  static async runProductionUpdate() {
+    console.log('🌱 生产部署：结构升级与数据保护模式...')
+    
+    try {
+      await sequelize.authenticate()
+      console.log('✅ 数据库连接成功')
+      
+      await this.smartSync()
+      console.log('✅ 数据库表结构同步完成')
+      
+      await this.createDefaultSystemConfig()
+      
+      await this.createDefaultAdmin({ allowPasswordReset: false })
+      
+      await this.importAdministrativeRegions()
+      
+      await this.verifyDatabaseIntegrity()
+      
+      console.log('🎉 生产部署数据库步骤完成（未改动现有业务数据与管理员密码）')
+      
+    } catch (error) {
+      console.error('❌ 生产部署数据库步骤失败:', error)
       throw error
     }
   }
@@ -224,16 +253,22 @@ class DataSeeder {
     }
   }
   
-  static async createDefaultAdmin() {
+  static async createDefaultAdmin(options = {}) {
+    const allowPasswordReset = options.allowPasswordReset !== false
+    
     try {
       const existingAdmin = await Administrator.findOne({ where: { username: 'admin' } })
       if (existingAdmin) {
-        // 强制重置密码为123456，确保始终可用
-        existingAdmin.password = '123456'
-        await existingAdmin.save()
-        console.log('✅ 默认管理员密码已重置为123456')
-        console.log('   用户名: admin')
-        console.log('   密码: 123456')
+        if (allowPasswordReset) {
+          // 本地开发 / npm run setup：强制重置密码为123456，确保始终可用
+          existingAdmin.password = '123456'
+          await existingAdmin.save()
+          console.log('✅ 默认管理员密码已重置为123456')
+          console.log('   用户名: admin')
+          console.log('   密码: 123456')
+        } else {
+          console.log('ℹ️  生产部署：检测到已有管理员，不修改密码与账户信息')
+        }
         return
       }
       

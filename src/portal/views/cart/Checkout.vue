@@ -170,7 +170,7 @@
               <h3 class="text-sm font-medium text-gray-700 mb-3">{{ t('order.fillShippingInfo') }}</h3>
               
               <!-- 联系人信息 -->
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4 sm:items-start">
                 <!-- 联系人 -->
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -179,7 +179,7 @@
                   <input
                     v-model="orderForm.contact_name"
                     type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     :class="{ 'border-red-500': errors.contact_name }"
                     :placeholder="t('order.contactNamePlaceholder')"
                   />
@@ -190,32 +190,25 @@
 
                 <!-- 联系电话 -->
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-3">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
                     {{ t('order.contactPhone') || '联系电话' }} <span class="text-red-500">*</span>
                   </label>
-                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
-                    <!-- 国家选择 -->
-                    <div class="sm:col-span-2">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
+                    <div class="w-full shrink-0 sm:w-[7rem]">
                       <CountrySelector
                         v-model="orderForm.contact_country_code"
                         :placeholder="t('common.selectCountry')"
                         @country-change="handleOrderCountryChange"
                       />
                     </div>
-                    <!-- 手机号输入 -->
-                    <div class="sm:col-span-3">
-                      <div class="relative">
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                          <span class="text-gray-500 text-sm">{{ orderForm.contact_country_code }}</span>
-                        </div>
-                        <input
-                          v-model="orderForm.contact_phone"
-                          type="tel"
-                          class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                          :class="{ 'border-red-500': errors.contact_phone }"
-                          :placeholder="`请输入手机号`"
-                        />
-                      </div>
+                    <div class="min-w-0 flex-1 flex flex-col justify-start">
+                      <input
+                        v-model="orderForm.contact_phone"
+                        type="tel"
+                        class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="{ 'border-red-500': errors.contact_phone }"
+                        :placeholder="`请输入手机号`"
+                      />
                       <p v-if="errors.contact_phone" class="text-red-500 text-xs mt-1">
                         {{ errors.contact_phone }}
                       </p>
@@ -263,7 +256,7 @@
                 </label>
                 <select
                   v-model="orderForm.address_type"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   <option value="home">{{ t('order.addressHome') || '家庭' }}</option>
                   <option value="company">{{ t('order.addressCompany') || '公司' }}</option>

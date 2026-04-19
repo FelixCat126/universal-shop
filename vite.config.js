@@ -3,7 +3,24 @@ import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    {
+      name: 'inject-portal-build-meta',
+      transformIndexHtml () {
+        return [
+          {
+            tag: 'meta',
+            injectTo: 'head',
+            attrs: {
+              name: 'portal-build-at',
+              content: new Date().toISOString()
+            }
+          }
+        ]
+      }
+    }
+  ],
   root: './src/portal',
   base: '/portal/',  // 修复：添加/portal/前缀
   resolve: {

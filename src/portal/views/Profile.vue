@@ -298,30 +298,23 @@
 
           <!-- 联系人手机号 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-3">{{ t('order.contactPhone') }} *</label>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
-              <!-- 国家选择 -->
-              <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('order.contactPhone') }} *</label>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
+              <div class="w-full shrink-0 sm:w-[7rem]">
                 <CountrySelector
                   v-model="addressForm.contact_country_code"
                   placeholder="选择国家"
                   @country-change="handleAddressCountryChange"
                 />
               </div>
-              <!-- 手机号输入 -->
-              <div class="sm:col-span-3">
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <span class="text-gray-500 text-sm">{{ addressForm.contact_country_code }}</span>
-                  </div>
-                  <input
-                    v-model="addressForm.contact_phone"
-                    type="tel"
-                    required
-                    class="appearance-none block w-full pl-16 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    :placeholder="`请输入手机号`"
-                  />
-                </div>
+              <div class="min-w-0 flex-1 flex flex-col justify-start">
+                <input
+                  v-model="addressForm.contact_phone"
+                  type="tel"
+                  required
+                  class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  :placeholder="`请输入手机号`"
+                />
               </div>
             </div>
           </div>

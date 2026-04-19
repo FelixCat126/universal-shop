@@ -8,7 +8,7 @@
 set -e
 
 PROJECT_NAME="universal-shop"
-VERSION="1.2.0"
+VERSION="$(node -p "require('./package.json').version" 2>/dev/null || echo "1.2.0")"
 PACKAGE_DIR="${PROJECT_NAME}-v${VERSION}"
 
 echo "📦 Universal Shop 打包"

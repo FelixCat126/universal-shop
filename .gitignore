@@ -11,6 +11,13 @@ dist/
 .env
 .env.local
 .env.production
+deploy.env
+
+# 本地/运维部署脚本与示例（不入库，避免与业务代码混提交）
+scripts/deploy-aliyun.sh
+scripts/production-deploy-setup.mjs
+scripts/nginx-portal-proxy.example.conf
+deploy.env.example
 
 # Database
 database/*.db

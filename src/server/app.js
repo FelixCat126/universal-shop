@@ -1,5 +1,7 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import sequelize from './config/database.js'
@@ -29,6 +31,10 @@ import './models/SystemConfig.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+const projectRoot = path.join(__dirname, '../..')
+const portalDir = path.join(projectRoot, 'dist/portal')
+const adminDir = path.join(projectRoot, 'dist/admin')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -107,6 +113,25 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+/** 排查部署：返回 package 版本与 dist/portal/index.html 修改时间（确认是否已同步新前端） */
+app.get('/api/portal-build', (req, res) => {
+  try {
+    const pkgPath = path.join(projectRoot, 'package.json')
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+    const idx = path.join(portalDir, 'index.html')
+    const st = fs.statSync(idx)
+    res.json({
+      success: true,
+      appVersion: pkg.version,
+      portalIndexModified: st.mtime.toISOString(),
+      portalDir,
+      hint: '若公网仍为旧界面：对比 portalIndexModified 是否为本次部署时间；过旧则多为 Nginx/OSS 未指向本机 dist，或 CDN 缓存未刷新'
+    })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
 // API 404处理
 app.use('/api/*', (req, res) => {
   console.log('❌ API 404:', req.originalUrl)
@@ -118,14 +143,18 @@ app.use('/api/*', (req, res) => {
 })
 
 // 静态文件服务
-const portalDir = path.join(__dirname, '../../dist/portal')
-const adminDir = path.join(__dirname, '../../dist/admin')
-
 console.log('📁 Portal目录:', portalDir)
 console.log('📁 Admin目录:', adminDir)
 
+/** 避免浏览器长期缓存 SPA 的 index.html，否则部署后仍引用旧 hash 的 JS/CSS */
+function setNoCacheHtml (res) {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+}
+
 // 上传文件
-app.use('/uploads', express.static(path.join(__dirname, '../../public/uploads'), {
+app.use('/uploads', express.static(path.join(projectRoot, 'public/uploads'), {
   maxAge: '30d'
 }))
 
@@ -145,6 +174,9 @@ app.use('/portal/assets', express.static(path.join(portalDir, 'assets'), {
 app.use('/portal', express.static(portalDir, {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      setNoCacheHtml(res)
+    }
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript; charset=UTF-8')
     } else if (filePath.endsWith('.css')) {
@@ -169,6 +201,9 @@ app.use('/admin/assets', express.static(path.join(adminDir, 'assets'), {
 app.use('/admin', express.static(adminDir, {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      setNoCacheHtml(res)
+    }
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript; charset=UTF-8')
     } else if (filePath.endsWith('.css')) {
@@ -187,6 +222,7 @@ app.get('/portal/*', (req, res, next) => {
   }
   
   console.log('📱 返回Portal index.html')
+  setNoCacheHtml(res)
   res.sendFile(path.join(portalDir, 'index.html'))
 })
 
@@ -198,6 +234,7 @@ app.get('/admin/*', (req, res, next) => {
   }
   
   console.log('🔧 返回Admin index.html')
+  setNoCacheHtml(res)
   res.sendFile(path.join(adminDir, 'index.html'))
 })
 
