@@ -11,13 +11,11 @@ dist/
 .env
 .env.local
 .env.production
+# 含密钥、真实 ECS 路径等，勿提交
 deploy.env
 
-# 本地/运维部署脚本与示例（不入库，避免与业务代码混提交）
+# 一键部署 shell 仅本机/私库保留，有意不传 GitHub；配置好本机 scripts/deploy-aliyun.sh 后即可 npm run deploy:aliyun
 scripts/deploy-aliyun.sh
-scripts/production-deploy-setup.mjs
-scripts/nginx-portal-proxy.example.conf
-deploy.env.example
 
 # Database
 database/*.db

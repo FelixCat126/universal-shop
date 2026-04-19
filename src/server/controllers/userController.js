@@ -34,8 +34,8 @@ class UserController {
         })
       }
 
-      // 验证手机号格式 - 更精确的验证
-      const phoneValidation = this._validatePhoneNumber(phone, country_code)
+      // 验证手机号格式（静态方法作路由回调时 this 非类实例，须显式用类名）
+      const phoneValidation = UserController._validatePhoneNumber(phone, country_code)
       if (!phoneValidation.isValid) {
         return res.status(400).json({
           success: false,

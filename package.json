@@ -42,7 +42,8 @@
     "migrate:order-status": "node run-order-status-migration.js migrate",
     "rollback:order-status": "node run-order-status-migration.js rollback",
     "migrate:exchange-rate": "node run-exchange-rate-migration.js migrate",
-    "install:all": "./install.sh"
+    "install:all": "./install.sh",
+    "deploy:aliyun": "bash scripts/deploy-aliyun.sh"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

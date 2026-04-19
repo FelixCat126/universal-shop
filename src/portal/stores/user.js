@@ -10,7 +10,8 @@ export const useUserStore = defineStore('user', () => {
 
   // 计算属性
   const isAuthenticated = computed(() => !!token.value && !!user.value)
-  // isLoggedIn 和 isAuthenticated 是同一个概念，保留isAuthenticated即可
+  // 与 isAuthenticated 同义；结账页、购物车、App 等处使用 isLoggedIn，须同时导出
+  const isLoggedIn = isAuthenticated
   const userInfo = computed(() => user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
@@ -170,6 +171,7 @@ export const useUserStore = defineStore('user', () => {
     
     // 计算属性
     isAuthenticated,
+    isLoggedIn,
     userInfo,
     isAdmin,
     
