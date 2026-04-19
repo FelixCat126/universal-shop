@@ -484,7 +484,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
@@ -879,20 +879,21 @@ const submitOrder = async () => {
       // 清空购物车状态
       await cartStore.loadCart()
       
+      const payload = response.data.data || {}
       // 检查是否是游客下单且后端已自动注册
-      if (response.data.data.autoRegistered && response.data.data.user && response.data.data.token) {
+      if (payload.autoRegistered && payload.user && payload.token) {
         // 后端已自动注册，直接登录
-        userStore.setAuth(response.data.data.user, response.data.data.token)
+        userStore.setAuth(payload.user, payload.token)
         
         // 生成密码提示
-        const phone = response.data.data.user.phone
+        const phone = payload.user.phone
         const password = phone.slice(-8)
         showMessage(t('user.accountCreatedPassword', { password }), 'success')
         
-        // 延迟跳转到个人中心
+        await nextTick()
         setTimeout(() => {
-          router.push('/profile?tab=orders')
-        }, 5000)
+          router.push({ path: '/profile', query: { tab: 'orders' } })
+        }, 500)
       } else if (!userStore.isLoggedIn) {
         // 后端自动注册失败时，提示用户手动注册
         showMessage('自动注册失败，请手动注册后再下单', 'error')
@@ -900,10 +901,9 @@ const submitOrder = async () => {
           router.push('/register')
         }, 2000)
       } else {
-        // 已登录用户直接跳转到订单页面
-        setTimeout(() => {
-          router.push('/profile?tab=orders')
-        }, 2000)
+        // 已登录用户：立即跳转个人中心订单列表（与在线支付「完成支付」同一路径）
+        await nextTick()
+        await router.push({ path: '/profile', query: { tab: 'orders' } })
       }
     } else {
       showMessage(response.data.message || t('order.submitFailed'), 'error')

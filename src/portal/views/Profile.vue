@@ -439,6 +439,17 @@ const formatAddress = (address) => {
 // 页面状态
 const activeTab = ref('orders')
 
+// 与 URL ?tab= 同步（从结算页带 tab=orders 进入时可靠；同页仅改 query 时也会更新）
+watch(
+  () => route.query.tab,
+  (tabParam) => {
+    if (tabParam && ['orders', 'addresses', 'profile'].includes(String(tabParam))) {
+      activeTab.value = String(tabParam)
+    }
+  },
+  { immediate: true }
+)
+
 // 地址模态框状态
 const showAddressModal = ref(false)
 const editingAddress = ref(null)
@@ -917,12 +928,6 @@ const setDefaultAddress = async (addressId) => {
 
 // 页面加载时获取数据
 onMounted(async () => {
-  // 检查URL参数，如果有tab参数则切换到对应标签页
-  const tabParam = route.query.tab
-  if (tabParam && ['orders', 'addresses', 'profile'].includes(tabParam)) {
-    activeTab.value = tabParam
-  }
-  
   // 确保用户数据已加载，如果没有则尝试从localStorage恢复
   if (!userStore.user) {
     await userStore.checkAuth()

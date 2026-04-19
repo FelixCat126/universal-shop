@@ -294,7 +294,7 @@ const handleSubmit = async () => {
       success(t('user.registerSuccess'))
       
       // 跳转到首页
-      router.push('/')
+      router.push({ name: 'Home' })
     }
   } catch (error) {
     console.error('Registration failed:', error)

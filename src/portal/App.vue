@@ -6,7 +6,7 @@
         <div class="flex items-center justify-between h-16">
           <!-- 网站标题 -->
           <div class="flex items-center">
-            <router-link to="/" class="text-xl font-bold text-gray-900 hover:text-blue-600">
+            <router-link :to="{ name: 'Home' }" class="text-xl font-bold text-gray-900 hover:text-blue-600">
               {{ t('nav.home') }}
             </router-link>
           </div>
@@ -89,7 +89,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from './stores/cart.js'
 import { useUserStore } from './stores/user.js'
 import ToastContainer from './components/ui/Toast/ToastContainer.vue'
@@ -99,6 +99,7 @@ import ToastContainer from './components/ui/Toast/ToastContainer.vue'
 // 国际化
 const { locale, t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 
 // 状态管理
 const cartStore = useCartStore()
@@ -156,12 +157,12 @@ const handleLogout = async () => {
   try {
     await userStore.logout()
     // 注意：购物车状态清理现在由watch监听器自动处理
-    // 强制跳转到首页并刷新页面以确保状态重置
-    window.location.href = '/'
+    // 强制跳转到门户首页并刷新页面以确保状态重置（须带 /portal/ base，勿用 '/'）
+    window.location.href = router.resolve({ name: 'Home' }).href
   } catch (error) {
     console.error('登出失败:', error)
     // 即使出错也要跳转到首页
-    window.location.href = '/'
+    window.location.href = router.resolve({ name: 'Home' }).href
   }
 }
 

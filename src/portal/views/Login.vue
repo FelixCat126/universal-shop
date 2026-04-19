@@ -147,7 +147,7 @@
     <!-- 返回首页 -->
     <div class="mt-8 text-center">
       <router-link
-        to="/"
+        :to="{ name: 'Home' }"
         class="inline-flex items-center text-sm text-gray-600 hover:text-gray-500"
       >
         <ArrowLeftIcon class="h-4 w-4 mr-1" />
