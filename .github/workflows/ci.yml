@@ -14,10 +14,7 @@ jobs:
       matrix:
         node-version: [20.x]
     
-    services:
-      # 如果需要数据库服务，可以添加这里
-      # sqlite: 使用文件数据库，不需要服务
-    
+    # 未使用 services（SQLite 为文件库）；若需 Postgres 等再在此添加映射，勿留空 services:
     steps:
     - name: 📥 检出代码
       uses: actions/checkout@v4
