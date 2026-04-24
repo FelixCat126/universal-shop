@@ -1,20 +1,5 @@
 <template>
   <div class="operation-logs">
-    <!-- 页面标题和操作区 -->
-    <el-card class="header-card" shadow="never">
-      <div class="header-section">
-        <h1 class="page-title">
-          <el-icon><Document /></el-icon>
-          {{ t('operationLogs.title') }}
-        </h1>
-        <div class="actions">
-          <el-button @click="loadLogs" :loading="loading" icon="Refresh">{{ t('operationLogs.refresh') }}</el-button>
-          <el-button @click="resetFilters">{{ t('common.reset') }}</el-button>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- 筛选区域 -->
     <el-card class="filter-card" shadow="never">
       <el-form :model="filters" class="filter-form">
         <el-row :gutter="20">
@@ -87,17 +72,34 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <div class="filter-actions">
+          <el-button type="primary" @click="loadLogs" :loading="loading">
+            <el-icon><Refresh /></el-icon>
+            {{ t('operationLogs.refresh') }}
+          </el-button>
+          <el-button @click="resetFilters">
+            <el-icon><RefreshLeft /></el-icon>
+            {{ t('common.reset') }}
+          </el-button>
+        </div>
       </el-form>
     </el-card>
 
-    <!-- 日志表格 -->
     <el-card class="table-card" shadow="never">
+      <template #header>
+        <div class="table-header">
+          <span>{{ t('operationLogs.title') }}</span>
+          <span class="table-info">{{ pagination.total }}</span>
+        </div>
+      </template>
       <el-table 
         :data="logs" 
         v-loading="loading"
         stripe
         border
+        table-layout="fixed"
         style="width: 100%"
+        class="operation-logs-table"
         :default-sort="{ prop: 'created_at', order: 'descending' }"
       >
         <el-table-column prop="admin_username" :label="t('operationLogs.admin')" width="120" />
@@ -227,7 +229,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Document } from '@element-plus/icons-vue'
+import { Refresh, RefreshLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useAdminStore } from '../stores/admin.js'
@@ -396,29 +398,36 @@ onMounted(() => {
 
 <style scoped>
 .operation-logs {
-  padding: 20px;
+  padding: 0;
 }
 
-.header-card,
 .filter-card,
 .table-card {
   margin-bottom: 20px;
 }
 
-.header-section {
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-weight: 600;
+  color: #303133;
 }
 
-.page-title {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.table-info {
+  font-size: 14px;
+  color: #909399;
+  font-weight: normal;
 }
 
 .pagination-wrapper {
@@ -485,13 +494,5 @@ onMounted(() => {
     padding: 10px;
   }
   
-  .page-title {
-    font-size: 20px;
-  }
-  
-  .header-section {
-    flex-direction: column;
-    gap: 10px;
-  }
 }
 </style>

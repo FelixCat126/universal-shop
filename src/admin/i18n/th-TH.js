@@ -30,7 +30,7 @@ export default {
     cod: 'เก็บเงินปลายทาง',
     online: 'ชำระออนไลน์',
     currency: '฿',
-    currencyName: 'บาท',
+    currencyName: 'บาทไทย ฿',
     createTime: 'เวลาสร้าง',
     confirm: 'ยืนยัน',
     cancel: 'ยกเลิก',
@@ -115,7 +115,7 @@ export default {
     updateTime: 'เวลาอัพเดต',
     addProduct: 'เพิ่มสินค้า',
     editProduct: 'แก้ไขสินค้า',
-    deleteProduct: 'ลบสินค้า',
+    deleteProduct: 'ถอดสินค้าออกจากการขาย',
     lowStock: 'สต็อกต่ำ',
     outOfStock: 'สินค้าหมด',
     uploadImage: 'อัพโหลดรูปภาพ'
@@ -220,7 +220,16 @@ export default {
       purpose: '• ใช้สำหรับการแปลงอัตราแลกเปลี่ยนราคาสินค้า',
       example: '• ตัวอย่าง: 1.00 หมายถึงไม่มีการแปลง, 1.50 หมายถึงคูณราคาด้วย 1.5 เท่า'
     },
-    
+    currencyUnit: 'สกุลเงิน',
+    currencyUnitSubtitle: 'เลือกหนึ่งแบบ; ยอดเงินแสดงสัญลักษณ์ ชื่อสกุลเงินตามภาษาหน้าจอ',
+    currencyUnitTips: 'มีผลทันทีหลังบันทึก ตัวเลือกเป็น「ชื่อ + สัญลักษณ์」 ราคาแสดงเฉพาะสัญลักษณ์ (เช่น ฿100)',
+    saveCurrencyUnit: 'บันทึกสกุลเงิน',
+    currencyOptions: {
+      THB: 'บาทไทย ฿',
+      USD: 'ดอลลาร์สหรัฐ $',
+      CNY: 'หยวนจีน ¥'
+    },
+
     uploadTips: {
       bannerSize: '• ขนาดแนะนำ: 1200x300px หรือใหญ่กว่า',
       bannerFormat: '• รูปแบบที่รองรับ: JPG, PNG, GIF, WebP',
@@ -242,7 +251,9 @@ export default {
       invalidFileFormat: 'รูปแบบไฟล์ไม่ถูกต้อง',
       exchangeRateSaveSuccess: 'บันทึกอัตราแลกเปลี่ยนสำเร็จ',
       exchangeRateSaveFailed: 'บันทึกอัตราแลกเปลี่ยนล้มเหลว',
-      invalidExchangeRate: 'กรุณาใส่อัตราแลกเปลี่ยนที่ถูกต้อง (≥0, ทศนิยมสูงสุด 2 ตำแหน่ง)'
+      invalidExchangeRate: 'กรุณาใส่อัตราแลกเปลี่ยนที่ถูกต้อง (≥0, ทศนิยมสูงสุด 2 ตำแหน่ง)',
+      currencyUnitSaveSuccess: 'บันทึกสัญลักษณ์สำเร็จ',
+      currencyUnitSaveFailed: 'บันทึกสัญลักษณ์ล้มเหลว'
     }
   },
 
@@ -340,7 +351,7 @@ export default {
       update_order_status: 'อัปเดตสถานะคำสั่งซื้อ',
       create_product: 'สร้างสินค้า',
       update_product: 'อัปเดตสินค้า',
-      delete_product: 'ลบสินค้า',
+      delete_product: 'ถอดสินค้าออกจากการขาย',
       upload_product_image: 'อัปโหลดรูปภาพสินค้า',
       view: 'ดู'
     },
@@ -389,6 +400,7 @@ export default {
     active: 'ใช้งานอยู่',
     inactive: 'ไม่ใช้งาน',
     viewDetails: 'ดูรายละเอียด',
+    viewOrders: 'คำสั่งซื้อทั้งหมด',
     ban: 'ระงับ',
     unban: 'ยกเลิกระงับ',
     never: 'ไม่เคย',
@@ -436,7 +448,7 @@ export default {
     status: 'สถานะคำสั่งซื้อ',
     selectStatus: 'กรุณาเลือกสถานะ',
     search: 'ค้นหา',
-    searchPlaceholder: 'หมายเลขคำสั่งซื้อ/ชื่อ/โทรศัพท์',
+    searchPlaceholder: 'หมายเลขคำสั่งซื้อ/ผู้รับ/โทรศัพท์/ชื่อเล่นบัญชี',
     startDate: 'วันที่เริ่มต้น',
     endDate: 'วันที่สิ้นสุด',
     selectStartDate: 'เลือกวันที่เริ่มต้น',
@@ -522,9 +534,20 @@ export default {
     status: 'สถานะ',
     actions: 'การดำเนินการ',
     edit: 'แก้ไข',
-    delete: 'ลบ',
+    delete: 'ถอดออกจากการขาย',
     view: 'ดู',
     adjustStock: 'ปรับปรุงคลังสินค้า',
+    shelfStatus: 'การขาย/สถานะ',
+    shelfOn: 'วางขาย',
+    shelfDelisted: 'ถอดแล้ว',
+    saleActive: 'กำลังขาย',
+    saleInactive: 'หยุดขาย',
+    restore: 'วางขายอีกครั้ง',
+    listingFilter: 'สถานะการขาย',
+    listingFilterAll: 'ทั้งหมด',
+    listingFilterOnShelf: 'ยังไม่ถอด',
+    listingFilterDelisted: 'ถอดแล้ว',
+    listTotal: 'จำนวนสินค้า',
     // 分类选项
     categories: {
       electronics: 'อิเล็กทรอนิกส์',
@@ -558,11 +581,15 @@ export default {
     messages: {
       addSuccess: 'เพิ่มสินค้าสำเร็จ',
       updateSuccess: 'อัปเดตสินค้าสำเร็จ',
-      deleteSuccess: 'ลบสินค้าสำเร็จ',
+      deleteSuccess: 'ถอดสินค้าออกจากการขายสำเร็จ',
+      deleteFailed: 'ถอดสินค้าออกจากการขายล้มเหลว',
       saveFailed: 'บันทึกสินค้าล้มเหลว',
-      confirmDelete: 'คุณแน่ใจหรือไม่ที่จะลบสินค้านี้?',
+      confirmDelete: 'ถอดสินค้านี้ออกจากการขายหรือไม่? จะไม่แสดงในร้านค้า คำสั่งซื้อเดิมยังเชื่อมโยงได้',
       confirmAdd: 'คุณแน่ใจหรือไม่ที่จะเพิ่มสินค้านี้?',
-      confirmUpdate: 'คุณแน่ใจหรือไม่ที่จะอัปเดตสินค้านี้?'
+      confirmUpdate: 'คุณแน่ใจหรือไม่ที่จะอัปเดตสินค้านี้?',
+      confirmRestore: 'วางขายสินค้านี้อีกครั้งหรือไม่? จะแสดงในร้านค้าอีกครั้ง',
+      restoreSuccess: 'วางขายอีกครั้งสำเร็จ',
+      restoreFailed: 'วางขายอีกครั้งล้มเหลว'
     },
     // 库存调整
     stockAdjustment: {

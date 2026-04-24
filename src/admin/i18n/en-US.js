@@ -29,8 +29,8 @@ export default {
     paymentMethod: 'Payment Method',
     cod: 'Cash on Delivery',
     online: 'Online Payment',
-    currency: '$',
-    currencyName: 'USD',
+    currency: '฿',
+    currencyName: 'Thai Baht ฿',
     createTime: 'Create Time',
     delete: 'Delete',
     edit: 'Edit',
@@ -113,7 +113,7 @@ export default {
     updateTime: 'Update Time',
     addProduct: 'Add Product',
     editProduct: 'Edit Product',
-    deleteProduct: 'Delete Product',
+    deleteProduct: 'Delist Product',
     lowStock: 'Low Stock',
     outOfStock: 'Out of Stock',
     uploadImage: 'Upload Image'
@@ -218,7 +218,16 @@ export default {
       purpose: '• Used for product price exchange rate conversion',
       example: '• Example: 1.00 means no conversion, 1.50 means multiply price by 1.5'
     },
-    
+    currencyUnit: 'Currency',
+    currencyUnitSubtitle: 'Choose one; amounts use the symbol only, labels follow UI language (ZH / EN / TH).',
+    currencyUnitTips: 'Applies site-wide after save. Options show name + symbol; prices show the symbol only (e.g. ฿100).',
+    saveCurrencyUnit: 'Save currency',
+    currencyOptions: {
+      THB: 'Thai Baht ฿',
+      USD: 'US Dollar $',
+      CNY: 'Chinese Yuan ¥'
+    },
+
     uploadTips: {
       bannerSize: '• Recommended size: 1200x300px or larger',
       bannerFormat: '• Supported formats: JPG, PNG, GIF, WebP',
@@ -240,7 +249,9 @@ export default {
       invalidFileFormat: 'Invalid file format',
       exchangeRateSaveSuccess: 'Exchange rate saved successfully',
       exchangeRateSaveFailed: 'Failed to save exchange rate',
-      invalidExchangeRate: 'Please enter a valid exchange rate (≥0, up to 2 decimal places)'
+      invalidExchangeRate: 'Please enter a valid exchange rate (≥0, up to 2 decimal places)',
+      currencyUnitSaveSuccess: 'Currency symbol saved',
+      currencyUnitSaveFailed: 'Failed to save currency symbol'
     }
   },
 
@@ -338,7 +349,7 @@ export default {
       update_order_status: 'Update Order Status',
       create_product: 'Create Product',
       update_product: 'Update Product',
-      delete_product: 'Delete Product',
+      delete_product: 'Delist Product',
       upload_product_image: 'Upload Product Image',
       view: 'View'
     },
@@ -388,6 +399,7 @@ export default {
     active: 'Active',
     inactive: 'Inactive',
     viewDetails: 'View Details',
+    viewOrders: 'All orders',
     ban: 'Ban',
     unban: 'Unban',
     never: 'Never',
@@ -434,7 +446,7 @@ export default {
     status: 'Order Status',
     selectStatus: 'Please select status',
     search: 'Search',
-    searchPlaceholder: 'Order No./Name/Phone',
+    searchPlaceholder: 'Order No./Recipient/Phone/User nickname',
     startDate: 'Start Date',
     endDate: 'End Date',
     selectStartDate: 'Select start date',
@@ -520,9 +532,20 @@ export default {
     status: 'Status',
     actions: 'Actions',
     edit: 'Edit',
-    delete: 'Delete',
+    delete: 'Delist',
     view: 'View',
     adjustStock: 'Adjust Stock',
+    shelfStatus: 'Listing & sale',
+    shelfOn: 'On shelf',
+    shelfDelisted: 'Delisted',
+    saleActive: 'Active',
+    saleInactive: 'Inactive',
+    restore: 'Relist',
+    listingFilter: 'Listing',
+    listingFilterAll: 'All',
+    listingFilterOnShelf: 'On shelf',
+    listingFilterDelisted: 'Delisted',
+    listTotal: 'Total',
     // Category options
     categories: {
       electronics: 'Electronics',
@@ -556,11 +579,15 @@ export default {
     messages: {
       addSuccess: 'Product added successfully',
       updateSuccess: 'Product updated successfully',
-      deleteSuccess: 'Product deleted successfully',
+      deleteSuccess: 'Product delisted successfully',
+      deleteFailed: 'Failed to delist product',
       saveFailed: 'Failed to save product',
-      confirmDelete: 'Are you sure you want to delete this product?',
+      confirmDelete: 'Delist this product? It will be hidden from the storefront; existing orders stay linked.',
       confirmAdd: 'Are you sure you want to add this product?',
-      confirmUpdate: 'Are you sure you want to update this product?'
+      confirmUpdate: 'Are you sure you want to update this product?',
+      confirmRestore: 'Relist this product? It will appear on the storefront again.',
+      restoreSuccess: 'Product relisted successfully',
+      restoreFailed: 'Failed to relist product'
     },
     // Stock adjustment
     stockAdjustment: {

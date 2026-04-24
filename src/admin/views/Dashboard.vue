@@ -1,12 +1,12 @@
 <template>
   <div class="dashboard">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h2 class="page-title">{{ t('dashboard.title') }}</h2>
-      <p class="page-description">{{ t('dashboard.description') }}</p>
+    <div class="admin-module-toolbar">
+      <el-button type="primary" :loading="loading" @click="loadStatistics">
+        <el-icon><Refresh /></el-icon>
+        {{ t('dashboard.refreshData') }}
+      </el-button>
     </div>
 
-    <!-- 统计卡片 -->
     <div class="stats-section">
       <el-row :gutter="20">
         <el-col :span="6">
@@ -101,19 +101,6 @@
           </el-card>
         </el-col>
       </el-row>
-    </div>
-
-    <!-- 刷新按钮 -->
-    <div class="refresh-section">
-      <el-button 
-        type="primary" 
-        :loading="loading" 
-        @click="loadStatistics"
-        size="large"
-      >
-        <el-icon><Refresh /></el-icon>
-        {{ t('dashboard.refreshData') }}
-      </el-button>
     </div>
   </div>
 </template>
@@ -279,8 +266,6 @@ const loadStatistics = async () => {
         // 更新趋势数据
         orderTrendData.value = data.data.orderTrend || []
         userTrendData.value = data.data.userTrend || []
-        
-        ElMessage.success(t('common.success'))
       } else {
         ElMessage.error(data.message || t('dashboard.loadDataFailed'))
       }
@@ -308,29 +293,6 @@ onMounted(() => {
   padding: 0;
 }
 
-/* 页面标题 */
-.page-header {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0 0 8px 0;
-}
-
-.page-description {
-  color: #909399;
-  font-size: 14px;
-  margin: 0;
-}
-
-/* 统计卡片 */
 .stats-section {
   margin-bottom: 20px;
 }
@@ -425,12 +387,6 @@ onMounted(() => {
   font-size: 14px;
 }
 
-/* 刷新按钮 */
-.refresh-section {
-  text-align: center;
-  padding: 20px 0;
-}
-
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .stats-card {
@@ -449,10 +405,6 @@ onMounted(() => {
   
   .chart-card {
     height: 300px;
-  }
-  
-  .page-header {
-    padding: 16px;
   }
 }
 </style>

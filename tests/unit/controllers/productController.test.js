@@ -278,7 +278,7 @@ describe('ProductController 单元测试', () => {
     })
   })
   
-  describe('deleteProduct 删除商品', () => {
+  describe('deleteProduct 下架商品（逻辑删除）', () => {
     let req, res, testProduct
     
     beforeEach(async () => {
@@ -294,17 +294,20 @@ describe('ProductController 单元测试', () => {
       }
     })
     
-    it('应该删除商品', async () => {
+    it('应该逻辑下架商品', async () => {
       await ProductController.deleteProduct(req, res)
-      
-      expect(res.status).toHaveBeenCalledWith(200)
+
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        message: '商品删除成功'
+        message: '产品已下架'
       })
       
-      const deletedProduct = await Product.findByPk(testProduct.id)
-      expect(deletedProduct).toBeNull()
+      const notVisible = await Product.findByPk(testProduct.id)
+      expect(notVisible).toBeNull()
+
+      const archived = await Product.findByPk(testProduct.id, { paranoid: false })
+      expect(archived).not.toBeNull()
+      expect(archived.deleted_at).toBeTruthy()
     })
     
     it('应该返回404当商品不存在', async () => {
@@ -313,6 +316,25 @@ describe('ProductController 单元测试', () => {
       await ProductController.deleteProduct(req, res)
       
       expect(res.status).toHaveBeenCalledWith(404)
+    })
+
+    it('已有订单明细引用时仍可下架', async () => {
+      const Order = sequelize.models.Order
+      const OrderItem = sequelize.models.OrderItem
+      const User = sequelize.models.User
+      const user = await User.create(await TestDataFactory.createUser())
+      const order = await Order.create(TestDataFactory.createOrder(user.id))
+      await OrderItem.create(TestDataFactory.createOrderItem(order.id, testProduct.id))
+
+      await ProductController.deleteProduct(req, res)
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: '产品已下架'
+      })
+      const archived = await Product.findByPk(testProduct.id, { paranoid: false })
+      expect(archived).not.toBeNull()
+      expect(archived.deleted_at).toBeTruthy()
     })
   })
   

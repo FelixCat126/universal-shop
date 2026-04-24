@@ -32,7 +32,8 @@ export default {
     ok: 'OK',
     retry: 'Retry',
     refresh: 'Refresh',
-    currency: '$',
+    currency: '฿',
+    currencyName: 'Thai Baht ฿',
     optional: 'Optional',
     or: 'or',
     free: 'Free',
@@ -139,6 +140,7 @@ export default {
     productDetail: 'Product Details',
     noProducts: 'No Products',
     loadMore: 'Load More',
+    noMoreProducts: "You've reached the end",
     searchPlaceholder: 'Search products...',
     discount: 'Off',
     insufficientStock: 'Insufficient stock, only {stock} items left',
@@ -391,7 +393,18 @@ export default {
     defaultAddressSet: 'Default address set successfully',
     setDefaultFailed: 'Failed to set default address',
     confirmDeleteDefault: 'Are you sure you want to delete the default address? Another address will be automatically set as default after deletion.',
-    confirmDeleteAddress: 'Are you sure you want to delete this address?'
+    confirmDeleteAddress: 'Are you sure you want to delete this address?',
+    addressPhoneComboPlaceholder: 'Type a number or pick from previously used numbers',
+    avatar: 'Profile photo',
+    changeAvatar: 'Upload photo',
+    removeAvatar: 'Remove photo',
+    avatarHint: 'JPG, PNG, WebP, or GIF, up to 2MB.',
+    avatarUploading: 'Uploading…',
+    avatarInvalidType: 'Please choose a JPG, PNG, WebP, or GIF image',
+    avatarTooLarge: 'Image must be 2MB or smaller',
+    avatarUploadFailed: 'Upload failed. Please try again.',
+    avatarUpdated: 'Profile photo updated',
+    avatarRemoved: 'Profile photo removed'
   },
 
   // 错误消息

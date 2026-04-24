@@ -29,8 +29,8 @@ export default {
     paymentMethod: '支付方式',
     cod: '货到付款',
     online: '在线付款',
-    currency: '¥',
-    currencyName: '人民币',
+    currency: '฿',
+    currencyName: '泰铢 ฿',
     createTime: '创建时间',
     confirm: '确认',
     cancel: '取消',
@@ -115,7 +115,7 @@ export default {
     updateTime: '更新时间',
     addProduct: '添加产品',
     editProduct: '编辑产品',
-    deleteProduct: '删除产品',
+    deleteProduct: '下架产品',
     lowStock: '库存不足',
     outOfStock: '缺货',
     uploadImage: '上传图片'
@@ -220,7 +220,16 @@ export default {
       purpose: '• 用于商品价格汇率换算',
       example: '• 例如：1.00 表示无汇率转换，1.50 表示价格乘以1.5倍'
     },
-    
+    currencyUnit: '货币单位',
+    currencyUnitSubtitle: '三选一；金额前为货币符号，名称随界面语言显示（中文/英文/泰文）',
+    currencyUnitTips: '保存后立即在用户端与管理端生效。列表为「名称 + 符号」，金额处仅显示符号（如 ฿100）。',
+    saveCurrencyUnit: '保存货币单位',
+    currencyOptions: {
+      THB: '泰铢 ฿',
+      USD: '美元 $',
+      CNY: '人民币 ¥'
+    },
+
     uploadTips: {
       bannerSize: '• 建议尺寸：1200x300px 或更大',
       bannerFormat: '• 支持格式：JPG、PNG、GIF、WebP',
@@ -242,7 +251,9 @@ export default {
       invalidFileFormat: '文件格式不正确',
       exchangeRateSaveSuccess: '汇算比例保存成功',
       exchangeRateSaveFailed: '汇算比例保存失败',
-      invalidExchangeRate: '请输入有效的汇算比例（≥0，最多两位小数）'
+      invalidExchangeRate: '请输入有效的汇算比例（≥0，最多两位小数）',
+      currencyUnitSaveSuccess: '货币单位已保存',
+      currencyUnitSaveFailed: '货币单位保存失败'
     }
   },
 
@@ -340,7 +351,7 @@ export default {
       update_order_status: '更新订单状态',
       create_product: '创建商品',
       update_product: '更新商品',
-      delete_product: '删除商品',
+      delete_product: '下架商品',
       upload_product_image: '上传商品图片',
       view: '查看'
     },
@@ -390,6 +401,7 @@ export default {
     active: '活跃',
     inactive: '非活跃',
     viewDetails: '查看详情',
+    viewOrders: '全部订单',
     ban: '封禁',
     unban: '解封',
     never: '从未',
@@ -436,7 +448,7 @@ export default {
     status: '订单状态',
     selectStatus: '请选择状态',
     search: '搜索',
-    searchPlaceholder: '订单号/姓名/电话',
+    searchPlaceholder: '订单号/收货人/电话/用户昵称',
     startDate: '开始日期',
     endDate: '结束日期',
     selectStartDate: '选择开始日期',
@@ -522,9 +534,20 @@ export default {
     status: '状态',
     actions: '操作',
     edit: '编辑',
-    delete: '删除',
+    delete: '下架',
     view: '查看',
     adjustStock: '调整库存',
+    shelfStatus: '上架与销售',
+    shelfOn: '在售',
+    shelfDelisted: '已下架',
+    saleActive: '销售中',
+    saleInactive: '停售',
+    restore: '重新上架',
+    listingFilter: '上架筛选',
+    listingFilterAll: '全部',
+    listingFilterOnShelf: '未下架',
+    listingFilterDelisted: '已下架',
+    listTotal: '商品总数',
     // 分类选项
     categories: {
       electronics: '电子产品',
@@ -558,11 +581,15 @@ export default {
     messages: {
       addSuccess: '产品添加成功',
       updateSuccess: '产品更新成功',
-      deleteSuccess: '产品删除成功',
+      deleteSuccess: '产品已下架',
+      deleteFailed: '下架产品失败',
       saveFailed: '保存产品失败',
-      confirmDelete: '确定要删除此产品吗？',
+      confirmDelete: '确定要将此产品下架吗？下架后前台不再展示，订单记录仍可正常关联。',
       confirmAdd: '确定要添加这个产品吗？',
-      confirmUpdate: '确定要更新这个产品吗？'
+      confirmUpdate: '确定要更新这个产品吗？',
+      confirmRestore: '确定重新上架该商品吗？前台将恢复展示。',
+      restoreSuccess: '商品已重新上架',
+      restoreFailed: '重新上架失败'
     },
     // 库存调整
     stockAdjustment: {

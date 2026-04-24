@@ -50,7 +50,7 @@ class AddressController {
 
       const {
         contact_name,
-        contact_country_code = '+86',
+        contact_country_code = '+66',
         contact_phone,
         province,
         city,
@@ -168,7 +168,7 @@ class AddressController {
 
       const {
         contact_name,
-        contact_country_code = '+86',
+        contact_country_code = '+66',
         contact_phone,
         province,
         city,

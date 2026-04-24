@@ -30,7 +30,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // 可以在这里添加认证token
-    const token = localStorage.getItem('admin-token')
+    const token = localStorage.getItem('admin_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -50,7 +50,7 @@ api.interceptors.response.use(
     console.error('API请求失败:', error)
     if (error.response?.status === 401) {
       // 处理未授权错误
-      localStorage.removeItem('admin-token')
+      localStorage.removeItem('admin_token')
       window.location.href = '/login'
     }
     return Promise.reject(error)
@@ -79,9 +79,14 @@ export const productAPI = {
     return api.put(`/products/${id}`, data)
   },
 
-  // 删除产品
+  // 下架产品（逻辑删除）
   deleteProduct(id) {
     return api.delete(`/products/${id}`)
+  },
+
+  // 重新上架（取消软删除）
+  restoreProduct(id) {
+    return api.post(`/products/${id}/restore`)
   },
 
   // 调整库存

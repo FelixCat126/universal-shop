@@ -37,7 +37,7 @@ export default {
     remove: 'ลบออก',
     summary: 'สรุป',
     currency: '฿',
-    currencyName: 'บาท',
+    currencyName: 'บาทไทย ฿',
     unit: 'ชิ้น',
     or: 'หรือ',
     optional: 'ไม่จำเป็น',
@@ -79,6 +79,7 @@ export default {
     productDetail: 'รายละเอียดสินค้า',
     noProducts: 'ไม่มีสินค้า',
     loadMore: 'โหลดเพิ่มเติม',
+    noMoreProducts: 'แสดงครบทุกรายการแล้ว',
     searchPlaceholder: 'ค้นหาสินค้า...',
     discount: 'ลด',
     // 产品详情页新增
@@ -384,7 +385,18 @@ export default {
     defaultAddressSet: 'ตั้งที่อยู่เริ่มต้นสำเร็จ',
     setDefaultFailed: 'ตั้งที่อยู่เริ่มต้นไม่สำเร็จ',
     confirmDeleteDefault: 'คุณแน่ใจหรือไม่ที่จะลบที่อยู่เริ่มต้น? หลังจากลบแล้วจะตั้งที่อยู่อื่นเป็นเริ่มต้นโดยอัตโนมัติ',
-    confirmDeleteAddress: 'คุณแน่ใจหรือไม่ที่จะลบที่อยู่นี้?'
+    confirmDeleteAddress: 'คุณแน่ใจหรือไม่ที่จะลบที่อยู่นี้?',
+    addressPhoneComboPlaceholder: 'พิมพ์เบอร์หรือเลือกจากรายการที่เคยใช้',
+    avatar: 'รูปโปรไฟล์',
+    changeAvatar: 'อัปโหลดรูป',
+    removeAvatar: 'ลบรูป',
+    avatarHint: 'รองรับ JPG, PNG, WebP, GIF ขนาดไม่เกิน 2MB',
+    avatarUploading: 'กำลังอัปโหลด…',
+    avatarInvalidType: 'โปรดเลือกไฟล์ JPG, PNG, WebP หรือ GIF',
+    avatarTooLarge: 'ไฟล์ต้องไม่เกิน 2MB',
+    avatarUploadFailed: 'อัปโหลดไม่สำเร็จ ลองอีกครั้ง',
+    avatarUpdated: 'อัปเดตรูปโปรไฟล์แล้ว',
+    avatarRemoved: 'ลบรูปโปรไฟล์แล้ว'
   },
 
   // 错误消息

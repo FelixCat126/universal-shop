@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import sequelize from './config/database.js'
+import { DataTypes } from 'sequelize'
 import productRoutes from './routes/productRoutes.js'
 import uploadRoutes from './routes/uploadRoutes.js'
 import userRoutes from './routes/userRoutes.js'
@@ -68,13 +69,25 @@ app.use((req, res, next) => {
   next()
 })
 
+async function ensureUserAvatarUrlColumn() {
+  const qi = sequelize.getQueryInterface()
+  const desc = await qi.describeTable('users')
+  if (!desc.avatar_url) {
+    await qi.addColumn('users', 'avatar_url', {
+      type: DataTypes.STRING(512),
+      allowNull: true
+    })
+    console.log('✅ 已为 users 表添加 avatar_url 字段')
+  }
+}
+
 // 数据库连接和同步
 sequelize.authenticate()
   .then(() => {
     console.log('✅ 数据库连接成功')
-    // 暂时使用基础同步模式，避免alter时的验证冲突
     return sequelize.sync({ alter: false })
   })
+  .then(() => ensureUserAvatarUrlColumn())
   .then(() => {
     console.log('✅ 数据库模型同步成功')
   })

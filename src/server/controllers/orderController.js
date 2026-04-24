@@ -42,7 +42,7 @@ class OrderController {
       // 如果用户未登录，检查是否为游客下单
       if (!userId) {
         // 解析并验证手机号格式（包含国家区号）
-        let countryCode = '+86' // 默认值
+        let countryCode = '+66' // 默认值
         let phoneNumber = contact_phone
         
         // 检查是否包含国家区号并解析
@@ -289,7 +289,7 @@ class OrderController {
       // 为游客用户创建默认地址（复用统一逻辑）
       if (isGuestOrder) {
         // 将完整手机号切分为国家区号与本地号
-        let contact_country_code = '+86'
+        let contact_country_code = '+66'
         let phoneNumber = contact_phone
         const supportedCodes = ['+86', '+66', '+60']
         for (const code of supportedCodes) {
@@ -328,7 +328,8 @@ class OrderController {
             as: 'items',
             include: [{
               model: Product,
-              as: 'product'
+              as: 'product',
+              paranoid: false
             }]
           }
         ]
@@ -443,7 +444,8 @@ class OrderController {
             as: 'items',
             include: [{
               model: Product,
-              as: 'product'
+              as: 'product',
+              paranoid: false
             }]
           },
           {
@@ -503,11 +505,27 @@ class OrderController {
         }
       }
       if (keyword) {
-        where[Op.or] = [
-          { order_no: { [Op.like]: `%${keyword}%` } },
-          { contact_name: { [Op.like]: `%${keyword}%` } },
-          { contact_phone: { [Op.like]: `%${keyword}%` } }
+        const like = `%${keyword}%`
+        const matchingUsers = await User.findAll({
+          attributes: ['id'],
+          where: {
+            [Op.or]: [
+              { nickname: { [Op.like]: like } },
+              { phone: { [Op.like]: like } },
+              { username: { [Op.like]: like } }
+            ]
+          }
+        })
+        const userIds = matchingUsers.map((u) => u.id)
+        const orClauses = [
+          { order_no: { [Op.like]: like } },
+          { contact_name: { [Op.like]: like } },
+          { contact_phone: { [Op.like]: like } }
         ]
+        if (userIds.length > 0) {
+          orClauses.push({ user_id: { [Op.in]: userIds } })
+        }
+        where[Op.or] = orClauses
       }
 
       const { count, rows: orders } = await Order.findAndCountAll({

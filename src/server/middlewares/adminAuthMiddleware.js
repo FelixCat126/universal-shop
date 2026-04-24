@@ -7,6 +7,46 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET环境变量未设置')
 }
 
+/**
+ * 可选：请求中带合法管理员 Bearer 时设置 req.admin，否则 req.admin 为 null（不返回 401）
+ * 用于 /api/products 等同一路由需区分前台与管理后台行为的场景。
+ */
+export const optionalAuthenticateAdmin = async (req, res, next) => {
+  req.admin = null
+  try {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1]
+    if (!token) {
+      return next()
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET)
+    if (decoded.type !== 'admin') {
+      return next()
+    }
+
+    const admin = await Administrator.findOne({
+      where: {
+        id: decoded.adminId,
+        is_active: true
+      }
+    })
+    if (!admin) {
+      return next()
+    }
+
+    req.admin = {
+      id: admin.id,
+      username: admin.username,
+      role: admin.role,
+      email: admin.email
+    }
+  } catch (_) {
+    // 无效或过期的 token：按未登录管理员处理
+  }
+  next()
+}
+
 // 验证管理员JWT token
 export const authenticateAdmin = async (req, res, next) => {
   try {

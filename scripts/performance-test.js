@@ -379,8 +379,8 @@ class PerformanceTest {
     const timestamp = Date.now()
     return {
       nickname: `性能测试用户${timestamp}`,
-      country_code: '+86',
-      phone: `139${timestamp.toString().slice(-8)}`,
+      country_code: '+66',
+      phone: `8${String(timestamp % 100000000).padStart(8, '0')}`,
       email: `perftest${timestamp}@example.com`,
       password: '123456'
     }

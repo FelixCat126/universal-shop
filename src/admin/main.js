@@ -5,8 +5,10 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 
-import App from './App.vue'
 import router from './router'
+import { fetchAndApplyCurrencyUnit } from '../utils/currencyI18n.js'
+import App from './App.vue'
+import './styles/admin-ui-overrides.css'
 
 // 导入语言包
 import zhCN from './i18n/zh-CN.js'
@@ -16,8 +18,8 @@ import enUS from './i18n/en-US.js'
 // 创建i18n实例
 const i18n = createI18n({
   legacy: false,
-  locale: localStorage.getItem('admin-language') || 'th-TH',
-  fallbackLocale: 'th-TH',
+  locale: localStorage.getItem('admin-language') || 'zh-CN',
+  fallbackLocale: 'zh-CN',
   messages: {
     'zh-CN': zhCN,
     'th-TH': thTH,
@@ -37,4 +39,6 @@ app.use(ElementPlus)
 app.use(i18n)
 app.use(router)
 
-app.mount('#app')
+fetchAndApplyCurrencyUnit(i18n, '').finally(() => {
+  app.mount('#app')
+})

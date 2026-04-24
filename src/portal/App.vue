@@ -93,6 +93,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from './stores/cart.js'
 import { useUserStore } from './stores/user.js'
 import ToastContainer from './components/ui/Toast/ToastContainer.vue'
+import i18n from './i18n'
+import { fetchAndApplyCurrencyUnit } from '../utils/currencyI18n.js'
 
 // 门户端主应用组件已加载
 
@@ -213,6 +215,8 @@ onMounted(async () => {
   locale.value = currentLanguage.value
   
   try {
+    await fetchAndApplyCurrencyUnit(i18n, '')
+
     // 检查用户认证状态
     await userStore.checkAuth()
     

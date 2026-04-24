@@ -14,9 +14,10 @@
             size="small"
             style="width: 80px; margin-right: 16px"
           >
-            <el-option value="th-TH" :label="t('language.thai')">
+            <!-- 暂不提供泰文界面选项（语言包仍保留，localStorage 为 th-TH 时仍可使用） -->
+            <!-- <el-option value="th-TH" :label="t('language.thai')">
               <span>ไทย</span>
-            </el-option>
+            </el-option> -->
             <el-option value="zh-CN" :label="t('language.chinese')">
               <span>中文</span>
             </el-option>

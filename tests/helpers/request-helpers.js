@@ -12,7 +12,7 @@ export function createAuthenticatedRequest(user, overrides = {}) {
       id: user.id,
       phone: user.phone,
       nickname: user.nickname,
-      country_code: user.country_code || '+86',
+      country_code: user.country_code || '+66',
       email: user.email,
       referral_code: user.referral_code
     },

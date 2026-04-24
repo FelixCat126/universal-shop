@@ -560,7 +560,7 @@ const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9
 // 订单表单
 const orderForm = reactive({
   contact_name: '',
-  contact_country_code: '+86',
+  contact_country_code: '+66',
   contact_phone: '',
   province: '',
   city: '',
@@ -721,7 +721,7 @@ const handleCheckoutAddressRegionChange = (regionData) => {
 const selectAddress = (address) => {
   selectedAddress.value = address
   orderForm.contact_name = address.contact_name
-  orderForm.contact_country_code = address.contact_country_code || '+86'
+  orderForm.contact_country_code = address.contact_country_code || '+66'
   orderForm.contact_phone = address.contact_phone
   orderForm.delivery_address = `${address.province} ${address.city} ${address.district} ${address.detail_address} ${address.postal_code || ''}`.trim()
 }

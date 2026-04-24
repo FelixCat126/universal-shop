@@ -65,6 +65,8 @@ const Product = sequelize.define('Product', {
   timestamps: true,
   createdAt: 'created_at',
   updatedAt: 'updated_at',
+  paranoid: true,
+  deletedAt: 'deleted_at',
   comment: '产品信息表',
   indexes: [
     // 商品分类索引（用于分类筛选）
@@ -101,6 +103,10 @@ const Product = sequelize.define('Product', {
     {
       fields: ['status', 'category'],
       name: 'idx_product_status_category'
+    },
+    {
+      fields: ['deleted_at'],
+      name: 'idx_product_deleted_at'
     }
   ]
 })

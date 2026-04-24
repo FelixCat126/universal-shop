@@ -1,11 +1,5 @@
 <template>
   <div class="users-management">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h2 class="page-title">{{ t('users.title') }}</h2>
-      <p class="page-description">{{ t('users.description') }}</p>
-    </div>
-
     <!-- 搜索和筛选 -->
     <div class="filter-section">
       <el-card>
@@ -46,13 +40,16 @@
               <el-icon><Refresh /></el-icon>
               {{ t('users.reset') }}
             </el-button>
-            <el-button type="success" @click="exportUsers" :loading="isExporting">
-              <el-icon><Download /></el-icon>
-              {{ t('users.exportUsers') }}
-            </el-button>
           </el-form-item>
         </el-form>
       </el-card>
+    </div>
+
+    <div class="admin-module-toolbar">
+      <el-button type="success" @click="exportUsers" :loading="isExporting">
+        <el-icon><Download /></el-icon>
+        {{ t('users.exportUsers') }}
+      </el-button>
     </div>
 
     <!-- 用户统计 -->
@@ -120,10 +117,21 @@
         >
           <el-table-column prop="id" :label="t('users.id')" width="80" align="center" />
           
-          <el-table-column :label="t('users.nickname')" width="180" min-width="150">
+          <el-table-column :label="t('users.nickname')" width="240" min-width="200">
             <template #default="scope">
-              <div class="user-nickname">
-                {{ scope.row.nickname || t('common.notSet') }}
+              <div class="user-nickname-cell">
+                <el-avatar
+                  :size="44"
+                  :src="adminAvatarSrc(scope.row.avatar_url)"
+                  class="user-list-avatar"
+                >
+                  {{ nicknameInitial(scope.row.nickname) }}
+                </el-avatar>
+                <div class="user-nickname-text">
+                  <span class="nickname-line" :title="scope.row.nickname || ''">
+                    {{ scope.row.nickname || t('common.notSet') }}
+                  </span>
+                </div>
               </div>
             </template>
           </el-table-column>
@@ -132,8 +140,8 @@
             <template #default="scope">
               <div class="user-phone">
                 <div class="phone-display" v-if="scope.row.phone">
-                  <CountryFlag :country-code="scope.row.country_code || '+86'" />
-                  <span class="country-code">{{ scope.row.country_code || '+86' }}</span>
+                  <CountryFlag :country-code="scope.row.country_code || '+66'" />
+                  <span class="country-code">{{ scope.row.country_code || '+66' }}</span>
                   <span class="phone-number">{{ scope.row.phone }}</span>
                 </div>
                 <span v-else class="no-phone">{{ t('common.notSet') }}</span>
@@ -179,7 +187,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.actions')" width="200" align="center" fixed="right">
+          <el-table-column :label="t('users.actions')" width="280" align="center" fixed="right">
             <template #default="scope">
               <div class="action-buttons">
                 <el-button 
@@ -196,6 +204,13 @@
                   @click="viewUserDetail(scope.row)"
                 >
                   {{ t('users.viewDetails') }}
+                </el-button>
+                <el-button
+                  type="info"
+                  size="small"
+                  @click="goUserOrders(scope.row)"
+                >
+                  {{ t('users.viewOrders') }}
                 </el-button>
               </div>
             </template>
@@ -234,11 +249,23 @@
           <h4 class="section-title">{{ t('users.basicInfo') }}</h4>
           <el-descriptions :column="2" border>
             <el-descriptions-item :label="t('users.id')">{{ selectedUser.id }}</el-descriptions-item>
+            <el-descriptions-item :label="t('users.nickname')" :span="2">
+              <div class="detail-nickname-row">
+                <el-avatar
+                  :size="56"
+                  :src="adminAvatarSrc(selectedUser.avatar_url)"
+                  class="detail-user-avatar"
+                >
+                  {{ nicknameInitial(selectedUser.nickname) }}
+                </el-avatar>
+                <span class="detail-nickname-text">{{ selectedUser.nickname || t('common.notSet') }}</span>
+              </div>
+            </el-descriptions-item>
             <el-descriptions-item :label="t('users.email')">{{ selectedUser.email }}</el-descriptions-item>
             <el-descriptions-item :label="t('users.phone')">
               <div v-if="selectedUser.phone" class="phone-detail">
-                <CountryFlag :country-code="selectedUser.country_code || '+86'" />
-                <span class="country-code">{{ selectedUser.country_code || '+86' }}</span>
+                <CountryFlag :country-code="selectedUser.country_code || '+66'" />
+                <span class="country-code">{{ selectedUser.country_code || '+66' }}</span>
                 <span class="phone-number">{{ selectedUser.phone }}</span>
               </div>
               <span v-else>{{ t('common.notSet') }}</span>
@@ -285,8 +312,8 @@
                 <div class="contact-info">
                   <span class="contact-name">{{ address.contact_name }}</span>
                   <div class="contact-phone">
-                    <CountryFlag :country-code="address.contact_country_code || '+86'" />
-                    <span class="country-code">{{ address.contact_country_code || '+86' }}</span>
+                    <CountryFlag :country-code="address.contact_country_code || '+66'" />
+                    <span class="country-code">{{ address.contact_country_code || '+66' }}</span>
                     <span class="phone-number">{{ address.contact_phone }}</span>
                   </div>
                 </div>
@@ -317,6 +344,13 @@
       
       <template #footer>
         <el-button @click="closeUserDialog">{{ t('common.close') }}</el-button>
+        <el-button
+          v-if="selectedUser"
+          type="primary"
+          @click="goUserOrders(selectedUser); closeUserDialog()"
+        >
+          {{ t('users.viewOrders') }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -327,11 +361,26 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar, Loading, Location } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { userAPI } from '../api/users.js'
 import { useAdminStore } from '../stores/admin.js'
 import CountryFlag from '../components/CountryFlag.vue'
 
 const { t } = useI18n()
+const router = useRouter()
+
+const adminAvatarSrc = (url) => {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return url
+}
+
+const nicknameInitial = (name) => {
+  const s = (name && String(name).trim()) || ''
+  if (!s) return '?'
+  const ch = s[0]
+  return /[\u4e00-\u9fff]/.test(ch) ? ch : ch.toUpperCase()
+}
 
 // 用户管理页面已加载
 
@@ -445,40 +494,33 @@ const resetSearch = () => {
 const exportUsers = async () => {
   try {
     isExporting.value = true
-    ElMessage.info(t('users.messages.exporting'))
-    
-    // 调用导出API
+
     const response = await adminStore.apiRequest('/api/admin/export/users', {
       method: 'GET'
     })
-    
+
     if (response.ok) {
-      // 获取文件数据
       const blob = await response.blob()
-      
-      // 创建下载链接
+
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      
-      // 从响应头获取文件名，如果没有则使用默认名称
+
       const contentDisposition = response.headers.get('Content-Disposition')
       let filename = `用户数据_${new Date().toISOString().split('T')[0]}.xlsx`
-      
+
       if (contentDisposition) {
         const matches = contentDisposition.match(/filename\*=UTF-8''(.+)/)
         if (matches) {
           filename = decodeURIComponent(matches[1])
         }
       }
-      
+
       link.download = filename
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      
-      ElMessage.success(t('users.messages.exportSuccess'))
     } else {
       const errorData = await response.json()
       ElMessage.error(errorData.message || t('users.messages.exportFailed'))
@@ -489,6 +531,16 @@ const exportUsers = async () => {
   } finally {
     isExporting.value = false
   }
+}
+
+// 跳转订单管理并按该用户筛选
+const goUserOrders = (user) => {
+  if (!user?.id) return
+  const phone = user.phone
+    ? `${user.country_code || ''}${user.phone}`
+    : ''
+  const keyword = phone || user.nickname || user.username || String(user.id)
+  router.push({ name: 'Orders', query: { keyword } })
 }
 
 // 查看用户详情
@@ -699,24 +751,7 @@ onMounted(() => {
 
 <style scoped>
 .users-management {
-  padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-  color: #303133;
-}
-
-.page-description {
-  color: #606266;
-  margin: 0;
-  font-size: 14px;
+  padding: 0;
 }
 
 .filter-section {
@@ -781,6 +816,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-weight: 600;
+  color: #303133;
 }
 
 .table-info {
@@ -815,12 +852,53 @@ onMounted(() => {
   max-width: 280px;
 }
 
-.user-nickname {
+.user-nickname-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.user-list-avatar {
+  flex-shrink: 0;
+  border: 2px solid #ebeef5;
+}
+
+.user-nickname-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.user-nickname-text .nickname-line {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
-  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.35;
+}
+
+.detail-nickname-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.detail-user-avatar {
+  flex-shrink: 0;
+  border: 2px solid #ebeef5;
+}
+
+.detail-nickname-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .user-phone {

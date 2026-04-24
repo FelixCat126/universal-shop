@@ -1,12 +1,12 @@
 <template>
   <div class="system-config">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h2 class="page-title">{{ t('systemConfig.title') }}</h2>
-      <p class="page-description">{{ t('systemConfig.description') }}</p>
+    <div class="admin-module-toolbar">
+      <el-button type="primary" @click="loadConfigs" :loading="loading">
+        <el-icon><Refresh /></el-icon>
+        {{ t('systemConfig.refreshConfig') }}
+      </el-button>
     </div>
 
-    <!-- 配置项 -->
     <div class="config-sections">
       <!-- 首页长图配置 -->
       <el-card class="config-card" shadow="hover">
@@ -160,14 +160,38 @@
           </div>
         </div>
       </el-card>
-    </div>
 
-    <!-- 操作按钮 -->
-    <div class="actions">
-      <el-button type="primary" @click="loadConfigs" :loading="loading">
-        <el-icon><Refresh /></el-icon>
-        {{ t('systemConfig.refreshConfig') }}
-      </el-button>
+      <!-- 货币单位（全站统一） -->
+      <el-card class="config-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3>{{ t('systemConfig.currencyUnit') }}</h3>
+            <span class="card-subtitle">{{ t('systemConfig.currencyUnitSubtitle') }}</span>
+          </div>
+        </template>
+        <div class="config-content">
+          <div class="currency-unit-section">
+            <el-select
+              v-model="currencyCode"
+              style="width: 280px"
+            >
+              <el-option value="THB" :label="t('systemConfig.currencyOptions.THB')" />
+              <el-option value="USD" :label="t('systemConfig.currencyOptions.USD')" />
+              <el-option value="CNY" :label="t('systemConfig.currencyOptions.CNY')" />
+            </el-select>
+            <el-button
+              type="primary"
+              style="margin-left: 12px"
+              @click="saveCurrencyUnit"
+            >
+              {{ t('systemConfig.saveCurrencyUnit') }}
+            </el-button>
+            <div class="exchange-rate-tips" style="margin-top: 12px">
+              <p>{{ t('systemConfig.currencyUnitTips') }}</p>
+            </div>
+          </div>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -178,9 +202,10 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Delete, Refresh } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin.js'
+import { normalizeCurrencyCode, mergeCurrencyCodeIntoLocales } from '../../utils/currencyI18n.js'
 
 // 国际化
-const { t } = useI18n()
+const { t, mergeLocaleMessage } = useI18n()
 
 // 使用store
 const adminStore = useAdminStore()
@@ -190,6 +215,7 @@ const loading = ref(false)
 const homeBanner = ref(null)
 const paymentQR = ref(null)
 const exchangeRate = ref(1.00) // 汇算比例，默认1.00
+const currencyCode = ref('THB')
 
 const uploading = reactive({
   homeBanner: false,
@@ -237,6 +263,8 @@ const loadConfigs = async () => {
         homeBanner.value = configs.home_banner?.value || null
         paymentQR.value = configs.payment_qrcode?.value || null
         exchangeRate.value = parseFloat(configs.exchange_rate?.value || '1.00')
+        currencyCode.value = normalizeCurrencyCode(configs.currency_unit?.value)
+        mergeCurrencyCodeIntoLocales(mergeLocaleMessage, currencyCode.value)
       } else {
         ElMessage.error(data.message || t('systemConfig.messages.loadConfigFailed'))
       }
@@ -472,6 +500,39 @@ const resetExchangeRate = () => {
   saveExchangeRate(1.00)
 }
 
+const saveCurrencyUnit = async () => {
+  try {
+    const valueToSave = normalizeCurrencyCode(currencyCode.value)
+    const response = await adminStore.apiRequest('/api/system-config/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        key: 'currency_unit',
+        value: valueToSave,
+        type: 'text',
+        description: '全站货币代码 THB|USD|CNY'
+      })
+    })
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success) {
+        currencyCode.value = valueToSave
+        mergeCurrencyCodeIntoLocales(mergeLocaleMessage, valueToSave)
+        ElMessage.success(t('systemConfig.messages.currencyUnitSaveSuccess'))
+      } else {
+        ElMessage.error(data.message || t('systemConfig.messages.currencyUnitSaveFailed'))
+      }
+    } else {
+      ElMessage.error(t('systemConfig.messages.currencyUnitSaveFailed'))
+    }
+  } catch (error) {
+    console.error('保存货币单位失败:', error)
+    ElMessage.error(t('systemConfig.messages.currencyUnitSaveFailed'))
+  }
+}
+
 // 组件挂载时加载配置
 onMounted(() => {
   loadConfigs()
@@ -483,29 +544,6 @@ onMounted(() => {
   padding: 0;
 }
 
-/* 页面标题 */
-.page-header {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0 0 8px 0;
-}
-
-.page-description {
-  color: #909399;
-  font-size: 14px;
-  margin: 0;
-}
-
-/* 配置区域 */
 .config-sections {
   display: grid;
   gap: 20px;
@@ -651,18 +689,8 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
-/* 操作按钮 */
-.actions {
-  text-align: center;
-  padding: 20px 0;
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .page-header {
-    padding: 16px;
-  }
-  
   .card-header {
     flex-direction: column;
     align-items: flex-start;

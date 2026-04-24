@@ -1,11 +1,5 @@
 <template>
   <div class="orders-management">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h2 class="page-title">{{ t('orders.title') }}</h2>
-      <p class="page-description">{{ t('orders.description') }}</p>
-    </div>
-
     <!-- 搜索和筛选 -->
     <div class="filter-section">
       <el-card>
@@ -23,7 +17,7 @@
               <el-option :label="t('orders.statusOptions.cancelled')" value="cancelled" />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item :label="t('orders.search')">
             <el-input
               v-model="filters.keyword"
@@ -63,13 +57,16 @@
               <el-icon><Refresh /></el-icon>
               {{ t('orders.reset') }}
             </el-button>
-            <el-button type="success" @click="exportOrders" :loading="isExporting">
-              <el-icon><Download /></el-icon>
-              {{ t('orders.export') }}
-            </el-button>
           </el-form-item>
         </el-form>
       </el-card>
+    </div>
+
+    <div class="admin-module-toolbar">
+      <el-button type="success" @click="exportOrders" :loading="isExporting">
+        <el-icon><Download /></el-icon>
+        {{ t('orders.export') }}
+      </el-button>
     </div>
 
     <!-- 统计信息 -->
@@ -399,13 +396,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download, TrendCharts, SuccessFilled, Coin, Calendar, Document, User, Location, ShoppingBag, ChatLineRound } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 // 使用adminStore
 const adminStore = useAdminStore()
@@ -416,7 +416,6 @@ const loading = ref(false)
 const isExporting = ref(false)
 const showDetailModal = ref(false)
 const selectedOrder = ref(null)
-const exchangeRate = ref(1.00) // 汇算比例
 
 // 分页数据
 const currentPage = ref(1)
@@ -474,7 +473,7 @@ const loadOrders = async () => {
       limit: pagination.limit,
       ...filters
     }
-    
+
     const queryString = new URLSearchParams(params).toString()
     const response = await adminStore.apiRequest(`/api/admin/orders?${queryString}`, {
       method: 'GET'
@@ -575,40 +574,33 @@ const closeDetailModal = () => {
 const exportOrders = async () => {
   try {
     isExporting.value = true
-    ElMessage.info(t('orders.messages.exporting'))
-    
-    // 调用导出API
+
     const response = await adminStore.apiRequest('/api/admin/export/orders', {
       method: 'GET'
     })
-    
+
     if (response.ok) {
-      // 获取文件数据
       const blob = await response.blob()
-      
-      // 创建下载链接
+
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      
-      // 从响应头获取文件名，如果没有则使用默认名称
+
       const contentDisposition = response.headers.get('Content-Disposition')
       let filename = `订单数据_${new Date().toISOString().split('T')[0]}.xlsx`
-      
+
       if (contentDisposition) {
         const matches = contentDisposition.match(/filename\*=UTF-8''(.+)/)
         if (matches) {
           filename = decodeURIComponent(matches[1])
         }
       }
-      
+
       link.download = filename
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      
-      ElMessage.success(t('orders.messages.exportSuccess'))
     } else {
       const errorData = await response.json()
       ElMessage.error(errorData.message || t('orders.messages.exportFailed'))
@@ -645,6 +637,11 @@ const handleCurrentChange = (page) => {
 }
 
 // 重置筛选条件
+const syncKeywordFromRoute = () => {
+  const qk = route.query.keyword
+  filters.keyword = qk != null && String(qk).trim() !== '' ? String(qk).trim() : ''
+}
+
 const resetFilters = () => {
   Object.assign(filters, {
     status: '',
@@ -654,8 +651,22 @@ const resetFilters = () => {
   })
   currentPage.value = 1
   pagination.page = 1
+  if (route.query.keyword != null && String(route.query.keyword).trim() !== '') {
+    router.replace({ name: 'Orders', query: {} })
+    return
+  }
   loadOrders()
 }
+
+watch(
+  () => route.query.keyword,
+  () => {
+    syncKeywordFromRoute()
+    currentPage.value = 1
+    pagination.page = 1
+    loadOrders()
+  }
+)
 
 // 工具函数
 const formatDate = (dateString) => {
@@ -696,64 +707,23 @@ const getPaymentMethodClass = (method) => {
   return `payment-${method}`
 }
 
-// 获取汇算比例配置
-const loadExchangeRate = async () => {
-  try {
-    const response = await adminStore.apiRequest('/api/system-config/exchange_rate', {
-      method: 'GET'
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success && data.data) {
-        exchangeRate.value = parseFloat(data.data.value || '1.00')
-      }
-    }
-  } catch (error) {
-    console.error('加载汇算比例失败:', error)
-    // 使用默认值1.00，不显示错误提示
-  }
-}
-
-// 计算汇算后金额
-const getExchangedAmount = (amount, orderExchangeRate = null) => {
-  // 优先使用订单保存的汇率，如果没有则使用当前系统配置的汇率
-  const rate = orderExchangeRate || exchangeRate.value
+// 在线支付 USDT：仅按订单下单时保存的汇率换算，不使用当前系统汇算比例（避免改汇率影响历史订单展示）
+const getExchangedAmount = (amount, orderExchangeRate) => {
+  const raw = orderExchangeRate == null || orderExchangeRate === '' ? NaN : parseFloat(orderExchangeRate)
+  const rate = Number.isFinite(raw) ? raw : 1
   return (parseFloat(amount) * rate).toFixed(2)
 }
 
 // 组件挂载时加载数据
 onMounted(() => {
+  syncKeywordFromRoute()
   loadOrders()
-  loadExchangeRate()
 })
 </script>
 
 <style scoped>
 .orders-management {
   padding: 0;
-}
-
-/* 页面标题 */
-.page-header {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0 0 8px 0;
-}
-
-.page-description {
-  color: #909399;
-  font-size: 14px;
-  margin: 0;
 }
 
 /* 搜索筛选区域 */

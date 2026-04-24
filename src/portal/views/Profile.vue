@@ -16,8 +16,9 @@
       <!-- 用户信息卡片 -->
       <div class="bg-white rounded-lg shadow p-6 mb-8">
         <div class="flex items-center space-x-4">
-          <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-2xl">
-            👤
+          <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-2xl shrink-0 overflow-hidden ring-2 ring-gray-100">
+            <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" alt="" class="w-full h-full object-cover" />
+            <span v-else>👤</span>
           </div>
           <div class="flex-1">
             <p class="text-lg font-semibold text-gray-900">{{ displayNickname }}</p>
@@ -188,7 +189,7 @@
                     <div class="flex items-center mb-2">
                       <h4 class="font-medium text-gray-900">{{ address.contact_name }}</h4>
                       <span class="ml-2 text-sm text-gray-600">
-                        {{ formatPhoneDisplay(address.contact_phone, address.contact_country_code || '+86') }}
+                        {{ formatPhoneDisplay(address.contact_phone, address.contact_country_code || '+66') }}
                       </span>
                       <span v-if="address.is_default" class="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">{{ t('profile.default') }}</span>
                     </div>
@@ -242,6 +243,42 @@
           <div v-else-if="activeTab === 'profile'" class="bg-white p-6 rounded-lg shadow">
             <h3 class="text-lg font-medium text-gray-900 mb-4">{{ t('user.profile') }}</h3>
             <form @submit.prevent="handleSaveProfile" class="space-y-4 max-w-lg">
+              <div class="flex flex-col sm:flex-row sm:items-start gap-4 pb-4 border-b border-gray-100">
+                <span class="block text-sm font-medium text-gray-700 sm:pt-2 sm:w-24 shrink-0">{{ t('profile.avatar') }}</span>
+                <div class="flex flex-col sm:flex-row items-start gap-4 flex-1 min-w-0">
+                  <div class="w-20 h-20 rounded-full overflow-hidden bg-gray-100 ring-2 ring-gray-200 flex items-center justify-center shrink-0">
+                    <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" alt="" class="w-full h-full object-cover" />
+                    <span v-else class="text-3xl text-gray-400">👤</span>
+                  </div>
+                  <div class="flex flex-col gap-2 min-w-0">
+                    <input
+                      ref="avatarFileInput"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      class="hidden"
+                      @change="onAvatarFileChange"
+                    />
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 w-fit"
+                      :disabled="avatarUploading"
+                      @click="avatarFileInput?.click()"
+                    >
+                      {{ avatarUploading ? t('profile.avatarUploading') : t('profile.changeAvatar') }}
+                    </button>
+                    <button
+                      v-if="userStore.user?.avatar_url"
+                      type="button"
+                      class="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 w-fit"
+                      :disabled="avatarUploading || profileSaving"
+                      @click="removeAvatar"
+                    >
+                      {{ t('profile.removeAvatar') }}
+                    </button>
+                    <p class="text-xs text-gray-500 max-w-sm">{{ t('profile.avatarHint') }}</p>
+                  </div>
+                </div>
+              </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">{{ t('user.nickname') }}</label>
                 <input 
@@ -312,9 +349,18 @@
                   v-model="addressForm.contact_phone"
                   type="tel"
                   required
+                  list="profile-address-phone-history"
+                  autocomplete="tel-national"
                   class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  :placeholder="`请输入手机号`"
+                  :placeholder="t('profile.addressPhoneComboPlaceholder')"
                 />
+                <datalist id="profile-address-phone-history">
+                  <option
+                    v-for="num in savedPhonesForCountry"
+                    :key="num"
+                    :value="num"
+                  />
+                </datalist>
               </div>
             </div>
           </div>
@@ -394,6 +440,7 @@ import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddress
 import { getUserOrders } from '../api/orders.js'
 import { userAPI } from '../api/users.js'
 import api from '../api/index.js'
+import config from '../../config/index.js'
 import CountrySelector from '../components/CountrySelector.vue'
 import ThailandAddressSelector from '../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n, formatPhoneDisplay } from '../utils/phoneValidation.js'
@@ -464,7 +511,7 @@ const addresses = ref([])
 // 地址表单数据
 const addressForm = ref({
   contact_name: '',
-  contact_country_code: '+86',
+  contact_country_code: '+66',
   contact_phone: '',
   province: '',
   city: '',
@@ -473,6 +520,34 @@ const addressForm = ref({
   detail_address: '',
   address_type: 'home',
   is_default: false
+})
+
+const normalizeAddressCountryCode = (code) => {
+  if (code == null || String(code).trim() === '') return '+66'
+  const s = String(code).trim()
+  return s.startsWith('+') ? s : `+${s.replace(/^\+/, '')}`
+}
+
+/** 当前区号下已保存的本地手机号（历史地址 + 账号绑定），供 datalist 选择，仍走 validatePhoneI18n */
+const savedPhonesForCountry = computed(() => {
+  const target = normalizeAddressCountryCode(addressForm.value.contact_country_code)
+  const seen = new Set()
+  const out = []
+  const push = (p) => {
+    const v = String(p ?? '').trim()
+    if (!v || seen.has(v)) return
+    seen.add(v)
+    out.push(v)
+  }
+  for (const a of addresses.value) {
+    if (normalizeAddressCountryCode(a.contact_country_code) !== target) continue
+    push(a.contact_phone)
+  }
+  const u = userStore.user
+  if (u?.phone && normalizeAddressCountryCode(u.country_code) === target) {
+    push(u.phone)
+  }
+  return out
 })
 
 // 三级联动地址选择器数据
@@ -497,6 +572,14 @@ const profileErrors = ref({
   email: ''
 })
 const profileSaving = ref(false)
+const avatarFileInput = ref(null)
+const avatarUploading = ref(false)
+
+const avatarDisplayUrl = computed(() => {
+  const u = userStore.user?.avatar_url
+  if (!u) return null
+  return config.buildStaticUrl(u)
+})
 
 // 监听用户数据变化，更新表单
 watch(() => userStore.user, (newUser) => {
@@ -557,10 +640,10 @@ const formatDateTime = (dateString) => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
 }
 
-// 计算汇算后金额
-const getExchangedAmount = (amount, orderExchangeRate = null) => {
-  // 优先使用订单保存的汇率，如果没有则使用默认值1
-  const rate = orderExchangeRate || 1.0000
+// 在线支付 USDT：仅按订单保存的汇率换算（系统汇算比例变更不影响历史订单）
+const getExchangedAmount = (amount, orderExchangeRate) => {
+  const raw = orderExchangeRate == null || orderExchangeRate === '' ? NaN : parseFloat(orderExchangeRate)
+  const rate = Number.isFinite(raw) ? raw : 1
   return (parseFloat(amount) * rate).toFixed(2)
 }
 
@@ -731,7 +814,7 @@ const resetAddressForm = () => {
   
   addressForm.value = {
     contact_name: '',
-    contact_country_code: '+86',
+    contact_country_code: '+66',
     contact_phone: '',
     province: '',
     city: '',
@@ -878,6 +961,76 @@ const validateProfile = () => {
   }
   
   return isValid
+}
+
+const onAvatarFileChange = async (e) => {
+  const input = e.target
+  const file = input?.files?.[0]
+  if (input) input.value = ''
+  if (!file) return
+
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (!allowed.includes(file.type)) {
+    showError(t('profile.avatarInvalidType'))
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    showError(t('profile.avatarTooLarge'))
+    return
+  }
+
+  avatarUploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('avatar', file)
+    const res = await api.post('/upload/avatar', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    if (!res.data?.success) {
+      showError(res.data?.message || t('profile.avatarUploadFailed'))
+      return
+    }
+    const url = res.data.data?.url
+    const upd = await userStore.updateProfile({
+      nickname: profileForm.value.nickname.trim(),
+      email: profileForm.value.email.trim() || undefined,
+      avatar_url: url
+    })
+    if (upd.success) {
+      await refreshUserInfo()
+      success(t('profile.avatarUpdated'))
+    } else {
+      showError(upd.message || t('profile.avatarUploadFailed'))
+    }
+  } catch (err) {
+    console.error(err)
+    showError(t('profile.avatarUploadFailed'))
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+const removeAvatar = async () => {
+  if (!userStore.user?.avatar_url) return
+  avatarUploading.value = true
+  try {
+    const upd = await userStore.updateProfile({
+      nickname: profileForm.value.nickname.trim(),
+      email: profileForm.value.email.trim() || undefined,
+      avatar_url: null
+    })
+    if (upd.success) {
+      await refreshUserInfo()
+      success(t('profile.avatarRemoved'))
+    } else {
+      showError(upd.message || t('profile.saveFailed'))
+    }
+  } catch (err) {
+    console.error(err)
+    showError(t('profile.saveFailed'))
+  } finally {
+    avatarUploading.value = false
+  }
 }
 
 // 保存个人资料

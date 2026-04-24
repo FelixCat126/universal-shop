@@ -48,6 +48,7 @@ cp -r docs "${PACKAGE_DIR}/" 2>/dev/null || true
 
 # 复制脚本目录
 cp -r scripts "${PACKAGE_DIR}/" 2>/dev/null || true
+chmod +x "${PACKAGE_DIR}/scripts/deploy-on-server.sh" 2>/dev/null || true
 
 # 生成PM2配置文件
 cat > "${PACKAGE_DIR}/ecosystem.config.js" << 'EOF'
@@ -262,9 +263,11 @@ openssl req -x509 -newkey rsa:4096 -keyout ssl/server.key -out ssl/server.crt -d
 - 生产环境建议使用HTTPS
 EOF
 
-# 打包
+# 打包（macOS：禁止把 xattr / AppleDouble 的 ._ 文件打进包，避免 Linux 上被当成 SQL 执行）
 echo "🗜️ 创建压缩包..."
+export COPYFILE_DISABLE=1
 tar -czf "${PACKAGE_DIR}.tar.gz" "${PACKAGE_DIR}/"
+unset COPYFILE_DISABLE 2>/dev/null || true
 SIZE=$(du -h "${PACKAGE_DIR}.tar.gz" | cut -f1)
 
 # 清理临时目录

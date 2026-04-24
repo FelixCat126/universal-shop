@@ -80,91 +80,65 @@ class DataSeeder {
   
   static async smartSync() {
     try {
-      // 检查是否是全新安装（通过检查是否有任何表存在）
       const tables = await sequelize.getQueryInterface().showAllTables()
       const isFirstInstall = tables.length === 0
-      
+
       if (isFirstInstall) {
-        console.log('🆕 检测到全新安装，创建数据库表...')
-        // 全新安装，使用force重建所有表
-        await sequelize.sync({ force: true })
+        console.log('🆕 全新安装：根据模型创建表（不使用 force，避免误删生产数据）')
       } else {
-        console.log('🔄 检测到现有数据库，使用保守的安全更新策略...')
-        // 不使用alter: true，因为它可能会错误地添加约束
-        // 而是使用基本sync加上手动列添加
-        await sequelize.sync()
-        
-        // 手动添加缺失的列和修复约束
-        await this.addMissingColumns()
+        // 旧库缺列时必须先 ALTER，再 sync；否则 sync 会先建索引而报 no such column: deleted_at
+        console.log('🔄 已有数据库：先执行 SQL 补丁（补列等），再 Sequelize sync')
+        await this.applySqlPatchesOnly()
+      }
+
+      // 兜底：补丁已记录但 ALTER 未生效时（如 SQLite 单条 query 未执行到 ALTER），仍保证列存在
+      await this.ensureSqliteProductDeletedAtColumn()
+
+      // 绝不使用 sync({ force: true })，以免 DROP 表；新建库时空库 sync 仅 CREATE
+      await sequelize.sync()
+
+      if (isFirstInstall) {
+        await this.applySqlPatchesOnly()
+      }
+
+      if (process.env.NODE_ENV === 'production') {
+        console.log('ℹ️  生产环境：跳过含 DROP/重建 的购物车约束自动修复（避免影响线上数据）')
+      } else {
+        await this.fixIncorrectConstraints()
       }
     } catch (error) {
       console.error('❌ 数据库同步失败:', error)
       throw error
     }
   }
-  
-  static async addMissingColumns() {
+
+  static async applySqlPatchesOnly() {
     try {
-      console.log('🔧 检查并添加缺失的数据库列...')
-      
-      // 检查orders表是否有exchange_rate字段
-      const [orderColumns] = await sequelize.query(`PRAGMA table_info(orders)`)
-      const hasExchangeRate = orderColumns.some(col => col.name === 'exchange_rate')
-      
-      if (!hasExchangeRate) {
-        console.log('➕ 为orders表添加exchange_rate字段')
-        await sequelize.query(`
-          ALTER TABLE orders 
-          ADD COLUMN exchange_rate DECIMAL(10, 4) DEFAULT 1.0000
-        `)
-      }
-      
-      // 检查products表是否有alias字段
-      const [productColumns] = await sequelize.query(`PRAGMA table_info(products)`)
-      const hasAlias = productColumns.some(col => col.name === 'alias')
-      
-      if (!hasAlias) {
-        console.log('➕ 为products表添加alias字段')
-        await sequelize.query(`
-          ALTER TABLE products 
-          ADD COLUMN alias VARCHAR(200)
-        `)
-      }
-      
-      // 检查orders表是否有地址分字段
-      const hasProvince = orderColumns.some(col => col.name === 'province')
-      const hasCity = orderColumns.some(col => col.name === 'city')
-      const hasDistrict = orderColumns.some(col => col.name === 'district')
-      const hasPostalCode = orderColumns.some(col => col.name === 'postal_code')
-      
-      if (!hasProvince) {
-        console.log('➕ 为orders表添加province字段')
-        await sequelize.query(`ALTER TABLE orders ADD COLUMN province VARCHAR(50)`)
-      }
-      
-      if (!hasCity) {
-        console.log('➕ 为orders表添加city字段')
-        await sequelize.query(`ALTER TABLE orders ADD COLUMN city VARCHAR(50)`)
-      }
-      
-      if (!hasDistrict) {
-        console.log('➕ 为orders表添加district字段')
-        await sequelize.query(`ALTER TABLE orders ADD COLUMN district VARCHAR(50)`)
-      }
-      
-      if (!hasPostalCode) {
-        console.log('➕ 为orders表添加postal_code字段')
-        await sequelize.query(`ALTER TABLE orders ADD COLUMN postal_code VARCHAR(10)`)
-      }
-      
-      console.log('✅ 数据库列检查完成')
-      
-      // 修复错误的约束
-      await this.fixIncorrectConstraints()
+      console.log('🔧 检查可选 SQL 补丁（scripts/db/patches/，无文件则跳过）...')
+      const { applySqlPatches } = await import('../../../scripts/db/apply-sql-patches.mjs')
+      await applySqlPatches(sequelize)
+      console.log('✅ SQL 补丁已执行')
     } catch (error) {
-      console.warn('⚠️  添加缺失列时出现错误:', error.message)
-      // 不抛出错误，让流程继续
+      console.error('❌ SQL 补丁步骤失败:', error)
+      throw error
     }
+  }
+
+  /** SQLite：若 products 表存在但无 deleted_at，则补列（与 Product 模型 paranoid 一致） */
+  static async ensureSqliteProductDeletedAtColumn() {
+    if (sequelize.getDialect() !== 'sqlite') return
+
+    const [tables] = await sequelize.query(`
+      SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'products' LIMIT 1
+    `)
+    if (tables.length === 0) return
+
+    const [cols] = await sequelize.query('PRAGMA table_info(products)')
+    const hasDeletedAt = cols.some((c) => c.name === 'deleted_at')
+    if (hasDeletedAt) return
+
+    console.log('🔧 products 表缺少 deleted_at，正在执行 ALTER ADD COLUMN（软删除列）...')
+    await sequelize.query('ALTER TABLE products ADD COLUMN deleted_at DATETIME')
   }
   
   static async fixIncorrectConstraints() {
@@ -302,6 +276,12 @@ class DataSeeder {
           config_value: '1.0000',
           description: '汇算比例配置',
           config_type: 'number'
+        },
+        {
+          config_key: 'currency_unit',
+          config_value: 'THB',
+          description: '全站货币代码：THB 泰铢 | USD 美元 | CNY 人民币',
+          config_type: 'text'
         },
         {
           config_key: 'db_version',

@@ -1,27 +1,31 @@
 <template>
   <div class="operators-management">
-    <!-- 页面标题 -->
-    <el-card class="header-card" shadow="never">
-      <div class="page-header">
-        <h1 class="page-title">
-          <el-icon><User /></el-icon>
-          {{ t('operators.title') }}
-        </h1>
-        <p class="page-description">{{ t('operators.description') }}</p>
-        <div class="actions">
-          <el-button @click="loadAdmins" :loading="loading" icon="Refresh">{{ t('operators.refresh') }}</el-button>
-          <el-button type="primary" @click="showCreateDialog" icon="Plus">{{ t('operators.addOperator') }}</el-button>
-        </div>
-      </div>
-    </el-card>
+    <div class="admin-module-toolbar">
+      <el-button @click="loadAdmins" :loading="loading">
+        <el-icon><Refresh /></el-icon>
+        {{ t('operators.refresh') }}
+      </el-button>
+      <el-button type="primary" @click="showCreateDialog">
+        <el-icon><Plus /></el-icon>
+        {{ t('operators.addOperator') }}
+      </el-button>
+    </div>
 
-    <!-- 管理员列表 -->
-    <el-card shadow="never">
+    <el-card shadow="never" class="table-card">
+      <template #header>
+        <div class="table-header">
+          <span>{{ t('operators.title') }}</span>
+          <span class="table-info">{{ administrators.length }}</span>
+        </div>
+      </template>
       <el-table 
         :data="administrators" 
         v-loading="loading"
         stripe
+        border
+        table-layout="fixed"
         style="width: 100%"
+        class="operators-table"
       >
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" :label="t('operators.username')" min-width="120" />
@@ -49,9 +53,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="t('operators.lastLogin')" width="160">
+        <el-table-column :label="t('operators.lastLogin')" width="200" min-width="190" class-name="operators-col-last-login">
           <template #default="{ row }">
-            {{ formatDate(row.last_login_at) }}
+            <span class="operators-last-login-text">{{ formatLastLogin(row.last_login_at) }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="t('operators.actions')" width="280" fixed="right">
@@ -151,7 +155,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-import { User, Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin.js'
 
 const adminStore = useAdminStore()
@@ -240,9 +244,13 @@ const getRoleTagType = (role) => {
   return typeMap[role] || 'info'
 }
 
-const formatDate = (dateString) => {
+/** 本地时间 yyyy-MM-dd HH:mm:ss */
+const formatLastLogin = (dateString) => {
   if (!dateString) return t('operators.never')
-  return new Date(dateString).toLocaleString()
+  const d = new Date(dateString)
+  if (Number.isNaN(d.getTime())) return t('operators.never')
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 const isProtectedAdmin = (admin) => {
@@ -418,54 +426,42 @@ onMounted(() => {
 
 <style scoped>
 .operators-management {
-  padding: 20px;
+  padding: 0;
 }
 
-.header-card {
+.table-card {
   margin-bottom: 20px;
 }
 
-.page-header {
+.table-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.page-title {
-  font-size: 24px;
+  align-items: center;
   font-weight: 600;
   color: #303133;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
-.page-description {
-  color: #606266;
-  margin: 8px 0 0 0;
+.table-info {
   font-size: 14px;
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-  flex-shrink: 0;
+  color: #909399;
+  font-weight: normal;
 }
 
 .dialog-footer {
   text-align: right;
 }
 
+.operators-last-login-text {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+:deep(.operators-col-last-login .cell) {
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .actions {
+  .admin-module-toolbar {
     justify-content: flex-start;
   }
 }

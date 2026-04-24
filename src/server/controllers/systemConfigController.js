@@ -7,6 +7,19 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+const CURRENCY_CODES = ['THB', 'USD', 'CNY']
+
+function normalizeCurrencyCodeForApi (raw) {
+  if (raw == null || raw === '') return 'THB'
+  const s = String(raw).trim()
+  const u = s.toUpperCase()
+  if (CURRENCY_CODES.includes(u)) return u
+  if (s === '¥' || u === 'RMB' || s === '元') return 'CNY'
+  if (s === '$' || s === '＄') return 'USD'
+  if (s === '฿') return 'THB'
+  return 'THB'
+}
+
 // 配置文件上传
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -110,6 +123,28 @@ class SystemConfigController {
         })
       }
       
+      // 货币单位：仅允许 THB / USD / CNY，默认泰铢
+      if (key === 'currency_unit') {
+        const raw = value == null ? '' : String(value).trim().toUpperCase()
+        if (!CURRENCY_CODES.includes(raw)) {
+          return res.status(400).json({
+            success: false,
+            message: '货币单位必须是 THB（泰铢）、USD（美元）或 CNY（人民币）之一'
+          })
+        }
+        const config = await SystemConfig.setConfig(
+          key,
+          raw,
+          type || 'text',
+          description || '全站货币代码 THB|USD|CNY'
+        )
+        return res.json({
+          success: true,
+          message: '货币单位已保存',
+          data: config
+        })
+      }
+
       // 特殊验证：汇算比例
       if (key === 'exchange_rate') {
         const numValue = parseFloat(value)
@@ -410,10 +445,14 @@ class SystemConfigController {
       const configs = await SystemConfig.getAllConfigs()
       
       // 只返回公开的配置项
+      const code = normalizeCurrencyCodeForApi(configs.currency_unit?.value)
       const publicConfigs = {
         home_banner: configs.home_banner?.value || null,
         payment_qrcode: configs.payment_qrcode?.value || null,
-        exchange_rate: configs.exchange_rate?.value || '1.00'
+        exchange_rate: configs.exchange_rate?.value || '1.00',
+        currency_code: code,
+        /** @deprecated 与 currency_code 相同，兼容旧前端 */
+        currency_unit: code
       }
       
       res.json({

@@ -46,7 +46,7 @@ const { t } = useI18n()
 const props = defineProps({
   modelValue: {
     type: String,
-    default: '+86'
+    default: '+66'
   },
   label: {
     type: String,
@@ -80,20 +80,20 @@ const emit = defineEmits(['update:modelValue', 'country-change'])
 // 国家数据 - 使用国际化
 const countries = computed(() => [
   {
+    code: '+66',
+    name: t('country.thailand'),
+    flag: '🇹🇭',
+    phoneLength: 9
+  },
+  {
     code: '+86',
     name: t('country.china'),
     flag: '🇨🇳',
     phoneLength: 11
   },
   {
-    code: '+66', 
-    name: t('country.thailand'),
-    flag: '🇹🇭',
-    phoneLength: 9
-  },
-  {
     code: '+60',
-    name: t('country.malaysia'), 
+    name: t('country.malaysia'),
     flag: '🇲🇾',
     phoneLength: 11
   }

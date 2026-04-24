@@ -1,4 +1,6 @@
 import Product from '../models/Product.js'
+import Cart from '../models/Cart.js'
+import sequelize from '../config/database.js'
 import { Op } from 'sequelize'
 
 class ProductController {
@@ -10,7 +12,8 @@ class ProductController {
         pageSize = 20,
         name = '',
         category = '',
-        stockStatus = ''
+        stockStatus = '',
+        listingStatus = '' // 管理端：all | on_shelf | delisted
       } = req.query
 
       const offset = (page - 1) * pageSize
@@ -47,12 +50,31 @@ class ProductController {
         }
       }
 
-      // 查询数据
+      const isAdmin = !!req.admin
+      const paranoid = !isAdmin
+
+      if (isAdmin && listingStatus === 'on_shelf') {
+        where.deleted_at = { [Op.is]: null }
+      } else if (isAdmin && listingStatus === 'delisted') {
+        where.deleted_at = { [Op.ne]: null }
+      }
+
+      // 管理端：先按是否已下架（在售优先），再按 status（active 优先），再按创建时间倒序
+      const order = isAdmin
+        ? [
+            [sequelize.literal('(CASE WHEN deleted_at IS NULL THEN 0 ELSE 1 END)'), 'ASC'],
+            [sequelize.literal("(CASE WHEN status = 'active' THEN 0 ELSE 1 END)"), 'ASC'],
+            ['created_at', 'DESC']
+          ]
+        : [['created_at', 'DESC']]
+
       const { count, rows } = await Product.findAndCountAll({
         where,
         offset,
         limit,
-        order: [['created_at', 'DESC']]
+        order,
+        paranoid,
+        subQuery: false
       })
 
       // 转换数据格式，将 image 字段映射为 image_url
@@ -60,6 +82,10 @@ class ProductController {
         const productData = product.toJSON()
         if (productData.image) {
           productData.image_url = productData.image
+        }
+        if (isAdmin) {
+          const del = productData.deleted_at ?? productData.deletedAt
+          productData.delisted = !!del
         }
         return productData
       })
@@ -88,7 +114,7 @@ class ProductController {
   static async getProduct(req, res) {
     try {
       const { id } = req.params
-      const product = await Product.findByPk(id)
+      const product = await Product.findByPk(id, { paranoid: !req.admin })
 
       if (!product) {
         return res.status(404).json({
@@ -101,6 +127,10 @@ class ProductController {
       const productData = product.toJSON()
       if (productData.image) {
         productData.image_url = productData.image
+      }
+      if (req.admin) {
+        const del = productData.deleted_at ?? productData.deletedAt
+        productData.delisted = !!del
       }
 
       res.json({
@@ -180,7 +210,7 @@ class ProductController {
         image
       } = req.body
 
-      const product = await Product.findByPk(id)
+      const product = await Product.findByPk(id, { paranoid: !req.admin })
       if (!product) {
         return res.status(404).json({
           success: false,
@@ -215,11 +245,19 @@ class ProductController {
     }
   }
 
-  // 删除产品
+  // 下架产品：逻辑删除（保留行与订单外键），并清理购物车中该商品
   static async deleteProduct(req, res) {
     try {
       const { id } = req.params
-      const product = await Product.findByPk(id)
+      const productId = parseInt(id, 10)
+      if (Number.isNaN(productId)) {
+        return res.status(400).json({
+          success: false,
+          message: '无效的产品ID'
+        })
+      }
+
+      const product = await Product.findByPk(productId, { paranoid: false })
 
       if (!product) {
         return res.status(404).json({
@@ -228,17 +266,77 @@ class ProductController {
         })
       }
 
-      await product.destroy()
+      if (product.deleted_at || product.deletedAt) {
+        return res.status(400).json({
+          success: false,
+          message: '该商品已下架'
+        })
+      }
+
+      await sequelize.transaction(async (t) => {
+        await Cart.destroy({ where: { product_id: productId }, transaction: t })
+        await product.destroy({ transaction: t })
+      })
 
       res.json({
         success: true,
-        message: '产品删除成功'
+        message: '产品已下架'
       })
     } catch (error) {
-      console.error('删除产品失败:', error)
+      console.error('下架产品失败:', error)
       res.status(500).json({
         success: false,
-        message: '删除产品失败',
+        message: '下架产品失败',
+        error: error.message
+      })
+    }
+  }
+
+  // 重新上架（清除软删除）
+  static async restoreProduct(req, res) {
+    try {
+      if (!req.admin) {
+        return res.status(403).json({
+          success: false,
+          message: '需要管理员登录后才能重新上架'
+        })
+      }
+
+      const productId = parseInt(req.params.id, 10)
+      if (Number.isNaN(productId)) {
+        return res.status(400).json({
+          success: false,
+          message: '无效的产品ID'
+        })
+      }
+
+      const product = await Product.findByPk(productId, { paranoid: false })
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: '产品不存在'
+        })
+      }
+
+      if (!product.deleted_at && !product.deletedAt) {
+        return res.status(400).json({
+          success: false,
+          message: '商品未下架，无需重新上架'
+        })
+      }
+
+      await product.restore()
+
+      res.json({
+        success: true,
+        message: '商品已重新上架',
+        data: product
+      })
+    } catch (error) {
+      console.error('重新上架失败:', error)
+      res.status(500).json({
+        success: false,
+        message: '重新上架失败',
         error: error.message
       })
     }
@@ -250,7 +348,7 @@ class ProductController {
       const { id } = req.params
       const { type, quantity } = req.body // type: 'set' | 'add' | 'subtract'
 
-      const product = await Product.findByPk(id)
+      const product = await Product.findByPk(id, { paranoid: !req.admin })
       if (!product) {
         return res.status(404).json({
           success: false,

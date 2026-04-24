@@ -199,7 +199,7 @@ const message = ref('')
 const messageType = ref('success')
 // 表单数据
 const formData = ref({
-  countryCode: '+86',
+  countryCode: '+66',
   phone: '',
   password: '',
   rememberMe: false

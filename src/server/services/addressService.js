@@ -6,7 +6,7 @@ import Address from '../models/Address.js'
  * @param {Object} params - 地址创建参数
  * @param {number} params.userId - 用户ID
  * @param {string} params.contact_name - 收货人姓名
- * @param {string} [params.contact_country_code='+86'] - 国家区号（+86/+66/+60）
+ * @param {string} [params.contact_country_code='+66'] - 国家区号（+86/+66/+60）
  * @param {string} params.contact_phone - 手机号（不含国家区号）
  * @param {string} [params.province] - 省份
  * @param {string} [params.city] - 城市
@@ -21,7 +21,7 @@ export async function createUserAddress(params, transaction) {
   const {
     userId,
     contact_name,
-    contact_country_code = '+86',
+    contact_country_code = '+66',
     contact_phone,
     province = '',
     city = '',

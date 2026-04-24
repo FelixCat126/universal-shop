@@ -79,4 +79,6 @@ body {
   padding: 0;
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
 }
+
+/* 按钮图标与文案间距见 styles/admin-ui-overrides.css（main.js 末尾引入，保证覆盖 EP） */
 </style>

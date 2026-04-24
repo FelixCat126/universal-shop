@@ -84,6 +84,7 @@ class ExportController {
             include: [{
               model: Product,
               as: 'product',
+              paranoid: false,
               attributes: ['name', 'alias', 'price']
             }]
           }

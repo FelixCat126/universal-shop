@@ -36,8 +36,8 @@ export default {
     quantity: '数量',
     remove: '移除',
     summary: '摘要',
-    currency: '¥',
-    currencyName: '人民币',
+    currency: '฿',
+    currencyName: '泰铢 ฿',
     unit: '件',
     or: '或者',
     optional: '选填',
@@ -79,6 +79,7 @@ export default {
     productDetail: '商品详情',
     noProducts: '暂无商品',
     loadMore: '加载更多',
+    noMoreProducts: '已加载全部商品',
     searchPlaceholder: '搜索商品...',
     discount: '折',
     // 产品详情页新增
@@ -384,7 +385,18 @@ export default {
     defaultAddressSet: '默认地址设置成功',
     setDefaultFailed: '设置默认地址失败',
     confirmDeleteDefault: '确定要删除默认地址吗？删除后将自动设置其他地址为默认地址。',
-    confirmDeleteAddress: '确定要删除这个地址吗？'
+    confirmDeleteAddress: '确定要删除这个地址吗？',
+    addressPhoneComboPlaceholder: '输入手机号或从列表选择已用过的号码',
+    avatar: '头像',
+    changeAvatar: '上传头像',
+    removeAvatar: '移除头像',
+    avatarHint: '支持 JPG、PNG、WebP、GIF，最大 2MB。',
+    avatarUploading: '上传中…',
+    avatarInvalidType: '请选择 JPG、PNG、WebP 或 GIF 图片',
+    avatarTooLarge: '图片不能超过 2MB',
+    avatarUploadFailed: '头像上传失败，请重试',
+    avatarUpdated: '头像已更新',
+    avatarRemoved: '已移除头像'
   },
 
   // 错误消息

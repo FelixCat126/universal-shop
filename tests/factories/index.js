@@ -10,8 +10,8 @@ export class TestDataFactory {
     const defaultData = {
       username: faker.internet.email(),
       nickname: faker.person.firstName(),
-      country_code: '+86',
-      phone: `138001380${(timestamp % 100).toString().padStart(2, '0')}`,
+      country_code: '+66',
+      phone: `8${(timestamp % 100000000).toString().padStart(8, '0')}`,
       email: `test${timestamp}${randomSuffix}@example.com`,
       password: '123456', // 原始密码，将在模型中自动加密
       is_active: true,

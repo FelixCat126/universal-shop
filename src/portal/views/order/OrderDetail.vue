@@ -284,10 +284,10 @@ const formatDateTime = (dateString) => {
   }
 }
 
-// 计算汇算后金额
-const getExchangedAmount = (amount, orderExchangeRate = null) => {
-  // 优先使用订单保存的汇率，如果没有则使用默认值1
-  const rate = orderExchangeRate || 1.0000
+// 在线支付 USDT：仅按订单保存的汇率换算（系统汇算比例变更不影响历史订单）
+const getExchangedAmount = (amount, orderExchangeRate) => {
+  const raw = orderExchangeRate == null || orderExchangeRate === '' ? NaN : parseFloat(orderExchangeRate)
+  const rate = Number.isFinite(raw) ? raw : 1
   return (parseFloat(amount) * rate).toFixed(2)
 }
 

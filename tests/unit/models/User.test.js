@@ -188,7 +188,7 @@ describe('User 模型', () => {
       const safeData = user.toSafeJSON()
       const expectedFields = [
         'id', 'username', 'nickname', 'country_code', 'phone',
-        'email', 'is_active', 'referral_code', 'referral_from',
+        'email', 'is_active', 'referral_code',
         'created_at', 'updated_at'
       ]
       
@@ -217,13 +217,22 @@ describe('User 模型', () => {
     })
     
     it('应该允许相同手机号但不同国家区号', async () => {
-      const differentCountryData = await TestDataFactory.createUser({
-        country_code: '+66', // 不同国家区号
-        phone: existingUser.phone, // 相同手机号
-        email: 'thai@example.com'
+      // 使用同一本地号码、不同区号；须同时满足各国最少位数（如 +86 需 11 位）
+      const sharedLocal = '13812345678'
+      const first = await TestDataFactory.createUser({
+        country_code: '+66',
+        phone: sharedLocal,
+        email: 'cross66@test.com',
+        username: 'cross66@test.com'
       })
-      
-      const user = await User.create(differentCountryData)
+      await User.create(first)
+      const second = await TestDataFactory.createUser({
+        country_code: '+86',
+        phone: sharedLocal,
+        email: 'cross86@test.com',
+        username: 'cross86@test.com'
+      })
+      const user = await User.create(second)
       expect(user.id).toBeDefined()
     })
     

@@ -25,7 +25,7 @@ const Address = sequelize.define('Address', {
   contact_country_code: {
     type: DataTypes.STRING(10),
     allowNull: false,
-    defaultValue: '+86',
+    defaultValue: '+66',
     validate: {
       isIn: [['+86', '+66', '+60']],
       notEmpty: true

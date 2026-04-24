@@ -15,7 +15,7 @@ class UserController {
   // 用户注册
   static async register(req, res) {
     try {
-      const { nickname, country_code = '+86', phone, email, password, referral_code } = req.body
+      const { nickname, country_code = '+66', phone, email, password, referral_code } = req.body
 
       // 验证必填字段
       if (!nickname || !phone || !password) {
@@ -124,11 +124,31 @@ class UserController {
         return res.status(401).json({ success: false, message: '未登录' })
       }
 
-      const { nickname, email } = req.body
+      const { nickname, email, avatar_url } = req.body
+      let nextAvatarUrl
+      const avatarKeyPresent = Object.prototype.hasOwnProperty.call(req.body, 'avatar_url')
 
       // 基本校验
       if (!nickname || nickname.length > 50) {
         return res.status(400).json({ success: false, message: '昵称不能为空且不超过50个字符' })
+      }
+
+      if (avatarKeyPresent) {
+        if (avatar_url == null || avatar_url === '') {
+          nextAvatarUrl = null
+        } else {
+          const s = String(avatar_url).trim()
+          if (s.length > 512) {
+            return res.status(400).json({ success: false, message: '头像地址无效' })
+          }
+          if (!s.startsWith('/uploads/avatars/')) {
+            return res.status(400).json({ success: false, message: '头像地址无效' })
+          }
+          if (s.includes('..') || s.includes('\\')) {
+            return res.status(400).json({ success: false, message: '头像地址无效' })
+          }
+          nextAvatarUrl = s
+        }
       }
 
       // 邮箱可选；如果传入则校验唯一
@@ -156,6 +176,9 @@ class UserController {
       // 同步email与username（兼容旧逻辑用户名即邮箱）
       user.email = email || null
       user.username = email || null
+      if (avatarKeyPresent) {
+        user.avatar_url = nextAvatarUrl
+      }
       await user.save()
 
       return res.json({ success: true, message: '资料更新成功', data: user.toSafeJSON() })
@@ -284,7 +307,9 @@ class UserController {
         pageSize = 10, 
         email = '',
         phone = '',
-        referral_code = ''
+        referral_code = '',
+        name = '',
+        id: userIdParam = ''
       } = req.query
 
       const limit = parseInt(pageSize)
@@ -292,6 +317,23 @@ class UserController {
 
       // 构建查询条件
       const whereConditions = []
+      if (userIdParam !== undefined && userIdParam !== null && String(userIdParam).trim() !== '') {
+        const uid = parseInt(String(userIdParam), 10)
+        if (Number.isFinite(uid) && uid > 0) {
+          whereConditions.push({ id: uid })
+        }
+      }
+      const nameTrim = typeof name === 'string' ? name.trim() : ''
+      if (nameTrim) {
+        const q = `%${nameTrim}%`
+        whereConditions.push({
+          [Op.or]: [
+            { nickname: { [Op.like]: q } },
+            { username: { [Op.like]: q } },
+            { phone: { [Op.like]: q } }
+          ]
+        })
+      }
       if (email) {
         whereConditions.push({
           [Op.or]: [
@@ -385,7 +427,7 @@ class UserController {
     try {
       const userId = req.user.userId
       const user = await User.findByPk(userId, {
-        attributes: ['id', 'username', 'email', 'phone', 'referral_code', 'created_at']
+        attributes: ['id', 'username', 'email', 'phone', 'nickname', 'avatar_url', 'referral_code', 'created_at']
       })
 
       if (!user) {
@@ -465,7 +507,7 @@ class UserController {
   static async createUserForOrder(fullPhoneWithCode, contactName, referralCode = null) {
     try {
       // 解析完整手机号中的国家区号和手机号
-      let countryCode = '+86' // 默认值
+      let countryCode = '+66' // 默认值
       let phoneNumber = fullPhoneWithCode
       
       // 检查是否包含国家区号并解析

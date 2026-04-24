@@ -1,0 +1,39 @@
+/**
+ * 管理后台全局 UI 覆盖
+ * 必须在 main.js 中于 element-plus/dist/index.css 之后、且尽量靠后 import。
+ */
+
+/* 模块内：筛选区与下方区域之间的操作栏，主操作按钮靠右排列 */
+.admin-module-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/*
+ * 按钮内图标与文案：约等于「一个空格」宽度（0.25em），避免与 Element Plus 默认叠加出过大间隙。
+ * 仅统一 .el-button__text 内 flex gap，外层按钮不再设 gap，防止与内层重复。
+ */
+html body #app .el-button.el-button {
+  gap: 0;
+  column-gap: 0;
+}
+
+html body #app .el-button .el-button__text {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.25em !important;
+  column-gap: 0.25em !important;
+}
+
+html body #app .el-button > .el-icon:not(:last-child),
+html body #app .el-button > i.el-icon:not(:last-child) {
+  margin-inline-end: 0.25em !important;
+}
+
+html body #app .el-button .el-button__text > .el-icon:not(:last-child) {
+  margin-inline-end: 0.25em !important;
+}

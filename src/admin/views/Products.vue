@@ -1,71 +1,98 @@
 <template>
   <div class="products">
-    <!-- 页面标题和操作栏 -->
-    <div class="header-section">
-      <div class="title-section">
-        <h1>{{ t('products.title') }}</h1>
-        <p>{{ t('products.description') }}</p>
-      </div>
-      <div class="action-section">
-        <el-button type="primary" @click="showAddDialog">
-          <el-icon><Plus /></el-icon>
-          {{ t('products.addProduct') }}
-        </el-button>
-      </div>
+    <div class="filter-section">
+      <el-card>
+        <el-form :model="searchForm" inline class="search-form">
+          <el-form-item :label="t('products.searchName')">
+            <el-input
+              v-model="searchForm.name"
+              :placeholder="t('products.searchName')"
+              clearable
+              style="width: 200px"
+              @input="handleSearch"
+            />
+          </el-form-item>
+          <el-form-item :label="t('products.category')">
+            <el-select
+              v-model="searchForm.category"
+              :placeholder="t('products.selectCategory')"
+              clearable
+              style="width: 160px"
+              @change="handleSearch"
+            >
+              <el-option :label="t('products.categories.electronics')" value="electronics" />
+              <el-option :label="t('products.categories.clothing')" value="clothing" />
+              <el-option :label="t('products.categories.home')" value="home" />
+              <el-option :label="t('products.categories.sports')" value="sports" />
+              <el-option :label="t('products.categories.others')" value="others" />
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="t('products.stockStatus')">
+            <el-select
+              v-model="searchForm.stockStatus"
+              :placeholder="t('products.stockStatus')"
+              clearable
+              style="width: 140px"
+              @change="handleSearch"
+            >
+              <el-option :label="t('products.stockOptions.normal')" value="normal" />
+              <el-option :label="t('products.stockOptions.low')" value="low" />
+              <el-option :label="t('products.stockOptions.out')" value="out" />
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="t('products.listingFilter')">
+            <el-select
+              v-model="searchForm.listingStatus"
+              :placeholder="t('products.listingFilter')"
+              clearable
+              style="width: 150px"
+              @change="handleSearch"
+            >
+              <el-option :label="t('products.listingFilterAll')" value="" />
+              <el-option :label="t('products.listingFilterOnShelf')" value="on_shelf" />
+              <el-option :label="t('products.listingFilterDelisted')" value="delisted" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">
+              <el-icon><Search /></el-icon>
+              {{ t('common.search') }}
+            </el-button>
+            <el-button @click="resetSearch">
+              <el-icon><Refresh /></el-icon>
+              {{ t('common.reset') }}
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
     </div>
 
-    <!-- 搜索和筛选栏 -->
-    <div class="search-section">
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <el-input
-            v-model="searchForm.name"
-            :placeholder="t('products.searchName')"
-            prefix-icon="Search"
-            clearable
-            @input="handleSearch"
-          />
-        </el-col>
-        <el-col :span="4">
-          <el-select
-            v-model="searchForm.category"
-            :placeholder="t('products.selectCategory')"
-            clearable
-            @change="handleSearch"
-          >
-            <el-option :label="t('products.categories.electronics')" value="electronics" />
-            <el-option :label="t('products.categories.clothing')" value="clothing" />
-            <el-option :label="t('products.categories.home')" value="home" />
-            <el-option :label="t('products.categories.sports')" value="sports" />
-            <el-option :label="t('products.categories.others')" value="others" />
-          </el-select>
-        </el-col>
-        <el-col :span="4">
-          <el-select
-            v-model="searchForm.stockStatus"
-            :placeholder="t('products.stockStatus')"
-            clearable
-            @change="handleSearch"
-          >
-            <el-option :label="t('products.stockOptions.normal')" value="normal" />
-            <el-option :label="t('products.stockOptions.low')" value="low" />
-            <el-option :label="t('products.stockOptions.out')" value="out" />
-          </el-select>
-        </el-col>
-        <el-col :span="3">
-          <el-button @click="resetSearch">{{ t('common.reset') }}</el-button>
-        </el-col>
-      </el-row>
+    <div class="admin-module-toolbar">
+      <el-button type="primary" @click="showAddDialog">
+        <el-icon><Plus /></el-icon>
+        {{ t('products.addProduct') }}
+      </el-button>
     </div>
 
-    <!-- 产品表格 -->
     <div class="table-section">
+      <el-card>
+        <template #header>
+          <div class="table-header">
+            <span>{{ t('products.title') }}</span>
+            <span class="table-info">{{ t('products.listTotal') }} {{ totalProducts }}</span>
+          </div>
+        </template>
+        <div class="table-wrapper">
       <el-table 
         :data="filteredProducts" 
-        style="width: 100%" 
+        style="width: 100%; min-width: 1200px" 
         v-loading="loading"
         row-key="id"
         border
+        stripe
+        table-layout="fixed"
+        class="product-table"
+        :row-class-name="tableRowClassName"
       >
         <el-table-column prop="id" label="ID" width="80" />
         
@@ -105,6 +132,24 @@
         <el-table-column prop="category" :label="t('products.category')" width="140" min-width="120">
           <template #default="scope">
             <el-tag>{{ getCategoryLabel(scope.row.category) }}</el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column :label="t('products.shelfStatus')" width="130" min-width="120">
+          <template #default="scope">
+            <div class="shelf-status-cell">
+              <el-tag v-if="isDelisted(scope.row)" type="info" size="small">{{ t('products.shelfDelisted') }}</el-tag>
+              <template v-else>
+                <el-tag type="success" size="small">{{ t('products.shelfOn') }}</el-tag>
+                <el-tag
+                  :type="scope.row.status === 'active' ? 'primary' : 'warning'"
+                  size="small"
+                  class="shelf-status-second"
+                >
+                  {{ scope.row.status === 'active' ? t('products.saleActive') : t('products.saleInactive') }}
+                </el-tag>
+              </template>
+            </div>
           </template>
         </el-table-column>
 
@@ -161,7 +206,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.actions')" width="280" min-width="260" fixed="right">
+        <el-table-column :label="t('products.actions')" width="300" min-width="280" fixed="right">
           <template #default="scope">
             <div class="action-buttons">
               <el-button
@@ -178,18 +223,27 @@
                 {{ t('products.adjustStock') }}
               </el-button>
               <el-button
+                v-if="!isDelisted(scope.row)"
                 size="small"
                 type="danger"
                 @click="deleteProduct(scope.row)"
               >
                 {{ t('products.delete') }}
               </el-button>
+              <el-button
+                v-else
+                size="small"
+                type="success"
+                @click="restoreProduct(scope.row)"
+              >
+                {{ t('products.restore') }}
+              </el-button>
             </div>
           </template>
         </el-table-column>
       </el-table>
+        </div>
 
-      <!-- 分页 -->
       <div class="pagination-section">
         <el-pagination
           v-model:current-page="currentPage"
@@ -201,6 +255,7 @@
           @current-change="handleCurrentChange"
         />
       </div>
+      </el-card>
     </div>
 
     <!-- 添加/编辑产品对话框 -->
@@ -361,7 +416,7 @@
 <script>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Loading, Picture, Delete, Edit } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Loading, Picture, Delete, Edit } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { productAPI } from '../api/products.js'
 
@@ -370,6 +425,7 @@ export default {
   components: {
     Plus,
     Search,
+    Refresh,
     Loading,
     Picture,
     Delete,
@@ -396,7 +452,8 @@ export default {
     const searchForm = reactive({
       name: '',
       category: '',
-      stockStatus: ''
+      stockStatus: '',
+      listingStatus: ''
     })
 
     // 产品表单
@@ -476,6 +533,15 @@ export default {
         hour: '2-digit',
         minute: '2-digit'
       })
+    }
+
+    const isDelisted = (row) => {
+      if (!row) return false
+      return !!(row.delisted || row.deleted_at || row.deletedAt)
+    }
+
+    const tableRowClassName = ({ row }) => {
+      return isDelisted(row) ? 'product-row-delisted' : ''
     }
 
     const showAddDialog = () => {
@@ -599,8 +665,38 @@ export default {
           return // 用户取消操作
         }
         if (error.response) {
-          ElMessage.error(t('products.messages.saveFailed') + ': ' + (error.response?.data?.message || error.message))
+          ElMessage.error(
+            t('products.messages.deleteFailed') +
+              ': ' +
+              (error.response?.data?.message || error.message)
+          )
         }
+      }
+    }
+
+    const restoreProduct = async (product) => {
+      try {
+        await ElMessageBox.confirm(
+          t('products.messages.confirmRestore'),
+          t('common.confirm'),
+          {
+            confirmButtonText: t('common.confirm'),
+            cancelButtonText: t('common.cancel'),
+            type: 'success'
+          }
+        )
+        const response = await productAPI.restoreProduct(product.id)
+        if (response.data.success) {
+          ElMessage.success(t('products.messages.restoreSuccess'))
+          loadProducts()
+        }
+      } catch (error) {
+        if (error === 'cancel') return
+        ElMessage.error(
+          t('products.messages.restoreFailed') +
+            ': ' +
+            (error.response?.data?.message || error.message)
+        )
       }
     }
 
@@ -655,7 +751,8 @@ export default {
       Object.assign(searchForm, {
         name: '',
         category: '',
-        stockStatus: ''
+        stockStatus: '',
+        listingStatus: ''
       })
       currentPage.value = 1
       loadProducts()
@@ -718,7 +815,8 @@ export default {
           pageSize: pageSize.value,
           name: searchForm.name,
           category: searchForm.category,
-          stockStatus: searchForm.stockStatus
+          stockStatus: searchForm.stockStatus,
+          listingStatus: searchForm.listingStatus || undefined
         }
         
         const response = await productAPI.getProducts(params)
@@ -736,7 +834,7 @@ export default {
 
     // 监听搜索条件变化
     watch(
-      () => [searchForm.name, searchForm.category, searchForm.stockStatus],
+      () => [searchForm.name, searchForm.category, searchForm.stockStatus, searchForm.listingStatus],
       () => {
         // 防抖处理
         clearTimeout(searchTimeout.value)
@@ -778,11 +876,14 @@ export default {
       getCategoryLabel,
       getDiscountPrice,
       formatDate,
+      isDelisted,
+      tableRowClassName,
       showAddDialog,
       editProduct,
       resetProductForm,
       saveProduct,
       deleteProduct,
+      restoreProduct,
       showStockDialog,
       getStockPreview,
       adjustStock,
@@ -805,53 +906,64 @@ export default {
   padding: 0;
 }
 
-.header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+.filter-section {
   margin-bottom: 20px;
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.title-section h1 {
-  margin: 0 0 8px 0;
-  font-size: 24px;
-  color: #303133;
-}
-
-.title-section p {
-  margin: 0;
-  color: #909399;
-  font-size: 14px;
-}
-
-.search-section {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  margin-bottom: 20px;
+.search-form {
+  padding: 8px 0;
 }
 
 .table-section {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
 }
 
-.table-section .el-table {
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: #303133;
+}
+
+.table-info {
+  font-size: 14px;
+  color: #909399;
+  font-weight: normal;
+}
+
+.shelf-status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.shelf-status-second {
+  margin-left: 0;
+}
+
+:deep(.product-row-delisted) {
+  --el-table-tr-bg-color: #f4f6f9;
+}
+
+:deep(.product-row-delisted td) {
+  background: #f4f6f9 !important;
+}
+
+.product-table.el-table {
   width: 100%;
 }
 
-.table-section .el-table td {
+.product-table.el-table td {
   padding: 12px 8px;
 }
 
-.table-section .el-table th {
+.product-table.el-table th {
   padding: 12px 8px;
   background-color: #fafafa;
 }

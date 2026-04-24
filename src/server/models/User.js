@@ -31,10 +31,15 @@ const User = sequelize.define('User', {
     },
     comment: '用户昵称'
   },
+  avatar_url: {
+    type: DataTypes.STRING(512),
+    allowNull: true,
+    comment: '个性头像相对路径，如 /uploads/avatars/xxx.jpg'
+  },
   country_code: {
     type: DataTypes.STRING(10),
     allowNull: false,
-    defaultValue: '+86',
+    defaultValue: '+66',
     validate: {
       isIn: [['+86', '+66', '+60']],
       notEmpty: true

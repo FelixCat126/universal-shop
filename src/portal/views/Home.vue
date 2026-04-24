@@ -40,21 +40,23 @@
         </div>
       </div>
       
-      <!-- 加载状态 -->
-      <div v-if="isLoading" class="flex justify-center py-12">
+      <!-- 首次加载 -->
+      <div v-if="isLoading && !products.length" class="flex justify-center py-12">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
       
-      <!-- 产品网格 -->
-      <div v-else-if="filteredProducts.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <!-- 产品网格（卡片等高，按钮贴底） -->
+      <div
+        v-else-if="products.length > 0"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch"
+      >
         <div
-          v-for="product in filteredProducts"
+          v-for="product in products"
           :key="product.id"
-          class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer transform hover:scale-105"
+          class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer transform hover:scale-[1.02] flex flex-col h-full min-h-0"
           @click="goToProductDetail(product.id)"
         >
-          <!-- 产品图片 -->
-          <div class="aspect-w-1 aspect-h-1 w-full bg-gray-200 rounded-t-xl overflow-hidden relative">
+          <div class="aspect-w-1 aspect-h-1 w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
             <img
               :src="product.image_url || defaultImage"
               :alt="getCurrentLanguageValue(product, 'name')"
@@ -63,80 +65,69 @@
               @error="handleImageError"
               @load="handleImageLoad"
             >
-            <!-- 现在使用默认SVG图片，不需要额外的占位符 -->
           </div>
           
-          <!-- 产品信息 -->
-          <div class="p-4">
+          <div class="p-4 flex flex-col flex-1 min-h-0">
             <h3 class="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
               {{ getCurrentLanguageValue(product, 'name') }}
             </h3>
             
-            <p class="text-gray-600 text-sm mb-3 line-clamp-2">
+            <p class="text-gray-600 text-sm mb-3 line-clamp-2 shrink-0">
               {{ getCurrentLanguageValue(product, 'description') }}
             </p>
             
-            <!-- 价格和库存 -->
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center space-x-2">
-                <!-- 有折扣时显示折扣价 -->
-                <span v-if="product.discount && product.discount > 0" class="text-xl font-bold text-red-600">
-                  {{ t('common.currency') }}{{ getDiscountPrice(product) }}
-                </span>
-                <!-- 无折扣时显示原价 -->
-                <span v-else class="text-xl font-bold text-blue-600">
-                  {{ t('common.currency') }}{{ product.price }}
-                </span>
-                <!-- 有折扣时显示原价（删除线） -->
-                <span v-if="product.discount && product.discount > 0" 
-                      class="text-sm text-gray-400 line-through">
-                  {{ t('common.currency') }}{{ product.price }}
-                </span>
-                <!-- 折扣标签 -->
-                <span v-if="product.discount && product.discount > 0"
-                      class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded">
-                  {{ product.discount }}%
-                </span>
+            <div class="mt-auto pt-2 border-t border-gray-100">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                  <span v-if="product.discount && product.discount > 0" class="text-xl font-bold text-red-600">
+                    {{ t('common.currency') }}{{ getDiscountPrice(product) }}
+                  </span>
+                  <span v-else class="text-xl font-bold text-blue-600">
+                    {{ t('common.currency') }}{{ product.price }}
+                  </span>
+                  <span
+                    v-if="product.discount && product.discount > 0"
+                    class="text-sm text-gray-400 line-through"
+                  >
+                    {{ t('common.currency') }}{{ product.price }}
+                  </span>
+                  <span
+                    v-if="product.discount && product.discount > 0"
+                    class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded"
+                  >
+                    {{ product.discount }}%
+                  </span>
+                </div>
+                
+                <div class="text-xs shrink-0 ml-2">
+                  <span v-if="product.stock > 10" class="text-green-600">
+                    {{ t('product.inStock') }}
+                  </span>
+                  <span v-else-if="product.stock > 0" class="text-yellow-600">
+                    {{ t('product.lowStock') }}
+                  </span>
+                  <span v-else class="text-red-600">
+                    {{ t('product.soldOut') }}
+                  </span>
+                </div>
               </div>
               
-              <div class="text-xs">
-                <span 
-                  v-if="product.stock > 10"
-                  class="text-green-600"
+              <div class="flex space-x-2">
+                <button
+                  @click.stop="addToCart(product)"
+                  :disabled="product.stock === 0"
+                  class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {{ t('product.inStock') }}
-                </span>
-                <span 
-                  v-else-if="product.stock > 0"
-                  class="text-yellow-600"
+                  {{ t('product.addToCart') }}
+                </button>
+                <button
+                  @click.stop="buyNow(product)"
+                  :disabled="product.stock === 0"
+                  class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {{ t('product.lowStock') }}
-                </span>
-                <span 
-                  v-else
-                  class="text-red-600"
-                >
-                  {{ t('product.soldOut') }}
-                </span>
+                  {{ t('product.buyNow') }}
+                </button>
               </div>
-            </div>
-            
-            <!-- 操作按钮 -->
-            <div class="flex space-x-2">
-              <button
-                @click.stop="addToCart(product)"
-                :disabled="product.stock === 0"
-                class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {{ t('product.addToCart') }}
-              </button>
-              <button
-                @click.stop="buyNow(product)"
-                :disabled="product.stock === 0"
-                class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {{ t('product.buyNow') }}
-              </button>
             </div>
           </div>
         </div>
@@ -154,31 +145,23 @@
           {{ t('cart.emptyDesc') }}
         </p>
       </div>
-      
-      <!-- 分页 -->
-      <div v-if="totalPages > 1" class="mt-8 flex justify-center">
-        <nav class="flex items-center space-x-2">
-          <button
-            @click="goToPage(currentPage - 1)"
-            :disabled="currentPage === 1"
-            class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            上一页
-          </button>
-          
-          <span class="px-3 py-2 text-sm text-gray-700">
-            {{ currentPage }} / {{ totalPages }}
-          </span>
-          
-          <button
-            @click="goToPage(currentPage + 1)"
-            :disabled="currentPage === totalPages"
-            class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            下一页
-          </button>
-        </nav>
+
+      <!-- 滚动加载：触底追加下一页 -->
+      <div
+        v-show="products.length > 0 && hasMore"
+        ref="loadMoreSentinel"
+        class="h-8 w-full shrink-0"
+        aria-hidden="true"
+      />
+      <div v-if="loadingMore" class="flex justify-center py-6">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
+      <p
+        v-if="products.length > 0 && !hasMore && !loadingMore && !isLoading"
+        class="text-center text-sm text-gray-500 py-6"
+      >
+        {{ t('product.noMoreProducts') }}
+      </p>
     </main>
 
     <!-- 消息提示 -->
@@ -195,7 +178,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../stores/cart.js'
@@ -217,12 +200,19 @@ const { showError } = useToast()
 
 // 响应式数据
 const isLoading = ref(false)
+const loadingMore = ref(false)
 const products = ref([])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const totalPages = ref(1)
 const pageSize = 12
 const homeBanner = ref(null)
+const loadMoreSentinel = ref(null)
+const loadMoreBusy = ref(false)
+let loadMoreObserver = null
+let searchDebounceTimer = null
+
+const hasMore = computed(() => currentPage.value < totalPages.value)
 
 // 消息提示
 const showMessage = ref(false)
@@ -240,20 +230,6 @@ const getCurrentLanguageValue = (item, field) => {
   }
   return item[field] || ''
 }
-
-// 计算属性
-const filteredProducts = computed(() => {
-  if (!searchQuery.value) return products.value
-  
-  return products.value.filter(product => {
-    const name = getCurrentLanguageValue(product, 'name')
-    const description = getCurrentLanguageValue(product, 'description')
-    const query = searchQuery.value.toLowerCase()
-    
-    return name.toLowerCase().includes(query) || 
-           description.toLowerCase().includes(query)
-  })
-})
 
 // 获取完整的图片URL - 使用配置管理器
 const getImageUrl = (imagePath) => {
@@ -318,45 +294,58 @@ const loadSystemConfig = async () => {
   }
 }
 
-// 加载产品数据
-const loadProducts = async () => {
-  try {
+const mapProductRow = (product) => ({
+  id: product.id,
+  name: product.name,
+  name_th: product.name_th,
+  description: product.description,
+  description_th: product.description_th,
+  price: parseFloat(product.price),
+  discount: product.discount,
+  stock: product.stock,
+  image_url: product.image || defaultImage,
+  category: product.category,
+  created_at: product.created_at
+})
+
+// 加载产品：append 为 true 时追加一页（无限滚动）
+const loadProducts = async ({ append = false } = {}) => {
+  if (append) {
+    loadingMore.value = true
+  } else {
     isLoading.value = true
-    
+  }
+
+  try {
     const params = {
       page: currentPage.value,
-      pageSize: pageSize,
-      name: searchQuery.value || undefined
+      pageSize,
+      name: searchQuery.value?.trim() || undefined
     }
-    
-    const response = await productAPI.getProducts(params)
-    
-    if (response.data.success) {
-      // 转换数据格式以匹配前端显示需求
-      products.value = response.data.data.products.map(product => ({
-        id: product.id,
-        name: product.name,
-        name_th: product.name_th,
-        description: product.description,
-        description_th: product.description_th,
-        price: parseFloat(product.price),
-        discount: product.discount,
-        stock: product.stock,
-        image_url: product.image || defaultImage,
-        category: product.category,
-        created_at: product.created_at
-      }))
-      
-      totalPages.value = response.data.data.totalPages
 
+    const response = await productAPI.getProducts(params)
+
+    if (response.data.success) {
+      const list = (response.data.data.products || []).map(mapProductRow)
+      totalPages.value = response.data.data.totalPages || 1
+
+      if (append) {
+        const seen = new Set(products.value.map((p) => p.id))
+        for (const p of list) {
+          if (!seen.has(p.id)) {
+            seen.add(p.id)
+            products.value.push(p)
+          }
+        }
+      } else {
+        products.value = list
+      }
     } else {
       console.error('加载产品失败:', response.data.message)
       showError('加载产品失败: ' + response.data.message)
     }
   } catch (error) {
     console.error('加载产品失败:', error)
-    
-    // 如果API失败，显示友好的错误信息
     if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
       showError('无法连接到服务器，请确保后端服务已启动 (npm run dev:server)')
     } else {
@@ -364,7 +353,34 @@ const loadProducts = async () => {
     }
   } finally {
     isLoading.value = false
+    loadingMore.value = false
   }
+}
+
+const loadNextPage = async () => {
+  if (loadMoreBusy.value || loadingMore.value || isLoading.value || !hasMore.value) return
+  loadMoreBusy.value = true
+  try {
+    currentPage.value += 1
+    await loadProducts({ append: true })
+  } finally {
+    loadMoreBusy.value = false
+  }
+}
+
+const attachInfiniteScroll = () => {
+  loadMoreObserver?.disconnect()
+  const el = loadMoreSentinel.value
+  if (!el || !products.value.length || !hasMore.value) return
+
+  loadMoreObserver = new IntersectionObserver(
+    (entries) => {
+      const hit = entries.some((e) => e.isIntersecting)
+      if (hit) loadNextPage()
+    },
+    { root: null, rootMargin: '120px', threshold: 0 }
+  )
+  loadMoreObserver.observe(el)
 }
 
 // 计算折扣价格
@@ -443,18 +459,46 @@ const handleBannerError = (event) => {
   homeBanner.value = null
 }
 
-// 分页
-const goToPage = (page) => {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-
+watch(
+  () => searchQuery.value,
+  () => {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = setTimeout(async () => {
+      currentPage.value = 1
+      await loadProducts({ append: false })
+      await nextTick()
+      attachInfiniteScroll()
+    }, 400)
   }
-}
+)
+
+watch(
+  () => locale.value,
+  (v) => {
+    if (v) currentLanguage.value = v
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [products.value.length, hasMore.value],
+  () => {
+    nextTick(() => attachInfiniteScroll())
+  }
+)
 
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
   loadSystemConfig()
-  loadProducts()
+  await loadProducts({ append: false })
+  await nextTick()
+  attachInfiniteScroll()
+})
+
+onUnmounted(() => {
+  loadMoreObserver?.disconnect()
+  loadMoreObserver = null
+  clearTimeout(searchDebounceTimer)
 })
 </script>
 

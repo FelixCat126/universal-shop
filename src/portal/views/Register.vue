@@ -179,7 +179,7 @@ const { success, error: showError } = useToast()
 // 表单数据
 const form = reactive({
   nickname: '',
-  countryCode: '+86',
+  countryCode: '+66',
   phone: '',
   email: '',
   password: '',
