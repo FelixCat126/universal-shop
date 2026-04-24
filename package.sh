@@ -263,11 +263,17 @@ openssl req -x509 -newkey rsa:4096 -keyout ssl/server.key -out ssl/server.crt -d
 - 生产环境建议使用HTTPS
 EOF
 
-# 打包（macOS：禁止把 xattr / AppleDouble 的 ._ 文件打进包，避免 Linux 上被当成 SQL 执行）
+# 打包（macOS：禁止把 xattr / AppleDouble / provenance 等打进包，减少 Linux 解压时 tar 刷屏警告）
 echo "🗜️ 创建压缩包..."
 export COPYFILE_DISABLE=1
-tar -czf "${PACKAGE_DIR}.tar.gz" "${PACKAGE_DIR}/"
+export COPY_EXTENDED_ATTRIBUTES_DISABLE=1
+if tar --help 2>&1 | grep -q 'no-mac-metadata'; then
+  tar --no-mac-metadata -czf "${PACKAGE_DIR}.tar.gz" "${PACKAGE_DIR}/"
+else
+  tar -czf "${PACKAGE_DIR}.tar.gz" "${PACKAGE_DIR}/"
+fi
 unset COPYFILE_DISABLE 2>/dev/null || true
+unset COPY_EXTENDED_ATTRIBUTES_DISABLE 2>/dev/null || true
 SIZE=$(du -h "${PACKAGE_DIR}.tar.gz" | cut -f1)
 
 # 清理临时目录
