@@ -20,9 +20,36 @@
             <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" alt="" class="w-full h-full object-cover" />
             <span v-else>👤</span>
           </div>
-          <div class="flex-1">
-            <p class="text-lg font-semibold text-gray-900">{{ displayNickname }}</p>
-            <p class="text-sm text-gray-600">📱 {{ userStore.user?.phone || t('profile.phoneNotSet') }}</p>
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p class="text-lg font-semibold text-gray-900">{{ displayNickname }}</p>
+              <input
+                ref="avatarFileInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                class="hidden"
+                @change="onAvatarFileChange"
+              />
+              <button
+                type="button"
+                class="text-sm px-2.5 py-1 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                :disabled="avatarUploading"
+                @click="avatarFileInput?.click()"
+              >
+                {{ avatarUploading ? t('profile.avatarUploading') : t('profile.changeAvatar') }}
+              </button>
+              <button
+                v-if="userStore.user?.avatar_url"
+                type="button"
+                class="text-sm px-2.5 py-1 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 shrink-0"
+                :disabled="avatarUploading || profileSaving"
+                @click="removeAvatar"
+              >
+                {{ t('profile.removeAvatar') }}
+              </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">{{ t('profile.avatarHint') }}</p>
+            <p class="text-sm text-gray-600 mt-2">📱 {{ userStore.user?.phone || t('profile.phoneNotSet') }}</p>
             <p class="text-xs text-gray-400">📅 {{ t('profile.registerTime') }}: {{ formatDate(userStore.user?.created_at) }}</p>
           </div>
         </div>
@@ -243,42 +270,6 @@
           <div v-else-if="activeTab === 'profile'" class="bg-white p-6 rounded-lg shadow">
             <h3 class="text-lg font-medium text-gray-900 mb-4">{{ t('user.profile') }}</h3>
             <form @submit.prevent="handleSaveProfile" class="space-y-4 max-w-lg">
-              <div class="flex flex-col sm:flex-row sm:items-start gap-4 pb-4 border-b border-gray-100">
-                <span class="block text-sm font-medium text-gray-700 sm:pt-2 sm:w-24 shrink-0">{{ t('profile.avatar') }}</span>
-                <div class="flex flex-col sm:flex-row items-start gap-4 flex-1 min-w-0">
-                  <div class="w-20 h-20 rounded-full overflow-hidden bg-gray-100 ring-2 ring-gray-200 flex items-center justify-center shrink-0">
-                    <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" alt="" class="w-full h-full object-cover" />
-                    <span v-else class="text-3xl text-gray-400">👤</span>
-                  </div>
-                  <div class="flex flex-col gap-2 min-w-0">
-                    <input
-                      ref="avatarFileInput"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      class="hidden"
-                      @change="onAvatarFileChange"
-                    />
-                    <button
-                      type="button"
-                      class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 w-fit"
-                      :disabled="avatarUploading"
-                      @click="avatarFileInput?.click()"
-                    >
-                      {{ avatarUploading ? t('profile.avatarUploading') : t('profile.changeAvatar') }}
-                    </button>
-                    <button
-                      v-if="userStore.user?.avatar_url"
-                      type="button"
-                      class="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 w-fit"
-                      :disabled="avatarUploading || profileSaving"
-                      @click="removeAvatar"
-                    >
-                      {{ t('profile.removeAvatar') }}
-                    </button>
-                    <p class="text-xs text-gray-500 max-w-sm">{{ t('profile.avatarHint') }}</p>
-                  </div>
-                </div>
-              </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">{{ t('user.nickname') }}</label>
                 <input 
