@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * 可选：仅在需要改表结构时，向 scripts/db/patches/ 放入 010_描述.sql（三位数字前缀）。
+ * 向 scripts/db/patches/ 放入 017_*.sql … 028_*.sql（三位数字前缀，见该目录）。
+ * 仅在「已有数据库」upgrade 时在 sync 前先执行补丁；全新空库会先 sync 再跑补丁（列若已存在会提示 duplicate 并跳过）。
  * 目录为空则完全不访问数据库。执行失败若提示列已存在则跳过并记录。
  */
 import fs from 'fs'

@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
+import ProductCategory from './ProductCategory.js'
 
 const Product = sequelize.define('Product', {
   id: {
@@ -22,17 +23,27 @@ const Product = sequelize.define('Product', {
     allowNull: true,
     comment: '产品描述'
   },
-  category: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    defaultValue: 'others',
-    comment: '产品分类'
+  category_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '产品分类 ID（product_categories.id）',
+    references: {
+      model: 'product_categories',
+      key: 'id'
+    }
   },
   price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
     defaultValue: 0.00,
-    comment: '产品价格'
+    comment: '产品价格（泰铢 THB）'
+  },
+  points: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: { min: 0 },
+    comment: '购买所需积分（0 表示不启用积分兑换）'
   },
   discount: {
     type: DataTypes.INTEGER,
@@ -71,8 +82,8 @@ const Product = sequelize.define('Product', {
   indexes: [
     // 商品分类索引（用于分类筛选）
     {
-      fields: ['category'],
-      name: 'idx_product_category'
+      fields: ['category_id'],
+      name: 'idx_product_category_id'
     },
     // 价格索引（用于价格排序和筛选）
     {
@@ -101,14 +112,19 @@ const Product = sequelize.define('Product', {
     },
     // 复合索引：状态+分类（常用组合查询）
     {
-      fields: ['status', 'category'],
-      name: 'idx_product_status_category'
+      fields: ['status', 'category_id'],
+      name: 'idx_product_status_category_id'
     },
     {
       fields: ['deleted_at'],
       name: 'idx_product_deleted_at'
     }
   ]
+})
+
+Product.belongsTo(ProductCategory, {
+  foreignKey: 'category_id',
+  as: 'productCategory'
 })
 
 export default Product

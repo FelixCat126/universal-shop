@@ -1,15 +1,10 @@
 import User from '../models/User.js'
 import jwt from 'jsonwebtoken'
 import { Op } from 'sequelize'
-
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET || JWT_SECRET === 'your-secret-key-here' || JWT_SECRET.length < 32) {
-  console.error('❌ 安全警告: JWT_SECRET未正确配置!')
-  console.error('请在.env文件中设置安全的JWT_SECRET（至少32个字符）')
-  if (process.env.NODE_ENV === 'production') {
-    process.exit(1)
-  }
-}
+import Order from '../models/Order.js'
+import { JWT_SECRET } from '../config/jwtSecret.js'
+import * as pointsService from '../services/pointsService.js'
+import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 
 class UserController {
   // 用户注册
@@ -79,6 +74,14 @@ class UserController {
             message: '该邮箱已被注册'
           })
         }
+      }
+
+      const pol = assertPasswordPolicy(password)
+      if (!pol.ok) {
+        return res.status(400).json({
+          success: false,
+          message: pol.message
+        })
       }
 
       // 使用统一的核心创建逻辑
@@ -185,6 +188,63 @@ class UserController {
     } catch (error) {
       console.error('更新用户资料失败:', error)
       return res.status(500).json({ success: false, message: '更新失败', error: error.message })
+    }
+  }
+
+  /** 已登录用户修改登录密码（需校验旧密码） */
+  static async changePassword(req, res) {
+    try {
+      const userId = req.user?.userId
+      if (!userId) {
+        return res.status(401).json({ success: false, message: '未登录' })
+      }
+
+      const { old_password: oldPassword, new_password: newPassword } = req.body
+
+      if (oldPassword == null || newPassword == null ||
+          String(oldPassword).length === 0 || String(newPassword).length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '请输入当前密码和新密码'
+        })
+      }
+
+      const next = String(newPassword)
+      const pol = assertPasswordPolicy(next)
+      if (!pol.ok) {
+        return res.status(400).json({
+          success: false,
+          message: pol.message
+        })
+      }
+
+      const user = await User.findByPk(userId)
+      if (!user) {
+        return res.status(404).json({ success: false, message: '用户不存在' })
+      }
+
+      const ok = await user.validatePassword(String(oldPassword))
+      if (!ok) {
+        return res.status(400).json({
+          success: false,
+          message: '当前密码不正确'
+        })
+      }
+
+      user.password = next
+      await user.save()
+
+      return res.json({
+        success: true,
+        message: '密码已更新'
+      })
+    } catch (error) {
+      console.error('修改密码失败:', error)
+      return res.status(500).json({
+        success: false,
+        message: '修改密码失败',
+        error: error.message
+      })
     }
   }
 
@@ -549,6 +609,14 @@ class UserController {
       throw new Error(phoneValidation.message)
     }
 
+    // 自助注册／后台创建：校验密码复杂度；订单自动注册等口令由系统生成，不套用此规则
+    if (!isAutoRegister) {
+      const pol = assertPasswordPolicy(password)
+      if (!pol.ok) {
+        throw new Error(pol.message)
+      }
+    }
+
     // 检查手机号是否已存在
     const existingPhone = await User.findOne({ 
       where: { 
@@ -671,6 +739,46 @@ class UserController {
         success: false,
         message: '更新用户状态失败',
         error: error.message
+      })
+    }
+  }
+
+  /**
+   * 顶部名片统计：订单总数、累计消费(THB)、当前积分余额
+   */
+  static async getProfileMetrics(req, res) {
+    try {
+      const userId = req.user?.userId
+      if (!userId) {
+        return res.status(401).json({ success: false, message: '未登录' })
+      }
+
+      const order_count = await Order.count({ where: { user_id: userId } })
+      const spentRaw = await Order.sum('total_amount_thb', {
+        where: {
+          user_id: userId,
+          payment_method: { [Op.ne]: 'points' }
+        }
+      })
+      const spent_thb = spentRaw != null && spentRaw !== ''
+        ? parseFloat(String(spentRaw))
+        : 0
+
+      const points_balance = await pointsService.getBalance(userId)
+
+      res.json({
+        success: true,
+        data: {
+          order_count,
+          spent_thb: Number.isFinite(spent_thb) ? spent_thb : 0,
+          points_balance
+        }
+      })
+    } catch (error) {
+      console.error('获取个人中心统计失败:', error)
+      res.status(500).json({
+        success: false,
+        message: '获取统计失败'
       })
     }
   }

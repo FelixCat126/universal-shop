@@ -29,6 +29,7 @@ export default {
     paymentMethod: 'วิธีการชำระเงิน',
     cod: 'เก็บเงินปลายทาง',
     online: 'ชำระออนไลน์',
+    pointsRedeem: 'แลกด้วยแต้ม',
     currency: '฿',
     currencyName: 'บาทไทย ฿',
     createTime: 'เวลาสร้าง',
@@ -90,7 +91,9 @@ export default {
   // 导航菜单
   menu: {
     dashboard: 'สถิติภาพรวม',
-    products: 'จัดการสินค้า',
+    productsMenu: 'สินค้า',
+    productsList: 'จัดการสินค้า',
+    categoryManage: 'จัดการหมวดหมู่',
     orders: 'จัดการคำสั่งซื้อ',
     users: 'จัดการผู้ใช้',
     operators: 'จัดการผู้ดำเนินการ',
@@ -98,6 +101,23 @@ export default {
     operationLogs: 'บันทึกการดำเนินการ',
     systemConfig: 'การตั้งค่าระบบ',
     logout: 'ออกจากระบบ'
+  },
+
+  categories: {
+    title: 'จัดการหมวดหมู่',
+    keyword: 'ชื่อหมวด',
+    keywordPlaceholder: 'ค้นหาแบบคลุมเครือ',
+    name: 'ชื่อหมวดหมู่',
+    namePlaceholder: 'ระบุชื่อหมวดหมู่',
+    sortOrder: 'ลำดับ',
+    add: 'เพิ่มหมวด',
+    edit: 'แก้ไขหมวด',
+    total: 'ทั้งหมด',
+    nameRequired: 'กรุณาระบุชื่อหมวด',
+    confirmDelete: 'ลบหมวดหมู่นี้?',
+    createSuccess: 'สร้างแล้ว',
+    updateSuccess: 'อัปเดตแล้ว',
+    deleteSuccess: 'ลบแล้ว'
   },
 
   // 产品管理
@@ -220,6 +240,20 @@ export default {
       purpose: '• ใช้สำหรับการแปลงอัตราแลกเปลี่ยนราคาสินค้า',
       example: '• ตัวอย่าง: 1.00 หมายถึงไม่มีการแปลง, 1.50 หมายถึงคูณราคาด้วย 1.5 เท่า'
     },
+    exchangeRates: 'อัตราคิดลด · คูณสามสกุลแยกกัน',
+    exchangeRatesSubtitle: 'แยกกำหนดเรตของ USD/USDT、CNY、MYR ราคาสินค้าหลังบ้านเป็นบาท',
+    exchangeRatesIntro: 'ช่องสามช่องอิสระต่อกัน เป็นอัตราคูณจากราคาบาท (บาท × เรต)；ใส่ 0 เพื่อไม่ให้โชว์สกุลนั้นที่พอร์ทัล',
+    fxUSD: '① USD/USDT — อัตราคูณ',
+    fxCNY: '② หยวนจีน CNY — อัตราคูณ',
+    fxMYR: '③ ริงจิตมาเลเซีย MYR — อัตราคูณ',
+    saveExchangeRates: 'บันทึกอัตรา',
+    resetExchangeRates: 'รีเซ็ตเป็น 0 ทั้งหมด',
+    exchangeRatesTips: {
+      base: '• ราคาในแอดมินเป็นบาท; ด้านล่างคือตัวคูณ (บาท × อัตรา)',
+      range: '• ค่าต้องไม่ติดลบ',
+      precision: '• ทศนิยมสูงสุด 2 ตำแหน่ง；ถ้าเป็น 0 จะไม่แสดงสกุลนั้นที่พอร์ทัล',
+      usdt: '• USD/USDT เหมือนค่าที่ใช้อัดแยงเป็นสแนปชอร์ตเมื่อชำระออนไลน์'
+    },
     currencyUnit: 'สกุลเงิน',
     currencyUnitSubtitle: 'เลือกหนึ่งแบบ; ยอดเงินแสดงสัญลักษณ์ ชื่อสกุลเงินตามภาษาหน้าจอ',
     currencyUnitTips: 'มีผลทันทีหลังบันทึก ตัวเลือกเป็น「ชื่อ + สัญลักษณ์」 ราคาแสดงเฉพาะสัญลักษณ์ (เช่น ฿100)',
@@ -249,7 +283,7 @@ export default {
       confirmDelete: 'คุณแน่ใจหรือไม่ที่จะลบรายการนี้?',
       fileTooLarge: 'ขนาดไฟล์ใหญ่เกินไป',
       invalidFileFormat: 'รูปแบบไฟล์ไม่ถูกต้อง',
-      exchangeRateSaveSuccess: 'บันทึกอัตราแลกเปลี่ยนสำเร็จ',
+      exchangeRateSaveSuccess: 'บันทึกอัตราคิดลดหลายสกุลแล้ว',
       exchangeRateSaveFailed: 'บันทึกอัตราแลกเปลี่ยนล้มเหลว',
       invalidExchangeRate: 'กรุณาใส่อัตราแลกเปลี่ยนที่ถูกต้อง (≥0, ทศนิยมสูงสุด 2 ตำแหน่ง)',
       currencyUnitSaveSuccess: 'บันทึกสัญลักษณ์สำเร็จ',
@@ -475,8 +509,13 @@ export default {
     productList: 'รายการสินค้า',
     productName: 'ชื่อสินค้า',
     price: 'ราคา',
+    originalPrice: 'ราคาเดิม',
     quantity: 'จำนวน',
     subtotal: 'ยอดรวมย่อย',
+    pointsPaidDisplay: '{n} คะแนน',
+    linePointsDisplay: '{n} คะแนน',
+    priceThbRef: 'อ้างอิง THB {v}',
+    productListCount: 'รายการสินค้า {n} แถว',
     orderSummary: 'สรุปคำสั่งซื้อ',
     totalAmount: 'ยอดรวมทั้งหมด',
     contactName: 'ชื่อผู้ติดต่อ',
@@ -503,6 +542,7 @@ export default {
     },
     messages: {
       loadFailed: 'โหลดข้อมูลคำสั่งซื้อล้มเหลว',
+      detailLoadFailed: 'โหลดรายละเอียดคำสั่งซื้อล้มเหลว',
       exportFailed: 'ส่งออกข้อมูลล้มเหลว',
       exportSuccess: 'ส่งออกข้อมูลสำเร็จ',
       exporting: 'กำลังส่งออกข้อมูลคำสั่งซื้อ...',
@@ -529,7 +569,9 @@ export default {
     alias: 'ชื่อเรียกอื่น',
     description: 'คำอธิบายสินค้า',
     category: 'หมวดหมู่',
-    price: 'ราคา',
+    price: 'ราคา (บาท THB)',
+    points: 'คะแนนที่ใช้แลกได้',
+    pointsHint: '0 หมายถึงไม่กำหนดการแลกด้วยคะแนน',
     stock: 'คลังสินค้า',
     status: 'สถานะ',
     actions: 'การดำเนินการ',
@@ -574,7 +616,8 @@ export default {
       enterName: 'กรุณากรอกชื่อสินค้า',
       enterAlias: 'กรุณากรอกชื่อเรียกอื่น (ไม่บังคับ)',
       enterDescription: 'กรุณากรอกคำอธิบายสินค้า',
-      enterPrice: 'กรุณากรอกราคาสินค้า',
+      enterPrice: 'ราคาเป็นบาท (THB)',
+      enterPoints: 'คะแนนที่ต้องใช้ 0 = ไม่มีข้อกำหนด',
       enterStock: 'กรุณากรอกจำนวนคลังสินค้า'
     },
     // 消息提示

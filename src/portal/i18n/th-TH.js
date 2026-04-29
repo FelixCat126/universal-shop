@@ -90,6 +90,7 @@ export default {
     productDescription: 'รายละเอียดสินค้า',
     quantityLabel: 'จำนวน',
     stockInfo: '(สต็อก: {stock} ชิ้น)',
+    stockCount: 'คงเหลือ {count} ชิ้น',
     addingToCart: 'กำลังเพิ่ม...',
     processing: 'กำลังดำเนินการ...',
     outOfStockMessage: 'สินค้านี้หมดสต็อกชั่วคราว',
@@ -97,6 +98,14 @@ export default {
     productNotFoundDesc: 'ขออภัย สินค้าที่คุณเข้าชมอาจถูกยกเลิกหรือไม่มีอยู่',
     backToHome: 'กลับหน้าแรก',
     close: 'ปิด',
+    currencyThbSymbol: '฿',
+    fxUSD: '$',
+    fxCNY: '¥',
+    fxMYR: 'RM',
+    pointsPurchase: 'แต้มที่ต้องใช้ในการซื้อ',
+    pointsValue: '{points} แต้ม',
+    pointsExchangeLabel: 'แลกด้วยแต้ม',
+    pointsExchangeBadge: 'แลก',
     // 库存状态
     stockStatuses: {
       outOfStock: 'หมดสต็อก',
@@ -243,6 +252,8 @@ export default {
     submitFailedRetry: 'การสั่งซื้อล้มเหลว กรุณาลองใหม่อีกครั้ง',
     total: 'รวมทั้งหมด',
     items: 'สินค้าในคำสั่งซื้อ',
+    linePointsRow: 'รายละ {points} แต้ม',
+    linePointsSum: 'รวม {points} แต้ม',
     shippingInfo: 'ข้อมูลการจัดส่ง',
     guestOrderHint: 'คุณกำลังสั่งซื้อในฐานะผู้เยี่ยมชม กรุณากรอกข้อมูลการจัดส่ง ระบบจะสร้างบัญชีให้คุณโดยอัตโนมัติหลังสั่งซื้อ',
     fillShippingInfo: 'กรอกข้อมูลการจัดส่ง',
@@ -310,7 +321,17 @@ export default {
     complete: 'ชำระเงินเสร็จสิ้น',
     cancel: 'ยกเลิกการชำระเงิน',
     usdtAmount: 'จำนวน USDT เทียบเท่า',
-    qrCodeSaveTip: 'เคล็ดลับ: คลิกขวาที่ QR Code เพื่อบันทึกและดาวน์โหลด'
+    qrCodeSaveTip: 'เคล็ดลับ: คลิกขวาที่ QR Code เพื่อบันทึกและดาวน์โหลด',
+    pointsRedeem: 'แลกด้วยคะแนน',
+    pointsRedeemDesc: 'ชำระเต็มจำนวนด้วยแต้มสะสม (ทุกชิ้นต้องแลกได้และแต้มเพียงพอ)',
+    pointsBalanceLabel: 'คงเหลือ {balance} แต้ม',
+    pointsOrderNeed: 'ออเดอร์นี้ใช้ {need} แต้ม',
+    pointsInsufficient: 'คุณมี {balance} แต้ม แต่ออเดอร์นี้ต้องการ {need} แต้ม',
+    pointsPaySummary: 'ชำระด้วยแต้มครบ หัก {need} แต้ม',
+    pointsMixedCartHint:
+      'ถ้ามีสินค้าที่ไม่ใช้แต้มแลกร่วมอยู่ จะชำระเต็มจำนวนด้วยแต้มทั้งบิลไม่ได้ — ให้แยกรายการหรือลบสินค้าที่ไม่ร่วมแลกแต้ออก',
+    pointsSubmitBlocked: 'ยังใช้แลกด้วยคะแนนไม่ได้ กรุณาเลือกวิธีอื่น',
+    pointsRedeemedShort: 'ชำระแล้ว {points} แต้ม'
   },
 
   // 表单验证
@@ -318,7 +339,7 @@ export default {
     required: 'ช่องนี้จำเป็น',
     email: 'กรุณาใส่อีเมลที่ถูกต้อง',
     phone: 'กรุณาใส่เบอร์โทรศัพท์ที่ถูกต้อง',
-    password: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
+    password: 'กรุณาตั้งรหัสผ่านตามที่กำหนดด้านล่าง',
     confirmPassword: 'รหัสผ่านไม่ตรงกัน',
     username: 'ชื่อผู้ใช้ต้องมี 3-20 ตัวอักษร',
     usernameRequired: 'กรุณาใส่ชื่อผู้ใช้',
@@ -327,7 +348,10 @@ export default {
     emailOrPhoneRequired: 'กรุณาใส่เบอร์โทรศัพท์หรืออีเมล',
     accountMinLength: 'บัญชีต้องมีอย่างน้อย 3 ตัวอักษร',
     passwordRequired: 'กรุณาใส่รหัสผ่าน',
-    passwordMinLength: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
+    passwordMinLength: 'รหัสผ่านอย่างน้อย 8 ตัวอักษร',
+    passwordNeedsDigit: 'ต้องมีตัวเลขอย่างน้อยหนึ่งตัว',
+    passwordNeedsLetter: 'ต้องมีตัวอักษร A–Z อย่างน้อยหนึ่งตัว (แยกตัวพิมพ์)',
+    passwordPolicyHint: 'อย่างน้อย 8 ตัว และต้องมีทั้งตัวเลขกับตัวอักษร (มีสัญลักษณ์ได้)',
     nicknameRequired: 'กรุณาใส่ชื่อเล่น',
     nicknameMaxLength: 'ชื่อเล่นต้องไม่เกิน 50 ตัวอักษร',
     phoneRequired: 'กรุณาใส่เบอร์โทรศัพท์',
@@ -357,6 +381,7 @@ export default {
     completedOrders: 'คำสั่งซื้อที่เสร็จสิ้น',
     shippingAddresses: 'ที่อยู่จัดส่ง',
     totalSpent: 'ยอดใช้จ่ายทั้งหมด',
+    totalSpentHintThb: 'ผลรวมฐานราคาบาทตามคำสั่งซื้อ (ใช้สำหรับสถิติ)',
     myOrders: 'คำสั่งซื้อของฉัน',
     allOrders: 'คำสั่งซื้อทั้งหมด',
     loadingOrders: 'กำลังโหลดคำสั่งซื้อ...',
@@ -396,7 +421,33 @@ export default {
     avatarTooLarge: 'ไฟล์ต้องไม่เกิน 2MB',
     avatarUploadFailed: 'อัปโหลดไม่สำเร็จ ลองอีกครั้ง',
     avatarUpdated: 'อัปเดตรูปโปรไฟล์แล้ว',
-    avatarRemoved: 'ลบรูปโปรไฟล์แล้ว'
+    avatarRemoved: 'ลบรูปโปรไฟล์แล้ว',
+    pointsBalanceTitle: 'ยอดแต้มสะสม',
+    pointsLedgerTab: 'รายละเอียดแต้ม',
+    dateFrom: 'ตั้งแต่วันที่',
+    dateTo: 'ถึงวันที่',
+    applyFilter: 'กรอง',
+    ordersRangeSpend: 'การใช้จ่ายในช่วงที่เลือก: {amount}',
+    loadingMore: 'กำลังโหลดเพิ่ม…',
+    noMoreItems: 'โหลดครบแล้ว',
+    loadingPointsLedger: 'กำลังโหลดรายการแต้ม…',
+    pointTxOrderRef: 'คำสั่งซื้อ',
+    pointTxBalanceAfter: 'คงเหลือหลังทำรายการ',
+    pointTypeEarn: 'ได้รับจากการสั่งซื้อ',
+    pointTypeRedeem: 'แลกใช้แต้ม',
+    noPointTransactions: 'ไม่มีรายการแต้มในช่วงเวลาที่เลือก',
+    loadPointsLedgerFailed: 'โหลดรายละเอียดแต้มไม่สำเร็จ',
+    changePassword: 'เปลี่ยนรหัสผ่าน',
+    changePasswordTitle: 'เปลี่ยนรหัสผ่านเข้าสู่ระบบ',
+    oldPassword: 'รหัสผ่านปัจจุบัน',
+    newPassword: 'รหัสผ่านใหม่',
+    confirmNewPassword: 'ยืนยันรหัสผ่านใหม่',
+    confirmPasswordChange: 'ยืนยันการเปลี่ยน',
+    changingPassword: 'กำลังบันทึก…',
+    passwordMismatch: 'รหัสผ่านใหม่ไม่ตรงกัน',
+    passwordOldRequired: 'กรอกรหัสผ่านปัจจุบัน',
+    passwordChanged: 'อัปเดตรหัสผ่านแล้ว',
+    passwordChangeFailed: 'เปลี่ยนรหัสผ่านไม่สำเร็จ'
   },
 
   // 错误消息
@@ -427,10 +478,15 @@ export default {
 
   // 语言选择
   language: {
+    label: 'ภาษาหน้าจอ',
     chinese: '中文',
     thai: 'ไทย',
     english: 'English',
     switchSuccess: 'เปลี่ยนภาษาสำเร็จ'
+  },
+
+  exchangeDisplay: {
+    currency: 'สกุลเงิน'
   },
 
   // 国家名称

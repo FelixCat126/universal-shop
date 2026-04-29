@@ -1,4 +1,5 @@
 import SystemConfig from '../models/SystemConfig.js'
+import { normalizeExchangeRates, FX_KEYS } from '../utils/exchangeRates.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs/promises'
@@ -20,6 +21,34 @@ function normalizeCurrencyCodeForApi (raw) {
   return 'THB'
 }
 
+/** @param {{ [k: string]: { value?: unknown } } } configs SystemConfig.getAllConfigs 结果 */
+function getNormalizedExchangeRatesForApi (configs) {
+  const merged = configs.exchange_rates?.value
+  if (merged && typeof merged === 'object') {
+    return normalizeExchangeRates(merged)
+  }
+  const legacyStr = configs.exchange_rate?.value
+  let usd = 0
+  if (legacyStr != null && String(legacyStr).trim() !== '') {
+    const n = parseFloat(legacyStr)
+    if (Number.isFinite(n) && n >= 0) usd = Math.round(n * 100) / 100
+  }
+  return normalizeExchangeRates({ USD: usd.toFixed(2), CNY: '0.00', MYR: '0.00' })
+}
+
+function parseExchangeRatesBody (raw) {
+  if (raw == null) return null
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const j = JSON.parse(raw)
+      return typeof j === 'object' && j !== null ? j : null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
 // 配置文件上传
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -145,27 +174,60 @@ class SystemConfigController {
         })
       }
 
-      // 特殊验证：汇算比例
+      // 多币种汇算（相对泰铢标价）
+      if (key === 'exchange_rates') {
+        const parsed = parseExchangeRatesBody(value)
+        if (!parsed) {
+          return res.status(400).json({
+            success: false,
+            message: 'exchange_rates 须为 JSON 对象，包含 USD、CNY、MYR'
+          })
+        }
+        const normalized = normalizeExchangeRates(parsed)
+        for (const k of FX_KEYS) {
+          const rawV = parsed[k]
+          if (rawV != null && rawV !== '') {
+            const dec = String(rawV).split('.')
+            if (dec.length > 1 && dec[1].length > 2) {
+              return res.status(400).json({
+                success: false,
+                message: `${k} 汇率小数位数不能超过2位`
+              })
+            }
+          }
+        }
+        await SystemConfig.setConfig(
+          'exchange_rates',
+          normalized,
+          'json',
+          description || '多币种汇算（相对泰铢标价：金额×比例；USD 等同 USDT）'
+        )
+        await SystemConfig.setConfig('exchange_rate', normalized.USD, 'text', '兼容字段：与 USD 同步')
+        return res.json({
+          success: true,
+          message: '汇率配置已保存',
+          data: { exchange_rates: normalized }
+        })
+      }
+
+      // 兼容：单笔 exchange_rate 视为美元/USDT 比例，并写回 exchange_rates.USD
       if (key === 'exchange_rate') {
         const numValue = parseFloat(value)
-        
-        // 检查是否为有效数字
+
         if (isNaN(numValue)) {
           return res.status(400).json({
             success: false,
             message: '汇算比例必须是有效的数字'
           })
         }
-        
-        // 检查是否为负数
+
         if (numValue < 0) {
           return res.status(400).json({
             success: false,
             message: '汇算比例不能为负数'
           })
         }
-        
-        // 检查小数位数不超过2位
+
         const decimalParts = value.toString().split('.')
         if (decimalParts.length > 1 && decimalParts[1].length > 2) {
           return res.status(400).json({
@@ -173,11 +235,14 @@ class SystemConfigController {
             message: '汇算比例小数位数不能超过2位'
           })
         }
-        
-        // 格式化为两位小数字符串
+
         const formattedValue = numValue.toFixed(2)
-        const config = await SystemConfig.setConfig(key, formattedValue, type, description)
-        
+        const merged = await SystemConfig.getConfig('exchange_rates')
+        const base = merged && typeof merged === 'object' ? merged : {}
+        const next = normalizeExchangeRates({ ...base, USD: formattedValue })
+        await SystemConfig.setConfig('exchange_rates', next, 'json', '多币种汇算（相对泰铢标价：金额×比例；USD 等同 USDT）')
+        const config = await SystemConfig.setConfig(key, next.USD, type, description)
+
         res.json({
           success: true,
           message: '汇算比例设置成功',
@@ -446,10 +511,13 @@ class SystemConfigController {
       
       // 只返回公开的配置项
       const code = normalizeCurrencyCodeForApi(configs.currency_unit?.value)
+      const rates = getNormalizedExchangeRatesForApi(configs)
       const publicConfigs = {
         home_banner: configs.home_banner?.value || null,
         payment_qrcode: configs.payment_qrcode?.value || null,
-        exchange_rate: configs.exchange_rate?.value || '1.00',
+        exchange_rates: rates,
+        /** 兼容旧订单/结算：与 USD 相同，表示泰铢总额 × 比例 = USDT（美元）金额 */
+        exchange_rate: rates.USD,
         currency_code: code,
         /** @deprecated 与 currency_code 相同，兼容旧前端 */
         currency_unit: code

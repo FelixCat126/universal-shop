@@ -56,12 +56,12 @@
       </div>
 
       <!-- 统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="flex items-center">
             <div class="h-8 w-8 text-green-600 flex items-center justify-center text-2xl">✅</div>
             <div class="ml-4">
-              <p class="text-2xl font-semibold text-gray-900">{{ orderStats.total }}</p>
+              <p class="text-2xl font-semibold text-gray-900">{{ profileMetrics.order_count }}</p>
               <p class="text-sm text-gray-600">{{ t('profile.completedOrders') }}</p>
             </div>
           </div>
@@ -78,9 +78,19 @@
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="flex items-center">
             <div class="h-8 w-8 text-purple-600 flex items-center justify-center text-2xl">💰</div>
-            <div class="ml-4">
-              <p class="text-2xl font-semibold text-gray-900">{{ t('common.currency') }}{{ orders.length > 0 ? orders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0).toFixed(2) : '0.00' }}</p>
+            <div class="ml-4 min-w-0">
+              <p class="text-2xl font-semibold text-gray-900">{{ t('product.currencyThbSymbol') }}{{ formatMoneyThb(profileMetrics.spent_thb) }}</p>
               <p class="text-sm text-gray-600">{{ t('profile.totalSpent') }}</p>
+              <p class="text-xs text-gray-400">{{ t('profile.totalSpentHintThb') }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+          <div class="flex items-center">
+            <div class="h-8 w-8 text-amber-600 flex items-center justify-center text-2xl">⭐</div>
+            <div class="ml-4">
+              <p class="text-2xl font-semibold text-amber-900 tabular-nums">{{ profileMetrics.points_balance }}</p>
+              <p class="text-sm text-gray-600">{{ t('profile.pointsBalanceTitle') }}</p>
             </div>
           </div>
         </div>
@@ -115,6 +125,18 @@
               {{ t('profile.shippingAddresses') }}
             </button>
             <button 
+              @click="activeTab = 'points'"
+              :class="[
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                activeTab === 'points'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ]"
+            >
+              <span class="inline-block w-5 h-5 mr-2 text-center">⭐</span>
+              {{ t('profile.pointsLedgerTab') }}
+            </button>
+            <button 
               @click="activeTab = 'profile'" 
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
@@ -132,59 +154,186 @@
         <!-- 标签内容区域 -->
         <div class="p-6">
           <div v-if="activeTab === 'orders'">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
               <h3 class="text-lg font-medium text-gray-900">{{ t('profile.myOrders') }}</h3>
-              <div class="flex space-x-2">
-                <span class="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded">{{ t('profile.allOrders') }}</span>
+              <div class="flex flex-wrap items-end gap-3">
+                <div class="flex flex-col">
+                  <label class="text-xs text-gray-500">{{ t('profile.dateFrom') }}</label>
+                  <input
+                    v-model="ordersDateFrom"
+                    type="date"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div class="flex flex-col">
+                  <label class="text-xs text-gray-500">{{ t('profile.dateTo') }}</label>
+                  <input
+                    v-model="ordersDateTo"
+                    type="date"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  :disabled="loadingOrders"
+                  @click="applyOrderFilters"
+                >
+                  {{ t('profile.applyFilter') }}
+                </button>
               </div>
             </div>
+            <p class="text-xs text-gray-600 mb-4">
+              {{
+                t('profile.ordersRangeSpend', {
+                  amount: `${t('product.currencyThbSymbol')}${formatMoneyThb(ordersSpentSum)}`
+                })
+              }}
+            </p>
 
             <div v-if="loadingOrders" class="text-center py-8">
               <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
               <p class="mt-2 text-sm text-gray-500">{{ t('profile.loadingOrders') }}</p>
             </div>
 
-            <div v-else-if="orders.length > 0" class="space-y-4">
-              <div 
-                v-for="order in orders" 
-                :key="order.id"
-                class="border rounded-lg p-4 hover:shadow-md transition-shadow"
+            <template v-else-if="orders.length > 0">
+              <div
+                ref="ordersScrollRoot"
+                class="max-h-[min(65vh,600px)] overflow-y-auto overscroll-contain space-y-4 rounded-lg border border-gray-100 p-3 pr-2"
               >
-                <div class="flex justify-between items-start mb-2">
-                  <div>
-                    <div class="font-medium">{{ t('order.orderNo') }}: {{ order.order_no }}</div>
-                    <div class="text-sm text-gray-600">{{ formatDateTime(order.created_at) }}</div>
-                  </div>
-                  <div class="text-right">
-                    <div class="font-medium" v-if="order.payment_method === 'online'">
-                      <div class="text-blue-600">USDT {{ getExchangedAmount(order.total_amount, order.exchange_rate) }}</div>
-                      <div class="text-xs text-gray-500">({{ t('common.currency') }}{{ order.total_amount }})</div>
+                <div
+                  v-for="order in orders"
+                  :key="order.id"
+                  class="rounded-lg border p-4 transition-shadow hover:shadow-md"
+                >
+                  <div class="mb-2 flex justify-between items-start">
+                    <div>
+                      <div class="font-medium">{{ t('order.orderNo') }}: {{ order.order_no }}</div>
+                      <div class="text-sm text-gray-600">{{ formatDateTime(order.created_at) }}</div>
                     </div>
-                    <div class="font-medium" v-else>{{ t('common.currency') }}{{ order.total_amount }}</div>
-                    <div :class="['text-sm', getStatusStyle(order.status)]">
-                      {{ getStatusText(order.status) }}
+                    <div class="text-right">
+                      <div class="font-medium" v-if="order.payment_method === 'online'">
+                        <div class="text-blue-600">{{ orderAmountMain(order).mainLabel }}</div>
+                        <div class="text-xs text-gray-500">≈ {{ usdtHint(order) }} USDT</div>
+                      </div>
+                      <div class="font-medium" v-else-if="order.payment_method === 'points'">
+                        <div class="text-amber-900">{{ orderAmountMain(order).mainLabel }}</div>
+                      </div>
+                      <div class="font-medium" v-else>
+                        {{ orderAmountMain(order).mainLabel }}
+                      </div>
+                      <div :class="['text-sm', getStatusStyle(order.status)]">
+                        {{ getStatusText(order.status) }}
+                      </div>
                     </div>
                   </div>
+                  <div class="text-sm text-gray-700">
+                    {{ order.delivery_address }}
+                    <span v-if="order.postal_code" class="ml-1">({{ t('address.postalCode') || '邮编' }}: {{ order.postal_code }})</span>
+                  </div>
+                  <div class="mt-2 flex justify-end">
+                    <button
+                      type="button"
+                      @click="viewOrderDetail(order.id)"
+                      class="rounded border border-gray-300 px-3 py-1 text-xs hover:bg-gray-50"
+                    >
+                      {{ t('profile.viewDetails') }}
+                    </button>
+                  </div>
                 </div>
-                <div class="text-sm text-gray-700">
-                  {{ order.delivery_address }}
-                  <span v-if="order.postal_code" class="ml-1">({{ t('address.postalCode') || '邮编' }}: {{ order.postal_code }})</span>
+                <div ref="ordersLoadSentinel" class="h-1 w-full shrink-0" aria-hidden="true" />
+                <div v-if="loadingMoreOrders" class="flex justify-center py-3">
+                  <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
                 </div>
-                <div class="flex justify-end mt-2">
-                  <button 
-                    @click="viewOrderDetail(order.id)"
-                    class="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-50"
-                  >
-                    {{ t('profile.viewDetails') }}
-                  </button>
+                <p v-else-if="!ordersHasMore && orders.length > 0" class="py-2 text-center text-xs text-gray-400">
+                  {{ t('profile.noMoreItems') }}
+                </p>
+              </div>
+            </template>
+
+            <div v-else class="py-12 text-center">
+              <div class="mx-auto flex h-12 w-12 items-center justify-center text-3xl text-gray-400">🛍️</div>
+              <h3 class="mt-2 text-sm font-medium text-gray-900">{{ t('order.noOrders') }}</h3>
+              <p class="mt-1 text-sm text-gray-500">{{ t('profile.noOrdersDesc') }}</p>
+            </div>
+          </div>
+
+          <div v-else-if="activeTab === 'points'">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h3 class="text-lg font-medium text-gray-900">{{ t('profile.pointsLedgerTab') }}</h3>
+              <div class="flex flex-wrap items-end gap-3">
+                <div class="flex flex-col">
+                  <label class="text-xs text-gray-500">{{ t('profile.dateFrom') }}</label>
+                  <input
+                    v-model="pointsDateFrom"
+                    type="date"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                  />
                 </div>
+                <div class="flex flex-col">
+                  <label class="text-xs text-gray-500">{{ t('profile.dateTo') }}</label>
+                  <input
+                    v-model="pointsDateTo"
+                    type="date"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  :disabled="loadingPointsTx"
+                  @click="applyPointsFilters"
+                >
+                  {{ t('profile.applyFilter') }}
+                </button>
               </div>
             </div>
 
-            <div v-else class="text-center py-12">
-              <div class="mx-auto h-12 w-12 text-gray-400 flex items-center justify-center text-3xl">🛍️</div>
-              <h3 class="mt-2 text-sm font-medium text-gray-900">{{ t('order.noOrders') }}</h3>
-              <p class="mt-1 text-sm text-gray-500">{{ t('profile.noOrdersDesc') }}</p>
+            <div v-if="loadingPointsTx" class="py-8 text-center">
+              <div class="inline-block h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
+              <p class="mt-2 text-sm text-gray-500">{{ t('profile.loadingPointsLedger') }}</p>
+            </div>
+
+            <template v-else-if="pointTransactions.length > 0">
+              <div
+                ref="pointsScrollRoot"
+                class="max-h-[min(65vh,600px)] overflow-y-auto overscroll-contain space-y-3 rounded-lg border border-gray-100 p-3 pr-2"
+              >
+                <div
+                  v-for="tx in pointTransactions"
+                  :key="tx.id"
+                  class="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-amber-100 bg-amber-50/40 p-3"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium text-gray-900">{{ pointTxTitle(tx) }}</div>
+                    <div class="mt-1 text-xs text-gray-600">
+                      {{ formatDateTime(tx.created_at) }}
+                      <span v-if="tx.order?.order_no" class="ml-2">{{ t('profile.pointTxOrderRef') }} {{ tx.order.order_no }}</span>
+                    </div>
+                    <p v-if="tx.note" class="mt-1 text-xs text-gray-500">{{ tx.note }}</p>
+                  </div>
+                  <div class="text-right tabular-nums">
+                    <div
+                      :class="tx.delta >= 0 ? 'text-green-700' : 'text-red-600'"
+                      class="text-base font-semibold"
+                    >
+                      {{ tx.delta >= 0 ? '+' : '' }}{{ tx.delta }}
+                    </div>
+                    <div class="text-xs text-gray-500">{{ t('profile.pointTxBalanceAfter') }} {{ tx.balance_after }}</div>
+                  </div>
+                </div>
+                <div ref="pointsLoadSentinel" class="h-1 w-full shrink-0" aria-hidden="true" />
+                <div v-if="loadingMorePointsTx" class="flex justify-center py-3">
+                  <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-amber-600"></div>
+                </div>
+                <p v-else-if="!pointsHasMore && pointTransactions.length > 0" class="py-2 text-center text-xs text-gray-400">
+                  {{ t('profile.noMoreItems') }}
+                </p>
+              </div>
+            </template>
+
+            <div v-else class="py-12 text-center">
+              <p class="text-sm text-gray-500">{{ t('profile.noPointTransactions') }}</p>
             </div>
           </div>
 
@@ -291,13 +440,20 @@
                 />
                 <p v-if="profileErrors.email" class="text-xs text-red-600 mt-1">{{ profileErrors.email }}</p>
               </div>
-              <div class="pt-2">
-                <button 
-                  type="submit" 
+              <div class="pt-2 flex flex-col sm:flex-row gap-3 sm:items-center">
+                <button
+                  type="submit"
                   :disabled="profileSaving"
-                  class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  class="w-full sm:w-auto px-4 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-base"
                 >
                   {{ profileSaving ? t('profile.saving') : t('common.save') }}
+                </button>
+                <button
+                  type="button"
+                  class="w-full sm:w-auto px-4 py-2.5 border border-gray-300 rounded-md text-gray-800 hover:bg-gray-50 text-base font-medium"
+                  @click="openPasswordModal"
+                >
+                  {{ t('profile.changePassword') }}
                 </button>
               </div>
             </form>
@@ -306,7 +462,79 @@
       </div>
     </div>
 
-    <!-- 地址添加/编辑模态框 -->
+    <!-- 修改密码 -->
+    <div v-if="showPasswordModal" class="fixed inset-0 z-[60] flex flex-col justify-end sm:justify-center sm:items-center sm:p-4" aria-modal="true" role="dialog">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-[1px]" @click.self="closePasswordModal" />
+      <div
+        class="relative z-10 w-full max-h-[min(92dvh,560px)] sm:max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-xl bg-white shadow-xl sm:w-full sm:max-w-md"
+        :style="{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }"
+      >
+        <div class="sticky top-0 z-[1] flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3 sm:px-6 sm:rounded-t-xl">
+          <h3 class="text-lg font-semibold text-gray-900 pr-2">{{ t('profile.changePasswordTitle') }}</h3>
+          <button
+            type="button"
+            class="shrink-0 rounded-full p-2 text-gray-500 hover:bg-gray-100"
+            aria-label="close"
+            @click="closePasswordModal"
+          >
+            ✕
+          </button>
+        </div>
+        <form class="space-y-4 px-4 py-4 sm:px-6 sm:pb-5" @submit.prevent="submitPasswordChange">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('profile.oldPassword') }}</label>
+            <input
+              v-model="passwordForm.old"
+              type="password"
+              autocomplete="current-password"
+              class="block w-full text-base border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              :placeholder="t('profile.oldPassword')"
+            >
+            <p v-if="passwordErrors.old" class="text-xs text-red-600 mt-1">{{ passwordErrors.old }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('profile.newPassword') }}</label>
+            <p class="text-xs text-gray-500 mb-2 leading-snug">{{ t('validation.passwordPolicyHint') }}</p>
+            <input
+              v-model="passwordForm.new"
+              type="password"
+              autocomplete="new-password"
+              class="block w-full text-base border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              :placeholder="t('user.passwordPlaceholder')"
+            >
+            <p v-if="passwordErrors.new" class="text-xs text-red-600 mt-1">{{ passwordErrors.new }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('profile.confirmNewPassword') }}</label>
+            <input
+              v-model="passwordForm.confirm"
+              type="password"
+              autocomplete="new-password"
+              class="block w-full text-base border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              :placeholder="t('validation.confirmPasswordRequired')"
+            >
+            <p v-if="passwordErrors.confirm" class="text-xs text-red-600 mt-1">{{ passwordErrors.confirm }}</p>
+          </div>
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
+            <button
+              type="button"
+              class="w-full sm:w-auto px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-base"
+              @click="closePasswordModal"
+            >
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              type="submit"
+              :disabled="passwordSubmitting"
+              class="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-base font-medium"
+            >
+              {{ passwordSubmitting ? t('profile.changingPassword') : t('profile.confirmPasswordChange') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div v-if="showAddressModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="fixed inset-0 bg-black bg-opacity-50" @click="showAddressModal = false"></div>
       <div class="bg-white p-6 rounded-lg shadow-xl z-10 w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -423,9 +651,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { formatRecordedOrderAmount } from '../utils/orderBillingDisplay.js'
 import { useUserStore } from '../stores/user.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
 import { getUserOrders } from '../api/orders.js'
@@ -436,6 +665,7 @@ import CountrySelector from '../components/CountrySelector.vue'
 import ThailandAddressSelector from '../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n, formatPhoneDisplay } from '../utils/phoneValidation.js'
 import { useToast } from '../composables/useToast.js'
+import { describePasswordPolicyFailure } from '../utils/passwordPolicy.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -481,7 +711,7 @@ const activeTab = ref('orders')
 watch(
   () => route.query.tab,
   (tabParam) => {
-    if (tabParam && ['orders', 'addresses', 'profile'].includes(String(tabParam))) {
+    if (tabParam && ['orders', 'addresses', 'points', 'profile'].includes(String(tabParam))) {
       activeTab.value = String(tabParam)
     }
   },
@@ -492,9 +722,62 @@ watch(
 const showAddressModal = ref(false)
 const editingAddress = ref(null)
 
-// 订单数据
+// 订单与时间筛选、滚动分页
+const formatMoneyThb = (n) => {
+  const x = Number(n)
+  return Number.isFinite(x) ? x.toFixed(2) : '0.00'
+}
+
+const defaultThreeMonthRange = () => {
+  const end = new Date()
+  const start = new Date()
+  start.setMonth(start.getMonth() - 3)
+  const fmt = (d) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const da = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${da}`
+  }
+  return { start: fmt(start), end: fmt(end) }
+}
+
+const range0 = defaultThreeMonthRange()
+
+const profileMetrics = ref({
+  order_count: 0,
+  spent_thb: 0,
+  points_balance: 0
+})
+
+const loadingProfileMetrics = ref(false)
+
 const orders = ref([])
 const loadingOrders = ref(false)
+const ordersDateFrom = ref(range0.start)
+const ordersDateTo = ref(range0.end)
+const ordersPage = ref(1)
+const ordersPageSize = 15
+const ordersTotal = ref(0)
+const ordersSpentSum = ref(0)
+const loadingMoreOrders = ref(false)
+const ordersScrollRoot = ref(null)
+const ordersLoadSentinel = ref(null)
+const ordersHasMore = computed(() => orders.value.length < ordersTotal.value)
+
+const pointTransactions = ref([])
+const pointsDateFrom = ref(range0.start)
+const pointsDateTo = ref(range0.end)
+const pointsTxPage = ref(1)
+const pointsTxPageSize = 20
+const pointsTxTotal = ref(0)
+const loadingPointsTx = ref(false)
+const loadingMorePointsTx = ref(false)
+const pointsScrollRoot = ref(null)
+const pointsLoadSentinel = ref(null)
+const pointsHasMore = computed(() => pointTransactions.value.length < pointsTxTotal.value)
+
+let ordersIo = null
+let pointsIo = null
 
 // 地址数据
 const addresses = ref([])
@@ -566,6 +849,86 @@ const profileSaving = ref(false)
 const avatarFileInput = ref(null)
 const avatarUploading = ref(false)
 
+const showPasswordModal = ref(false)
+const passwordSubmitting = ref(false)
+const passwordForm = ref({
+  old: '',
+  new: '',
+  confirm: ''
+})
+const passwordErrors = ref({
+  old: '',
+  new: '',
+  confirm: ''
+})
+
+const openPasswordModal = () => {
+  passwordForm.value = { old: '', new: '', confirm: '' }
+  passwordErrors.value = { old: '', new: '', confirm: '' }
+  showPasswordModal.value = true
+}
+
+const closePasswordModal = () => {
+  showPasswordModal.value = false
+  passwordSubmitting.value = false
+}
+
+const validatePasswordForm = () => {
+  passwordErrors.value = { old: '', new: '', confirm: '' }
+  let ok = true
+  if (!passwordForm.value.old) {
+    passwordErrors.value.old = t('profile.passwordOldRequired')
+    ok = false
+  }
+  const next = passwordForm.value.new
+  if (!next) {
+    passwordErrors.value.new = t('validation.passwordRequired')
+    ok = false
+  } else {
+    const fail = describePasswordPolicyFailure(next)
+    if (fail === 'short') {
+      passwordErrors.value.new = t('validation.passwordMinLength')
+      ok = false
+    } else if (fail === 'digit') {
+      passwordErrors.value.new = t('validation.passwordNeedsDigit')
+      ok = false
+    } else if (fail === 'letter') {
+      passwordErrors.value.new = t('validation.passwordNeedsLetter')
+      ok = false
+    }
+  }
+  if (passwordForm.value.confirm !== passwordForm.value.new) {
+    passwordErrors.value.confirm = t('profile.passwordMismatch')
+    ok = false
+  }
+  return ok
+}
+
+const submitPasswordChange = async () => {
+  if (!validatePasswordForm()) return
+  passwordSubmitting.value = true
+  try {
+    const res = await userAPI.changePassword({
+      old_password: String(passwordForm.value.old),
+      new_password: String(passwordForm.value.new)
+    })
+    if (res.data?.success) {
+      success(res.data.message || t('profile.passwordChanged'))
+      closePasswordModal()
+    } else {
+      showError(res.data?.message || t('profile.passwordChangeFailed'))
+    }
+  } catch (err) {
+    const msg =
+      err.response?.data?.message ||
+      err.message ||
+      t('profile.passwordChangeFailed')
+    showError(msg)
+  } finally {
+    passwordSubmitting.value = false
+  }
+}
+
 const avatarDisplayUrl = computed(() => {
   const u = userStore.user?.avatar_url
   if (!u) return null
@@ -608,14 +971,19 @@ const displayNickname = computed(() => {
   return userStore.user?.nickname || t('profile.defaultNickname')
 })
 
-// 计算统计数据
-const orderStats = computed(() => {
-  const total = orders.value.length
-  
-  return {
-    total
+const orderAmountMain = (order) => {
+  if (order.payment_method === 'points' && order.points_redeemed != null) {
+    return { mainLabel: t('payment.pointsRedeemedShort', { points: order.points_redeemed }) }
   }
-})
+  return formatRecordedOrderAmount(order)
+}
+
+const usdtHint = (order) => {
+  const thb = parseFloat(order.total_amount_thb)
+  const r = parseFloat(order.exchange_rate)
+  if (!(Number.isFinite(thb) && Number.isFinite(r))) return '0.00'
+  return (thb * r).toFixed(2)
+}
 
 // 工具方法
 const formatDate = (dateString) => {
@@ -629,13 +997,6 @@ const formatDateTime = (dateString) => {
   if (!dateString) return t('profile.unknown')
   const date = new Date(dateString)
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
-}
-
-// 在线支付 USDT：仅按订单保存的汇率换算（系统汇算比例变更不影响历史订单）
-const getExchangedAmount = (amount, orderExchangeRate) => {
-  const raw = orderExchangeRate == null || orderExchangeRate === '' ? NaN : parseFloat(orderExchangeRate)
-  const rate = Number.isFinite(raw) ? raw : 1
-  return (parseFloat(amount) * rate).toFixed(2)
 }
 
 // 获取订单状态样式
@@ -670,28 +1031,176 @@ const viewOrderDetail = (orderId) => {
 }
 
 
-
-// 加载用户订单
-const loadOrders = async () => {
+const loadProfileMetrics = async () => {
+  loadingProfileMetrics.value = true
   try {
-    loadingOrders.value = true
-    const response = await getUserOrders()
-    if (response.data.success) {
-      // 后端返回的数据结构是 { orders, total, page, totalPages }
-      const orderList = response.data.data?.orders || []
-      // 按创建时间倒序排列（最新的在前面）
-      orders.value = orderList.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    } else {
-      orders.value = []
-      console.error('加载订单失败:', response.data.message)
+    const res = await userAPI.getProfileMetrics()
+    if (res.data?.success && res.data.data) {
+      profileMetrics.value = {
+        order_count: Number(res.data.data.order_count) || 0,
+        spent_thb: Number(res.data.data.spent_thb) || 0,
+        points_balance: Number(res.data.data.points_balance) || 0
+      }
     }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loadingProfileMetrics.value = false
+  }
+}
+
+const loadOrders = async ({ reset = false, append = false } = {}) => {
+  const busy = append ? loadingMoreOrders : loadingOrders
+  if (busy.value) return
+  if (reset || !append) {
+    ordersPage.value = 1
+    if (!append) orders.value = []
+  }
+  busy.value = true
+  try {
+    const response = await getUserOrders({
+      page: ordersPage.value,
+      limit: ordersPageSize,
+      created_from: ordersDateFrom.value,
+      created_to: ordersDateTo.value
+    })
+    if (!response.data?.success) {
+      if (!append) orders.value = []
+      showError(response.data?.message || t('profile.loadOrdersFailed'))
+      return
+    }
+    const d = response.data.data
+    const list = d.orders || []
+    ordersTotal.value = d.total ?? 0
+    ordersSpentSum.value = d.spent_thb_sum ?? 0
+    if (append) {
+      orders.value = orders.value.concat(list)
+    } else {
+      orders.value = list
+    }
+    await nextTick()
+    setupOrdersIntersection()
   } catch (error) {
     console.error('加载订单失败:', error)
-    orders.value = []
+    if (!append) orders.value = []
     showError(t('profile.loadOrdersFailed'))
   } finally {
-    loadingOrders.value = false
+    busy.value = false
   }
+}
+
+const loadMoreOrders = async () => {
+  if (loadingOrders.value || loadingMoreOrders.value) return
+  if (!ordersHasMore.value) return
+  ordersPage.value += 1
+  await loadOrders({ append: true })
+}
+
+const applyOrderFilters = () => {
+  loadOrders({ reset: true })
+}
+
+const teardownOrdersIo = () => {
+  if (ordersIo) {
+    ordersIo.disconnect()
+    ordersIo = null
+  }
+}
+
+const setupOrdersIntersection = () => {
+  teardownOrdersIo()
+  const root = ordersScrollRoot.value
+  const target = ordersLoadSentinel.value
+  if (!root || !target || activeTab.value !== 'orders') return
+  if (!ordersHasMore.value) return
+  ordersIo = new IntersectionObserver(
+    (entries) => {
+      const hit = entries.some((e) => e.isIntersecting)
+      if (!hit) return
+      loadMoreOrders()
+    },
+    { root, rootMargin: '120px', threshold: 0 }
+  )
+  ordersIo.observe(target)
+}
+
+const loadPointTransactions = async ({ reset = false, append = false } = {}) => {
+  const busy = append ? loadingMorePointsTx : loadingPointsTx
+  if (busy.value) return
+  if (reset || !append) {
+    pointsTxPage.value = 1
+    if (!append) pointTransactions.value = []
+  }
+  busy.value = true
+  try {
+    const res = await userAPI.getPointTransactions({
+      page: pointsTxPage.value,
+      limit: pointsTxPageSize,
+      created_from: pointsDateFrom.value,
+      created_to: pointsDateTo.value
+    })
+    if (!res.data?.success) {
+      if (!append) pointTransactions.value = []
+      return
+    }
+    const d = res.data.data
+    const items = d.items || []
+    pointsTxTotal.value = d.total ?? 0
+    if (append) {
+      pointTransactions.value = pointTransactions.value.concat(items)
+    } else {
+      pointTransactions.value = items
+    }
+    await nextTick()
+    setupPointsIntersection()
+  } catch (e) {
+    console.error(e)
+    if (!append) pointTransactions.value = []
+    showError(t('profile.loadPointsLedgerFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+const loadMorePointsTx = async () => {
+  if (loadingPointsTx.value || loadingMorePointsTx.value) return
+  if (!pointsHasMore.value) return
+  pointsTxPage.value += 1
+  await loadPointTransactions({ append: true })
+}
+
+const applyPointsFilters = () => {
+  loadPointTransactions({ reset: true })
+}
+
+const teardownPointsIo = () => {
+  if (pointsIo) {
+    pointsIo.disconnect()
+    pointsIo = null
+  }
+}
+
+const setupPointsIntersection = () => {
+  teardownPointsIo()
+  const root = pointsScrollRoot.value
+  const target = pointsLoadSentinel.value
+  if (!root || !target || activeTab.value !== 'points') return
+  if (!pointsHasMore.value) return
+  pointsIo = new IntersectionObserver(
+    (entries) => {
+      const hit = entries.some((e) => e.isIntersecting)
+      if (!hit) return
+      loadMorePointsTx()
+    },
+    { root, rootMargin: '120px', threshold: 0 }
+  )
+  pointsIo.observe(target)
+}
+
+const pointTxTitle = (tx) => {
+  if (tx.type === 'earn_purchase') return t('profile.pointTypeEarn')
+  if (tx.type === 'redeem_order') return t('profile.pointTypeRedeem')
+  return tx.type || '—'
 }
 
 // 加载地址列表
@@ -1076,15 +1585,44 @@ onMounted(async () => {
   if (!userStore.user) {
     await userStore.checkAuth()
   }
-  
-  // 从数据库获取最新的用户信息（这样确保昵称等信息是最新的）
+
   await refreshUserInfo()
-  
-  // 并行加载订单和地址数据
+
   await Promise.all([
-    loadOrders(),
+    loadProfileMetrics(),
+    loadOrders({ reset: true }),
     loadAddresses()
   ])
+
+  await nextTick()
+  if (activeTab.value === 'points') {
+    await loadPointTransactions({ reset: true })
+  } else if (activeTab.value === 'orders') {
+    setupOrdersIntersection()
+  }
+})
+
+watch(activeTab, async (tab) => {
+  await nextTick()
+  if (tab === 'orders') {
+    setupOrdersIntersection()
+    teardownPointsIo()
+  } else if (tab === 'points') {
+    teardownOrdersIo()
+    if (pointTransactions.value.length === 0 && !loadingPointsTx.value) {
+      await loadPointTransactions({ reset: true })
+    } else {
+      setupPointsIntersection()
+    }
+  } else {
+    teardownOrdersIo()
+    teardownPointsIo()
+  }
+})
+
+onUnmounted(() => {
+  teardownOrdersIo()
+  teardownPointsIo()
 })
 </script>
 

@@ -2,12 +2,7 @@ import { Op } from 'sequelize'
 import jwt from 'jsonwebtoken'
 import Administrator from '../models/Administrator.js'
 import OperationLog from '../models/OperationLog.js'
-
-// 使用安全的JWT密钥
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET环境变量未设置')
-}
+import { JWT_SECRET } from '../config/jwtSecret.js'
 
 class AdministratorController {
   // 管理员登录

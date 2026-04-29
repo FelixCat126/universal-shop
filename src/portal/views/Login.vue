@@ -247,11 +247,9 @@ const validateForm = () => {
     }
   }
   
-  // 验证密码
+  // 验证密码（仅非空；兼容系统生成的纯数字初始口令等）
   if (!formData.value.password) {
     errors.value.password = t('validation.passwordRequired')
-  } else if (formData.value.password.length < 6) {
-    errors.value.password = t('validation.passwordMinLength')
   }
   
   return Object.keys(errors.value).length === 0

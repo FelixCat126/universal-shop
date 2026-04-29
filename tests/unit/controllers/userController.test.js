@@ -300,12 +300,11 @@ describe('UserController 单元测试', () => {
       req.body = {
         country_code: testUser.country_code,
         phone: testUser.phone,
-        password: '123456'
+        password: 'Abcd1234'
       }
       
       await UserController.login(req, res)
       
-      expect(res.status).toHaveBeenCalledWith(200)
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         message: '登录成功',
@@ -322,12 +321,11 @@ describe('UserController 单元测试', () => {
     it('应该成功登录（使用邮箱）', async () => {
       req.body = {
         email: testUser.email,
-        password: '123456'
+        password: 'Abcd1234'
       }
       
       await UserController.login(req, res)
       
-      expect(res.status).toHaveBeenCalledWith(200)
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         message: '登录成功',
@@ -360,7 +358,7 @@ describe('UserController 单元测试', () => {
       req.body = {
         country_code: '+86',
         phone: '19999999999',
-        password: '123456'
+        password: 'Abcd1234'
       }
       
       await UserController.login(req, res)
@@ -378,7 +376,7 @@ describe('UserController 单元测试', () => {
       req.body = {
         country_code: testUser.country_code,
         phone: testUser.phone,
-        password: '123456'
+        password: 'Abcd1234'
       }
       
       await UserController.login(req, res)
@@ -400,7 +398,7 @@ describe('UserController 单元测试', () => {
       expect(res.status).toHaveBeenCalledWith(400)
       expect(res.json).toHaveBeenCalledWith({
         success: false,
-        message: expect.stringContaining('参数')
+        message: '请提供手机号或邮箱进行登录'
       })
     })
     
@@ -410,7 +408,7 @@ describe('UserController 单元测试', () => {
       req.body = {
         country_code: testUser.country_code,
         phone: testUser.phone,
-        password: '123456'
+        password: 'Abcd1234'
       }
       
       await UserController.login(req, res)

@@ -8,6 +8,80 @@
     </div>
 
     <div class="config-sections">
+      <!-- 多币种汇算（相对门户商品泰铢标价）— 放首屏便于查找 -->
+      <el-card class="config-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3>{{ t('systemConfig.exchangeRates') }}</h3>
+            <span class="card-subtitle">{{ t('systemConfig.exchangeRatesSubtitle') }}</span>
+          </div>
+        </template>
+        
+        <div class="config-content">
+          <div class="exchange-rate-section">
+            <el-alert
+              type="info"
+              :closable="false"
+              show-icon
+              class="exchange-rates-intro-alert"
+            >
+              {{ t('systemConfig.exchangeRatesIntro') }}
+            </el-alert>
+
+            <div class="fx-grid">
+              <div class="fx-item">
+                <div class="fx-item-labels">
+                  <span class="fx-item-title">{{ t('systemConfig.fxUSD') }}</span>
+                </div>
+                <el-input-number
+                  v-model="exchangeRatesUsd"
+                  :min="0"
+                  :precision="2"
+                  :step="0.01"
+                  class="fx-item-input"
+                />
+              </div>
+              <div class="fx-item">
+                <div class="fx-item-labels">
+                  <span class="fx-item-title">{{ t('systemConfig.fxCNY') }}</span>
+                </div>
+                <el-input-number
+                  v-model="exchangeRatesCny"
+                  :min="0"
+                  :precision="2"
+                  :step="0.01"
+                  class="fx-item-input"
+                />
+              </div>
+              <div class="fx-item">
+                <div class="fx-item-labels">
+                  <span class="fx-item-title">{{ t('systemConfig.fxMYR') }}</span>
+                </div>
+                <el-input-number
+                  v-model="exchangeRatesMyr"
+                  :min="0"
+                  :precision="2"
+                  :step="0.01"
+                  class="fx-item-input"
+                />
+              </div>
+            </div>
+
+            <div class="exchange-rate-input" style="margin-top: 16px">
+              <el-button type="primary" @click="saveExchangeRates">{{ t('systemConfig.saveExchangeRates') }}</el-button>
+              <el-button @click="resetExchangeRates">{{ t('systemConfig.resetExchangeRates') }}</el-button>
+            </div>
+
+            <div class="exchange-rate-tips">
+              <p>{{ t('systemConfig.exchangeRatesTips.base') }}</p>
+              <p>{{ t('systemConfig.exchangeRatesTips.range') }}</p>
+              <p>{{ t('systemConfig.exchangeRatesTips.precision') }}</p>
+              <p>{{ t('systemConfig.exchangeRatesTips.usdt') }}</p>
+            </div>
+          </div>
+        </div>
+      </el-card>
+
       <!-- 首页长图配置 -->
       <el-card class="config-card" shadow="hover">
         <template #header>
@@ -108,59 +182,6 @@
         </div>
       </el-card>
 
-      <!-- 汇算比例配置 -->
-      <el-card class="config-card" shadow="hover">
-        <template #header>
-          <div class="card-header">
-            <h3>{{ t('systemConfig.exchangeRate') }}</h3>
-            <span class="card-subtitle">{{ t('systemConfig.exchangeRateSubtitle') }}</span>
-          </div>
-        </template>
-        
-        <div class="config-content">
-          <div class="exchange-rate-section">
-            <h4>{{ t('systemConfig.currentExchangeRate') }}: {{ exchangeRate.toFixed(2) }}</h4>
-            
-            <div class="input-section">
-              <h4>{{ t('systemConfig.exchangeRateValue') }}</h4>
-              <div class="exchange-rate-input">
-                <el-input-number
-                  v-model="exchangeRate"
-                  :min="0"
-                  :precision="2"
-                  :step="0.01"
-                  :controls="true"
-                  size="large"
-                  style="width: 200px"
-                  @change="saveExchangeRate"
-                />
-                <el-button 
-                  type="primary" 
-                  @click="saveExchangeRate(exchangeRate)"
-                  style="margin-left: 15px"
-                >
-                  {{ t('systemConfig.saveExchangeRate') }}
-                </el-button>
-                <el-button 
-                  type="default" 
-                  @click="resetExchangeRate"
-                  style="margin-left: 10px"
-                >
-                  {{ t('systemConfig.resetExchangeRate') }}
-                </el-button>
-              </div>
-            </div>
-            
-            <div class="exchange-rate-tips">
-              <p>{{ t('systemConfig.exchangeRateTips.range') }}</p>
-              <p>{{ t('systemConfig.exchangeRateTips.precision') }}</p>
-              <p>{{ t('systemConfig.exchangeRateTips.purpose') }}</p>
-              <p>{{ t('systemConfig.exchangeRateTips.example') }}</p>
-            </div>
-          </div>
-        </div>
-      </el-card>
-
       <!-- 货币单位（全站统一） -->
       <el-card class="config-card" shadow="hover">
         <template #header>
@@ -214,7 +235,9 @@ const adminStore = useAdminStore()
 const loading = ref(false)
 const homeBanner = ref(null)
 const paymentQR = ref(null)
-const exchangeRate = ref(1.00) // 汇算比例，默认1.00
+const exchangeRatesUsd = ref(0)
+const exchangeRatesCny = ref(0)
+const exchangeRatesMyr = ref(0)
 const currencyCode = ref('THB')
 
 const uploading = reactive({
@@ -262,7 +285,18 @@ const loadConfigs = async () => {
         const configs = data.data
         homeBanner.value = configs.home_banner?.value || null
         paymentQR.value = configs.payment_qrcode?.value || null
-        exchangeRate.value = parseFloat(configs.exchange_rate?.value || '1.00')
+        const xr = configs.exchange_rates?.value
+        if (xr && typeof xr === 'object') {
+          exchangeRatesUsd.value = parseFloat(xr.USD ?? '0')
+          exchangeRatesCny.value = parseFloat(xr.CNY ?? '0')
+          exchangeRatesMyr.value = parseFloat(xr.MYR ?? '0')
+        } else {
+          const legacy = parseFloat(configs.exchange_rate?.value || '0')
+          const v = Number.isFinite(legacy) ? legacy : 0
+          exchangeRatesUsd.value = v
+          exchangeRatesCny.value = 0
+          exchangeRatesMyr.value = 0
+        }
         currencyCode.value = normalizeCurrencyCode(configs.currency_unit?.value)
         mergeCurrencyCodeIntoLocales(mergeLocaleMessage, currencyCode.value)
       } else {
@@ -453,34 +487,41 @@ const deletePaymentQR = async () => {
   }
 }
 
-// 保存汇算比例
-const saveExchangeRate = async (value) => {
+const saveExchangeRates = async () => {
   try {
-    if (value < 0 || isNaN(value)) {
+    const usd = Number(exchangeRatesUsd.value)
+    const cny = Number(exchangeRatesCny.value)
+    const myr = Number(exchangeRatesMyr.value)
+    if ([usd, cny, myr].some((n) => !Number.isFinite(n) || n < 0)) {
       ElMessage.error(t('systemConfig.messages.invalidExchangeRate'))
       return
     }
-    
-    // 格式化为两位小数
-    const formattedValue = parseFloat(value).toFixed(2)
-    
+
+    const value = {
+      USD: usd.toFixed(2),
+      CNY: cny.toFixed(2),
+      MYR: myr.toFixed(2)
+    }
+
     const response = await adminStore.apiRequest('/api/system-config/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        key: 'exchange_rate',
-        value: formattedValue,
-        type: 'text',
-        description: '汇算比例配置'
+        key: 'exchange_rates',
+        value,
+        type: 'json',
+        description: '多币种汇算 USD|CNY|MYR'
       })
     })
-    
+
     if (response.ok) {
       const data = await response.json()
       if (data.success) {
-        exchangeRate.value = parseFloat(formattedValue)
+        exchangeRatesUsd.value = parseFloat(value.USD)
+        exchangeRatesCny.value = parseFloat(value.CNY)
+        exchangeRatesMyr.value = parseFloat(value.MYR)
         ElMessage.success(t('systemConfig.messages.exchangeRateSaveSuccess'))
       } else {
         ElMessage.error(data.message || t('systemConfig.messages.exchangeRateSaveFailed'))
@@ -489,15 +530,16 @@ const saveExchangeRate = async (value) => {
       ElMessage.error(t('systemConfig.messages.exchangeRateSaveFailed'))
     }
   } catch (error) {
-    console.error('保存汇算比例失败:', error)
+    console.error('保存汇率失败:', error)
     ElMessage.error(t('systemConfig.messages.exchangeRateSaveFailed'))
   }
 }
 
-// 重置汇算比例
-const resetExchangeRate = () => {
-  exchangeRate.value = 1.00
-  saveExchangeRate(1.00)
+const resetExchangeRates = async () => {
+  exchangeRatesUsd.value = 0
+  exchangeRatesCny.value = 0
+  exchangeRatesMyr.value = 0
+  await saveExchangeRates()
 }
 
 const saveCurrencyUnit = async () => {
@@ -560,8 +602,10 @@ onMounted(() => {
 
 .card-header {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
+  gap: 8px 20px;
 }
 
 .card-header h3 {
@@ -569,11 +613,21 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .card-subtitle {
+  flex: 1 1 280px;
+  min-width: min(100%, 220px);
+  max-width: 100%;
   font-size: 14px;
   color: #909399;
+  line-height: 1.5;
+  text-align: right;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .config-content {
@@ -661,6 +715,48 @@ onMounted(() => {
   margin-top: 20px;
 }
 
+.fx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 22px 28px;
+  align-items: stretch;
+}
+
+.fx-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.exchange-rates-intro-alert {
+  margin-bottom: 20px;
+}
+
+.fx-item-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* 英文等长句换行时仍与同行其它列输入框顶对齐 */
+  flex: 0 0 auto;
+  min-height: 3.1em;
+}
+
+.fx-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.fx-item-input {
+  width: 200px;
+  max-width: 100%;
+  align-self: flex-start;
+}
+
 .exchange-rate-input {
   display: flex;
   align-items: center;
@@ -690,11 +786,22 @@ onMounted(() => {
 }
 
 /* 响应式设计 */
+@media (max-width: 900px) {
+  .card-subtitle {
+    flex-basis: 100%;
+    text-align: left;
+  }
+}
+
 @media (max-width: 768px) {
   .card-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 5px;
+  }
+
+  .card-subtitle {
+    flex-basis: auto;
   }
   
   .image-preview img {
@@ -708,6 +815,10 @@ onMounted(() => {
   }
   
   .exchange-rate-input .el-input-number {
+    width: 100% !important;
+  }
+
+  .exchange-rate-section .fx-item-input {
     width: 100% !important;
   }
 }

@@ -5,6 +5,8 @@ import AdministratorController from '../controllers/administratorController.js'
 import AddressController from '../controllers/addressController.js'
 import { authenticateAdmin, requirePermission, requireSuperAdmin, logOperation } from '../middlewares/adminAuthMiddleware.js'
 
+import ProductCategoryController from '../controllers/productCategoryController.js'
+
 const router = express.Router()
 
 // 管理员登录（无需认证）
@@ -45,6 +47,12 @@ router.post('/administrators', requirePermission('administrators'), logOperation
 router.put('/administrators/:id', requirePermission('administrators'), logOperation('update_administrator', 'administrator'), AdministratorController.updateAdministrator)
 router.delete('/administrators/:id', requirePermission('administrators'), logOperation('delete_administrator', 'administrator'), AdministratorController.deleteAdministrator)
 router.put('/administrators/:id/reset-password', requirePermission('administrators'), logOperation('reset_password', 'administrator'), AdministratorController.resetPassword)
+
+// 商品类别（与产品共用 products 权限）
+router.get('/product-categories', requirePermission('products'), ProductCategoryController.listAdmin)
+router.post('/product-categories', requirePermission('products'), logOperation('create_product_category', 'product_category'), ProductCategoryController.create)
+router.put('/product-categories/:id', requirePermission('products'), logOperation('update_product_category', 'product_category'), ProductCategoryController.update)
+router.delete('/product-categories/:id', requirePermission('products'), logOperation('delete_product_category', 'product_category'), ProductCategoryController.remove)
 
 // 操作日志路由（仅超级管理员）
 router.get('/operation-logs', requireSuperAdmin, AdministratorController.getOperationLogs)

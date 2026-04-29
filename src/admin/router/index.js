@@ -30,6 +30,12 @@ const router = createRouter({
           meta: { title: '产品管理', requiresAuth: true, permission: 'products' }
         },
         {
+          path: '/product-categories',
+          name: 'ProductCategories',
+          component: () => import('../views/ProductCategories.vue'),
+          meta: { title: '类别管理', requiresAuth: true, permission: 'products' }
+        },
+        {
           path: '/orders',
           name: 'Orders',
           component: () => import('../views/Orders.vue'),

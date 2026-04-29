@@ -14,7 +14,7 @@ class StatisticsController {
       // 获取总金额数
       const totalAmountResult = await Order.findOne({
         attributes: [
-          [sequelize.fn('SUM', sequelize.col('total_amount')), 'total']
+          [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
         ]
       })
       const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
@@ -66,7 +66,7 @@ class StatisticsController {
         attributes: [
           [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
           [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('total_amount')), 'amount']
+          [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'amount']
         ],
         where: {
           created_at: {
@@ -194,7 +194,7 @@ class StatisticsController {
     
     const totalAmountResult = await Order.findOne({
       attributes: [
-        [sequelize.fn('SUM', sequelize.col('total_amount')), 'total']
+        [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
       ]
     })
     const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)

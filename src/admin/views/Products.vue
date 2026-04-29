@@ -14,17 +14,18 @@
           </el-form-item>
           <el-form-item :label="t('products.category')">
             <el-select
-              v-model="searchForm.category"
+              v-model="searchForm.category_id"
               :placeholder="t('products.selectCategory')"
               clearable
-              style="width: 160px"
+              style="width: 180px"
               @change="handleSearch"
             >
-              <el-option :label="t('products.categories.electronics')" value="electronics" />
-              <el-option :label="t('products.categories.clothing')" value="clothing" />
-              <el-option :label="t('products.categories.home')" value="home" />
-              <el-option :label="t('products.categories.sports')" value="sports" />
-              <el-option :label="t('products.categories.others')" value="others" />
+              <el-option
+                v-for="opt in categoryOptions"
+                :key="opt.id"
+                :label="opt.name"
+                :value="opt.id"
+              />
             </el-select>
           </el-form-item>
           <el-form-item :label="t('products.stockStatus')">
@@ -131,7 +132,7 @@
 
         <el-table-column prop="category" :label="t('products.category')" width="140" min-width="120">
           <template #default="scope">
-            <el-tag>{{ getCategoryLabel(scope.row.category) }}</el-tag>
+            <el-tag>{{ getCategoryLabel(scope.row) }}</el-tag>
           </template>
         </el-table-column>
 
@@ -158,17 +159,19 @@
             <div class="price-container">
               <!-- 有折扣时显示折扣价 -->
               <div v-if="scope.row.discount && scope.row.discount > 0" class="price-with-discount">
-                <span class="discount-price">{{ t('common.currency') }}{{ getDiscountPrice(scope.row) }}</span>
-                <span class="original-price">{{ t('common.currency') }}{{ scope.row.price }}</span>
+                <span class="discount-price">฿{{ getDiscountPrice(scope.row) }}</span>
+                <span class="original-price">฿{{ scope.row.price }}</span>
                 <el-tag type="danger" size="small" class="discount-tag">{{ scope.row.discount }}%</el-tag>
               </div>
               <!-- 无折扣时显示正常价格 -->
               <div v-else class="price-normal">
-                <span class="price">{{ t('common.currency') }}{{ scope.row.price }}</span>
+                <span class="price">฿{{ scope.row.price }}</span>
               </div>
             </div>
           </template>
         </el-table-column>
+
+        <el-table-column prop="points" :label="t('products.points')" width="120" align="right" />
 
         <el-table-column prop="stock" :label="t('products.stock')" width="160" min-width="140">
           <template #default="scope">
@@ -294,13 +297,14 @@
         <!-- 第一行：分类和价格 -->
         <el-row :gutter="20" class="form-row">
           <el-col :span="12">
-            <el-form-item :label="t('products.category')" prop="category">
-              <el-select v-model="productForm.category" :placeholder="t('products.selectCategory')">
-                <el-option :label="t('products.categories.electronics')" value="electronics" />
-                <el-option :label="t('products.categories.clothing')" value="clothing" />
-                <el-option :label="t('products.categories.home')" value="home" />
-                <el-option :label="t('products.categories.sports')" value="sports" />
-                <el-option :label="t('products.categories.others')" value="others" />
+            <el-form-item :label="t('products.category')" prop="category_id">
+              <el-select v-model.number="productForm.category_id" :placeholder="t('products.selectCategory')">
+                <el-option
+                  v-for="opt in categoryOptions"
+                  :key="opt.id"
+                  :label="opt.name"
+                  :value="opt.id"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -314,7 +318,7 @@
                 :placeholder="t('products.placeholders.enterPrice')"
                 style="width: 100%"
               >
-                <template #prepend>{{ t('common.currency') }}</template>
+                <template #prepend>฿</template>
               </el-input-number>
             </el-form-item>
           </el-col>
@@ -343,6 +347,25 @@
                 :placeholder="t('products.placeholders.enterStock')"
                 style="width: 100%"
               />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- 积分（购买所需） -->
+        <el-row :gutter="20" class="form-row">
+          <el-col :span="12">
+            <el-form-item :label="t('products.points')" prop="points">
+              <div class="product-points-field">
+                <el-input-number
+                  v-model="productForm.points"
+                  :min="0"
+                  :precision="0"
+                  :step="1"
+                  style="width: 100%"
+                  :placeholder="t('products.placeholders.enterPoints')"
+                />
+                <p class="product-points-hint">{{ t('products.pointsHint') }}</p>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -451,7 +474,7 @@ export default {
     // 搜索表单
     const searchForm = reactive({
       name: '',
-      category: '',
+      category_id: '',
       stockStatus: '',
       listingStatus: ''
     })
@@ -462,10 +485,11 @@ export default {
       name: '',
       alias: '', // 产品别名
       description: '',
-      category: '',
+      category_id: '',
       price: 0,
       discount: null,
       stock: 0,
+      points: 0,
       image: '',
       imagePreview: '' // 用于预览显示
     })
@@ -487,7 +511,7 @@ export default {
       name: [
         { required: true, message: t('products.validation.nameRequired'), trigger: 'blur' }
       ],
-      category: [
+      category_id: [
         { required: true, message: t('products.validation.categoryRequired'), trigger: 'change' }
       ],
       price: [
@@ -498,21 +522,30 @@ export default {
       ]
     }
 
+    const categoryOptions = ref([])
+
+    const loadCategoryOptions = async () => {
+      try {
+        const res = await productAPI.getProductCategories()
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          categoryOptions.value = res.data.data
+        }
+      } catch (e) {
+        console.error('加载商品类别失败:', e)
+      }
+    }
+
     // 计算属性
     const filteredProducts = computed(() => {
       return products.value
     })
 
     // 方法
-    const getCategoryLabel = (category) => {
-      const categoryMap = {
-        electronics: t('products.categories.electronics'),
-        clothing: t('products.categories.clothing'),
-        home: t('products.categories.home'),
-        sports: t('products.categories.sports'),
-        others: t('products.categories.others')
-      }
-      return categoryMap[category] || category
+    const getCategoryLabel = (row) => {
+      if (!row) return '-'
+      const c = row.category
+      if (c && typeof c === 'object' && c.name) return c.name
+      return '-'
     }
 
     // 计算折扣价格
@@ -558,6 +591,8 @@ export default {
       isEditing.value = true
       Object.assign(productForm, {
         ...product,
+        category_id: product.category?.id ?? product.category_id,
+        points: product.points != null ? Number(product.points) : 0,
         imagePreview: product.image || '' // 显示现有图片
       })
       showProductDialog.value = true
@@ -580,10 +615,11 @@ export default {
       productForm.name = ''
       productForm.alias = ''
       productForm.description = ''
-      productForm.category = ''
-      productForm.price = null
+      productForm.category_id = categoryOptions.value[0]?.id ?? ''
+      productForm.price = 0
       productForm.discount = null
-      productForm.stock = null
+      productForm.stock = 0
+      productForm.points = 0
       productForm.image = ''
       productForm.imagePreview = ''
       
@@ -750,7 +786,7 @@ export default {
     const resetSearch = () => {
       Object.assign(searchForm, {
         name: '',
-        category: '',
+        category_id: '',
         stockStatus: '',
         listingStatus: ''
       })
@@ -814,7 +850,7 @@ export default {
           page: currentPage.value,
           pageSize: pageSize.value,
           name: searchForm.name,
-          category: searchForm.category,
+          category_id: searchForm.category_id || undefined,
           stockStatus: searchForm.stockStatus,
           listingStatus: searchForm.listingStatus || undefined
         }
@@ -834,7 +870,7 @@ export default {
 
     // 监听搜索条件变化
     watch(
-      () => [searchForm.name, searchForm.category, searchForm.stockStatus, searchForm.listingStatus],
+      () => [searchForm.name, searchForm.category_id, searchForm.stockStatus, searchForm.listingStatus],
       () => {
         // 防抖处理
         clearTimeout(searchTimeout.value)
@@ -849,8 +885,9 @@ export default {
 
     const searchTimeout = ref(null)
 
-    onMounted(() => {
-      loadProducts()
+    onMounted(async () => {
+      await loadCategoryOptions()
+      await loadProducts()
     })
 
     return {
@@ -870,6 +907,7 @@ export default {
       productForm,
       stockForm,
       productRules,
+      categoryOptions,
       filteredProducts,
       
       // 方法
@@ -895,7 +933,8 @@ export default {
       handleImageError,
       clearImage,
       beforeImageUpload,
-      loadProducts
+      loadProducts,
+      loadCategoryOptions
     }
   }
 }
@@ -1307,5 +1346,17 @@ export default {
     width: 100%;
     min-width: auto;
   }
+}
+
+.product-points-field {
+  width: 100%;
+}
+
+.product-points-hint {
+  margin: 10px 0 0 0;
+  padding: 0;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.45;
 }
 </style>

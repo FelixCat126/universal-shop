@@ -152,6 +152,7 @@ export default {
     productDescription: 'Product Description',
     quantityLabel: 'Quantity',
     stockInfo: '(Stock: {stock} items)',
+    stockCount: 'Stock {count}',
     addingToCart: 'Adding...',
     processing: 'Processing...',
     outOfStockMessage: 'This product is temporarily out of stock',
@@ -159,6 +160,14 @@ export default {
     productNotFoundDesc: 'Sorry, the product you are looking for may have been removed or does not exist.',
     backToHome: 'Back to Home',
     close: 'Close',
+    currencyThbSymbol: '฿',
+    fxUSD: '$',
+    fxCNY: '¥',
+    fxMYR: 'RM',
+    pointsPurchase: 'Points to purchase',
+    pointsValue: '{points} points',
+    pointsExchangeLabel: 'Points redemption',
+    pointsExchangeBadge: 'PTS',
     // 库存状态
     stockStatuses: {
       outOfStock: 'Out of Stock',
@@ -237,6 +246,8 @@ export default {
     submitFailedRetry: 'Order submission failed, please try again',
     total: 'Order Total',
     items: 'Order Items',
+    linePointsRow: '{points} pts each',
+    linePointsSum: '{points} pts total',
     shippingInfo: 'Shipping Information',
     guestOrderHint: 'You are placing an order as a guest. Please fill in the shipping information. An account will be automatically created for you after placing the order.',
     fillShippingInfo: 'Fill in Shipping Information',
@@ -320,7 +331,17 @@ export default {
     complete: 'Complete Payment',
     cancel: 'Cancel Payment',
     usdtAmount: 'Equivalent USDT Amount',
-    qrCodeSaveTip: 'Tip: Right-click on QR code to save and download'
+    qrCodeSaveTip: 'Tip: Right-click on QR code to save and download',
+    pointsRedeem: 'Points checkout',
+    pointsRedeemDesc: 'Pay the full order with your points balance. Only when every item supports redemption and you have enough points.',
+    pointsBalanceLabel: 'Balance: {balance} pts',
+    pointsOrderNeed: 'This order needs {need} pts',
+    pointsInsufficient: 'You have {balance} pts but this order needs {need} pts',
+    pointsPaySummary: 'Full points payment: {need} pts will be deducted',
+    pointsMixedCartHint:
+      'If the cart includes non-points items, the full order cannot be paid with points. Remove non-points items or place a separate order.',
+    pointsSubmitBlocked: 'Points checkout is not available. Please choose another payment method.',
+    pointsRedeemedShort: 'Paid {points} pts'
   },
 
   // 验证消息
@@ -328,7 +349,7 @@ export default {
     required: 'This field is required',
     emailFormat: 'Please enter a valid email address',
     phoneFormat: 'Please enter a valid phone number',
-    passwordLength: 'Password must be at least 6 characters',
+    passwordLength: 'Password must be at least 8 characters',
     confirmPassword: 'Passwords do not match',
     usernameRequired: 'Please enter username',
     passwordRequired: 'Please enter password',
@@ -344,7 +365,10 @@ export default {
     detailAddressRequired: 'Please enter detailed address',
     emailOrPhoneRequired: 'Please enter phone number or email',
     accountMinLength: 'Account must be at least 3 characters',
-    passwordMinLength: 'Password must be at least 6 characters',
+    passwordMinLength: 'Use at least 8 characters',
+    passwordNeedsDigit: 'Include at least one digit',
+    passwordNeedsLetter: 'Include at least one letter (A–Z, case-sensitive)',
+    passwordPolicyHint: '8+ chars; letters and numbers required (symbols allowed; uppercase/lowercase counts)',
     nicknameMaxLength: 'Nickname cannot exceed 50 characters',
     confirmPasswordRequired: 'Please confirm password',
     email: 'Please enter a valid email address',
@@ -365,6 +389,7 @@ export default {
     completedOrders: 'Completed Orders',
     shippingAddresses: 'Shipping Addresses',
     totalSpent: 'Total Spent',
+    totalSpentHintThb: 'Sum of THB-equivalent totals (analytics)',
     myOrders: 'My Orders',
     allOrders: 'All Orders',
     loadingOrders: 'Loading orders...',
@@ -404,7 +429,33 @@ export default {
     avatarTooLarge: 'Image must be 2MB or smaller',
     avatarUploadFailed: 'Upload failed. Please try again.',
     avatarUpdated: 'Profile photo updated',
-    avatarRemoved: 'Profile photo removed'
+    avatarRemoved: 'Profile photo removed',
+    pointsBalanceTitle: 'Points balance',
+    pointsLedgerTab: 'Points ledger',
+    dateFrom: 'From',
+    dateTo: 'To',
+    applyFilter: 'Apply',
+    ordersRangeSpend: 'Spending in this range: {amount}',
+    loadingMore: 'Loading more…',
+    noMoreItems: 'End of list',
+    loadingPointsLedger: 'Loading ledger…',
+    pointTxOrderRef: 'Order',
+    pointTxBalanceAfter: 'Balance after',
+    pointTypeEarn: 'Earned from purchase',
+    pointTypeRedeem: 'Redeemed for order',
+    noPointTransactions: 'No ledger entries for the selected dates',
+    loadPointsLedgerFailed: 'Could not load points ledger',
+    changePassword: 'Change password',
+    changePasswordTitle: 'Change login password',
+    oldPassword: 'Current password',
+    newPassword: 'New password',
+    confirmNewPassword: 'Confirm new password',
+    confirmPasswordChange: 'Update password',
+    changingPassword: 'Saving…',
+    passwordMismatch: 'New passwords do not match',
+    passwordOldRequired: 'Enter your current password',
+    passwordChanged: 'Password updated',
+    passwordChangeFailed: 'Could not change password'
   },
 
   // 错误消息
@@ -444,10 +495,15 @@ export default {
 
   // 语言选择
   language: {
+    label: 'UI language',
     chinese: '中文',
     thai: 'ไทย',
     english: 'English',
     switchSuccess: 'Language switched successfully'
+  },
+
+  exchangeDisplay: {
+    currency: 'Currency'
   },
 
   // 国家名称

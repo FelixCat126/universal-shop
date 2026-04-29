@@ -91,6 +91,7 @@
             <label for="password" class="block text-sm font-medium text-gray-700">
               {{ t('user.password') }} <span class="text-red-500">*</span>
             </label>
+            <p class="mt-1 text-xs text-gray-500 leading-snug">{{ t('validation.passwordPolicyHint') }}</p>
             <div class="mt-1">
               <input
                 id="password"
@@ -169,6 +170,7 @@ import { userAPI } from '../api/users.js'
 import CountrySelector from '../components/CountrySelector.vue'
 import { validatePhoneI18n, getCountryInfo } from '../utils/phoneValidation.js'
 import { useToast } from '../composables/useToast.js'
+import { describePasswordPolicyFailure } from '../utils/passwordPolicy.js'
 
 // 国际化
 const { t } = useI18n()
@@ -251,8 +253,15 @@ const validateForm = () => {
   // 密码验证
   if (!form.password) {
     newErrors.password = t('validation.passwordRequired')
-  } else if (form.password.length < 6) {
-    newErrors.password = t('validation.passwordMinLength')
+  } else {
+    const fail = describePasswordPolicyFailure(form.password)
+    if (fail === 'short') {
+      newErrors.password = t('validation.passwordMinLength')
+    } else if (fail === 'digit') {
+      newErrors.password = t('validation.passwordNeedsDigit')
+    } else if (fail === 'letter') {
+      newErrors.password = t('validation.passwordNeedsLetter')
+    }
   }
 
   // 确认密码验证

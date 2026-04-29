@@ -90,6 +90,7 @@ export default {
     productDescription: '产品描述',
     quantityLabel: '数量',
     stockInfo: '(库存: {stock} 件)',
+    stockCount: '库存 {count} 件',
     addingToCart: '添加中...',
     processing: '处理中...',
     outOfStockMessage: '该商品暂时缺货',
@@ -97,6 +98,14 @@ export default {
     productNotFoundDesc: '抱歉，您访问的商品可能已被下架或不存在。',
     backToHome: '返回首页',
     close: '关闭',
+    currencyThbSymbol: '฿',
+    fxUSD: '$',
+    fxCNY: '¥',
+    fxMYR: 'RM',
+    pointsPurchase: '购买需积分',
+    pointsValue: '{points}积分',
+    pointsExchangeLabel: '支持积分换购',
+    pointsExchangeBadge: '换购',
     // 库存状态
     stockStatuses: {
       outOfStock: '缺货',
@@ -243,6 +252,8 @@ export default {
     submitFailedRetry: '订单提交失败，请重试',
     total: '订单总计',
     items: '订单商品',
+    linePointsRow: '每件 {points} 积分',
+    linePointsSum: '共 {points} 积分',
     shippingInfo: '收货信息',
     guestOrderHint: '您正在以游客身份下单，请填写收货信息。下单后系统将自动为您创建账户。',
     fillShippingInfo: '填写收货信息',
@@ -310,7 +321,17 @@ export default {
     complete: '完成付款',
     cancel: '取消支付',
     usdtAmount: '等值USDT金额',
-    qrCodeSaveTip: '提示：右键点击二维码可保存下载'
+    qrCodeSaveTip: '提示：右键点击二维码可保存下载',
+    pointsRedeem: '积分换购',
+    pointsRedeemDesc: '使用账户积分全额抵扣本单；仅当购物车内商品均支持积分兑换且积分充足时可选',
+    pointsBalanceLabel: '余额 {balance} 积分',
+    pointsOrderNeed: '本单需消耗 {need} 积分',
+    pointsInsufficient: '当前积分 {balance}，本单需 {need} 积分，不足以完成换购',
+    pointsPaySummary: '积分全额支付，共扣 {need} 积分',
+    pointsMixedCartHint:
+      '购物车中有非积分换购商品时，本订单无法用积分全额支付；请移除非积分换购商品或拆分下单。',
+    pointsSubmitBlocked: '当前无法使用积分换购，请选择其他支付方式',
+    pointsRedeemedShort: '已付 {points} 积分'
   },
 
   // 表单验证
@@ -318,7 +339,7 @@ export default {
     required: '此项为必填项',
     email: '请输入有效的邮箱地址',
     phone: '请输入有效的手机号',
-    password: '密码长度至少6位',
+    password: '请符合下方密码复杂度要求',
     confirmPassword: '两次输入的密码不一致',
     username: '用户名长度为3-20位',
     usernameRequired: '请输入用户名',
@@ -327,7 +348,10 @@ export default {
     emailOrPhoneRequired: '请输入手机号或邮箱',
     accountMinLength: '账号至少3个字符',
     passwordRequired: '请输入密码',
-    passwordMinLength: '密码至少6个字符',
+    passwordMinLength: '密码至少8个字符',
+    passwordNeedsDigit: '密码须包含至少一个数字',
+    passwordNeedsLetter: '密码须包含至少一个英文字母',
+    passwordPolicyHint: '至少8位；须同时含英文字母与数字（可使用常见符号；区分大小写）',
     nicknameRequired: '请输入昵称',
     nicknameMaxLength: '昵称不能超过50个字符',
     phoneRequired: '请输入手机号码',
@@ -357,6 +381,7 @@ export default {
     completedOrders: '已完成订单',
     shippingAddresses: '收货地址',
     totalSpent: '总消费',
+    totalSpentHintThb: '各单泰铢底价之和（用于统计）',
     myOrders: '我的订单',
     allOrders: '全部订单',
     loadingOrders: '加载订单中...',
@@ -396,7 +421,33 @@ export default {
     avatarTooLarge: '图片不能超过 2MB',
     avatarUploadFailed: '头像上传失败，请重试',
     avatarUpdated: '头像已更新',
-    avatarRemoved: '已移除头像'
+    avatarRemoved: '已移除头像',
+    pointsBalanceTitle: '积分余额',
+    pointsLedgerTab: '积分明细',
+    dateFrom: '开始日期',
+    dateTo: '结束日期',
+    applyFilter: '筛选',
+    ordersRangeSpend: '当前筛选范围内消费：{amount}',
+    loadingMore: '加载更多…',
+    noMoreItems: '已加载全部',
+    loadingPointsLedger: '加载明细中…',
+    pointTxOrderRef: '订单',
+    pointTxBalanceAfter: '变动后结余',
+    pointTypeEarn: '购物获得积分',
+    pointTypeRedeem: '积分换购扣减',
+    noPointTransactions: '所选时间范围内暂无积分变动',
+    loadPointsLedgerFailed: '加载积分明细失败',
+    changePassword: '修改密码',
+    changePasswordTitle: '修改登录密码',
+    oldPassword: '当前密码',
+    newPassword: '新密码',
+    confirmNewPassword: '确认新密码',
+    confirmPasswordChange: '确认修改',
+    changingPassword: '提交中…',
+    passwordMismatch: '两次输入的新密码不一致',
+    passwordOldRequired: '请输入当前密码',
+    passwordChanged: '密码已更新',
+    passwordChangeFailed: '密码修改失败，请重试'
   },
 
   // 错误消息
@@ -427,10 +478,15 @@ export default {
 
   // 语言选择
   language: {
+    label: '界面语言',
     chinese: '中文',
     thai: 'ไทย',
     english: 'English',
     switchSuccess: '语言切换成功'
+  },
+
+  exchangeDisplay: {
+    currency: '币种'
   },
 
   // 国家名称

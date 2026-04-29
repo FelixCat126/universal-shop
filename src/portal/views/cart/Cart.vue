@@ -86,16 +86,23 @@
                     <div class="flex items-center mt-2">
                       <!-- 有折扣时显示折扣价格 -->
                       <div v-if="item.product.discount && item.product.discount > 0" class="flex items-center space-x-2">
-                        <span class="text-lg font-bold text-red-600">{{ t('common.currency') }}{{ item.price }}</span>
-                        <span class="text-sm text-gray-400 line-through">{{ t('common.currency') }}{{ item.product.price }}</span>
+                        <span class="text-lg font-bold text-red-600">{{ portalCurrency.formatThb(item.price) }}</span>
+                        <span class="text-sm text-gray-400 line-through">{{ portalCurrency.formatThb(item.product.price) }}</span>
                         <span class="px-1 py-0.5 text-xs bg-red-100 text-red-600 rounded">{{ item.product.discount }}%</span>
                       </div>
                       <!-- 无折扣时显示正常价格 -->
                       <div v-else>
-                        <span class="text-lg font-bold text-blue-600">{{ t('common.currency') }}{{ item.price }}</span>
+                        <span class="text-lg font-bold text-blue-600">{{ portalCurrency.formatThb(item.price) }}</span>
                       </div>
-                      <span v-if="item.product.stock <= 10" class="ml-2 text-xs text-orange-600">
-                        {{ t('product.lowStock') }}
+                      <span
+                        class="ml-2 text-xs tabular-nums"
+                        :class="item.product.stock === 0
+                          ? 'text-red-600'
+                          : item.product.stock > 10
+                            ? 'text-green-600'
+                            : 'text-orange-600'"
+                      >
+                        {{ t('product.stockCount', { count: item.product.stock }) }}
                       </span>
                     </div>
                   </div>
@@ -126,7 +133,7 @@
                   <!-- 小计和删除 -->
                   <div class="flex flex-col items-end space-y-2">
                     <span class="text-lg font-bold text-gray-900">
-                      {{ t('common.currency') }}{{ (item.price * item.quantity).toFixed(2) }}
+                      {{ portalCurrency.formatThb(item.price * item.quantity) }}
                     </span>
                     <button
                       @click="removeItem(item)"
@@ -159,16 +166,23 @@
                       <div class="flex items-center mt-1">
                         <!-- 有折扣时显示折扣价格 -->
                         <div v-if="item.product.discount && item.product.discount > 0" class="flex items-center space-x-1">
-                          <span class="text-base font-bold text-red-600">{{ t('common.currency') }}{{ item.price }}</span>
-                          <span class="text-xs text-gray-400 line-through">{{ t('common.currency') }}{{ item.product.price }}</span>
+                          <span class="text-base font-bold text-red-600">{{ portalCurrency.formatThb(item.price) }}</span>
+                          <span class="text-xs text-gray-400 line-through">{{ portalCurrency.formatThb(item.product.price) }}</span>
                           <span class="px-1 py-0.5 text-xs bg-red-100 text-red-600 rounded">{{ item.product.discount }}%</span>
                         </div>
                         <!-- 无折扣时显示正常价格 -->
                         <div v-else>
-                          <span class="text-base font-bold text-blue-600">{{ t('common.currency') }}{{ item.price }}</span>
+                          <span class="text-base font-bold text-blue-600">{{ portalCurrency.formatThb(item.price) }}</span>
                         </div>
-                        <span v-if="item.product.stock <= 10" class="ml-2 text-xs text-orange-600">
-                          {{ t('product.lowStock') }}
+                        <span
+                          class="ml-2 text-xs tabular-nums"
+                          :class="item.product.stock === 0
+                            ? 'text-red-600'
+                            : item.product.stock > 10
+                              ? 'text-green-600'
+                              : 'text-orange-600'"
+                        >
+                          {{ t('product.stockCount', { count: item.product.stock }) }}
                         </span>
                       </div>
                     </div>
@@ -215,7 +229,7 @@
                     <div class="text-right">
                       <span class="text-sm text-gray-600">{{ t('cart.subtotal') }}:</span>
                       <span class="ml-1 text-lg font-bold text-gray-900">
-                        {{ t('common.currency') }}{{ (item.price * item.quantity).toFixed(2) }}
+                        {{ portalCurrency.formatThb(item.price * item.quantity) }}
                       </span>
                     </div>
                   </div>
@@ -250,7 +264,7 @@
 
             <div class="flex items-center justify-between">
               <dt class="text-sm text-gray-600">{{ t('cart.subtotal') }}</dt>
-              <dd class="text-sm font-medium text-gray-900">{{ t('common.currency') }}{{ cartStore.totalAmount.toFixed(2) }}</dd>
+              <dd class="text-sm font-medium text-gray-900">{{ portalCurrency.formatThb(cartStore.totalAmount.toFixed(2)) }}</dd>
             </div>
 
             <div class="flex items-center justify-between">
@@ -260,7 +274,7 @@
 
             <div class="border-t border-gray-200 pt-4 flex items-center justify-between">
               <dt class="text-lg font-medium text-gray-900">{{ t('cart.total') }}</dt>
-              <dd class="text-lg font-bold text-blue-600">{{ t('common.currency') }}{{ cartStore.totalAmount.toFixed(2) }}</dd>
+              <dd class="text-lg font-bold text-blue-600">{{ portalCurrency.formatThb(cartStore.totalAmount.toFixed(2)) }}</dd>
             </div>
           </div>
 
@@ -351,6 +365,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
+import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import { 
   ArrowLeftIcon, 
   ShoppingCartIcon, 
@@ -366,6 +381,7 @@ const { t, locale } = useI18n()
 // 路由和状态
 const router = useRouter()
 const cartStore = useCartStore()
+const portalCurrency = usePortalCurrencyStore()
 
 // 响应式数据
 const updating = ref(new Set())

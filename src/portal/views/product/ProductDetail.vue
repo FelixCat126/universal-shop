@@ -64,36 +64,38 @@
           <!-- 价格 -->
           <div class="mt-3">
             <h2 class="sr-only">{{ t('product.productPrice') }}</h2>
-            <div class="flex items-center space-x-3">
-              <!-- 有折扣时显示折扣价 -->
-              <div v-if="product.discount && product.discount > 0" class="flex items-center space-x-3">
-                <p class="text-3xl font-bold text-red-600">{{ t('common.currency') }}{{ getDiscountPrice(product) }}</p>
-                <p class="text-xl text-gray-400 line-through">{{ t('common.currency') }}{{ product.price }}</p>
-                <span class="px-2 py-1 text-sm bg-red-100 text-red-600 rounded-md font-medium">
-                  {{ product.discount }}%
-                </span>
+              <div class="flex flex-col gap-2">
+              <div class="flex items-center space-x-3">
+                <!-- 有折扣时显示折扣价 -->
+                <div v-if="product.discount && product.discount > 0" class="flex items-center space-x-3">
+                  <p class="text-3xl font-bold text-red-600">{{ portalCurrency.formatThb(getDiscountPrice(product)) }}</p>
+                  <p class="text-xl text-gray-400 line-through">{{ portalCurrency.formatThb(product.price) }}</p>
+                  <span class="px-2 py-1 text-sm bg-red-100 text-red-600 rounded-md font-medium">
+                    {{ product.discount }}%
+                  </span>
+                </div>
+                <!-- 无折扣时显示正常价格 -->
+                <div v-else>
+                  <p class="text-3xl font-bold text-blue-600">{{ portalCurrency.formatThb(product.price) }}</p>
+                </div>
               </div>
-              <!-- 无折扣时显示正常价格 -->
-              <div v-else>
-                <p class="text-3xl font-bold text-blue-600">{{ t('common.currency') }}{{ product.price }}</p>
-              </div>
+              <p v-if="product.points > 0" class="text-sm text-amber-800">
+                {{ t('product.pointsPurchase') }}：{{ t('product.pointsValue', { points: product.points }) }}
+              </p>
             </div>
           </div>
 
-          <!-- 库存状态 -->
+          <!-- 库存数量（徽标底色与原文案档位一致） -->
           <div class="mt-6">
             <div class="flex items-center">
               <span class="text-sm text-gray-600 mr-2">{{ t('product.stockStatus') }}:</span>
               <span 
                 :class="getStockStatusClass(product.stock)"
-                class="px-2 py-1 text-xs font-medium rounded-full"
+                class="px-2 py-1 text-xs font-medium rounded-full tabular-nums"
               >
-                {{ getStockStatusText(product.stock) }}
+                {{ t('product.stockCount', { count: product.stock }) }}
               </span>
             </div>
-            <p v-if="product.stock > 0 && product.stock <= 10" class="text-sm text-orange-600 mt-1">
-              {{ t('product.stockRemaining', { stock: product.stock }) }}
-            </p>
           </div>
 
           <!-- 产品描述 -->
@@ -126,9 +128,6 @@
                   <PlusIcon class="h-4 w-4" />
                 </button>
               </div>
-              <span class="ml-4 text-sm text-gray-500">
-                {{ t('product.stockInfo', { stock: product.stock }) }}
-              </span>
             </div>
 
             <!-- 操作按钮 -->
@@ -226,12 +225,16 @@ import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
 import { useUserStore } from '../../stores/user.js'
 import { productAPI } from '../../api/products.js'
-import { 
+import {
   ArrowLeftIcon, 
   ShoppingCartIcon, 
   MinusIcon, 
   PlusIcon 
 } from '@heroicons/vue/24/outline'
+import config from '../../../config/index.js'
+import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
+
+const portalCurrency = usePortalCurrencyStore()
 
 // 路由和状态
 const route = useRoute()
@@ -297,11 +300,11 @@ const getCurrentLanguageValue = (item, field) => {
 }
 
 // 计算折扣价格
-const getDiscountPrice = (product) => {
-  if (!product.discount || product.discount <= 0) {
-    return product.price
+const getDiscountPrice = (prod) => {
+  if (!prod.discount || prod.discount <= 0) {
+    return prod.price
   }
-  const discountPrice = product.price * (1 - product.discount / 100)
+  const discountPrice = prod.price * (1 - prod.discount / 100)
   return discountPrice.toFixed(2)
 }
 
@@ -310,13 +313,6 @@ const getStockStatusClass = (stock) => {
   if (stock === 0) return 'bg-red-100 text-red-800'
   if (stock <= 10) return 'bg-orange-100 text-orange-800'
   return 'bg-green-100 text-green-800'
-}
-
-// 获取库存状态文本
-const getStockStatusText = (stock) => {
-  if (stock === 0) return t('product.stockStatuses.outOfStock')
-  if (stock <= 10) return t('product.stockStatuses.lowStock')
-  return t('product.stockStatuses.inStock')
 }
 
 // 数量操作

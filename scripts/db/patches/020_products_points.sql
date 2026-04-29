@@ -1,0 +1,2 @@
+-- 商品「兑换所需积分」
+ALTER TABLE products ADD COLUMN points INTEGER NOT NULL DEFAULT 0;

@@ -15,6 +15,7 @@ const {
   Order
 } = models
 import { importThailandData } from './thailandRegions.js'
+import { ensureProductCategoriesMigrate } from '../utils/ensureProductCategoriesMigrate.js'
 
 class DataSeeder {
   static async run() {
@@ -61,7 +62,10 @@ class DataSeeder {
       
       await this.smartSync()
       console.log('✅ 数据库表结构同步完成')
-      
+
+      await ensureProductCategoriesMigrate()
+      console.log('✅ 商品分类表与 products.category_id 增量迁移已完成（幂等，不覆盖既有分类赋值）')
+
       await this.createDefaultSystemConfig()
       
       await this.createDefaultAdmin({ allowPasswordReset: false })
@@ -273,9 +277,15 @@ class DataSeeder {
       const defaultConfigs = [
         {
           config_key: 'exchange_rate',
-          config_value: '1.0000',
-          description: '汇算比例配置',
-          config_type: 'number'
+          config_value: '0.00',
+          description: '兼容字段：与 exchange_rates.USD（USDT）同步',
+          config_type: 'text'
+        },
+        {
+          config_key: 'exchange_rates',
+          config_value: JSON.stringify({ USD: '0.00', CNY: '0.00', MYR: '0.00' }),
+          description: '多币种汇算 USD|CNY|MYR（相对泰铢标价）',
+          config_type: 'json'
         },
         {
           config_key: 'currency_unit',

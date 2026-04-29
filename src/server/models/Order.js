@@ -26,13 +26,29 @@ const Order = sequelize.define('Order', {
   total_amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
-    comment: '订单总金额'
+    comment: '订单总金额（以 currency_code 币种计；历史未迁移行与 THB 一致）'
+  },
+  total_amount_thb: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    comment: '订单泰铢底价合计（供统计与核验；与 total_amount 币种不同步时以此为准还原 THB）'
+  },
+  currency_code: {
+    type: DataTypes.STRING(10),
+    allowNull: false,
+    defaultValue: 'THB',
+    comment: '结账展示/记账币种 THB|USD|CNY|MYR'
   },
   payment_method: {
     type: DataTypes.STRING(20),
     allowNull: false,
     defaultValue: 'cod',
-    comment: '支付方式: cod-货到付款, online-在线付款'
+    comment: '支付方式: cod-货到付款, online-在线付款, points-积分换购'
+  },
+  points_redeemed: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '积分换购订单消耗的积分总和（仅限 payment_method=points）'
   },
   status: {
     type: DataTypes.STRING(20),

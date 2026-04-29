@@ -29,6 +29,7 @@ export default {
     paymentMethod: '支付方式',
     cod: '货到付款',
     online: '在线付款',
+    pointsRedeem: '积分换购',
     currency: '฿',
     currencyName: '泰铢 ฿',
     createTime: '创建时间',
@@ -90,7 +91,9 @@ export default {
   // 导航菜单
   menu: {
     dashboard: '统计总览',
-    products: '产品管理',
+    productsMenu: '产品',
+    productsList: '产品管理',
+    categoryManage: '类别管理',
     orders: '订单管理',
     users: '用户管理',
     operators: '操作员管理',
@@ -98,6 +101,24 @@ export default {
     operationLogs: '操作日志',
     systemConfig: '系统配置',
     logout: '退出登录'
+  },
+
+  // 商品类别管理
+  categories: {
+    title: '类别管理',
+    keyword: '类别名称',
+    keywordPlaceholder: '支持模糊搜索',
+    name: '类别名称',
+    namePlaceholder: '请输入类别名称',
+    sortOrder: '排序',
+    add: '新建类别',
+    edit: '编辑类别',
+    total: '共',
+    nameRequired: '请输入类别名称',
+    confirmDelete: '确定删除该类目？若类目下仍有商品将无法删除。',
+    createSuccess: '创建成功',
+    updateSuccess: '更新成功',
+    deleteSuccess: '删除成功'
   },
 
   // 产品管理
@@ -220,6 +241,20 @@ export default {
       purpose: '• 用于商品价格汇率换算',
       example: '• 例如：1.00 表示无汇率转换，1.50 表示价格乘以1.5倍'
     },
+    exchangeRates: '汇算比例 · 三项独立汇率比例',
+    exchangeRatesSubtitle: '分别填写：美元/USDT｜人民币（CNY）｜马来西亚令吉（MYR）；商品后台价格为泰铢底价，门户按下列比例折算展示',
+    exchangeRatesIntro: '三种货币互不替代，每项为独立乘数。「泰铢标价 × 本项比例 ≈ 该币种参考金额（保留两位小数）」。填 0 表示门户暂不展示对应币种折算。',
+    fxUSD: '① 美元 / USDT — 汇算比例',
+    fxCNY: '② 人民币 CNY — 汇算比例',
+    fxMYR: '③ 马来西亚令吉 MYR — 汇算比例',
+    saveExchangeRates: '保存汇率',
+    resetExchangeRates: '全部重置为 0',
+    exchangeRatesTips: {
+      base: '• 商品管理中的价格为泰铢底价；以下为「泰铢 × 比例 = 该币种参考金额」的比例。',
+      range: '• 每项仅允许不小于 0 的数值',
+      precision: '• 支持最多两位小数；为 0 时门户不展示对应币种',
+      usdt: '• 美元/USDT 与在线支付订单快照使用同一 USD 数值'
+    },
     currencyUnit: '货币单位',
     currencyUnitSubtitle: '三选一；金额前为货币符号，名称随界面语言显示（中文/英文/泰文）',
     currencyUnitTips: '保存后立即在用户端与管理端生效。列表为「名称 + 符号」，金额处仅显示符号（如 ฿100）。',
@@ -249,7 +284,7 @@ export default {
       confirmDelete: '确定要删除此项吗？',
       fileTooLarge: '文件大小超出限制',
       invalidFileFormat: '文件格式不正确',
-      exchangeRateSaveSuccess: '汇算比例保存成功',
+      exchangeRateSaveSuccess: '多币种汇算比例已保存',
       exchangeRateSaveFailed: '汇算比例保存失败',
       invalidExchangeRate: '请输入有效的汇算比例（≥0，最多两位小数）',
       currencyUnitSaveSuccess: '货币单位已保存',
@@ -475,8 +510,13 @@ export default {
     productList: '商品列表',
     productName: '商品名称',
     price: '价格',
+    originalPrice: '原价',
     quantity: '数量',
     subtotal: '小计',
+    pointsPaidDisplay: '{n} 积分',
+    linePointsDisplay: '{n} 积分',
+    priceThbRef: '参考底价 THB {v}',
+    productListCount: '共 {n} 件',
     orderSummary: '订单汇总',
     totalAmount: '总金额',
     contactName: '联系人',
@@ -503,6 +543,7 @@ export default {
     },
     messages: {
       loadFailed: '加载订单数据失败',
+      detailLoadFailed: '加载订单详情失败',
       exportFailed: '导出数据失败',
       exportSuccess: '导出数据成功',
       exporting: '正在导出订单数据...',
@@ -529,7 +570,9 @@ export default {
     alias: '产品别名',
     description: '产品描述',
     category: '分类',
-    price: '价格',
+    price: '价格（泰铢）',
+    points: '购买所需积分',
+    pointsHint: '0 表示不要求积分兑换',
     stock: '库存',
     status: '状态',
     actions: '操作',
@@ -574,7 +617,8 @@ export default {
       enterName: '请输入产品名称',
       enterAlias: '请输入产品别名（可选）',
       enterDescription: '请输入产品描述',
-      enterPrice: '请输入产品价格',
+      enterPrice: '请输入泰铢价格',
+      enterPoints: '购买所需积分，0 表示不要求',
       enterStock: '请输入库存数量'
     },
     // 消息提示

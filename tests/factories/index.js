@@ -13,7 +13,7 @@ export class TestDataFactory {
       country_code: '+66',
       phone: `8${(timestamp % 100000000).toString().padStart(8, '0')}`,
       email: `test${timestamp}${randomSuffix}@example.com`,
-      password: '123456', // 原始密码，将在模型中自动加密
+      password: 'Abcd1234', // 原始密码，将在模型中自动加密（须符合门户密码复杂度）
       is_active: true,
       referral_code: faker.string.alphanumeric(8).toUpperCase(),
       referral_from: null
@@ -29,7 +29,7 @@ export class TestDataFactory {
     const defaultData = {
       username: `testadmin${timestamp}`,
       email: `admin${timestamp}@test.com`,
-      password: '123456', // 原始密码，将在模型中自动加密
+      password: 'Abcd1234', // 原始密码，将在模型中自动加密（须符合门户密码复杂度）
       role: 'admin',
       is_active: true,
       real_name: faker.person.fullName(),

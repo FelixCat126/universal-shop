@@ -183,7 +183,12 @@ class ExportController {
           : ''
         
         // 计算代收货款：货到付款=订单金额，在线付款=0
-        const codAmount = order.payment_method === 'cod' ? order.total_amount : '0'
+        const amountThb = order.total_amount_thb != null && order.total_amount_thb !== ''
+          ? parseFloat(order.total_amount_thb)
+          : parseFloat(order.total_amount)
+        const codAmount = order.payment_method === 'cod' && Number.isFinite(amountThb)
+          ? amountThb.toFixed(2)
+          : '0'
         
         // 订单状态三语言转换：泰文（中文、英文）
         const getStatusText = (status) => {
@@ -226,7 +231,7 @@ class ExportController {
           'รหัสไปรษณีย์（目的邮编、Postal Code）': order.postal_code || '',
           'ที่อยู่ผู้รับ（收件地址、Delivery Address）': detailAddress,
           'ชื่อสินค้า（物品名称、Product Name）': productNames,
-          'มูลค่าสินค้า（物品价值、Product Value）': order.total_amount || '',
+          'มูลค่าสินค้า（物品价值、Product Value）': (order.total_amount_thb != null && order.total_amount_thb !== '' ? Number(order.total_amount_thb).toFixed(2) : order.total_amount) || '',
           'หมายเหตุ（备注、Remarks）': order.notes || '',
           'เก็บเงินปลายทาง（代收货款、Cash on Delivery）': codAmount,
           'สถานะคำสั่งซื้อ（订单状态、Order Status）': getStatusText(order.status),

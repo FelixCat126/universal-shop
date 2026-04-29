@@ -57,6 +57,12 @@ const OrderItem = sequelize.define('OrderItem', {
     type: DataTypes.STRING(255),
     allowNull: true,
     comment: '商品泰文名称快照'
+  },
+  points_line_cost: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+    comment: '该行换购所用积分快照（每件×数量；非积分单可为 0）'
   }
 }, {
   tableName: 'order_items',

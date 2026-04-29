@@ -51,6 +51,13 @@ export const userAPI = {
     return api.get(`${API_BASE_URL}/profile`)
   },
 
+  getProfileMetrics: () => api.get(`${API_BASE_URL}/profile/metrics`),
+
+  getPointTransactions: (params) => api.get(`${API_BASE_URL}/points/transactions`, { params }),
+
+  /** 修改登录密码 body: { old_password, new_password } */
+  changePassword: (body) => api.put(`${API_BASE_URL}/profile/password`, body),
+
   // 验证推荐码
   verifyReferralCode: (code) => {
     return api.get(`${API_BASE_URL}/verify-referral/${code}`)

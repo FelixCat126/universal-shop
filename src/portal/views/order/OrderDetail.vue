@@ -58,11 +58,22 @@
               {{ getStatusText(order.status) }}
             </span>
             <div class="mt-2">
-              <div v-if="order.payment_method === 'online'" class="text-right">
-                <div class="text-lg font-bold text-blue-600">USDT {{ getExchangedAmount(order.total_amount, order.exchange_rate) }}</div>
-                <div class="text-sm text-gray-500">({{ t('common.currency') }}{{ order.total_amount }})</div>
-              </div>
-              <p v-else class="text-lg font-bold text-blue-600">{{ t('common.currency') }}{{ order.total_amount }}</p>
+              <template v-if="order.payment_method === 'points'">
+                <p class="text-lg font-bold text-amber-900">{{ t('payment.pointsRedeemedShort', { points: order.points_redeemed }) }}</p>
+              </template>
+              <template v-else-if="order.payment_method === 'online'">
+                <div class="text-lg font-bold text-blue-600">{{ formattedOrder.mainLabel }}</div>
+                <div class="text-sm text-green-600">≈ {{ usdtFromOrder }} USDT</div>
+                <div v-if="formattedOrder.amountThb != null && order.currency_code !== 'THB'" class="text-sm text-gray-500">
+                  (≈ {{ t('product.currencyThbSymbol') }}{{ formattedOrder.amountThb.toFixed(2) }} THB)
+                </div>
+              </template>
+              <template v-else>
+                <p class="text-lg font-bold text-blue-600">{{ formattedOrder.mainLabel }}</p>
+                <div v-if="formattedOrder.amountThb != null && order.currency_code !== 'THB'" class="text-sm text-gray-500">
+                  (≈ {{ t('product.currencyThbSymbol') }}{{ formattedOrder.amountThb.toFixed(2) }} THB)
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -135,10 +146,20 @@
               </h4>
               <div class="flex items-center justify-between mt-2">
                 <div class="text-xs sm:text-sm text-gray-500">
-                  {{ t('cart.price') }}: {{ t('common.currency') }}{{ item.price }} × {{ item.quantity }}
+                  <template v-if="order.payment_method === 'points' && item.points_line_cost != null">
+                    {{ t('order.linePointsRow', { points: item.points_line_cost }) }} × {{ item.quantity }}
+                  </template>
+                  <template v-else>
+                    {{ t('cart.price') }}: {{ formatLineRecordedFromThb(order, item.price) }} × {{ item.quantity }}
+                  </template>
                 </div>
                 <div class="text-sm sm:text-base font-bold text-gray-900">
-                  {{ t('common.currency') }}{{ (item.price * item.quantity).toFixed(2) }}
+                  <template v-if="order.payment_method === 'points' && item.points_line_cost != null">
+                    {{ t('order.linePointsSum', { points: Number(item.points_line_cost) * Number(item.quantity) }) }}
+                  </template>
+                  <template v-else>
+                    {{ formatLineRecordedFromThb(order, item.price * item.quantity) }}
+                  </template>
                 </div>
               </div>
             </div>
@@ -149,11 +170,16 @@
         <div class="mt-6 pt-6 border-t border-gray-200">
           <div class="flex justify-between items-center">
             <span class="text-lg font-semibold text-gray-900">{{ t('order.total') }}</span>
-            <div v-if="order.payment_method === 'online'" class="text-right">
-              <div class="text-xl font-bold text-blue-600">USDT {{ getExchangedAmount(order.total_amount, order.exchange_rate) }}</div>
-              <div class="text-sm text-gray-500">({{ t('common.currency') }}{{ order.total_amount }})</div>
+            <template v-if="order.payment_method === 'points'">
+              <span class="text-xl font-bold text-amber-900">{{ t('payment.pointsRedeemedShort', { points: order.points_redeemed }) }}</span>
+            </template>
+            <div v-else-if="order.payment_method === 'online'" class="text-right">
+              <div class="text-xl font-bold text-blue-600">{{ formattedOrder.mainLabel }}</div>
+              <div class="text-sm text-green-600">≈ {{ usdtFromOrder }} USDT</div>
             </div>
-            <span v-else class="text-xl font-bold text-blue-600">{{ t('common.currency') }}{{ order.total_amount }}</span>
+            <div v-else class="text-right">
+              <span class="text-xl font-bold text-blue-600">{{ formattedOrder.mainLabel }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -179,7 +205,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getOrderDetail } from '../../api/orders.js'
@@ -193,6 +219,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import getCurrentLanguageValue from '../../utils/language.js'
 import config from '../../../config/index.js'
+import { formatRecordedOrderAmount, formatLineRecordedFromThb } from '../../utils/orderBillingDisplay.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -284,12 +311,18 @@ const formatDateTime = (dateString) => {
   }
 }
 
-// 在线支付 USDT：仅按订单保存的汇率换算（系统汇算比例变更不影响历史订单）
-const getExchangedAmount = (amount, orderExchangeRate) => {
-  const raw = orderExchangeRate == null || orderExchangeRate === '' ? NaN : parseFloat(orderExchangeRate)
-  const rate = Number.isFinite(raw) ? raw : 1
-  return (parseFloat(amount) * rate).toFixed(2)
-}
+const formattedOrder = computed(() =>
+  order.value ? formatRecordedOrderAmount(order.value) : { currencyCode: 'THB', mainLabel: '—', amountThb: null }
+)
+
+const usdtFromOrder = computed(() => {
+  const o = order.value
+  if (!o) return '0.00'
+  const thb = parseFloat(o.total_amount_thb)
+  const r = parseFloat(o.exchange_rate)
+  if (!(Number.isFinite(thb) && Number.isFinite(r))) return '0.00'
+  return (thb * r).toFixed(2)
+})
 
 // 加载订单详情
 const loadOrderDetail = async () => {

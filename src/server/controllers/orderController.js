@@ -7,20 +7,34 @@ import Cart from '../models/Cart.js'
 import Address from '../models/Address.js'
 import sequelize from '../config/database.js'
 import UserController from './userController.js'
+import { JWT_SECRET } from '../config/jwtSecret.js'
 import { createUserAddress } from '../services/addressService.js'
+import { normalizeExchangeRates, thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
+import * as pointsService from '../services/pointsService.js'
+import { applyCreatedBetween } from '../utils/dateFilters.js'
 
 class OrderController {
   // 创建订单
   static async createOrder(req, res) {
+    const paymentMethodRaw = req.body.payment_method != null ? String(req.body.payment_method) : ''
+    const paymentMethod = ['cod', 'online', 'points'].includes(paymentMethodRaw)
+      ? paymentMethodRaw
+      : 'cod'
+    if (paymentMethod === 'points' && !req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+        message: '请先登录后再使用积分换购'
+      })
+    }
+
     const transaction = await sequelize.transaction()
-    
+
     try {
-      const { 
+      const {
         items,
         contact_name,
         contact_phone,
         delivery_address,
-        payment_method = 'cod', // cod: 货到付款, online: 在线付款
         notes = '',
         referral_code, // 推荐码（可选）
         // 登录用户的地址ID
@@ -30,7 +44,8 @@ class OrderController {
         city = '',
         district = '',
         detail_address = '',
-        postal_code = ''
+        postal_code = '',
+        checkout_currency: checkoutCurrencyRaw
       } = req.body
       
       let userId = req.user?.userId
@@ -119,7 +134,8 @@ class OrderController {
         })
       }
 
-      let totalAmount = 0
+      let totalAmountThb = 0
+      let pointsPurchaseTotal = 0
       const orderItems = []
 
       // 批量查询商品信息（避免N+1查询）
@@ -161,33 +177,85 @@ class OrderController {
         }
 
         const itemTotal = actualPrice * item.quantity
-        totalAmount += itemTotal
+        totalAmountThb += itemTotal
+
+        const ptsUnit = Number(product.points) || 0
+        const pointsLineCost = ptsUnit > 0 ? ptsUnit * item.quantity : 0
+        if (paymentMethod === 'points') {
+          if (ptsUnit <= 0 || pointsLineCost <= 0) {
+            await transaction.rollback()
+            return res.status(400).json({
+              success: false,
+              message: '积分换购订单中只能包含支持积分兑换的商品'
+            })
+          }
+        }
+
+        pointsPurchaseTotal += pointsLineCost
 
         orderItems.push({
           product_id: item.product_id,
           quantity: item.quantity,
-          price: actualPrice, // 实际支付价格
-          original_price: product.price, // 原价
-          discount: product.discount, // 折扣百分比
+          price: actualPrice,
+          original_price: product.price,
+          discount: product.discount,
           product_name_zh: product.name,
-          product_name_th: product.name_th || null
+          product_name_th: product.name_th || null,
+          points_line_cost: pointsLineCost
         })
       }
 
-      // 获取当前系统汇率配置
-      let exchangeRate = 1.0000
-      try {
-        const SystemConfig = (await import('../models/SystemConfig.js')).default
+      const checkoutCurrency = normalizeCheckoutCurrency(checkoutCurrencyRaw)
+
+      // 汇算比例：与门户计价一致（泰铢底价 × 比例 = 外币金额）
+      const SystemConfig = (await import('../models/SystemConfig.js')).default
+      let xrJson = await SystemConfig.getConfig('exchange_rates')
+      if (!xrJson || typeof xrJson !== 'object') {
         const rateConfig = await SystemConfig.findOne({
           where: { config_key: 'exchange_rate' }
         })
-        if (rateConfig && rateConfig.config_value) {
-          exchangeRate = parseFloat(rateConfig.config_value)
+        let usdFallback = 0
+        if (rateConfig?.config_value) {
+          const n = parseFloat(rateConfig.config_value)
+          usdFallback = Number.isFinite(n) && n >= 0 ? n : 0
         }
-      } catch (error) {
-        console.error('获取汇率配置失败，使用默认值1.0000:', error)
+        xrJson = {
+          USD: usdFallback.toFixed(2),
+          CNY: '0.00',
+          MYR: '0.00'
+        }
+      }
+      const normRates = normalizeExchangeRates(xrJson)
+
+      if (paymentMethod !== 'points' && checkoutCurrency !== 'THB') {
+        const need = parseFloat(normRates[checkoutCurrency])
+        if (!Number.isFinite(need) || need <= 0) {
+          await transaction.rollback()
+          return res.status(400).json({
+            success: false,
+            message: `无法在所选币种 ${checkoutCurrency} 结账：系统未配置有效汇算比例或未启用该币种`
+          })
+        }
       }
 
+      totalAmountThb = parseFloat(totalAmountThb.toFixed(2))
+
+      let totalBilling
+      if (paymentMethod === 'points') {
+        totalAmountThb = 0
+        totalBilling = 0
+        if (!(pointsPurchaseTotal > 0)) {
+          await transaction.rollback()
+          return res.status(400).json({
+            success: false,
+            message: '无效的积分兑换数量'
+          })
+        }
+      } else {
+        totalBilling = thbToBillingAmount(totalAmountThb, checkoutCurrency, normRates)
+      }
+      const exchangeRateUsd = parseFloat(normRates.USD || '0')
+      const exchangeRateSnapshot = Number.isFinite(exchangeRateUsd) ? exchangeRateUsd : 0
       // 获取完整的地址信息（省市区邮编）
       let orderProvince = province
       let orderCity = city  
@@ -249,8 +317,11 @@ class OrderController {
       const order = await Order.create({
         order_no: orderNo,
         user_id: userId,
-        total_amount: totalAmount,
-        payment_method,
+        total_amount: totalBilling,
+        total_amount_thb: totalAmountThb,
+        currency_code: checkoutCurrency,
+        payment_method: paymentMethod,
+        points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
         status: 'shipping', // 订单提交后进入送货中状态
         contact_name: orderContactName,
         contact_phone: orderContactPhone,
@@ -260,7 +331,7 @@ class OrderController {
         district: orderDistrict,
         postal_code: orderPostalCode,
         notes,
-        exchange_rate: exchangeRate // 保存下单时的汇率
+        exchange_rate: exchangeRateSnapshot // 下单时 USD 汇算（与历史 USDT 展示兼容）
       }, { transaction })
 
       // 创建订单项
@@ -275,6 +346,15 @@ class OrderController {
           by: orderItem.quantity,
           where: { id: orderItem.product_id },
           transaction
+        })
+      }
+
+      if (paymentMethod === 'points') {
+        await pointsService.redeemPointsForOrder(transaction, {
+          userId,
+          orderId: order.id,
+          points: pointsPurchaseTotal,
+          note: `积分换购 ${order.order_no}`
         })
       }
 
@@ -320,6 +400,17 @@ class OrderController {
 
       await transaction.commit()
 
+      try {
+        if (paymentMethod !== 'points' && userId) {
+          const qtySum = items.reduce((s, it) => s + Number(it.quantity || 0), 0)
+          if (qtySum > 0) {
+            await pointsService.grantPurchasePoints(userId, order.id, qtySum)
+          }
+        }
+      } catch (earnErr) {
+        console.error('购物积分发放失败:', earnErr)
+      }
+
       // 返回创建的订单信息
       const createdOrder = await Order.findByPk(order.id, {
         include: [
@@ -343,7 +434,6 @@ class OrderController {
       // 如果是游客下单，返回用户信息和token
       if (isGuestOrder) {
         const jwt = (await import('jsonwebtoken')).default
-        const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here'
         
         const user = await User.findByPk(userId)
         const token = jwt.sign(
@@ -366,6 +456,12 @@ class OrderController {
     } catch (error) {
       await transaction.rollback()
       console.error('创建订单失败:', error)
+      if (error && error.message === 'POINTS_INSUFFICIENT') {
+        return res.status(400).json({
+          success: false,
+          message: '积分余额不足，请选择其他支付方式或减少兑换数量'
+        })
+      }
       res.status(500).json({
         success: false,
         message: '创建订单失败',
@@ -386,27 +482,40 @@ class OrderController {
       }
 
       const { page = 1, limit = 10, status } = req.query
-      const offset = (page - 1) * limit
+      const safeLimit = Math.min(Math.max(Number.parseInt(String(limit), 10) || 10, 1), 100)
+      const safePage = Math.max(Number.parseInt(String(page), 10) || 1, 1)
+      const offset = (safePage - 1) * safeLimit
 
-      const where = { user_id: userId }
+      let where = { user_id: userId }
       if (status) {
         where.status = status
       }
+      where = applyCreatedBetween(where, req.query)
 
       const { count, rows: orders } = await Order.findAndCountAll({
         where,
         order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        limit: safeLimit,
+        offset
       })
+
+      const spentWhere = {
+        ...where,
+        payment_method: { [Op.ne]: 'points' }
+      }
+      const spentRaw = await Order.sum('total_amount_thb', { where: spentWhere })
+      const spentThbSum = spentRaw != null && spentRaw !== ''
+        ? parseFloat(String(spentRaw))
+        : 0
 
       res.json({
         success: true,
         data: {
           orders,
           total: count,
-          page: parseInt(page),
-          totalPages: Math.ceil(count / limit)
+          page: safePage,
+          totalPages: Math.ceil(count / safeLimit) || 0,
+          spent_thb_sum: Number.isFinite(spentThbSum) ? spentThbSum : 0
         }
       })
 
@@ -420,46 +529,66 @@ class OrderController {
     }
   }
 
-  // 获取订单详情
+  // 获取订单详情（门户：仅能查本人订单；管理端：按 id 查任意订单）
   static async getOrderDetail(req, res) {
     try {
       const { id } = req.params
+      const admin = req.admin
       const userId = req.user?.userId
 
-      if (!userId) {
+      const detailIncludes = [
+        {
+          model: OrderItem,
+          as: 'items',
+          include: [{
+            model: Product,
+            as: 'product',
+            paranoid: false
+          }]
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: admin
+            ? ['id', 'nickname', 'phone', 'referred_by_code']
+            : ['id', 'nickname', 'phone']
+        }
+      ]
+
+      let order = null
+
+      if (admin) {
+        order = await Order.findByPk(id, { include: detailIncludes })
+        if (!order) {
+          return res.status(404).json({
+            success: false,
+            message: '订单不存在'
+          })
+        }
+        if (order.user?.referred_by_code) {
+          const referrer = await User.findOne({
+            where: { referral_code: order.user.referred_by_code },
+            attributes: ['id', 'nickname', 'phone']
+          })
+          if (referrer) {
+            order.user.dataValues.referrer = referrer
+          }
+        }
+      } else if (userId) {
+        order = await Order.findOne({
+          where: { id, user_id: userId },
+          include: detailIncludes
+        })
+        if (!order) {
+          return res.status(404).json({
+            success: false,
+            message: '订单不存在'
+          })
+        }
+      } else {
         return res.status(401).json({
           success: false,
           message: '用户未登录'
-        })
-      }
-
-      const order = await Order.findOne({
-        where: { 
-          id,
-          user_id: userId 
-        },
-        include: [
-          {
-            model: OrderItem,
-            as: 'items',
-            include: [{
-              model: Product,
-              as: 'product',
-              paranoid: false
-            }]
-          },
-          {
-            model: User,
-            as: 'user',
-            attributes: ['id', 'nickname', 'phone']
-          }
-        ]
-      })
-
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          message: '订单不存在'
         })
       }
 

@@ -62,10 +62,14 @@
             <el-icon><DataAnalysis /></el-icon>
             <span>{{ t('menu.dashboard') }}</span>
           </el-menu-item>
-          <el-menu-item index="/products">
-            <el-icon><Goods /></el-icon>
-            <span>{{ t('menu.products') }}</span>
-          </el-menu-item>
+          <el-sub-menu index="/products-menu">
+            <template #title>
+              <el-icon><Goods /></el-icon>
+              <span>{{ t('menu.productsMenu') }}</span>
+            </template>
+            <el-menu-item index="/products">{{ t('menu.productsList') }}</el-menu-item>
+            <el-menu-item index="/product-categories">{{ t('menu.categoryManage') }}</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/orders">
             <el-icon><Document /></el-icon>
             <span>{{ t('menu.orders') }}</span>

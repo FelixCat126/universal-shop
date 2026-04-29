@@ -126,11 +126,11 @@
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <span class="text-xl font-bold text-primary-600">
-                  ¥{{ product.price }}
+                  {{ portalCurrency.formatThb(product.price) }}
                 </span>
                 <span v-if="product.original_price && product.original_price > product.price" 
                       class="text-sm text-gray-400 line-through">
-                  ¥{{ product.original_price }}
+                  {{ portalCurrency.formatThb(product.original_price) }}
                 </span>
               </div>
               
@@ -237,6 +237,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../../stores/user.js'
 import { useCartStore } from '../../stores/cart.js'
+import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import {
   ShoppingCartIcon,
   ShoppingBagIcon,
@@ -247,6 +248,7 @@ import { useToast } from '../../composables/useToast.js'
 const router = useRouter()
 const userStore = useUserStore()
 const cartStore = useCartStore()
+const portalCurrency = usePortalCurrencyStore()
 const { t } = useI18n()
 const { showError } = useToast()
 

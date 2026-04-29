@@ -29,6 +29,7 @@ export default {
     paymentMethod: 'Payment Method',
     cod: 'Cash on Delivery',
     online: 'Online Payment',
+    pointsRedeem: 'Points redemption',
     currency: '฿',
     currencyName: 'Thai Baht ฿',
     createTime: 'Create Time',
@@ -88,7 +89,9 @@ export default {
   // Navigation menu
   menu: {
     dashboard: 'Dashboard',
-    products: 'Product Management',
+    productsMenu: 'Catalog',
+    productsList: 'Products',
+    categoryManage: 'Categories',
     orders: 'Order Management',
     users: 'User Management',
     operators: 'Operator Management',
@@ -96,6 +99,23 @@ export default {
     operationLogs: 'Operation Logs',
     systemConfig: 'System Configuration',
     logout: 'Logout'
+  },
+
+  categories: {
+    title: 'Category management',
+    keyword: 'Name',
+    keywordPlaceholder: 'Fuzzy search',
+    name: 'Category name',
+    namePlaceholder: 'Enter category name',
+    sortOrder: 'Sort order',
+    add: 'New category',
+    edit: 'Edit category',
+    total: 'Total',
+    nameRequired: 'Please enter a name',
+    confirmDelete: 'Delete this category?',
+    createSuccess: 'Created',
+    updateSuccess: 'Updated',
+    deleteSuccess: 'Deleted'
   },
 
   // Product management
@@ -218,6 +238,20 @@ export default {
       purpose: '• Used for product price exchange rate conversion',
       example: '• Example: 1.00 means no conversion, 1.50 means multiply price by 1.5'
     },
+    exchangeRates: 'Settlement ratios · three independent rates',
+    exchangeRatesSubtitle: 'Separate rates for USD/USDT, CNY, and MYR. Catalog is THB; the portal converts with each multiplier below.',
+    exchangeRatesIntro: 'These are three independent multipliers versus the THB list price (THB × ratio ≈ converted amount). 0 hides that currency on the portal.',
+    fxUSD: '① USD / USDT',
+    fxCNY: '② CNY',
+    fxMYR: '③ MYR',
+    saveExchangeRates: 'Save rates',
+    resetExchangeRates: 'Reset all to 0',
+    exchangeRatesTips: {
+      base: '• Admin price is THB; converted amount ≈ THB × ratio for each currency.',
+      range: '• Each value must be ≥ 0',
+      precision: '• Up to 2 decimal places; if 0, the portal hides that currency line',
+      usdt: '• USD/USDT matches the value used for online payment order snapshots'
+    },
     currencyUnit: 'Currency',
     currencyUnitSubtitle: 'Choose one; amounts use the symbol only, labels follow UI language (ZH / EN / TH).',
     currencyUnitTips: 'Applies site-wide after save. Options show name + symbol; prices show the symbol only (e.g. ฿100).',
@@ -247,7 +281,7 @@ export default {
       confirmDelete: 'Are you sure you want to delete this item?',
       fileTooLarge: 'File size exceeds limit',
       invalidFileFormat: 'Invalid file format',
-      exchangeRateSaveSuccess: 'Exchange rate saved successfully',
+      exchangeRateSaveSuccess: 'Multi-currency settlement ratios saved',
       exchangeRateSaveFailed: 'Failed to save exchange rate',
       invalidExchangeRate: 'Please enter a valid exchange rate (≥0, up to 2 decimal places)',
       currencyUnitSaveSuccess: 'Currency symbol saved',
@@ -473,8 +507,13 @@ export default {
     productList: 'Product List',
     productName: 'Product Name',
     price: 'Price',
+    originalPrice: 'Original',
     quantity: 'Quantity',
     subtotal: 'Subtotal',
+    pointsPaidDisplay: '{n} points',
+    linePointsDisplay: '{n} points',
+    priceThbRef: 'Reference THB {v}',
+    productListCount: '{n} line item(s)',
     orderSummary: 'Order Summary',
     totalAmount: 'Total Amount',
     contactName: 'Contact Name',
@@ -501,6 +540,7 @@ export default {
     },
     messages: {
       loadFailed: 'Failed to load order data',
+      detailLoadFailed: 'Failed to load order detail',
       exportFailed: 'Export failed',
       exportSuccess: 'Export successful',
       exporting: 'Exporting order data...',
@@ -527,7 +567,9 @@ export default {
     alias: 'Product Alias',
     description: 'Product Description',
     category: 'Category',
-    price: 'Price',
+    price: 'Price (THB)',
+    points: 'Points required',
+    pointsHint: '0 means points are not enforced',
     stock: 'Stock',
     status: 'Status',
     actions: 'Actions',
@@ -572,7 +614,8 @@ export default {
       enterName: 'Please enter product name',
       enterAlias: 'Please enter product alias (optional)',
       enterDescription: 'Please enter product description',
-      enterPrice: 'Please enter product price',
+      enterPrice: 'Price in THB',
+      enterPoints: 'Points required to purchase; 0 = no requirement',
       enterStock: 'Please enter stock quantity'
     },
     // Messages

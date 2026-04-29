@@ -9,6 +9,7 @@ import sequelize from '../config/database.js'
 // 导入所有模型
 import User from './User.js'
 import Administrator from './Administrator.js'
+import ProductCategory from './ProductCategory.js'
 import Product from './Product.js'
 import Cart from './Cart.js'
 import Order from './Order.js'
@@ -17,6 +18,8 @@ import Address from './Address.js'
 import AdministrativeRegion from './AdministrativeRegion.js'
 import SystemConfig from './SystemConfig.js'
 import OperationLog from './OperationLog.js'
+import './UserPointBalance.js'
+import './PointTransaction.js'
 
 // 注意：关联关系已在各个模型文件中定义，无需重复定义
 console.log('✅ 所有数据库模型已导入')
@@ -26,6 +29,7 @@ export {
   sequelize,
   User,
   Administrator,
+  ProductCategory,
   Product,
   Cart,
   Order,
@@ -41,6 +45,7 @@ export default {
   sequelize,
   User,
   Administrator,
+  ProductCategory,
   Product,
   Cart,
   Order,

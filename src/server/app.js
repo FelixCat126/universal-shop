@@ -6,7 +6,9 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import sequelize from './config/database.js'
 import { DataTypes } from 'sequelize'
+import { ensureProductCategoriesMigrate } from './utils/ensureProductCategoriesMigrate.js'
 import productRoutes from './routes/productRoutes.js'
+import productCategoryRoutes from './routes/productCategoryRoutes.js'
 import uploadRoutes from './routes/uploadRoutes.js'
 import userRoutes from './routes/userRoutes.js'
 import cartRoutes from './routes/cartRoutes.js'
@@ -20,6 +22,7 @@ import administrativeRegionsRoutes from './routes/administrativeRegions.js'
 
 // 导入模型以确保数据库同步
 import './models/User.js'
+import './models/ProductCategory.js'
 import './models/Product.js'
 import './models/Cart.js'
 import './models/Order.js'
@@ -29,6 +32,12 @@ import './models/Administrator.js'
 import './models/AdministrativeRegion.js'
 import './models/OperationLog.js'
 import './models/SystemConfig.js'
+import SystemConfig from './models/SystemConfig.js'
+import './models/UserPointBalance.js'
+import './models/PointTransaction.js'
+
+import './models/UserPointBalance.js'
+import './models/PointTransaction.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -69,7 +78,25 @@ app.use((req, res, next) => {
   next()
 })
 
-async function ensureUserAvatarUrlColumn() {
+/** SQLite：旧库 products 无 deleted_at 时先于 sync 补列，否则建索引会因缺列失败 */
+async function ensureSqliteProductDeletedAtColumn () {
+  if (sequelize.getDialect() !== 'sqlite') return
+
+  const [tables] = await sequelize.query(`
+    SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'products' LIMIT 1
+  `)
+  if (tables.length === 0) return
+
+  const [cols] = await sequelize.query('PRAGMA table_info(products)')
+  const hasDeletedAt = cols.some((c) => c.name === 'deleted_at')
+  if (hasDeletedAt) return
+
+  console.log('🔧 products 表缺少 deleted_at，正在执行 ALTER ADD COLUMN（软删除列）...')
+  await sequelize.query('ALTER TABLE products ADD COLUMN deleted_at DATETIME')
+  console.log('✅ 已为 products 表添加 deleted_at 字段')
+}
+
+async function ensureUserAvatarUrlColumn () {
   const qi = sequelize.getQueryInterface()
   const desc = await qi.describeTable('users')
   if (!desc.avatar_url) {
@@ -81,13 +108,94 @@ async function ensureUserAvatarUrlColumn() {
   }
 }
 
-// 数据库连接和同步
+async function ensureProductPointsColumn () {
+  const qi = sequelize.getQueryInterface()
+  const desc = await qi.describeTable('products')
+  if (!desc.points) {
+    await qi.addColumn('products', 'points', {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    })
+    console.log('✅ 已为 products 表添加 points 字段')
+  }
+}
+
+async function ensureOrderBillingColumns () {
+  const qi = sequelize.getQueryInterface()
+  const desc = await qi.describeTable('orders')
+  if (!desc.currency_code) {
+    await qi.addColumn('orders', 'currency_code', {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      defaultValue: 'THB'
+    })
+    await sequelize.query(`UPDATE orders SET currency_code = 'THB' WHERE currency_code IS NULL OR currency_code = ''`)
+    console.log('✅ 已为 orders 表添加 currency_code 字段')
+  }
+  if (!desc.total_amount_thb) {
+    await qi.addColumn('orders', 'total_amount_thb', {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true
+    })
+    await sequelize.query(`UPDATE orders SET total_amount_thb = total_amount WHERE total_amount_thb IS NULL`)
+    console.log('✅ 已为 orders 表添加 total_amount_thb（并由原 total_amount 回填泰铢）')
+  }
+}
+
+async function ensureOrderPointsRedeemedColumn () {
+  const qi = sequelize.getQueryInterface()
+  const desc = await qi.describeTable('orders')
+  if (!desc.points_redeemed) {
+    await qi.addColumn('orders', 'points_redeemed', {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    })
+    console.log('✅ 已为 orders 表添加 points_redeemed 字段')
+  }
+}
+
+async function ensureOrderItemPointsLineCostColumn () {
+  const qi = sequelize.getQueryInterface()
+  const desc = await qi.describeTable('order_items')
+  if (!desc.points_line_cost) {
+    await qi.addColumn('order_items', 'points_line_cost', {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    })
+    console.log('✅ 已为 order_items 表添加 points_line_cost 字段')
+  }
+}
+
+/** 旧库仅有 exchange_rate：补全 exchange_rates（JSON），不覆盖已有 exchange_rates */
+async function ensureExchangeRatesConfig () {
+  const existing = await SystemConfig.findOne({ where: { config_key: 'exchange_rates' } })
+  if (existing) return
+  const legacy = await SystemConfig.findOne({ where: { config_key: 'exchange_rate' } })
+  let usd = 0
+  if (legacy?.config_value != null && String(legacy.config_value).trim() !== '') {
+    const n = parseFloat(legacy.config_value)
+    if (Number.isFinite(n) && n >= 0) usd = Math.round(n * 100) / 100
+  }
+  const obj = normalizeExchangeRates({ USD: usd.toFixed(2), CNY: '0.00', MYR: '0.00' })
+  await SystemConfig.setConfig('exchange_rates', obj, 'json', '多币种汇算（相对泰铢标价：金额×比例）')
+  console.log('✅ 已补全 exchange_rates 配置（由旧 exchange_rate 迁移）')
+}
+
+// 数据库连接和同步（SQLite 须先补齐 deleted_at 再 sync，否则索引创建失败）
 sequelize.authenticate()
+  .then(() => ensureSqliteProductDeletedAtColumn())
   .then(() => {
     console.log('✅ 数据库连接成功')
     return sequelize.sync({ alter: false })
   })
   .then(() => ensureUserAvatarUrlColumn())
+  .then(() => ensureProductPointsColumn())
+  .then(() => ensureOrderBillingColumns())
+  .then(() => ensureOrderPointsRedeemedColumn())
+  .then(() => ensureOrderItemPointsLineCostColumn())
+  .then(() => ensureExchangeRatesConfig())
+  .then(() => ensureProductCategoriesMigrate())
   .then(() => {
     console.log('✅ 数据库模型同步成功')
   })
@@ -102,6 +210,7 @@ sequelize.authenticate()
 // API路由
 console.log('🔧 注册API路由...')
 app.use('/api/products', productRoutes)
+app.use('/api/product-categories', productCategoryRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/cart', cartRoutes)
@@ -272,6 +381,15 @@ export function startServer() {
     console.log(`📱 用户门户: http://localhost:${PORT}/portal/`)
     console.log(`🔧 管理后台: http://localhost:${PORT}/admin/`)
     console.log(`🩺 健康检查: http://localhost:${PORT}/api/health`)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('------------------------------------------------')
+      console.log('🔥 开发热更新（改 Vue 源码后此处才即时生效）：')
+      console.log('   门户 Dev  http://localhost:3001/        （vite.config.js）')
+      console.log('   管理后台  http://localhost:3002/admin/  （vite.admin.config.js）')
+      console.log('ℹ️  :3000 上的 /portal、/admin 来自 dist/** 构建文件；')
+      console.log('   若在 :3000 打开后台没看到最新界面，请先访问 :3002，或执行 npm run build:admin')
+      console.log('------------------------------------------------')
+    }
     console.log('================================================')
     console.log('💡 提示: 按 Ctrl+C 停止服务')
     console.log('')

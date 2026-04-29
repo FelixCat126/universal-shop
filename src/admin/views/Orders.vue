@@ -157,17 +157,30 @@
 
         <el-table-column :label="t('orders.amount')" width="200" align="center">
           <template #default="scope">
-            <div class="amount" v-if="scope.row.payment_method === 'online'">
-              <div class="converted-amount">USDT {{ getExchangedAmount(scope.row.total_amount, scope.row.exchange_rate) }}</div>
-              <div class="original-amount">({{ t('common.currency') }}{{ scope.row.total_amount }})</div>
+            <div class="amount">
+              <template v-if="scope.row.payment_method === 'points'">
+                <div class="converted-amount">{{ adminOrderPointsLabel(scope.row) }}</div>
+              </template>
+              <template v-else>
+                <div class="converted-amount">{{ formatRecordedOrderAmount(scope.row).mainLabel }}</div>
+                <div v-if="scope.row.payment_method === 'online'" class="original-amount">≈ {{ adminUsdtHint(scope.row) }} USDT</div>
+                <div
+                  v-if="scope.row.currency_code && scope.row.currency_code !== 'THB' && scope.row.total_amount_thb != null"
+                  class="original-amount"
+                >
+                  ≈ {{ t('common.currency') }}{{ Number(scope.row.total_amount_thb).toFixed(2) }} THB
+                </div>
+              </template>
             </div>
-            <div class="amount" v-else>{{ t('common.currency') }}{{ scope.row.total_amount }}</div>
           </template>
         </el-table-column>
 
         <el-table-column :label="t('common.paymentMethod')" width="150" align="center">
           <template #default="scope">
-            <el-tag :type="scope.row.payment_method === 'cod' ? 'warning' : 'success'" size="small">
+            <el-tag
+              :type="scope.row.payment_method === 'cod' ? 'warning' : scope.row.payment_method === 'online' ? 'success' : 'info'"
+              size="small"
+            >
               {{ getPaymentMethodText(scope.row.payment_method) }}
             </el-tag>
           </template>
@@ -247,7 +260,8 @@
       class="order-detail-dialog"
       :before-close="closeDetailModal"
     >
-      <div v-if="selectedOrder" class="order-detail-container">
+      <div v-loading="detailLoading" class="order-detail-loading-wrap">
+        <div v-if="selectedOrder" class="order-detail-container">
         <!-- 订单状态和基本信息卡片 -->
         <el-row :gutter="20" class="detail-row">
           <el-col :span="16">
@@ -271,15 +285,25 @@
                   </el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('orders.amount')">
-                  <span class="amount-text" v-if="selectedOrder.payment_method === 'online'">
-                    <div class="primary-amount">USDT {{ getExchangedAmount(selectedOrder.total_amount, selectedOrder.exchange_rate) }}</div>
-                    <div class="original-amount-detail">({{ t('common.currency') }}{{ selectedOrder.total_amount }})</div>
+                  <span class="amount-text">
+                    <template v-if="selectedOrder.payment_method === 'points'">
+                      <div class="primary-amount">{{ adminOrderPointsLabel(selectedOrder) }}</div>
+                    </template>
+                    <template v-else>
+                      <div class="primary-amount">{{ formatRecordedOrderAmount(selectedOrder).mainLabel }}</div>
+                      <div v-if="selectedOrder.payment_method === 'online'" class="original-amount-detail">≈ {{ adminUsdtHint(selectedOrder) }} USDT</div>
+                      <div
+                        v-if="selectedOrder.currency_code && selectedOrder.currency_code !== 'THB' && selectedOrder.total_amount_thb != null"
+                        class="original-amount-detail"
+                      >
+                        ≈ {{ t('common.currency') }}{{ Number(selectedOrder.total_amount_thb).toFixed(2) }} THB
+                      </div>
+                    </template>
                   </span>
-                  <span class="amount-text" v-else>{{ t('common.currency') }}{{ selectedOrder.total_amount }}</span>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('common.paymentMethod')">
                   <el-tag 
-                    :type="selectedOrder.payment_method === 'cod' ? 'warning' : 'success'"
+                    :type="selectedOrder.payment_method === 'cod' ? 'warning' : selectedOrder.payment_method === 'online' ? 'success' : 'info'"
                     size="small"
                   >
                     {{ getPaymentMethodText(selectedOrder.payment_method) }}
@@ -343,7 +367,7 @@
               <el-icon class="header-icon" color="#f56c6c"><ShoppingBag /></el-icon>
               <span>{{ t('orders.productList') }}</span>
               <el-tag type="info" size="small" class="item-count">
-                {{ selectedOrder.items.length }} {{ selectedOrder.items.length > 1 ? 'items' : 'item' }}
+                {{ t('orders.productListCount', { n: selectedOrder.items.length }) }}
               </el-tag>
             </div>
           </template>
@@ -355,6 +379,14 @@
               :class="{ 'item-border': index < selectedOrder.items.length - 1 }"
             >
               <div class="product-main">
+                <div class="product-thumb-wrap">
+                  <img
+                    class="product-thumb"
+                    :src="orderLineImageSrc(item)"
+                    alt=""
+                    @error="onOrderLineImageError"
+                  />
+                </div>
                 <div class="product-info">
                   <h4 class="product-name">{{ item.product_name_zh }}</h4>
                   <div class="product-meta">
@@ -362,18 +394,27 @@
                       {{ t('orders.quantity') }}: {{ item.quantity }}
                     </el-tag>
                     <template v-if="item.discount && item.discount > 0">
-                      <span class="price-current">{{ t('orders.price') }}: {{ t('common.currency') }}{{ item.price }}</span>
-                      <span class="price-original">{{ t('common.currency') }}{{ item.original_price }}</span>
+                      <span class="price-current">{{ t('orders.price') }} (THB): {{ item.price }}</span>
+                      <span class="price-original">{{ t('orders.originalPrice') }} (THB): {{ item.original_price }}</span>
                       <el-tag type="danger" size="small">{{ item.discount }}%折</el-tag>
                     </template>
                     <template v-else>
-                      <span class="price-current">{{ t('orders.price') }}: {{ t('common.currency') }}{{ item.price }}</span>
+                      <span class="price-current">{{ t('orders.price') }} (THB): {{ item.price }}</span>
                     </template>
                   </div>
                 </div>
                 <div class="product-total">
-                  <div class="total-label">小计</div>
-                  <div class="total-amount">{{ t('common.currency') }}{{ (item.price * item.quantity).toFixed(2) }}</div>
+                  <div class="total-label">{{ t('orders.subtotal') }}</div>
+                  <div class="total-amount">
+                    <template v-if="selectedOrder.payment_method === 'points'">
+                      <div>{{ adminLinePointsLabel(item) }}</div>
+                      <div class="text-xs text-gray-500">{{ t('orders.priceThbRef', { v: (item.price * item.quantity).toFixed(2) }) }}</div>
+                    </template>
+                    <template v-else>
+                      <div>{{ formatLineRecordedFromThb(selectedOrder, item.price * item.quantity) }}</div>
+                      <div class="text-xs text-gray-500">THB {{ (item.price * item.quantity).toFixed(2) }}</div>
+                    </template>
+                  </div>
                 </div>
               </div>
             </div>
@@ -390,6 +431,7 @@
           </template>
           <el-text class="notes-text">{{ selectedOrder.notes }}</el-text>
         </el-card>
+        </div>
       </div>
     </el-dialog>
   </div>
@@ -402,6 +444,11 @@ import { Search, Refresh, Download, TrendCharts, SuccessFilled, Coin, Calendar, 
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
+import config from '../../config/index.js'
+import { formatRecordedOrderAmount, formatLineRecordedFromThb } from '../../portal/utils/orderBillingDisplay.js'
+
+const orderLineImgFallback =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik02MCA2MEgxNDBWMTQwSDYwVjYwWiIgc3Ryb2tlPSIjOUI5QkEwIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPGNpcmNsZSBjeD0iODAiIGN5PSI4MCIgcj0iMTAiIGZpbGw9IiM5QjlCQTAiLz4KPHBhdGggZD0iTTkwIDEwMEwxMjAgNzBMMTMwIDgwTDEyMCAxMDBMOTAgMTAwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -416,6 +463,7 @@ const loading = ref(false)
 const isExporting = ref(false)
 const showDetailModal = ref(false)
 const selectedOrder = ref(null)
+const detailLoading = ref(false)
 
 // 分页数据
 const currentPage = ref(1)
@@ -441,11 +489,19 @@ const pagination = reactive({
 const stats = computed(() => {
   const total = orders.value.length
   const completed = orders.value.filter(order => order.status === 'completed').length
-  const totalAmount = orders.value.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0).toFixed(2)
-  
+  const sumOrderThb = (order) => {
+    if (order.payment_method === 'points') return 0
+    const raw =
+      order.total_amount_thb != null && order.total_amount_thb !== ''
+        ? order.total_amount_thb
+        : order.total_amount
+    return parseFloat(raw || 0)
+  }
+  const totalAmount = orders.value.reduce((sum, order) => sum + sumOrderThb(order), 0).toFixed(2)
+
   const today = new Date().toDateString()
   const todayOrders = orders.value.filter(order => new Date(order.created_at).toDateString() === today)
-  const todayAmount = todayOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0).toFixed(2)
+  const todayAmount = todayOrders.reduce((sum, order) => sum + sumOrderThb(order), 0).toFixed(2)
   
   return {
     total,
@@ -551,16 +607,32 @@ const deleteOrder = async (orderId) => {
 }
 
 // 查看订单详情
-const viewOrderDetail = (order) => {
+const viewOrderDetail = async (order) => {
+  showDetailModal.value = true
+  selectedOrder.value = null
+  detailLoading.value = true
   try {
-    selectedOrder.value = order // 显示基本信息
-    showDetailModal.value = true
-    
-    // 暂时只显示基本信息，避免API调用导致的路由问题
-    // 后续可以在API稳定后再添加详细信息获取
+    const response = await adminStore.apiRequest(`/api/admin/orders/${order.id}`, {
+      method: 'GET'
+    })
+    let data = {}
+    try {
+      data = await response.json()
+    } catch {
+      data = {}
+    }
+    if (!response.ok || !data.success) {
+      ElMessage.error((data && data.message) ? data.message : t('orders.messages.detailLoadFailed'))
+      showDetailModal.value = false
+      return
+    }
+    selectedOrder.value = data.data
   } catch (error) {
-    console.error('显示订单详情失败:', error)
-    ElMessage.error(t('orders.messages.loadFailed'))
+    console.error('加载订单详情失败:', error)
+    ElMessage.error(t('orders.messages.detailLoadFailed'))
+    showDetailModal.value = false
+  } finally {
+    detailLoading.value = false
   }
 }
 
@@ -700,18 +772,49 @@ const getStatusClass = (status) => {
 }
 
 const getPaymentMethodText = (method) => {
-  return method === 'cod' ? '💰 ' + t('common.cod') : '💳 ' + t('common.online')
+  if (method === 'cod') return '💰 ' + t('common.cod')
+  if (method === 'online') return '💳 ' + t('common.online')
+  if (method === 'points') return '⭐ ' + t('common.pointsRedeem')
+  return String(method || '')
 }
 
 const getPaymentMethodClass = (method) => {
   return `payment-${method}`
 }
 
-// 在线支付 USDT：仅按订单下单时保存的汇率换算，不使用当前系统汇算比例（避免改汇率影响历史订单展示）
-const getExchangedAmount = (amount, orderExchangeRate) => {
-  const raw = orderExchangeRate == null || orderExchangeRate === '' ? NaN : parseFloat(orderExchangeRate)
-  const rate = Number.isFinite(raw) ? raw : 1
-  return (parseFloat(amount) * rate).toFixed(2)
+const adminUsdtHint = (row) => {
+  const thb = parseFloat(row.total_amount_thb)
+  const r = parseFloat(row.exchange_rate)
+  if (!(Number.isFinite(thb) && Number.isFinite(r))) return '0.00'
+  return (thb * r).toFixed(2)
+}
+
+/** 管理端列表/详情：积分换购订单展示本单扣除积分 */
+const adminOrderPointsLabel = (order) => {
+  const n = Number(order?.points_redeemed)
+  if (Number.isFinite(n) && n >= 0) {
+    return t('orders.pointsPaidDisplay', { n })
+  }
+  return '—'
+}
+
+const adminLinePointsLabel = (item) => {
+  const n = Number(item?.points_line_cost)
+  if (Number.isFinite(n) && n >= 0) {
+    return t('orders.linePointsDisplay', { n })
+  }
+  return '—'
+}
+
+const orderLineImageSrc = (item) => {
+  const raw = item?.product?.image_url ?? item?.product?.image ?? ''
+  const u = typeof raw === 'string' ? raw.trim() : ''
+  if (!u) return orderLineImgFallback
+  return config.buildStaticUrl(u) || orderLineImgFallback
+}
+
+const onOrderLineImageError = (event) => {
+  event.target.src = orderLineImgFallback
 }
 
 // 组件挂载时加载数据
@@ -973,6 +1076,10 @@ onMounted(() => {
   }
 }
 
+.order-detail-loading-wrap {
+  min-height: 200px;
+}
+
 .order-detail-container {
   .detail-row {
     margin-bottom: 20px;
@@ -1066,12 +1173,30 @@ onMounted(() => {
     .product-main {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      gap: 20px;
+      align-items: center;
+      gap: 16px;
     }
-    
+
+    .product-thumb-wrap {
+      flex-shrink: 0;
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+    }
+
+    .product-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
     .product-info {
       flex: 1;
+      min-width: 0;
       
       .product-name {
         margin: 0 0 12px 0;
@@ -1180,10 +1305,17 @@ onMounted(() => {
     }
     
     .product-item .product-main {
-      flex-direction: column;
+      flex-direction: row;
+      align-items: flex-start;
+      flex-wrap: wrap;
       gap: 12px;
     }
-    
+
+    .product-item .product-thumb-wrap {
+      width: 64px;
+      height: 64px;
+    }
+
     .product-total {
       text-align: left;
     }

@@ -1,11 +1,6 @@
 import jwt from 'jsonwebtoken'
 import Administrator from '../models/Administrator.js'
-
-// 使用安全的JWT密钥
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET环境变量未设置')
-}
+import { JWT_SECRET } from '../config/jwtSecret.js'
 
 /**
  * 可选：请求中带合法管理员 Bearer 时设置 req.admin，否则 req.admin 为 null（不返回 401）

@@ -1,5 +1,6 @@
 import Cart from '../models/Cart.js'
 import Product from '../models/Product.js'
+import ProductCategory from '../models/ProductCategory.js'
 import { Op } from 'sequelize'
 
 class CartController {
@@ -30,7 +31,13 @@ class CartController {
           {
             model: Product,
             as: 'product',
-            attributes: ['id', 'name', 'description', 'price', 'discount', 'stock', 'image', 'category']
+            attributes: ['id', 'name', 'description', 'price', 'points', 'discount', 'stock', 'image', 'category_id'],
+            include: [{
+              model: ProductCategory,
+              as: 'productCategory',
+              attributes: ['id', 'name'],
+              required: false
+            }]
           }
         ],
         order: [['created_at', 'DESC']]

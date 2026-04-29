@@ -57,14 +57,14 @@
                     {{ item.product.name }}
                   </h3>
                   <div class="text-xs sm:text-sm text-gray-500 mt-1">
-                    {{ t('cart.price') }}: {{ t('common.currency') }}{{ item.price }} × {{ item.quantity }}
+                    {{ t('cart.price') }}: {{ portalCurrency.formatThb(item.price) }} × {{ item.quantity }}
                   </div>
                 </div>
 
                 <!-- 小计 -->
                 <div class="text-right">
                   <span class="text-sm sm:text-base font-bold text-gray-900">
-                    {{ t('common.currency') }}{{ (item.price * item.quantity).toFixed(2) }}
+                    {{ portalCurrency.formatThb(item.price * item.quantity) }}
                   </span>
                 </div>
               </div>
@@ -324,6 +324,49 @@
                   <p class="text-sm text-gray-500 mt-1">{{ t('payment.onlineDesc') }}</p>
                 </div>
               </label>
+
+              <label
+                v-if="showPointsRedeemCard"
+                class="flex items-center p-3 border rounded-lg transition-colors select-none"
+                :class="[
+                  pointsOptionDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50',
+                  orderForm.payment_method === 'points' && !pointsOptionDisabled ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                ]"
+                @click="!pointsOptionDisabled && (orderForm.payment_method = 'points')"
+              >
+                <input
+                  v-model="orderForm.payment_method"
+                  type="radio"
+                  value="points"
+                  :disabled="pointsOptionDisabled"
+                  class="mr-3 text-blue-600"
+                />
+                <div class="flex-1">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span class="text-2xl">⭐</span>
+                    <span class="font-medium">{{ t('payment.pointsRedeem') }}</span>
+                    <span
+                      v-if="userStore.isLoggedIn && pointsBalanceReady"
+                      class="text-sm text-amber-900 tabular-nums"
+                    >
+                      {{ t('payment.pointsBalanceLabel', { balance: pointsBalance }) }}
+                    </span>
+                  </div>
+                  <p class="text-sm text-gray-500 mt-1">{{ t('payment.pointsRedeemDesc') }}</p>
+                  <p
+                    v-if="cartSupportsPointsPayment"
+                    class="text-sm text-gray-700 mt-1 tabular-nums"
+                  >
+                    {{ t('payment.pointsOrderNeed', { need: orderPointsNeeded }) }}
+                  </p>
+                  <p v-if="pointsMixedCartBlocked" class="text-xs text-amber-800 mt-1">
+                    {{ t('payment.pointsMixedCartHint') }}
+                  </p>
+                  <p v-if="pointsInsufficientNotice" class="text-xs text-red-500 mt-1">
+                    {{ pointsInsufficientNotice }}
+                  </p>
+                </div>
+              </label>
             </div>
             </div>
 
@@ -351,7 +394,7 @@
               <!-- 商品小计 -->
               <div class="flex justify-between">
                 <span class="text-sm text-gray-600">{{ t('cart.subtotal') }}</span>
-                <span class="text-sm font-medium">{{ t('common.currency') }}{{ cartStore.totalAmount.toFixed(2) }}</span>
+                <span class="text-sm font-medium">{{ portalCurrency.formatThb(cartStore.totalAmount.toFixed(2)) }}</span>
               </div>
 
               <!-- 运费 -->
@@ -360,10 +403,26 @@
                 <span class="text-sm font-medium">{{ t('common.free') }}</span>
               </div>
 
+              <template v-if="orderForm.payment_method === 'points' && cartSupportsPointsPayment">
+                <div class="text-sm text-amber-900 whitespace-nowrap overflow-x-auto">
+                  {{ t('payment.pointsOrderNeed', { need: orderPointsNeeded }) }}
+                </div>
+              </template>
+
               <div class="border-t pt-3">
-                <div class="flex justify-between items-center">
-                  <span class="text-lg font-semibold">{{ t('order.total') }}</span>
-                  <span class="text-xl font-bold text-blue-600">{{ t('common.currency') }}{{ totalAmount.toFixed(2) }}</span>
+                <!-- 积分支付：金额与标题同一行，说明单独一行，避免窄侧栏把「订单总计」等拆字 -->
+                <template v-if="orderForm.payment_method === 'points' && cartSupportsPointsPayment">
+                  <div class="flex flex-nowrap justify-between gap-3 items-baseline">
+                    <span class="text-lg font-semibold text-gray-900 shrink-0 whitespace-nowrap">{{ t('order.total') }}</span>
+                    <span class="text-xl font-bold text-amber-900 whitespace-nowrap tabular-nums shrink-0">{{ portalCurrency.formatThb('0.00') }}</span>
+                  </div>
+                  <p class="text-xs text-gray-600 mt-1.5 text-right leading-relaxed">
+                    {{ t('payment.pointsPaySummary', { need: orderPointsNeeded }) }}
+                  </p>
+                </template>
+                <div v-else class="flex flex-nowrap justify-between gap-3 items-center">
+                  <span class="text-lg font-semibold text-gray-900 shrink-0 whitespace-nowrap">{{ t('order.total') }}</span>
+                  <span class="text-xl font-bold text-blue-600 whitespace-nowrap tabular-nums shrink-0">{{ portalCurrency.formatThb(totalAmount.toFixed(2)) }}</span>
                 </div>
               </div>
             </div>
@@ -403,7 +462,7 @@
             <!-- CNY金额 -->
             <div class="mb-3">
               <div class="text-sm text-gray-600">{{ t('order.amount') }}</div>
-              <div class="text-2xl font-bold text-blue-600">{{ t('common.currency') }}{{ totalAmount.toFixed(2) }}</div>
+              <div class="text-2xl font-bold text-blue-600">{{ portalCurrency.formatThb(totalAmount.toFixed(2)) }}</div>
             </div>
             <!-- USDT金额 -->
             <div class="pt-3 border-t border-gray-200">
@@ -484,11 +543,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
 import { useUserStore } from '../../stores/user.js'
+import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import { createOrder } from '../../api/orders.js'
 import { getAddresses } from '../../api/addresses.js'
 import api from '../../api/index.js'
@@ -541,14 +601,16 @@ const { t } = useI18n()
 const router = useRouter()
 const cartStore = useCartStore()
 const userStore = useUserStore()
+const portalCurrency = usePortalCurrencyStore()
 
-// 响应式数据
+const pointsBalance = ref(0)
+const pointsBalanceReady = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const loadingAddresses = ref(false)
 const showPaymentModal = ref(false)
 const paymentQRCode = ref(null)
-const exchangeRate = ref(1.00) // 汇算比例，默认1.00
+const exchangeRate = ref(0) // USD/USDT 汇算比例，与后台 exchange_rates.USD 一致
 
 // 地址数据
 const addresses = ref([])
@@ -584,6 +646,59 @@ const checkoutAddressRegion = ref({
 
 // 超过2件禁用货到付款
 const codDisabled = computed(() => cartStore.itemCount > 2)
+
+const cartSupportsPointsPayment = computed(() =>
+  userStore.isLoggedIn &&
+  cartStore.items.length > 0 &&
+  cartStore.items.every(it => Number(it.product?.points || 0) > 0)
+)
+
+/** 购物车中至少有一款「可积分兑换」商品（用于在非纯积分车时也展示卡片） */
+const cartHasPointsProduct = computed(() =>
+  cartStore.items.some(it => Number(it.product?.points || 0) > 0)
+)
+
+/** 登录且车里有可积分商品时展示积分换购车；全部为现金商品则不展示 */
+const showPointsRedeemCard = computed(() =>
+  userStore.isLoggedIn && cartStore.items.length > 0 && cartHasPointsProduct.value
+)
+
+/** 混入非积分商品时不可选，仅展示说明 */
+const pointsMixedCartBlocked = computed(() =>
+  cartHasPointsProduct.value && !cartSupportsPointsPayment.value
+)
+
+const orderPointsNeeded = computed(() =>
+  cartStore.items.reduce(
+    (s, item) => s + Number(item.product?.points || 0) * Number(item.quantity || 0),
+    0
+  )
+)
+
+const pointsInsufficientNotice = computed(() => {
+  if (!cartSupportsPointsPayment.value || !pointsBalanceReady.value) return ''
+  if (orderPointsNeeded.value <= 0) return ''
+  if (pointsBalance.value >= orderPointsNeeded.value) return ''
+  return t('payment.pointsInsufficient', {
+    balance: pointsBalance.value,
+    need: orderPointsNeeded.value
+  })
+})
+
+const pointsOptionDisabled = computed(() =>
+  !cartSupportsPointsPayment.value ||
+  orderPointsNeeded.value <= 0 ||
+  !!pointsInsufficientNotice.value
+)
+
+watch(
+  [cartSupportsPointsPayment, pointsOptionDisabled, codDisabled],
+  () => {
+    if (orderForm.payment_method === 'points' && pointsOptionDisabled.value) {
+      orderForm.payment_method = codDisabled.value ? 'online' : 'cod'
+    }
+  }
+)
 
 // 表单验证错误
 const errors = reactive({
@@ -636,7 +751,7 @@ const loadSystemConfig = async () => {
       const data = await response.json()
       if (data.success) {
         paymentQRCode.value = data.data.payment_qrcode
-        exchangeRate.value = parseFloat(data.data.exchange_rate || '1.00')
+        exchangeRate.value = parseFloat(data.data.exchange_rate || '0.00')
       }
     }
   } catch (error) {
@@ -675,6 +790,23 @@ const loadAddresses = async () => {
     addresses.value = []
   } finally {
     loadingAddresses.value = false
+  }
+}
+
+const loadPointsBalance = async () => {
+  pointsBalanceReady.value = false
+  if (!userStore.isLoggedIn) {
+    pointsBalance.value = 0
+    pointsBalanceReady.value = true
+    return
+  }
+  try {
+    const res = await api.get('/users/points/balance')
+    pointsBalance.value = res.data?.success ? (Number(res.data.data?.balance) || 0) : 0
+  } catch (_e) {
+    pointsBalance.value = 0
+  } finally {
+    pointsBalanceReady.value = true
   }
 }
 
@@ -826,6 +958,16 @@ const handleSubmitOrder = async () => {
     }
   }
 
+  // 积分换购：直接提交订单（金额记为 0，后端扣积分）
+  if (orderForm.payment_method === 'points') {
+    if (pointsOptionDisabled.value) {
+      showMessage(t('payment.pointsSubmitBlocked'), 'error')
+      return
+    }
+    await submitOrder()
+    return
+  }
+
   // 如果选择在线付款，显示支付二维码
   if (orderForm.payment_method === 'online') {
     showPaymentModal.value = true
@@ -866,7 +1008,8 @@ const submitOrder = async () => {
         postal_code: orderForm.postal_code ? orderForm.postal_code.trim() : ''
       }),
       // 传递推荐码
-      referral_code: orderForm.referral_code && orderForm.referral_code.trim() ? orderForm.referral_code.trim() : null
+      referral_code: orderForm.referral_code && orderForm.referral_code.trim() ? orderForm.referral_code.trim() : null,
+      checkout_currency: portalCurrency.selectedCode
     }
 
 
@@ -943,7 +1086,8 @@ onMounted(async () => {
     await Promise.all([
       cartStore.loadCart(),
       loadAddresses(),
-      loadSystemConfig()
+      loadSystemConfig(),
+      loadPointsBalance()
     ])
     if (codDisabled.value && orderForm.payment_method === 'cod') {
       orderForm.payment_method = 'online'

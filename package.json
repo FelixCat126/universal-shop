@@ -43,6 +43,7 @@
     "rollback:order-status": "node run-order-status-migration.js rollback",
     "migrate:exchange-rate": "node run-exchange-rate-migration.js migrate",
     "install:all": "./install.sh",
+    "migrate:production:categories": "NODE_ENV=production node scripts/db/migrate-product-categories-production.mjs",
     "deploy:aliyun": "bash scripts/deploy-aliyun.sh"
   },
   "dependencies": {

@@ -45,6 +45,10 @@ api.interceptors.response.use(
 
 // 产品API（用户端）
 export const productAPI = {
+  getProductCategories () {
+    return api.get('/product-categories')
+  },
+
   // 获取产品列表（分页）
   getProducts(params = {}) {
     return api.get('/products', { params })

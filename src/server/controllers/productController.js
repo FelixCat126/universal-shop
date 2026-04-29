@@ -1,4 +1,5 @@
 import Product from '../models/Product.js'
+import ProductCategory from '../models/ProductCategory.js'
 import Cart from '../models/Cart.js'
 import sequelize from '../config/database.js'
 import { Op } from 'sequelize'
@@ -11,9 +12,10 @@ class ProductController {
         page = 1,
         pageSize = 20,
         name = '',
-        category = '',
+        category_id: categoryIdParam = '',
+        category: categoryLegacy = '',
         stockStatus = '',
-        listingStatus = '' // 管理端：all | on_shelf | delisted
+        listingStatus = ''
       } = req.query
 
       const offset = (page - 1) * pageSize
@@ -22,17 +24,22 @@ class ProductController {
       // 构建查询条件
       const where = {}
 
+      const categoryKey = categoryIdParam !== '' && categoryIdParam != null
+        ? categoryIdParam
+        : categoryLegacy
+      if (categoryKey !== '' && categoryKey != null) {
+        const cid = parseInt(String(categoryKey), 10)
+        if (!Number.isNaN(cid)) {
+          where.category_id = cid
+        }
+      }
+
       // 名称搜索（支持中文和泰文）
       if (name) {
         where[Op.or] = [
           { name: { [Op.like]: `%${name}%` } },
           { name_th: { [Op.like]: `%${name}%` } }
         ]
-      }
-
-      // 分类筛选
-      if (category) {
-        where.category = category
       }
 
       // 库存状态筛选
@@ -70,16 +77,32 @@ class ProductController {
 
       const { count, rows } = await Product.findAndCountAll({
         where,
+        include: [
+          {
+            model: ProductCategory,
+            as: 'productCategory',
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ],
         offset,
         limit,
         order,
         paranoid,
-        subQuery: false
+        subQuery: false,
+        distinct: true
       })
 
       // 转换数据格式，将 image 字段映射为 image_url
       const products = rows.map(product => {
         const productData = product.toJSON()
+        if (productData.productCategory) {
+          productData.category = {
+            id: productData.productCategory.id,
+            name: productData.productCategory.name
+          }
+        }
+        delete productData.productCategory
         if (productData.image) {
           productData.image_url = productData.image
         }
@@ -114,7 +137,17 @@ class ProductController {
   static async getProduct(req, res) {
     try {
       const { id } = req.params
-      const product = await Product.findByPk(id, { paranoid: !req.admin })
+      const product = await Product.findByPk(id, {
+        paranoid: !req.admin,
+        include: [
+          {
+            model: ProductCategory,
+            as: 'productCategory',
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ]
+      })
 
       if (!product) {
         return res.status(404).json({
@@ -125,6 +158,13 @@ class ProductController {
 
       // 转换数据格式，将 image 字段映射为 image_url
       const productData = product.toJSON()
+      if (productData.productCategory) {
+        productData.category = {
+          id: productData.productCategory.id,
+          name: productData.productCategory.name
+        }
+      }
+      delete productData.productCategory
       if (productData.image) {
         productData.image_url = productData.image
       }
@@ -154,18 +194,47 @@ class ProductController {
         name,
         alias,
         description,
-        category,
+        category_id: category_id_raw,
         price,
         stock,
         discount,
-        image
+        image,
+        points
       } = req.body
 
+      // 兼容旧字段 category（数字字符串仅作兼容）
+      const category_id = category_id_raw !== undefined ? category_id_raw : req.body.category
+
       // 验证必填字段
-      if (!name || !category || price === undefined || stock === undefined) {
+      if (!name || category_id === undefined || category_id === null || category_id === '' || price === undefined || stock === undefined) {
         return res.status(400).json({
           success: false,
           message: '请填写所有必填字段'
+        })
+      }
+
+      const cid = parseInt(String(category_id), 10)
+      if (!Number.isInteger(cid) || cid < 1) {
+        return res.status(400).json({
+          success: false,
+          message: '请选择有效的产品分类'
+        })
+      }
+      const cat = await ProductCategory.findByPk(cid)
+      if (!cat) {
+        return res.status(400).json({
+          success: false,
+          message: '产品分类不存在'
+        })
+      }
+
+      const pts = points === undefined || points === null || points === ''
+        ? 0
+        : Number(points)
+      if (!Number.isInteger(pts) || pts < 0) {
+        return res.status(400).json({
+          success: false,
+          message: '积分必须为非负整数'
         })
       }
 
@@ -173,17 +242,37 @@ class ProductController {
         name,
         alias: alias || null,
         description,
-        category,
+        category_id: cid,
         price: parseFloat(price),
         stock: parseInt(stock),
         discount: discount !== undefined && discount !== null && discount !== '' ? parseInt(discount) : null,
-        image: image || null
+        image: image || null,
+        points: pts
       })
+
+      await product.reload({
+        include: [
+          {
+            model: ProductCategory,
+            as: 'productCategory',
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ]
+      })
+      const created = product.toJSON()
+      if (created.productCategory) {
+        created.category = {
+          id: created.productCategory.id,
+          name: created.productCategory.name
+        }
+      }
+      delete created.productCategory
 
       res.status(201).json({
         success: true,
         message: '产品创建成功',
-        data: product
+        data: created
       })
     } catch (error) {
       console.error('创建产品失败:', error)
@@ -196,19 +285,22 @@ class ProductController {
   }
 
   // 更新产品
-  static async updateProduct(req, res) {
+  static async updateProduct (req, res) {
     try {
       const { id } = req.params
       const {
         name,
         alias,
         description,
-        category,
+        category_id: patchCidRaw,
         price,
         stock,
         discount,
-        image
+        image,
+        points
       } = req.body
+
+      const legacyCat = req.body.category
 
       const product = await Product.findByPk(id, { paranoid: !req.admin })
       if (!product) {
@@ -218,22 +310,77 @@ class ProductController {
         })
       }
 
-      // 更新产品信息
+      let nextPoints = product.points
+      if (points !== undefined) {
+        const pts = points === null || points === '' ? 0 : Number(points)
+        if (!Number.isInteger(pts) || pts < 0) {
+          return res.status(400).json({
+            success: false,
+            message: '积分必须为非负整数'
+          })
+        }
+        nextPoints = pts
+      }
+
+      const cidInput = patchCidRaw !== undefined && patchCidRaw !== null && patchCidRaw !== ''
+        ? patchCidRaw
+        : legacyCat
+
+      let nextCategoryId = product.category_id
+      if (cidInput !== undefined && cidInput !== null && cidInput !== '') {
+        const u = parseInt(String(cidInput), 10)
+        if (!Number.isInteger(u) || u < 1) {
+          return res.status(400).json({
+            success: false,
+            message: '请选择有效的产品分类'
+          })
+        }
+        const exists = await ProductCategory.findByPk(u)
+        if (!exists) {
+          return res.status(400).json({
+            success: false,
+            message: '产品分类不存在'
+          })
+        }
+        nextCategoryId = u
+      }
+
       await product.update({
         name: name || product.name,
         alias: alias !== undefined ? (alias || null) : product.alias,
         description: description !== undefined ? description : product.description,
-        category: category || product.category,
+        category_id: nextCategoryId,
         price: price !== undefined ? parseFloat(price) : product.price,
         stock: stock !== undefined ? parseInt(stock) : product.stock,
         discount: discount !== undefined ? (discount === null || discount === '' ? null : parseInt(discount)) : product.discount,
-        image: image !== undefined ? image : product.image
+        image: image !== undefined ? image : product.image,
+        points: nextPoints
       })
+
+      await product.reload({
+        include: [
+          {
+            model: ProductCategory,
+            as: 'productCategory',
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ]
+      })
+
+      const out = product.toJSON()
+      if (out.productCategory) {
+        out.category = {
+          id: out.productCategory.id,
+          name: out.productCategory.name
+        }
+      }
+      delete out.productCategory
 
       res.json({
         success: true,
         message: '产品更新成功',
-        data: product
+        data: out
       })
     } catch (error) {
       console.error('更新产品失败:', error)
