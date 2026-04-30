@@ -87,6 +87,7 @@ export default {
     emailOrPhonePlaceholder: 'Please enter phone number or email',
     initialPasswordHint: 'Initial password is the last 8 digits of your phone number',
     createAccount: 'Create New Account',
+    partnerPortalLink: 'Partner login (wholesale)',
     loginExistingAccount: 'Sign in to existing account',
     phonePlaceholder: 'Please enter phone number (at least 10 digits, cannot start with 0)',
     phoneHint: 'Your phone number will be used as your login account',
@@ -277,7 +278,10 @@ export default {
     expressDelivery: 'Express Delivery',
     today: 'Today',
     orderIdRequired: 'Order ID cannot be empty',
-    loadDetailFailed: 'Failed to load order details'
+    loadDetailFailed: 'Failed to load order details',
+    onlinePayCreated: 'Your order was created. Scan to pay, then tap Payment done in this dialog.',
+    payConfirmOk: 'Payment confirmed',
+    goPay: 'Pay now'
   },
 
   // 地址管理

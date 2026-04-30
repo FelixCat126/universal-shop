@@ -3,7 +3,7 @@ import { useAdminStore } from '../stores/admin.js'
 import { ElMessage } from 'element-plus'
 
 const router = createRouter({
-  history: createWebHistory('/admin/'),  // 修复：明确指定base路径
+  history: createWebHistory(import.meta.env.BASE_URL || '/'),
   routes: [
     {
       path: '/login',
@@ -48,6 +48,18 @@ const router = createRouter({
           meta: { title: '用户管理', requiresAuth: true, permission: 'users' }
         },
         {
+          path: '/partners',
+          name: 'Partners',
+          component: () => import('../views/Partners.vue'),
+          meta: { title: '合作方账号', requiresAuth: true, permission: 'partners' }
+        },
+        {
+          path: '/partner-orders',
+          name: 'PartnerOrders',
+          component: () => import('../views/PartnerOrders.vue'),
+          meta: { title: '合作方订单', requiresAuth: true, permission: 'partners' }
+        },
+        {
           path: '/operators',
           name: 'Operators',
           component: () => import('../views/Operators.vue'),
@@ -73,8 +85,17 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const adminStore = useAdminStore()
-  
-  
+
+  // vite dev 下 base 为 /，但仍可能打开书签里的 /admin/xxx；剥掉前缀统一到应用内路径
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  if (baseUrl === '/' && to.path.startsWith('/admin')) {
+    let suffix = to.path.slice('/admin'.length)
+    if (!suffix || suffix === '/') suffix = '/'
+    else if (!suffix.startsWith('/')) suffix = `/${suffix}`
+    next({ path: suffix, query: to.query, hash: to.hash, replace: true })
+    return
+  }
+
   // 如果是登录页面，且已经登录，跳转到首页
   if (to.name === 'Login' && adminStore.isLoggedIn) {
     next('/dashboard')

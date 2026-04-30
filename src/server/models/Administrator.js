@@ -115,8 +115,8 @@ Administrator.prototype.toSafeJSON = function() {
 Administrator.prototype.hasPermission = function(resource) {
   const rolePermissions = {
     super_admin: ['*'], // 所有权限
-    admin: ['orders', 'users', 'products', 'administrators'], // 除了操作日志
-    operator: ['orders', 'users', 'products'] // 只能访问基本功能
+    admin: ['orders', 'users', 'products', 'administrators', 'partners'], // 除了操作日志
+    operator: ['orders', 'users', 'products'] // 批发合作方仅限 admin/super_admin
   }
   
   const permissions = rolePermissions[this.role] || []

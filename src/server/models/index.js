@@ -20,6 +20,10 @@ import SystemConfig from './SystemConfig.js'
 import OperationLog from './OperationLog.js'
 import './UserPointBalance.js'
 import './PointTransaction.js'
+import Partner from './Partner.js'
+import PartnerOrder from './PartnerOrder.js'
+import PartnerOrderItem from './PartnerOrderItem.js'
+import PartnerAddress from './PartnerAddress.js'
 
 // 注意：关联关系已在各个模型文件中定义，无需重复定义
 console.log('✅ 所有数据库模型已导入')
@@ -37,7 +41,11 @@ export {
   Address,
   AdministrativeRegion,
   SystemConfig,
-  OperationLog
+  OperationLog,
+  Partner,
+  PartnerOrder,
+  PartnerOrderItem,
+  PartnerAddress
 }
 
 // 导出默认对象
@@ -53,5 +61,9 @@ export default {
   Address,
   AdministrativeRegion,
   SystemConfig,
-  OperationLog
+  OperationLog,
+  Partner,
+  PartnerOrder,
+  PartnerOrderItem,
+  PartnerAddress
 }

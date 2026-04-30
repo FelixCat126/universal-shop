@@ -231,7 +231,15 @@
                     {{ order.delivery_address }}
                     <span v-if="order.postal_code" class="ml-1">({{ t('address.postalCode') || '邮编' }}: {{ order.postal_code }})</span>
                   </div>
-                  <div class="mt-2 flex justify-end">
+                  <div class="mt-2 flex flex-wrap justify-end gap-2">
+                    <button
+                      v-if="order.status === 'pending' && order.payment_method === 'online'"
+                      type="button"
+                      class="rounded border border-green-600 bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
+                      @click="openOnlinePayForOrder(order)"
+                    >
+                      {{ t('order.goPay') }}
+                    </button>
                     <button
                       type="button"
                       @click="viewOrderDetail(order.id)"
@@ -647,6 +655,64 @@
         </form>
       </div>
     </div>
+
+    <!-- 在线支付订单待支付：再次扫码 -->
+    <div v-if="onlinePayModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="fixed inset-0 bg-black bg-opacity-50" @click="closeOnlinePayModal"></div>
+      <div class="bg-white p-6 rounded-lg shadow-xl z-10 w-full max-w-md">
+        <div class="text-center">
+          <h3 class="text-lg font-medium mb-4">{{ t('payment.scanToPay') }}</h3>
+          <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+            <div class="mb-3">
+              <div class="text-sm text-gray-600">{{ t('order.amount') }}</div>
+              <div class="text-2xl font-bold text-blue-600">{{ portalCurrency.formatThb(onlinePayThbFormatted) }}</div>
+            </div>
+            <div class="pt-3 border-t border-gray-200">
+              <div class="text-sm text-gray-600">{{ t('payment.usdtAmount') }}</div>
+              <div class="text-xl font-semibold text-green-600">{{ onlinePayUsdt }} USDT</div>
+            </div>
+          </div>
+          <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div class="w-48 h-48 mx-auto bg-white rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
+              <div v-if="onlinePayQr" class="w-full h-full flex items-center justify-center">
+                <img
+                  :src="config.buildStaticUrl(onlinePayQr)"
+                  alt=""
+                  class="max-w-full max-h-full object-contain rounded-lg"
+                  @error="onlinePayQr = null"
+                />
+              </div>
+              <div v-else class="text-center">
+                <div class="text-6xl mb-2">📱</div>
+                <div class="text-sm text-gray-500">{{ t('payment.scanToPay') }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="mb-6 text-sm text-gray-600">
+            <p>{{ t('payment.scanInstruction') }}</p>
+            <p class="mt-1">{{ t('payment.confirmAfterPayment') }}</p>
+          </div>
+          <div class="flex space-x-3">
+            <button
+              type="button"
+              :disabled="onlinePayConfirming"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              @click="closeOnlinePayModal"
+            >
+              {{ t('payment.cancel') }}
+            </button>
+            <button
+              type="button"
+              :disabled="onlinePayConfirming"
+              class="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+              @click="confirmOnlinePayInProfile"
+            >
+              {{ onlinePayConfirming ? t('common.submitting') : t('payment.complete') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -656,8 +722,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatRecordedOrderAmount } from '../utils/orderBillingDisplay.js'
 import { useUserStore } from '../stores/user.js'
+import { usePortalCurrencyStore } from '../stores/portalCurrency.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
-import { getUserOrders } from '../api/orders.js'
+import { getUserOrders, confirmOnlinePayment as confirmOnlinePaymentApi } from '../api/orders.js'
 import { userAPI } from '../api/users.js'
 import api from '../api/index.js'
 import config from '../../config/index.js'
@@ -670,6 +737,7 @@ import { describePasswordPolicyFailure } from '../utils/passwordPolicy.js'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const portalCurrency = usePortalCurrencyStore()
 const { t } = useI18n()
 const { success, error: showError, warning } = useToast()
 
@@ -763,6 +831,24 @@ const loadingMoreOrders = ref(false)
 const ordersScrollRoot = ref(null)
 const ordersLoadSentinel = ref(null)
 const ordersHasMore = computed(() => orders.value.length < ordersTotal.value)
+
+const onlinePayModalOpen = ref(false)
+const onlinePayOrderId = ref(null)
+const onlinePayThb = ref(null)
+const onlinePayQr = ref(null)
+const onlinePayExchangeRate = ref(0)
+const onlinePayConfirming = ref(false)
+
+const onlinePayThbFormatted = computed(() => {
+  const x = parseFloat(String(onlinePayThb.value))
+  return Number.isFinite(x) ? x.toFixed(2) : '0.00'
+})
+
+const onlinePayUsdt = computed(() => {
+  const thb = parseFloat(onlinePayThbFormatted.value)
+  const t = Number.isFinite(thb) ? thb : 0
+  return (t * onlinePayExchangeRate.value).toFixed(2)
+})
 
 const pointTransactions = ref([])
 const pointsDateFrom = ref(range0.start)
@@ -1022,7 +1108,59 @@ const getStatusText = (status) => {
     completed: t('order.status.completed'),
     cancelled: t('order.status.cancelled')
   }
-  return statusMap[status] || t('order.status.completed')
+  if (status != null && status in statusMap) {
+    return statusMap[status]
+  }
+  return status != null && status !== '' ? String(status) : '—'
+}
+
+async function loadOnlinePayConfig () {
+  try {
+    const response = await fetch(config.buildApiUrl('/api/system-config/public'))
+    if (!response.ok) return
+    const data = await response.json()
+    if (data.success && data.data) {
+      onlinePayQr.value = data.data.payment_qrcode
+      onlinePayExchangeRate.value = parseFloat(data.data.exchange_rate || '0.00')
+    }
+  } catch {
+    /* silent */
+  }
+}
+
+function openOnlinePayForOrder (order) {
+  if (order.payment_method !== 'online' || order.status !== 'pending') return
+  onlinePayOrderId.value = order.id
+  onlinePayThb.value = order.total_amount_thb
+  loadOnlinePayConfig()
+  onlinePayModalOpen.value = true
+}
+
+function closeOnlinePayModal () {
+  if (onlinePayConfirming.value) return
+  onlinePayModalOpen.value = false
+}
+
+async function confirmOnlinePayInProfile () {
+  const id = onlinePayOrderId.value
+  if (!id) return
+  onlinePayConfirming.value = true
+  try {
+    const response = await confirmOnlinePaymentApi(id)
+    if (!response.data?.success) {
+      showError(response.data?.message || t('order.submitFailed'))
+      return
+    }
+    onlinePayModalOpen.value = false
+    onlinePayOrderId.value = null
+    success(t('order.payConfirmOk'))
+    await loadOrders({ reset: true })
+    await loadProfileMetrics()
+  } catch (error) {
+    showError(error.response?.data?.message || t('order.submitFailedRetry'))
+  } finally {
+    onlinePayConfirming.value = false
+  }
 }
 
 // 订单操作方法

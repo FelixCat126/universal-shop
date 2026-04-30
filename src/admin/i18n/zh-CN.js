@@ -9,7 +9,9 @@ export default {
     users: '用户管理 - 商城管理系统',
     operators: '操作员管理 - 商城管理系统',
     systemConfig: '系统配置 - 商城管理系统',
-    operationLogs: '操作日志 - 商城管理系统'
+    operationLogs: '操作日志 - 商城管理系统',
+    partnersPartners: '合作方账号 - 商城管理系统',
+    partnerOrders: '合作方订单 - 商城管理系统'
   },
 
   // 通用
@@ -96,6 +98,9 @@ export default {
     categoryManage: '类别管理',
     orders: '订单管理',
     users: '用户管理',
+    partnerWholesale: '合作方管理',
+    partnersAccounts: '合作方账号',
+    partnerOrdersMenu: '合作方订单',
     operators: '操作员管理',
     system: '系统管理',
     operationLogs: '操作日志',
@@ -103,7 +108,74 @@ export default {
     logout: '退出登录'
   },
 
-  // 商品类别管理
+  partnersMgmt: {
+    title: '合作方账号',
+    refresh: '刷新',
+    create: '新建合作方',
+    accountKind: '账号类别',
+    kindDealer: '经销商',
+    kindAgent: '代理',
+    login: '登录名',
+    displayName: '显示名称',
+    discountPercent: '折扣%',
+    active: '启用',
+    inactive: '禁用',
+    lastLogin: '最后登录',
+    resetPwd: '重置密码',
+    edit: '编辑',
+    pwdPlaceholder: '新密码不少于6字符',
+    createTitle: '新建合作方账号',
+    editTitle: '编辑合作方',
+    loginPlaceholder: '2–64字符',
+    displayNamePlaceholder: '可选',
+    password: '初始密码',
+    passwordHint: '不少于6字符',
+    save: '保存',
+    loadFailed: '加载失败',
+    createOk: '已创建',
+    updateOk: '已更新',
+    resetOk: '密码已重置'
+  },
+
+  partnerOrdersMgmt: {
+    title: '合作方订单',
+    export: '导出 Excel',
+    orderNo: '订单号',
+    partner: '合作方',
+    totalThb: '总额 THB',
+    status: '状态',
+    createdAt: '下单时间',
+    filterPartner: '合作方',
+    filterPartnerPlaceholder: '账号或显示名',
+    filterStatus: '状态',
+    filterStatusPlaceholder: '请选择状态',
+    dateFrom: '开始',
+    dateTo: '结束',
+    search: '查询',
+    reset: '重置',
+    sku: 'SKU',
+    qty: '数量',
+    unitPrice: '单价',
+    lineTotal: '小计',
+    updateStatusOk: '状态已更新',
+    exportFail: '导出失败',
+    loadFailed: '加载合作方订单失败',
+    statusUpdateFailed: '更新订单状态失败',
+    contactName: '联系人',
+    contactPhone: '联系电话',
+    address: '收货地址',
+    notes: '备注',
+    snapshotName: '名称快照',
+    productImage: '商品图',
+    orderStatus: {
+      pending_payment: '待支付',
+      submitted: '已提交',
+      processing: '处理中',
+      shipped: '已发货',
+      settled: '已结算',
+      cancelled: '已取消'
+    }
+  },
   categories: {
     title: '类别管理',
     keyword: '类别名称',
@@ -388,7 +460,16 @@ export default {
       update_product: '更新商品',
       delete_product: '下架商品',
       upload_product_image: '上传商品图片',
-      view: '查看'
+      view: '查看',
+      export: '导出',
+      create_partner: '创建合作方',
+      update_partner: '更新合作方',
+      reset_partner_password: '重置合作方密码',
+      update_partner_order_status: '更新合作方订单状态',
+      update_user_status: '更新用户状态',
+      create_product_category: '创建商品类目',
+      update_product_category: '更新商品类目',
+      delete_product_category: '删除商品类目'
     },
     resources: {
       administrator: '管理员',
@@ -399,7 +480,13 @@ export default {
       home_banner: '首页横幅',
       banner: '横幅',
       image: '图片',
-      file: '文件'
+      file: '文件',
+      partner: '合作方',
+      partner_order: '合作方订单',
+      product_category: '商品类目',
+      users: '用户',
+      orders: '订单',
+      payment_qrcode: '支付二维码'
     },
     messages: {
       loadFailed: '加载日志失败',

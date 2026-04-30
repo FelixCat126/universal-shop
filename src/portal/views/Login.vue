@@ -139,6 +139,12 @@
               <UserPlusIcon class="h-4 w-4 mr-2" />
               {{ t('user.createAccount') }}
             </router-link>
+            <a
+              :href="partnerHref"
+              class="mt-3 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+            >
+              {{ t('user.partnerPortalLink') }}
+            </a>
           </div>
         </form>
       </div>
@@ -213,6 +219,16 @@ const messageClass = computed(() => {
   return messageType.value === 'success' 
     ? 'bg-green-500 text-white' 
     : 'bg-red-500 text-white'
+})
+
+/** 开发环境门户在 :3001，合作方 dev 在 :3003；生产同源用 /partner/ */
+const partnerHref = computed(() => {
+  if (typeof window === 'undefined') return '/partner/'
+  const { hostname, port } = window.location
+  if (hostname === 'localhost' && port === '3001') {
+    return 'http://localhost:3003/partner/'
+  }
+  return '/partner/'
 })
 
 const currentCountry = computed(() => {

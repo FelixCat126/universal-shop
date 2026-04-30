@@ -19,6 +19,7 @@ import exportRoutes from './routes/exportRoutes.js'
 import statisticsRoutes from './routes/statisticsRoutes.js'
 import systemConfigRoutes from './routes/systemConfigRoutes.js'
 import administrativeRegionsRoutes from './routes/administrativeRegions.js'
+import partnerRoutes from './routes/partnerRoutes.js'
 
 // 导入模型以确保数据库同步
 import './models/User.js'
@@ -35,9 +36,10 @@ import './models/SystemConfig.js'
 import SystemConfig from './models/SystemConfig.js'
 import './models/UserPointBalance.js'
 import './models/PointTransaction.js'
-
-import './models/UserPointBalance.js'
-import './models/PointTransaction.js'
+import './models/Partner.js'
+import './models/PartnerOrder.js'
+import './models/PartnerOrderItem.js'
+import './models/PartnerAddress.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -45,6 +47,7 @@ const __dirname = path.dirname(__filename)
 const projectRoot = path.join(__dirname, '../..')
 const portalDir = path.join(projectRoot, 'dist/portal')
 const adminDir = path.join(projectRoot, 'dist/admin')
+const partnerDir = path.join(projectRoot, 'dist/partner')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -167,6 +170,60 @@ async function ensureOrderItemPointsLineCostColumn () {
   }
 }
 
+/** 旧库仅执行过 029 时缺列会导致合作方订单查询报错，启动时对齐模型字段 */
+async function ensurePartnerOrderSchemaColumns () {
+  const qi = sequelize.getQueryInterface()
+  const orderDesc = await qi.describeTable('partner_orders').catch(() => null)
+  if (!orderDesc) return
+
+  if (!orderDesc.partner_address_id) {
+    await qi.addColumn('partner_orders', 'partner_address_id', {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    })
+    console.log('✅ 已为 partner_orders 添加 partner_address_id')
+  }
+
+  const itemDesc = await qi.describeTable('partner_order_items').catch(() => null)
+  if (!itemDesc) return
+
+  if (!itemDesc.product_image_snapshot) {
+    await qi.addColumn('partner_order_items', 'product_image_snapshot', {
+      type: DataTypes.STRING(512),
+      allowNull: true
+    })
+    console.log('✅ 已为 partner_order_items 添加 product_image_snapshot')
+  }
+}
+
+async function ensurePartnerAddressSchemaColumns () {
+  const qi = sequelize.getQueryInterface()
+  const desc = await qi.describeTable('partner_addresses').catch(() => null)
+  if (!desc) return
+  if (!desc.city) {
+    await qi.addColumn('partner_addresses', 'city', {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    })
+    console.log('✅ 已为 partner_addresses 添加 city')
+  }
+  if (!desc.postal_code) {
+    await qi.addColumn('partner_addresses', 'postal_code', {
+      type: DataTypes.STRING(10),
+      allowNull: true
+    })
+    console.log('✅ 已为 partner_addresses 添加 postal_code')
+  }
+  if (!desc.phone_country_code) {
+    await qi.addColumn('partner_addresses', 'phone_country_code', {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      defaultValue: '+66'
+    })
+    console.log('✅ 已为 partner_addresses 添加 phone_country_code')
+  }
+}
+
 /** 旧库仅有 exchange_rate：补全 exchange_rates（JSON），不覆盖已有 exchange_rates */
 async function ensureExchangeRatesConfig () {
   const existing = await SystemConfig.findOne({ where: { config_key: 'exchange_rates' } })
@@ -194,6 +251,8 @@ sequelize.authenticate()
   .then(() => ensureOrderBillingColumns())
   .then(() => ensureOrderPointsRedeemedColumn())
   .then(() => ensureOrderItemPointsLineCostColumn())
+  .then(() => ensurePartnerOrderSchemaColumns())
+  .then(() => ensurePartnerAddressSchemaColumns())
   .then(() => ensureExchangeRatesConfig())
   .then(() => ensureProductCategoriesMigrate())
   .then(() => {
@@ -222,6 +281,7 @@ app.use('/api/admin/export', exportRoutes)
 app.use('/api/admin/statistics', statisticsRoutes)
 app.use('/api/system-config', systemConfigRoutes)
 app.use('/api/auth', userRoutes)
+app.use('/api/partner', partnerRoutes)
 
 console.log('✅ API路由注册完成')
 
@@ -267,6 +327,7 @@ app.use('/api/*', (req, res) => {
 // 静态文件服务
 console.log('📁 Portal目录:', portalDir)
 console.log('📁 Admin目录:', adminDir)
+console.log('📁 Partner目录:', partnerDir)
 
 /** 避免浏览器长期缓存 SPA 的 index.html，否则部署后仍引用旧 hash 的 JS/CSS */
 function setNoCacheHtml (res) {
@@ -334,6 +395,33 @@ app.use('/admin', express.static(adminDir, {
   }
 }))
 
+// Partner（合作方门户 / 批发订货）静态资源
+app.use('/partner/assets', express.static(path.join(partnerDir, 'assets'), {
+  immutable: true,
+  maxAge: '7d',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=UTF-8')
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=UTF-8')
+    }
+  }
+}))
+
+app.use('/partner', express.static(partnerDir, {
+  maxAge: '1d',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      setNoCacheHtml(res)
+    }
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=UTF-8')
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=UTF-8')
+    }
+  }
+}))
+
 
 // SPA路由处理
 app.get('/portal/*', (req, res, next) => {
@@ -360,6 +448,14 @@ app.get('/admin/*', (req, res, next) => {
   res.sendFile(path.join(adminDir, 'index.html'))
 })
 
+app.get('/partner/*', (req, res, next) => {
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$/)) {
+    return next()
+  }
+  setNoCacheHtml(res)
+  res.sendFile(path.join(partnerDir, 'index.html'))
+})
+
 // 根路径重定向
 app.get('/', (req, res) => {
   res.redirect('/portal/')
@@ -380,14 +476,17 @@ export function startServer() {
     console.log(`🌐 HTTP服务器: http://0.0.0.0:${PORT}`)
     console.log(`📱 用户门户: http://localhost:${PORT}/portal/`)
     console.log(`🔧 管理后台: http://localhost:${PORT}/admin/`)
+    console.log(`🤝 合作方门户: http://localhost:${PORT}/partner/`)
     console.log(`🩺 健康检查: http://localhost:${PORT}/api/health`)
     if (process.env.NODE_ENV !== 'production') {
       console.log('------------------------------------------------')
       console.log('🔥 开发热更新（改 Vue 源码后此处才即时生效）：')
       console.log('   门户 Dev  http://localhost:3001/        （vite.config.js）')
       console.log('   管理后台  http://localhost:3002/admin/  （vite.admin.config.js）')
-      console.log('ℹ️  :3000 上的 /portal、/admin 来自 dist/** 构建文件；')
+      console.log('   合作方门户  http://localhost:3003/partner/ （vite.partner.config.js）')
+      console.log('ℹ️  :3000 上的 /portal、/admin、/partner 来自 dist/** 构建文件；')
       console.log('   若在 :3000 打开后台没看到最新界面，请先访问 :3002，或执行 npm run build:admin')
+      console.log('   合作方页面同理：:3003 或 npm run build:partner')
       console.log('------------------------------------------------')
     }
     console.log('================================================')

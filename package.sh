@@ -25,6 +25,7 @@ echo "🔨 构建前端..."
 npm install --silent
 npm run build:portal
 npm run build:admin
+npm run build:partner
 
 # 创建打包目录结构
 echo "📁 创建打包目录..."
@@ -37,7 +38,7 @@ cp -r dist "${PACKAGE_DIR}/"
 cp package.json package-lock.json "${PACKAGE_DIR}/"
 cp setup.js "${PACKAGE_DIR}/"
 cp env.example "${PACKAGE_DIR}/"
-cp vite.config.js vite.admin.config.js "${PACKAGE_DIR}/"
+cp vite.config.js vite.admin.config.js vite.partner.config.js "${PACKAGE_DIR}/"
 cp tailwind.config.js postcss.config.js "${PACKAGE_DIR}/" 2>/dev/null || true
 cp nodemon.json "${PACKAGE_DIR}/" 2>/dev/null || true
 cp start-https-production.js "${PACKAGE_DIR}/"
@@ -198,6 +199,7 @@ npm install -g pm2
 # 3. 访问系统
 # 用户端: http://your-server:3000/portal/
 # 管理端: http://your-server:3000/admin/
+# 合作方: http://your-server:3000/partner/
 # 账户: admin / 123456
 ```
 

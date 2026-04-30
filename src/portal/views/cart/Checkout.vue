@@ -452,7 +452,7 @@
 
     <!-- 支付二维码模态框 -->
     <div v-if="showPaymentModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div class="fixed inset-0 bg-black bg-opacity-50" @click="showPaymentModal = false"></div>
+      <div class="fixed inset-0 bg-black bg-opacity-50" @click="cancelOnlinePayment"></div>
       <div class="bg-white p-6 rounded-lg shadow-xl z-10 w-full max-w-md">
         <div class="text-center">
           <h3 class="text-lg font-medium mb-4">{{ t('payment.scanToPay') }}</h3>
@@ -462,7 +462,7 @@
             <!-- CNY金额 -->
             <div class="mb-3">
               <div class="text-sm text-gray-600">{{ t('order.amount') }}</div>
-              <div class="text-2xl font-bold text-blue-600">{{ portalCurrency.formatThb(totalAmount.toFixed(2)) }}</div>
+              <div class="text-2xl font-bold text-blue-600">{{ portalCurrency.formatThb(paymentModalThbDisplay) }}</div>
             </div>
             <!-- USDT金额 -->
             <div class="pt-3 border-t border-gray-200">
@@ -508,17 +508,20 @@
           <!-- 按钮组 -->
           <div class="flex space-x-3">
             <button
-              @click="showPaymentModal = false"
-              class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              type="button"
+              :disabled="confirmingOnlinePayment"
+              @click="cancelOnlinePayment"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               {{ t('payment.cancel') }}
             </button>
             <button
+              type="button"
               @click="completeOnlinePayment"
-              :disabled="submitting"
+              :disabled="confirmingOnlinePayment"
               class="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
             >
-              {{ submitting ? t('common.submitting') : t('payment.complete') }}
+              {{ confirmingOnlinePayment ? t('common.submitting') : t('payment.complete') }}
             </button>
           </div>
         </div>
@@ -549,7 +552,7 @@ import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
 import { useUserStore } from '../../stores/user.js'
 import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
-import { createOrder } from '../../api/orders.js'
+import { createOrder, confirmOnlinePayment as confirmOnlinePaymentApi } from '../../api/orders.js'
 import { getAddresses } from '../../api/addresses.js'
 import api from '../../api/index.js'
 import config from '../../../config/index.js'
@@ -611,6 +614,9 @@ const loadingAddresses = ref(false)
 const showPaymentModal = ref(false)
 const paymentQRCode = ref(null)
 const exchangeRate = ref(0) // USD/USDT 汇算比例，与后台 exchange_rates.USD 一致
+const pendingOnlinePaymentOrderId = ref(null)
+const pendingOnlinePaymentThb = ref(null)
+const confirmingOnlinePayment = ref(false)
 
 // 地址数据
 const addresses = ref([])
@@ -722,9 +728,19 @@ const totalAmount = computed(() => {
   return cartStore.totalAmount
 })
 
-// 计算USDT金额
+const paymentModalThb = computed(() => {
+  const p = pendingOnlinePaymentThb.value
+  if (p != null && Number.isFinite(p)) return p
+  return totalAmount.value
+})
+
+const paymentModalThbDisplay = computed(() =>
+  Number.isFinite(Number(paymentModalThb.value)) ? Number(paymentModalThb.value).toFixed(2) : '0.00'
+)
+
+// 计算USDT金额（支付弹窗以内用订单底价 THB；未建单前兜底购物车合计）
 const usdtAmount = computed(() => {
-  return (totalAmount.value * exchangeRate.value).toFixed(2)
+  return (paymentModalThb.value * exchangeRate.value).toFixed(2)
 })
 
 // 显示消息
@@ -968,13 +984,6 @@ const handleSubmitOrder = async () => {
     return
   }
 
-  // 如果选择在线付款，显示支付二维码
-  if (orderForm.payment_method === 'online') {
-    showPaymentModal.value = true
-    return
-  }
-
-  // 货到付款直接提交订单
   await submitOrder()
 }
 
@@ -1017,34 +1026,46 @@ const submitOrder = async () => {
     const response = await createOrder(orderData)
 
     if (response.data.success) {
-      showMessage(t('order.submitSuccess'), 'success')
-      
-      // 清空购物车状态
       await cartStore.loadCart()
-      
       const payload = response.data.data || {}
-      // 检查是否是游客下单且后端已自动注册
+
+      if (orderForm.payment_method === 'online') {
+        const ord = payload.order
+        if (!ord?.id) {
+          showMessage(t('order.submitFailed'), 'error')
+          return
+        }
+        if (payload.autoRegistered && payload.user && payload.token) {
+          userStore.setAuth(payload.user, payload.token)
+          const phone = payload.user.phone
+          const password = phone.slice(-8)
+          showMessage(t('user.accountCreatedPassword', { password }), 'success')
+        }
+        pendingOnlinePaymentOrderId.value = ord.id
+        pendingOnlinePaymentThb.value = parseFloat(ord.total_amount_thb)
+        if (!Number.isFinite(pendingOnlinePaymentThb.value)) pendingOnlinePaymentThb.value = 0
+        await loadSystemConfig()
+        showMessage(t('order.onlinePayCreated'), 'success')
+        showPaymentModal.value = true
+        return
+      }
+
+      showMessage(t('order.submitSuccess'), 'success')
       if (payload.autoRegistered && payload.user && payload.token) {
-        // 后端已自动注册，直接登录
         userStore.setAuth(payload.user, payload.token)
-        
-        // 生成密码提示
         const phone = payload.user.phone
         const password = phone.slice(-8)
         showMessage(t('user.accountCreatedPassword', { password }), 'success')
-        
         await nextTick()
         setTimeout(() => {
           router.push({ path: '/profile', query: { tab: 'orders' } })
         }, 500)
       } else if (!userStore.isLoggedIn) {
-        // 后端自动注册失败时，提示用户手动注册
         showMessage('自动注册失败，请手动注册后再下单', 'error')
         setTimeout(() => {
           router.push('/register')
         }, 2000)
       } else {
-        // 已登录用户：立即跳转个人中心订单列表（与在线支付「完成支付」同一路径）
         await nextTick()
         await router.push({ path: '/profile', query: { tab: 'orders' } })
       }
@@ -1061,10 +1082,40 @@ const submitOrder = async () => {
   }
 }
 
-// 完成在线付款
+// 完成在线付款（仅确认已创建的待支付订单）
 const completeOnlinePayment = async () => {
+  const id = pendingOnlinePaymentOrderId.value
+  if (!id) {
+    showPaymentModal.value = false
+    return
+  }
+  confirmingOnlinePayment.value = true
+  try {
+    const response = await confirmOnlinePaymentApi(id)
+    if (!response.data?.success) {
+      showMessage(response.data?.message || t('order.submitFailed'), 'error')
+      return
+    }
+    showPaymentModal.value = false
+    pendingOnlinePaymentOrderId.value = null
+    pendingOnlinePaymentThb.value = null
+    showMessage(t('order.payConfirmOk'), 'success')
+    await nextTick()
+    await router.push({ path: '/profile', query: { tab: 'orders' } })
+  } catch (error) {
+    console.error(error)
+    showMessage(error.response?.data?.message || t('order.submitFailedRetry'), 'error')
+  } finally {
+    confirmingOnlinePayment.value = false
+  }
+}
+
+const cancelOnlinePayment = () => {
+  if (confirmingOnlinePayment.value) return
   showPaymentModal.value = false
-  await submitOrder()
+  pendingOnlinePaymentOrderId.value = null
+  pendingOnlinePaymentThb.value = null
+  router.push({ path: '/profile', query: { tab: 'orders' } })
 }
 
 // 处理二维码加载错误

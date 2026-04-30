@@ -358,6 +358,7 @@ class ProductController {
       })
 
       await product.reload({
+        paranoid: !req.admin,
         include: [
           {
             model: ProductCategory,

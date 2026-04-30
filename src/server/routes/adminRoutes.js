@@ -6,6 +6,7 @@ import AddressController from '../controllers/addressController.js'
 import { authenticateAdmin, requirePermission, requireSuperAdmin, logOperation } from '../middlewares/adminAuthMiddleware.js'
 
 import ProductCategoryController from '../controllers/productCategoryController.js'
+import PartnerAdminController from '../controllers/partnerAdminController.js'
 
 const router = express.Router()
 
@@ -35,6 +36,15 @@ router.get('/orders/:id', requirePermission('orders'), OrderController.getOrderD
 router.put('/orders/:id/status', requirePermission('orders'), logOperation('update_order_status', 'order'), OrderController.updateOrderStatus)
 router.delete('/orders/:id', requirePermission('orders'), logOperation('delete_order', 'order'), OrderController.deleteOrder)
 router.get('/orders/export', requirePermission('orders'), OrderController.exportOrders)
+
+// 合作方（批发）与普通用户菜单隔离：独立 permission partners
+router.get('/partners', requirePermission('partners'), PartnerAdminController.listPartners)
+router.post('/partners', requirePermission('partners'), logOperation('create_partner', 'partner'), PartnerAdminController.createPartner)
+router.put('/partners/:id', requirePermission('partners'), logOperation('update_partner', 'partner'), PartnerAdminController.updatePartner)
+router.put('/partners/:id/password', requirePermission('partners'), logOperation('reset_partner_password', 'partner'), PartnerAdminController.resetPartnerPassword)
+router.get('/partner-orders/export', requirePermission('partners'), PartnerAdminController.exportPartnerOrders)
+router.get('/partner-orders', requirePermission('partners'), PartnerAdminController.listPartnerOrders)
+router.put('/partner-orders/:id/status', requirePermission('partners'), logOperation('update_partner_order_status', 'partner_order'), PartnerAdminController.updatePartnerOrderStatus)
 
 // 管理员用户路由（需要users权限）
 router.get('/users', requirePermission('users'), UserController.getAllUsers)

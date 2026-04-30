@@ -17,6 +17,8 @@ export const useUserStore = defineStore('user', () => {
 
   // 设置认证信息
   const setAuth = (userData, authToken) => {
+    localStorage.removeItem('partner_token')
+    localStorage.removeItem('partner_profile')
     user.value = userData
     token.value = authToken
     localStorage.setItem('token', authToken)
@@ -27,6 +29,8 @@ export const useUserStore = defineStore('user', () => {
   const clearAuth = () => {
     user.value = null
     token.value = null
+    localStorage.removeItem('partner_token')
+    localStorage.removeItem('partner_profile')
     localStorage.removeItem('token')
     localStorage.removeItem('user')
   }

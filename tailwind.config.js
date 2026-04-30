@@ -3,8 +3,10 @@ export default {
   content: [
     "./src/portal/**/*.{js,ts,jsx,tsx,vue}",
     "./src/admin/**/*.{js,ts,jsx,tsx,vue}",
+    "./src/partner/**/*.{js,ts,jsx,tsx,vue}",
     "./src/portal/index.html",
-    "./src/admin/index.html"
+    "./src/admin/index.html",
+    "./src/partner/index.html"
   ],
   theme: {
     extend: {

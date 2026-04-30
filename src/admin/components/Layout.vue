@@ -47,16 +47,16 @@
       </div>
     </el-header>
 
-    <el-container>
+    <el-container class="layout-inner">
       <!-- 侧边栏 -->
       <el-aside width="200px" class="sidebar">
         <el-menu
-          :default-active="$route.path"
-          router
+          :default-active="activeMenuPath"
           class="sidebar-menu"
           background-color="#304156"
           text-color="#bfcbd9"
           active-text-color="#409EFF"
+          @select="onMenuSelect"
         >
           <el-menu-item index="/dashboard">
             <el-icon><DataAnalysis /></el-icon>
@@ -78,6 +78,14 @@
             <el-icon><User /></el-icon>
             <span>{{ t('menu.users') }}</span>
           </el-menu-item>
+          <el-sub-menu index="/partner-wholesale" v-if="adminStore.hasPermission('partners')">
+            <template #title>
+              <el-icon><OfficeBuilding /></el-icon>
+              <span>{{ t('menu.partnerWholesale') }}</span>
+            </template>
+            <el-menu-item index="/partners">{{ t('menu.partnersAccounts') }}</el-menu-item>
+            <el-menu-item index="/partner-orders">{{ t('menu.partnerOrdersMenu') }}</el-menu-item>
+          </el-sub-menu>
           <el-sub-menu index="/system">
             <template #title>
               <el-icon><UserFilled /></el-icon>
@@ -99,19 +107,31 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled } from '@element-plus/icons-vue'
+import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAdminStore } from '../stores/admin.js'
 
 // 国际化
 const { t, locale } = useI18n()
 
-// 路由和store
 const router = useRouter()
+const route = useRoute()
 const adminStore = useAdminStore()
+
+/** 与高亮索引一致（嵌套路由通常为 /dashboard 等无前缀路径） */
+const activeMenuPath = computed(() => route.path)
+
+/** el-sub-menu 仅用于展开的占位 index，不能做 router.push（否则跳转到不存在的路由） */
+const submenuGroupIndices = new Set(['/products-menu', '/partner-wholesale', '/system'])
+
+function onMenuSelect (index) {
+  const path = typeof index === 'string' ? index.trim() : ''
+  if (!path || submenuGroupIndices.has(path)) return
+  router.push(path)
+}
 
 // 语言切换
 const currentLanguage = ref(locale.value)
@@ -149,6 +169,15 @@ const getRoleText = (role) => {
 <style scoped>
 .layout {
   height: 100vh;
+  flex-direction: column;
+}
+
+.layout-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
 }
 
 .header {
@@ -185,7 +214,12 @@ const getRoleText = (role) => {
 }
 
 .sidebar {
+  flex-shrink: 0;
   background-color: #304156;
+  overflow-x: visible;
+  overflow-y: auto;
+  position: relative;
+  z-index: 101;
 }
 
 .sidebar-menu {
@@ -196,5 +230,10 @@ const getRoleText = (role) => {
 .main-content {
   background-color: #f0f2f5;
   padding: 20px;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  position: relative;
+  z-index: 0;
 }
 </style>

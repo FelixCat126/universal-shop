@@ -9,7 +9,9 @@ export default {
     users: 'User Management - Mall Management System',
     operators: 'Operator Management - Mall Management System',
     systemConfig: 'System Configuration - Mall Management System',
-    operationLogs: 'Operation Logs - Mall Management System'
+    operationLogs: 'Operation Logs - Mall Management System',
+    partnersPartners: 'Partner accounts - Mall Management System',
+    partnerOrders: 'Partner wholesale orders - Mall Management System'
   },
 
   // Common
@@ -94,11 +96,83 @@ export default {
     categoryManage: 'Categories',
     orders: 'Order Management',
     users: 'User Management',
+    partnerWholesale: 'Partner management',
+    partnersAccounts: 'Partner accounts',
+    partnerOrdersMenu: 'Partner orders',
     operators: 'Operator Management',
     system: 'System Management',
     operationLogs: 'Operation Logs',
     systemConfig: 'System Configuration',
     logout: 'Logout'
+  },
+
+  partnersMgmt: {
+    title: 'Partner accounts',
+    refresh: 'Refresh',
+    create: 'New partner',
+    accountKind: 'Account type',
+    kindDealer: 'Dealer',
+    kindAgent: 'Agent',
+    login: 'Login',
+    displayName: 'Display name',
+    discountPercent: 'Discount %',
+    active: 'Active',
+    inactive: 'Inactive',
+    lastLogin: 'Last login',
+    resetPwd: 'Reset password',
+    edit: 'Edit',
+    pwdPlaceholder: 'New password (min 6 chars)',
+    createTitle: 'Create partner account',
+    editTitle: 'Edit partner',
+    loginPlaceholder: '2–64 chars',
+    displayNamePlaceholder: 'Optional',
+    password: 'Initial password',
+    passwordHint: 'At least 6 characters',
+    save: 'Save',
+    loadFailed: 'Load failed',
+    createOk: 'Created',
+    updateOk: 'Updated',
+    resetOk: 'Password reset'
+  },
+
+  partnerOrdersMgmt: {
+    title: 'Partner orders',
+    export: 'Export Excel',
+    orderNo: 'Order no.',
+    partner: 'Partner',
+    totalThb: 'Total THB',
+    status: 'Status',
+    createdAt: 'Created at',
+    filterPartner: 'Partner',
+    filterPartnerPlaceholder: 'Login or display name',
+    filterStatus: 'Status',
+    filterStatusPlaceholder: 'Select status',
+    dateFrom: 'From',
+    dateTo: 'To',
+    search: 'Search',
+    reset: 'Reset',
+    sku: 'SKU',
+    qty: 'Qty',
+    unitPrice: 'Unit price',
+    lineTotal: 'Line total',
+    updateStatusOk: 'Status updated',
+    exportFail: 'Export failed',
+    loadFailed: 'Failed to load partner orders',
+    statusUpdateFailed: 'Failed to update order status',
+    contactName: 'Contact',
+    contactPhone: 'Phone',
+    address: 'Address',
+    notes: 'Notes',
+    snapshotName: 'Name snapshot',
+    productImage: 'Image',
+    orderStatus: {
+      pending_payment: 'Pending payment',
+      submitted: 'Submitted',
+      processing: 'Processing',
+      shipped: 'Shipped',
+      settled: 'Settled',
+      cancelled: 'Cancelled'
+    }
   },
 
   categories: {
@@ -385,7 +459,16 @@ export default {
       update_product: 'Update Product',
       delete_product: 'Delist Product',
       upload_product_image: 'Upload Product Image',
-      view: 'View'
+      view: 'View',
+      export: 'Export',
+      create_partner: 'Create Partner',
+      update_partner: 'Update Partner',
+      reset_partner_password: 'Reset Partner Password',
+      update_partner_order_status: 'Update Partner Order Status',
+      update_user_status: 'Update User Status',
+      create_product_category: 'Create Category',
+      update_product_category: 'Update Category',
+      delete_product_category: 'Delete Category'
     },
     resources: {
       administrator: 'Administrator',
@@ -396,7 +479,13 @@ export default {
       home_banner: 'Home Banner',
       banner: 'Banner',
       image: 'Image',
-      file: 'File'
+      file: 'File',
+      partner: 'Partner',
+      partner_order: 'Partner Order',
+      product_category: 'Product Category',
+      users: 'Users',
+      orders: 'Orders',
+      payment_qrcode: 'Payment QR Code'
     },
     messages: {
       loadFailed: 'Failed to load logs',

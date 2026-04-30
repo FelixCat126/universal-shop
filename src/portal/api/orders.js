@@ -15,10 +15,14 @@ export const getOrderDetail = (orderId) => {
   return api.get(`/orders/${orderId}`)
 }
 
-
+// 在线支付：弹窗内确认后进入送货中等后续流程
+export const confirmOnlinePayment = (orderId) => {
+  return api.post(`/orders/${orderId}/confirm-online-payment`)
+}
 
 export default {
   createOrder,
   getUserOrders,
-  getOrderDetail
+  getOrderDetail,
+  confirmOnlinePayment
 }

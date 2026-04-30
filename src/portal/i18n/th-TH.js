@@ -182,6 +182,7 @@ export default {
     initialPasswordHint: 'รหัสผ่านเริ่มต้นคือเลข 8 หลักท้ายของเบอร์โทรศัพท์',
     emailOrPhone: 'เบอร์โทรศัพท์หรืออีเมล',
     createAccount: 'สร้างบัญชีใหม่',
+    partnerPortalLink: 'เข้าสู่ระบบคู่ค้า (ขายส่ง)',
     loginExistingAccount: 'เข้าสู่ระบบบัญชีที่มีอยู่',
     nickname: 'ชื่อเล่น',
     nicknamePlaceholder: 'กรุณาใส่ชื่อเล่นของคุณ',
@@ -281,7 +282,10 @@ export default {
     expressDelivery: 'การจัดส่งด่วน',
     today: 'วันนี้',
     orderIdRequired: 'ต้องระบุหมายเลขคำสั่งซื้อ',
-    loadDetailFailed: 'ไม่สามารถโหลดรายละเอียดคำสั่งซื้อได้'
+    loadDetailFailed: 'ไม่สามารถโหลดรายละเอียดคำสั่งซื้อได้',
+    onlinePayCreated: 'สร้างคำสั่งซื้อแล้ว — สแกนชำระ แล้วกดยืนยันในหน้าต่างนี้',
+    payConfirmOk: 'ยืนยันการชำระเงินแล้ว',
+    goPay: 'ไปชำระเงิน'
   },
 
   // 地址管理

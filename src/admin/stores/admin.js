@@ -34,7 +34,7 @@ export const useAdminStore = defineStore('admin', () => {
     if (!adminInfo.value) return false
     const rolePermissions = {
       super_admin: ['*'],
-      admin: ['orders', 'users', 'products', 'administrators'],
+      admin: ['orders', 'users', 'products', 'administrators', 'partners'],
       operator: ['orders', 'users', 'products']
     }
     const permissions = rolePermissions[adminInfo.value.role] || []
@@ -113,7 +113,7 @@ export const useAdminStore = defineStore('admin', () => {
         logout()
         // 在store中不能使用useRouter()，直接使用window.location跳转
         if (typeof window !== 'undefined') {
-          window.location.href = '/admin/login'
+          window.location.href = `${import.meta.env.BASE_URL || '/'}login`
         }
         throw new Error('登录已过期，请重新登录')
       }

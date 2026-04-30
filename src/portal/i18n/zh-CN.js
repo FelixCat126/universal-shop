@@ -182,6 +182,7 @@ export default {
     initialPasswordHint: '初始密码为您手机号的后八位',
     emailOrPhone: '手机号或邮箱',
     createAccount: '创建新账户',
+    partnerPortalLink: '合作方登录（批发）',
     loginExistingAccount: '登录已有账户',
     nickname: '昵称',
     nicknamePlaceholder: '请输入您的昵称',
@@ -281,7 +282,10 @@ export default {
     expressDelivery: '加急配送',
     today: '今天',
     orderIdRequired: '订单ID不能为空',
-    loadDetailFailed: '获取订单详情失败'
+    loadDetailFailed: '获取订单详情失败',
+    onlinePayCreated: '订单已创建，请扫码支付后在本弹窗点击「完成付款」',
+    payConfirmOk: '支付已确认',
+    goPay: '去支付'
   },
 
   // 地址管理

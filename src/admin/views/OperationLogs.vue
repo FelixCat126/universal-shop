@@ -234,7 +234,7 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useAdminStore } from '../stores/admin.js'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const adminStore = useAdminStore()
 
@@ -370,14 +370,20 @@ const getActionTagType = (action) => {
   return typeMap[baseAction] || 'info'
 }
 
-// 获取操作类型文本
+// 获取操作类型文本（服务端 action 枚举可能扩展，未知项用可读回退，避免整段 i18n 路径露在界面上）
 const getActionText = (action) => {
-  return t(`operationLogs.actions.${action}`) || action
+  if (!action) return '—'
+  const key = `operationLogs.actions.${action}`
+  if (te(key)) return t(key)
+  return String(action).replace(/_/g, ' ')
 }
 
 // 获取资源类型文本
 const getResourceText = (resource) => {
-  return t(`operationLogs.resources.${resource}`) || resource
+  if (!resource) return '—'
+  const key = `operationLogs.resources.${resource}`
+  if (te(key)) return t(key)
+  return String(resource).replace(/_/g, ' ')
 }
 
 // 格式化日期时间

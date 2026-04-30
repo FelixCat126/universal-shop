@@ -97,6 +97,7 @@ class DataSeeder {
 
       // 兜底：补丁已记录但 ALTER 未生效时（如 SQLite 单条 query 未执行到 ALTER），仍保证列存在
       await this.ensureSqliteProductDeletedAtColumn()
+      await this.ensureSqlitePartnersAccountKindColumn()
 
       // 绝不使用 sync({ force: true })，以免 DROP 表；新建库时空库 sync 仅 CREATE
       await sequelize.sync()
@@ -143,6 +144,23 @@ class DataSeeder {
 
     console.log('🔧 products 表缺少 deleted_at，正在执行 ALTER ADD COLUMN（软删除列）...')
     await sequelize.query('ALTER TABLE products ADD COLUMN deleted_at DATETIME')
+  }
+
+  /** SQLite：若 partners 表存在但无 account_kind，则补列（与合作方 Partner 模型一致） */
+  static async ensureSqlitePartnersAccountKindColumn () {
+    if (sequelize.getDialect() !== 'sqlite') return
+
+    const [tables] = await sequelize.query(`
+      SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'partners' LIMIT 1
+    `)
+    if (tables.length === 0) return
+
+    const [cols] = await sequelize.query('PRAGMA table_info(partners)')
+    const has = cols.some((c) => c.name === 'account_kind')
+    if (has) return
+
+    console.log('🔧 partners 表缺少 account_kind，正在执行 ALTER ADD COLUMN...')
+    await sequelize.query(`ALTER TABLE partners ADD COLUMN account_kind VARCHAR(16) NOT NULL DEFAULT 'dealer'`)
   }
   
   static async fixIncorrectConstraints() {
@@ -297,6 +315,18 @@ class DataSeeder {
           config_key: 'db_version',
           config_value: '1.1.0', // 包含 exchange_rate 字段的版本
           description: '数据库Schema版本',
+          config_type: 'text'
+        },
+        {
+          config_key: 'partner_order_moq_unit',
+          config_value: '50',
+          description: '合作方批发单条明细最小起订量（件）',
+          config_type: 'text'
+        },
+        {
+          config_key: 'partner_order_moq_multiplier',
+          config_value: '1',
+          description: '合作方单 SKU 增量步长（1 表示仅下限起订后可逐件递增）',
           config_type: 'text'
         }
       ]

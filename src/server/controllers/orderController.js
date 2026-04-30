@@ -312,6 +312,7 @@ class OrderController {
       // 生成订单号
       const orderNo = `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
 
+      const initialOrderStatus = paymentMethod === 'online' ? 'pending' : 'shipping'
 
       // 创建订单
       const order = await Order.create({
@@ -322,7 +323,7 @@ class OrderController {
         currency_code: checkoutCurrency,
         payment_method: paymentMethod,
         points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
-        status: 'shipping', // 订单提交后进入送货中状态
+        status: initialOrderStatus,
         contact_name: orderContactName,
         contact_phone: orderContactPhone,
         delivery_address: orderDeliveryAddress,
@@ -401,7 +402,7 @@ class OrderController {
       await transaction.commit()
 
       try {
-        if (paymentMethod !== 'points' && userId) {
+        if (paymentMethod !== 'points' && paymentMethod !== 'online' && userId) {
           const qtySum = items.reduce((s, it) => s + Number(it.quantity || 0), 0)
           if (qtySum > 0) {
             await pointsService.grantPurchasePoints(userId, order.id, qtySum)
@@ -467,6 +468,63 @@ class OrderController {
         message: '创建订单失败',
         error: error.message
       })
+    }
+  }
+
+  /** 在线支付订单：用户在支付弹窗内确认后转为送货中（并发放购物积分） */
+  static async confirmOnlinePayment (req, res) {
+    try {
+      const userId = req.user?.userId
+      if (!userId) {
+        return res.status(401).json({ success: false, message: '请先登录' })
+      }
+      const id = parseInt(req.params.id, 10)
+      if (!Number.isFinite(id) || id < 1) {
+        return res.status(400).json({ success: false, message: '无效的订单 ID' })
+      }
+      const order = await Order.findOne({
+        where: { id, user_id: userId },
+        include: [{ model: OrderItem, as: 'items', attributes: ['quantity'] }]
+      })
+      if (!order) {
+        return res.status(404).json({ success: false, message: '订单不存在' })
+      }
+      if (order.payment_method !== 'online') {
+        return res.status(400).json({ success: false, message: '该订单不需要在线支付确认' })
+      }
+      if (order.status !== 'pending') {
+        return res.status(400).json({ success: false, message: '订单无需确认支付或已处理' })
+      }
+      await order.update({ status: 'shipping' })
+      try {
+        const qtySum = (order.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0)
+        if (qtySum > 0) {
+          await pointsService.grantPurchasePoints(userId, order.id, qtySum)
+        }
+      } catch (earnErr) {
+        console.error('购物积分发放失败:', earnErr)
+      }
+      const createdOrder = await Order.findByPk(order.id, {
+        include: [
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [{
+              model: Product,
+              as: 'product',
+              paranoid: false
+            }]
+          }
+        ]
+      })
+      return res.json({
+        success: true,
+        message: '支付已确认',
+        data: createdOrder
+      })
+    } catch (error) {
+      console.error('确认在线支付失败:', error)
+      return res.status(500).json({ success: false, message: '确认支付失败' })
     }
   }
 

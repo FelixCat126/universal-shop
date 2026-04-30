@@ -9,7 +9,9 @@ export default {
     users: 'จัดการผู้ใช้ - ระบบจัดการห้างสรรพสินค้า',
     operators: 'จัดการผู้ดำเนินการ - ระบบจัดการห้างสรรพสินค้า',
     systemConfig: 'ตั้งค่าระบบ - ระบบจัดการห้างสรรพสินค้า',
-    operationLogs: 'บันทึกการดำเนินการ - ระบบจัดการห้างสรรพสินค้า'
+    operationLogs: 'บันทึกการดำเนินการ - ระบบจัดการห้างสรรพสินค้า',
+    partnersPartners: 'บัญชีคู่ค้า - ระบบจัดการห้างสรรพสินค้า',
+    partnerOrders: 'คำสั่งซื้อคู่ค้า - ระบบจัดการห้างสรรพสินค้า'
   },
 
   // 通用
@@ -96,11 +98,83 @@ export default {
     categoryManage: 'จัดการหมวดหมู่',
     orders: 'จัดการคำสั่งซื้อ',
     users: 'จัดการผู้ใช้',
+    partnerWholesale: 'การจัดการคู่ค้า',
+    partnersAccounts: 'บัญชีคู่ค้า',
+    partnerOrdersMenu: 'คำสั่งซื้อคู่ค้า',
     operators: 'จัดการผู้ดำเนินการ',
     system: 'จัดการระบบ',
     operationLogs: 'บันทึกการดำเนินการ',
     systemConfig: 'การตั้งค่าระบบ',
     logout: 'ออกจากระบบ'
+  },
+
+  partnersMgmt: {
+    title: 'บัญชีคู่ค้า',
+    refresh: 'รีเฟรช',
+    create: 'เพิ่มคู่ค้า',
+    accountKind: 'ประเภทบัญชี',
+    kindDealer: 'ตัวแทนจำหน่าย',
+    kindAgent: 'ตัวแทน',
+    login: 'ชื่อเข้าระบบ',
+    displayName: 'ชื่อที่แสดง',
+    discountPercent: 'ส่วนลด %',
+    active: 'ใช้งาน',
+    inactive: 'ปิดการใช้งาน',
+    lastLogin: 'เข้าระบบล่าสุด',
+    resetPwd: 'รีเซ็ตรหัสผ่าน',
+    edit: 'แก้ไข',
+    pwdPlaceholder: 'รหัสใหม่อย่างน้อย 6 ตัว',
+    createTitle: 'สร้างบัญชีคู่ค้า',
+    editTitle: 'แก้ไขคู่ค้า',
+    loginPlaceholder: '2–64 ตัว',
+    displayNamePlaceholder: 'ไม่บังคับ',
+    password: 'รหัสผ่านเริ่มต้น',
+    passwordHint: 'อย่างน้อย 6 ตัว',
+    save: 'บันทึก',
+    loadFailed: 'โหลดไม่สำเร็จ',
+    createOk: 'สร้างแล้ว',
+    updateOk: 'อัปเดตแล้ว',
+    resetOk: 'รีเซ็ตรหัสแล้ว'
+  },
+
+  partnerOrdersMgmt: {
+    title: 'คำสั่งซื้อคู่ค้า',
+    export: 'ส่งออก Excel',
+    orderNo: 'เลขที่ออเดอร์',
+    partner: 'คู่ค้า',
+    totalThb: 'ยอดรวม THB',
+    status: 'สถานะ',
+    createdAt: 'เวลาสั่ง',
+    filterPartner: 'คู่ค้า',
+    filterPartnerPlaceholder: 'ชื่อเข้าระบบหรือชื่อที่แสดง',
+    filterStatus: 'สถานะ',
+    filterStatusPlaceholder: 'เลือกสถานะ',
+    dateFrom: 'ตั้งแต่',
+    dateTo: 'ถึง',
+    search: 'ค้นหา',
+    reset: 'รีเซ็ต',
+    sku: 'SKU',
+    qty: 'จำนวน',
+    unitPrice: 'ราคา/หน่วย',
+    lineTotal: 'รวมบรรทัด',
+    updateStatusOk: 'อัปเดตสถานะแล้ว',
+    exportFail: 'ส่งออกล้มเหลว',
+    loadFailed: 'โหลดคำสั่งซื้อคู่ค้าไม่สำเร็จ',
+    statusUpdateFailed: 'อัปเดตสถานะออเดอร์ไม่สำเร็จ',
+    contactName: 'ผู้ติดต่อ',
+    contactPhone: 'โทรศัพท์',
+    address: 'ที่อยู่จัดส่ง',
+    notes: 'หมายเหตุ',
+    snapshotName: 'ชื่อสำรอง',
+    productImage: 'รูปสินค้า',
+    orderStatus: {
+      pending_payment: 'รอชำระเงิน',
+      submitted: 'ส่งแล้ว',
+      processing: 'กำลังดำเนินการ',
+      shipped: 'จัดส่งแล้ว',
+      settled: 'ปิดบัญชีแล้ว',
+      cancelled: 'ยกเลิก'
+    }
   },
 
   categories: {
@@ -387,7 +461,16 @@ export default {
       update_product: 'อัปเดตสินค้า',
       delete_product: 'ถอดสินค้าออกจากการขาย',
       upload_product_image: 'อัปโหลดรูปภาพสินค้า',
-      view: 'ดู'
+      view: 'ดู',
+      export: 'ส่งออก',
+      create_partner: 'สร้างคู่ค้า',
+      update_partner: 'อัปเดตคู่ค้า',
+      reset_partner_password: 'รีเซ็ตรหัสคู่ค้า',
+      update_partner_order_status: 'อัปเดตสถานะคำสั่งซื้อคู่ค้า',
+      update_user_status: 'อัปเดตสถานะผู้ใช้',
+      create_product_category: 'สร้างหมวดสินค้า',
+      update_product_category: 'อัปเดตหมวดสินค้า',
+      delete_product_category: 'ลบหมวดสินค้า'
     },
     resources: {
       administrator: 'ผู้ดูแลระบบ',
@@ -398,7 +481,13 @@ export default {
       home_banner: 'แบนเนอร์หน้าแรก',
       banner: 'แบนเนอร์',
       image: 'รูปภาพ',
-      file: 'ไฟล์'
+      file: 'ไฟล์',
+      partner: 'คู่ค้า',
+      partner_order: 'คำสั่งซื้อคู่ค้า',
+      product_category: 'หมวดสินค้า',
+      users: 'ผู้ใช้',
+      orders: 'คำสั่งซื้อ',
+      payment_qrcode: 'QR ชำระเงิน'
     },
     messages: {
       loadFailed: 'โหลดบันทึกล้มเหลว',
