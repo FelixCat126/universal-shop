@@ -3,6 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { fileTypeFromFile } from 'file-type'
+import { logger } from '../utils/logger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -138,7 +139,7 @@ class UploadController {
         }
       })
     } catch (error) {
-      console.error('上传图片失败:', error)
+      logger.error('上传图片失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '上传图片失败',
@@ -175,7 +176,7 @@ class UploadController {
         }
       })
     } catch (error) {
-      console.error('上传头像失败:', error)
+      logger.error('上传头像失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '上传头像失败',
@@ -218,7 +219,7 @@ class UploadController {
         })
       }
     } catch (error) {
-      console.error('删除图片失败:', error)
+      logger.error('删除图片失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '删除图片失败',

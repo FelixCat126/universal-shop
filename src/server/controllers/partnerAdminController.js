@@ -4,6 +4,7 @@ import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import { parsePartnerAccountKind } from '../constants/partnerAccountKind.js'
 import XLSX from 'xlsx'
+import { logger } from '../utils/logger.js'
 const PARTNER_ORDER_STATUS_ZH = {
   pending_payment: '待支付',
   submitted: '已提交',
@@ -41,7 +42,7 @@ class PartnerAdminController {
       })
       return res.json({ success: true, data: rows })
     } catch (e) {
-      console.error('PartnerAdminController.listPartners:', e)
+      logger.error('PartnerAdminController.listPartners', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '读取合作方列表失败' })
     }
   }
@@ -73,7 +74,7 @@ class PartnerAdminController {
 
       return res.status(201).json({ success: true, data: row.toSafeJSON() })
     } catch (e) {
-      console.error('PartnerAdminController.createPartner:', e)
+      logger.error('PartnerAdminController.createPartner', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '创建失败', error: e.message })
     }
   }
@@ -100,7 +101,7 @@ class PartnerAdminController {
       await row.save()
       return res.json({ success: true, data: row.toSafeJSON() })
     } catch (e) {
-      console.error('PartnerAdminController.updatePartner:', e)
+      logger.error('PartnerAdminController.updatePartner', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '更新失败' })
     }
   }
@@ -120,7 +121,7 @@ class PartnerAdminController {
       await row.save()
       return res.json({ success: true, message: '密码已重置' })
     } catch (e) {
-      console.error('PartnerAdminController.resetPartnerPassword:', e)
+      logger.error('PartnerAdminController.resetPartnerPassword', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '重置失败' })
     }
   }
@@ -134,7 +135,7 @@ class PartnerAdminController {
       await row.destroy()
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
-      console.error('PartnerAdminController.deletePartner:', e)
+      logger.error('PartnerAdminController.deletePartner', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '删除失败；若有关联订单可先禁用账号' })
     }
   }
@@ -199,7 +200,7 @@ class PartnerAdminController {
         }
       })
     } catch (e) {
-      console.error('PartnerAdminController.listPartnerOrders:', e)
+      logger.error('PartnerAdminController.listPartnerOrders', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '读取合作方订单失败' })
     }
   }
@@ -221,7 +222,7 @@ class PartnerAdminController {
       await order.save()
       return res.json({ success: true, data: order })
     } catch (e) {
-      console.error('PartnerAdminController.updatePartnerOrderStatus:', e)
+      logger.error('PartnerAdminController.updatePartnerOrderStatus', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '更新失败' })
     }
   }
@@ -306,7 +307,7 @@ class PartnerAdminController {
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fn)}`)
       res.send(buffer)
     } catch (e) {
-      console.error('PartnerAdminController.exportPartnerOrders:', e)
+      logger.error('PartnerAdminController.exportPartnerOrders', { err: e?.message, stack: e?.stack })
       res.status(500).json({ success: false, message: '导出失败', error: e.message })
     }
   }

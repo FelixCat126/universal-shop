@@ -4,6 +4,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
+import { logger } from '../utils/logger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -108,7 +109,7 @@ class SystemConfigController {
         data: configs
       })
     } catch (error) {
-      console.error('获取系统配置失败:', error)
+      logger.error('获取系统配置失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取系统配置失败',
@@ -131,7 +132,7 @@ class SystemConfigController {
         }
       })
     } catch (error) {
-      console.error('获取配置失败:', error)
+      logger.error('获取配置失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取配置失败',
@@ -259,7 +260,7 @@ class SystemConfigController {
         })
       }
     } catch (error) {
-      console.error('设置配置失败:', error)
+      logger.error('设置配置失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '设置配置失败',
@@ -283,7 +284,7 @@ class SystemConfigController {
           const imagePath = path.join(__dirname, '../../../public', config.config_value)
           await fs.unlink(imagePath)
         } catch (error) {
-          console.warn('删除图片文件失败（不影响操作）:', error.message)
+          logger.warn('删除图片文件失败（不影响操作）:', error.message)
         }
       }
       
@@ -301,7 +302,7 @@ class SystemConfigController {
         })
       }
     } catch (error) {
-      console.error('删除配置失败:', error)
+      logger.error('删除配置失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '删除配置失败',
@@ -335,7 +336,7 @@ class SystemConfigController {
             await fs.unlink(oldImagePath)
           } catch (error) {
             // 删除旧图片失败不影响上传流程，只记录警告
-            console.warn('删除旧首页长图失败（不影响上传）:', error.message)
+            logger.warn('删除旧首页长图失败（不影响上传）:', error.message)
           }
         }
         
@@ -355,7 +356,7 @@ class SystemConfigController {
           }
         })
       } catch (error) {
-        console.error('上传首页长图失败:', error)
+        logger.error('上传首页长图失败', { err: error?.message, stack: error?.stack })
         res.status(500).json({
           success: false,
           message: '上传失败',
@@ -390,7 +391,7 @@ class SystemConfigController {
             await fs.unlink(oldImagePath)
           } catch (error) {
             // 删除旧二维码失败不影响上传流程，只记录警告
-            console.warn('删除旧支付二维码失败（不影响上传）:', error.message)
+            logger.warn('删除旧支付二维码失败（不影响上传）:', error.message)
           }
         }
         
@@ -410,7 +411,7 @@ class SystemConfigController {
           }
         })
       } catch (error) {
-        console.error('上传支付二维码失败:', error)
+        logger.error('上传支付二维码失败', { err: error?.message, stack: error?.stack })
         res.status(500).json({
           success: false,
           message: '上传失败',
@@ -432,18 +433,18 @@ class SystemConfigController {
         try {
           const imagePath = path.join(__dirname, '../../../public', config.config_value)
           await fs.unlink(imagePath)
-          console.log('✅ 物理文件删除成功')
+          logger.info('✅ 物理文件删除成功')
         } catch (error) {
-          console.warn('删除图片文件失败（不影响操作）:', error.message)
+          logger.warn('删除图片文件失败（不影响操作）:', error.message)
         }
       }
       
       // 删除数据库配置（即使物理文件不存在也要删除配置）
       try {
         const deleted = await SystemConfig.deleteConfig('home_banner')
-        console.log('✅ 数据库配置删除结果:', deleted)
+        logger.info('✅ 数据库配置删除结果:', deleted)
       } catch (dbError) {
-        console.warn('删除数据库配置失败:', dbError.message)
+        logger.warn('删除数据库配置失败:', dbError.message)
         // 即使数据库删除失败，也返回成功，因为可能配置本来就不存在
       }
       
@@ -452,7 +453,7 @@ class SystemConfigController {
         message: '首页长图删除成功'
       })
     } catch (error) {
-      console.error('删除首页长图失败:', error)
+      logger.error('删除首页长图失败', { err: error?.message, stack: error?.stack })
       // 即使出现异常，也尝试返回成功，因为删除操作的目标是清除配置
       res.json({
         success: true,
@@ -474,18 +475,18 @@ class SystemConfigController {
         try {
           const imagePath = path.join(__dirname, '../../../public', config.config_value)
           await fs.unlink(imagePath)
-          console.log('✅ 物理文件删除成功')
+          logger.info('✅ 物理文件删除成功')
         } catch (error) {
-          console.warn('删除二维码文件失败（不影响操作）:', error.message)
+          logger.warn('删除二维码文件失败（不影响操作）:', error.message)
         }
       }
       
       // 删除数据库配置（即使物理文件不存在也要删除配置）
       try {
         const deleted = await SystemConfig.deleteConfig('payment_qrcode')
-        console.log('✅ 数据库配置删除结果:', deleted)
+        logger.info('✅ 数据库配置删除结果:', deleted)
       } catch (dbError) {
-        console.warn('删除数据库配置失败:', dbError.message)
+        logger.warn('删除数据库配置失败:', dbError.message)
         // 即使数据库删除失败，也返回成功，因为可能配置本来就不存在
       }
       
@@ -494,7 +495,7 @@ class SystemConfigController {
         message: '支付二维码删除成功'
       })
     } catch (error) {
-      console.error('删除支付二维码失败:', error)
+      logger.error('删除支付二维码失败', { err: error?.message, stack: error?.stack })
       // 即使出现异常，也尝试返回成功，因为删除操作的目标是清除配置
       res.json({
         success: true,
@@ -528,7 +529,7 @@ class SystemConfigController {
         data: publicConfigs
       })
     } catch (error) {
-      console.error('获取公开配置失败:', error)
+      logger.error('获取公开配置失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取配置失败',

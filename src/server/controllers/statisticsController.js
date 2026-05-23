@@ -3,6 +3,7 @@ import sequelize from '../config/database.js'
 import User from '../models/User.js'
 import Order from '../models/Order.js'
 import Product from '../models/Product.js'
+import { logger } from '../utils/logger.js'
 
 class StatisticsController {
   // 获取统计总览数据
@@ -45,7 +46,7 @@ class StatisticsController {
         }
       })
     } catch (error) {
-      console.error('获取统计总览失败:', error)
+      logger.error('获取统计总览失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取统计总览失败',
@@ -99,7 +100,7 @@ class StatisticsController {
         data: trendData
       })
     } catch (error) {
-      console.error('获取订单趋势失败:', error)
+      logger.error('获取订单趋势失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取订单趋势失败',
@@ -151,7 +152,7 @@ class StatisticsController {
         data: trendData
       })
     } catch (error) {
-      console.error('获取用户注册趋势失败:', error)
+      logger.error('获取用户注册趋势失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取用户注册趋势失败',
@@ -179,7 +180,7 @@ class StatisticsController {
         }
       })
     } catch (error) {
-      console.error('获取综合统计失败:', error)
+      logger.error('获取综合统计失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取综合统计失败',

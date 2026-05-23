@@ -2,6 +2,7 @@ import PointTransaction from '../models/PointTransaction.js'
 import Order from '../models/Order.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import * as pointsService from '../services/pointsService.js'
+import { logger } from '../utils/logger.js'
 
 class PointsController {
   static async getBalance (req, res) {
@@ -16,7 +17,7 @@ class PointsController {
         data: { balance }
       })
     } catch (error) {
-      console.error('读取积分余额失败:', error)
+      logger.error('读取积分余额失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({
         success: false,
         message: '读取积分余额失败'
@@ -62,7 +63,7 @@ class PointsController {
         }
       })
     } catch (error) {
-      console.error('获取积分明细失败:', error)
+      logger.error('获取积分明细失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({
         success: false,
         message: '获取积分明细失败'

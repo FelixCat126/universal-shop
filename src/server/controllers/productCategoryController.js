@@ -1,6 +1,7 @@
 import { Op } from 'sequelize'
 import ProductCategory from '../models/ProductCategory.js'
 import Product from '../models/Product.js'
+import { logger } from '../utils/logger.js'
 
 class ProductCategoryController {
   /** 前台 / 公共：全部类别，按排序 */
@@ -11,7 +12,7 @@ class ProductCategoryController {
       })
       return res.json({ success: true, data: rows })
     } catch (e) {
-      console.error('listPublic categories', e)
+      logger.error('listPublic categories', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '获取类别列表失败' })
     }
   }
@@ -47,7 +48,7 @@ class ProductCategoryController {
         }
       })
     } catch (e) {
-      console.error('listAdmin categories', e)
+      logger.error('listAdmin categories', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '获取类别列表失败' })
     }
   }
@@ -66,7 +67,7 @@ class ProductCategoryController {
       })
       return res.status(201).json({ success: true, data: row })
     } catch (e) {
-      console.error('create category', e)
+      logger.error('create category', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '创建类别失败' })
     }
   }
@@ -96,7 +97,7 @@ class ProductCategoryController {
       await row.update(patch)
       return res.json({ success: true, data: row })
     } catch (e) {
-      console.error('update category', e)
+      logger.error('update category', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '更新类别失败' })
     }
   }
@@ -121,7 +122,7 @@ class ProductCategoryController {
       await row.destroy()
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
-      console.error('remove category', e)
+      logger.error('remove category', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '删除类别失败' })
     }
   }

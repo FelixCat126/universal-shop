@@ -3,6 +3,7 @@ import ProductCategory from '../models/ProductCategory.js'
 import Cart from '../models/Cart.js'
 import sequelize from '../config/database.js'
 import { Op } from 'sequelize'
+import { logger } from '../utils/logger.js'
 
 class ProductController {
   // 获取所有产品（分页和搜索）
@@ -124,7 +125,7 @@ class ProductController {
         }
       })
     } catch (error) {
-      console.error('获取产品列表失败:', error)
+      logger.error('获取产品列表失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取产品列表失败',
@@ -178,7 +179,7 @@ class ProductController {
         data: productData
       })
     } catch (error) {
-      console.error('获取产品详情失败:', error)
+      logger.error('获取产品详情失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取产品详情失败',
@@ -275,7 +276,7 @@ class ProductController {
         data: created
       })
     } catch (error) {
-      console.error('创建产品失败:', error)
+      logger.error('创建产品失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '创建产品失败',
@@ -384,7 +385,7 @@ class ProductController {
         data: out
       })
     } catch (error) {
-      console.error('更新产品失败:', error)
+      logger.error('更新产品失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '更新产品失败',
@@ -431,7 +432,7 @@ class ProductController {
         message: '产品已下架'
       })
     } catch (error) {
-      console.error('下架产品失败:', error)
+      logger.error('下架产品失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '下架产品失败',
@@ -481,7 +482,7 @@ class ProductController {
         data: product
       })
     } catch (error) {
-      console.error('重新上架失败:', error)
+      logger.error('重新上架失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '重新上架失败',
@@ -546,7 +547,7 @@ class ProductController {
         }
       })
     } catch (error) {
-      console.error('调整库存失败:', error)
+      logger.error('调整库存失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({ success: false, message: '调整库存失败' })
     }
   }
@@ -575,7 +576,7 @@ class ProductController {
         data: products
       })
     } catch (error) {
-      console.error('检查库存失败:', error)
+      logger.error('检查库存失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '检查库存失败',

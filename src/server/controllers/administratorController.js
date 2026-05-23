@@ -5,6 +5,7 @@ import OperationLog from '../models/OperationLog.js'
 import AuditLog from '../models/AuditLog.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
+import { logger } from '../utils/logger.js'
 
 class AdministratorController {
   // 管理员登录
@@ -100,7 +101,7 @@ class AdministratorController {
         }
       })
     } catch (error) {
-      console.error('管理员登录失败:', error)
+      logger.error('管理员登录失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '登录失败',
@@ -145,7 +146,7 @@ class AdministratorController {
         }
       })
     } catch (error) {
-      console.error('获取管理员列表失败:', error)
+      logger.error('获取管理员列表失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取管理员列表失败',
@@ -223,7 +224,7 @@ class AdministratorController {
         data: newAdmin.toSafeJSON()
       })
     } catch (error) {
-      console.error('创建管理员失败:', error)
+      logger.error('创建管理员失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '创建管理员失败',
@@ -324,7 +325,7 @@ class AdministratorController {
         data: admin.toSafeJSON()
       })
     } catch (error) {
-      console.error('更新管理员失败:', error)
+      logger.error('更新管理员失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '更新管理员失败',
@@ -384,7 +385,7 @@ class AdministratorController {
         message: '管理员删除成功'
       })
     } catch (error) {
-      console.error('删除管理员失败:', error)
+      logger.error('删除管理员失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '删除管理员失败',
@@ -443,7 +444,7 @@ class AdministratorController {
         message: '密码重置成功'
       })
     } catch (error) {
-      console.error('重置密码失败:', error)
+      logger.error('重置密码失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '重置密码失败',
@@ -485,7 +486,7 @@ class AdministratorController {
         }
       })
     } catch (error) {
-      console.error('获取操作日志失败:', error)
+      logger.error('获取操作日志失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取操作日志失败',
@@ -548,7 +549,7 @@ class AdministratorController {
         }
       })
     } catch (error) {
-      console.error('初始化超级管理员失败:', error)
+      logger.error('初始化超级管理员失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '初始化失败',

@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import Partner from '../models/Partner.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * 校验合作方 Bearer；payload 须含 type===partner、partnerId
@@ -40,7 +41,7 @@ export async function authenticatePartner (req, res, next) {
     req.partnerFull = partner
     next()
   } catch (e) {
-    console.error('authenticatePartner:', e)
+    logger.error('authenticatePartner', { err: e?.message, stack: e?.stack })
     return res.status(500).json({ success: false, message: '认证失败' })
   }
 }

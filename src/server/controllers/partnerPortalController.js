@@ -21,6 +21,7 @@ import {
 } from '../constants/partnerAccountKind.js'
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
+import { logger } from '../utils/logger.js'
 
 function genPartnerOrderNo () {
   const r = Math.floor(Math.random() * 9000) + 1000
@@ -128,7 +129,7 @@ class PartnerPortalController {
         }
       })
     } catch (e) {
-      console.error('PartnerPortalController.login:', e)
+      logger.error('PartnerPortalController.login', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '登录失败' })
     }
   }
@@ -144,7 +145,7 @@ class PartnerPortalController {
         }
       })
     } catch (e) {
-      console.error('PartnerPortalController.me:', e)
+      logger.error('PartnerPortalController.me', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '获取信息失败' })
     }
   }
@@ -222,7 +223,7 @@ class PartnerPortalController {
         }
       })
     } catch (e) {
-      console.error('PartnerPortalController.listProducts:', e)
+      logger.error('PartnerPortalController.listProducts', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '获取商品列表失败' })
     }
   }
@@ -408,7 +409,7 @@ class PartnerPortalController {
       })
     } catch (e) {
       await transaction.rollback()
-      console.error('PartnerPortalController.createOrder:', e)
+      logger.error('PartnerPortalController.createOrder', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '提交订单失败', error: e.message })
     }
   }
@@ -460,7 +461,7 @@ class PartnerPortalController {
       })
       return res.json({ success: true, message: '支付已确认', data: full })
     } catch (e) {
-      console.error('PartnerPortalController.confirmPartnerOrderPayment:', e)
+      logger.error('PartnerPortalController.confirmPartnerOrderPayment', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '确认支付失败' })
     }
   }
@@ -518,7 +519,7 @@ class PartnerPortalController {
         }
       })
     } catch (e) {
-      console.error('PartnerPortalController.listMyOrders:', e)
+      logger.error('PartnerPortalController.listMyOrders', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '获取订单失败' })
     }
   }
@@ -536,7 +537,7 @@ class PartnerPortalController {
 
       return res.json({ success: true, data: order })
     } catch (e) {
-      console.error('PartnerPortalController.orderDetail:', e)
+      logger.error('PartnerPortalController.orderDetail', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '加载订单失败' })
     }
   }
@@ -549,7 +550,7 @@ class PartnerPortalController {
       })
       return res.json({ success: true, data: rows })
     } catch (e) {
-      console.error('PartnerPortalController.listAddresses:', e)
+      logger.error('PartnerPortalController.listAddresses', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '读取地址失败' })
     }
   }
@@ -593,7 +594,7 @@ class PartnerPortalController {
       })
       return res.status(201).json({ success: true, data: row })
     } catch (e) {
-      console.error('PartnerPortalController.createAddress:', e)
+      logger.error('PartnerPortalController.createAddress', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '保存地址失败' })
     }
   }
@@ -632,7 +633,7 @@ class PartnerPortalController {
       await row.save()
       return res.json({ success: true, data: row })
     } catch (e) {
-      console.error('PartnerPortalController.updateAddress:', e)
+      logger.error('PartnerPortalController.updateAddress', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '更新地址失败' })
     }
   }
@@ -659,7 +660,7 @@ class PartnerPortalController {
 
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
-      console.error('PartnerPortalController.deleteAddress:', e)
+      logger.error('PartnerPortalController.deleteAddress', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '删除失败' })
     }
   }
@@ -713,7 +714,7 @@ class PartnerPortalController {
       const fresh = await PartnerAddress.findByPk(id)
       return res.json({ success: true, data: fresh })
     } catch (e) {
-      console.error('PartnerPortalController.setDefaultAddress:', e)
+      logger.error('PartnerPortalController.setDefaultAddress', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '设置默认地址失败' })
     }
   }

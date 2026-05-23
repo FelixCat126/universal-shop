@@ -3,6 +3,7 @@ import User from '../models/User.js'
 import Order from '../models/Order.js'
 import OrderItem from '../models/OrderItem.js'
 import Product from '../models/Product.js'
+import { logger } from '../utils/logger.js'
 
 class ExportController {
   // 导出用户数据
@@ -58,7 +59,7 @@ class ExportController {
       res.send(buffer)
 
     } catch (error) {
-      console.error('导出用户数据失败:', error)
+      logger.error('导出用户数据失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '导出失败',
@@ -310,7 +311,7 @@ class ExportController {
       res.send(buffer)
 
     } catch (error) {
-      console.error('导出订单数据失败:', error)
+      logger.error('导出订单数据失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '导出失败',

@@ -8,6 +8,7 @@ import * as pointsService from '../services/pointsService.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
+import { logger } from '../utils/logger.js'
 
 class UserController {
   // 用户注册
@@ -120,7 +121,7 @@ class UserController {
         }
       })
     } catch (error) {
-      console.error('用户注册失败:', error)
+      logger.error('用户注册失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '注册失败',
@@ -196,7 +197,7 @@ class UserController {
 
       return res.json({ success: true, message: '资料更新成功', data: user.toSafeJSON() })
     } catch (error) {
-      console.error('更新用户资料失败:', error)
+      logger.error('更新用户资料失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({ success: false, message: '更新失败', error: error.message })
     }
   }
@@ -249,7 +250,7 @@ class UserController {
         message: '密码已更新'
       })
     } catch (error) {
-      console.error('修改密码失败:', error)
+      logger.error('修改密码失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({
         success: false,
         message: '修改密码失败',
@@ -384,7 +385,7 @@ class UserController {
         }
       })
     } catch (error) {
-      console.error('用户登录失败:', error)
+      logger.error('用户登录失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '登录失败',
@@ -473,7 +474,7 @@ class UserController {
         }
       })
     } catch (error) {
-      console.error('获取用户列表失败:', error)
+      logger.error('获取用户列表失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取用户列表失败',
@@ -507,7 +508,7 @@ class UserController {
         })
       }
     } catch (error) {
-      console.error('验证推荐码失败:', error)
+      logger.error('验证推荐码失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '验证推荐码失败',
@@ -540,7 +541,7 @@ class UserController {
         }
       })
     } catch (error) {
-      console.error('Token验证失败:', error)
+      logger.error('Token验证失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: 'Token验证失败',
@@ -569,7 +570,7 @@ class UserController {
         data: user
       })
     } catch (error) {
-      console.error('获取用户信息失败:', error)
+      logger.error('获取用户信息失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取用户信息失败',
@@ -588,7 +589,7 @@ class UserController {
         message: '登出成功'
       })
     } catch (error) {
-      console.error('用户登出失败:', error)
+      logger.error('用户登出失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '登出失败',
@@ -628,7 +629,7 @@ class UserController {
         must_reset_password: true
       }, true)
     } catch (error) {
-      console.error('createUserForOrder 执行失败:', error)
+      logger.error('createUserForOrder 执行失败', { err: error?.message, stack: error?.stack })
       throw error
     }
   }
@@ -725,7 +726,7 @@ class UserController {
         }
       })
     } catch (error) {
-      console.error('检查手机号失败:', error)
+      logger.error('检查手机号失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '检查手机号失败',
@@ -771,7 +772,7 @@ class UserController {
       })
 
     } catch (error) {
-      console.error('更新用户状态失败:', error)
+      logger.error('更新用户状态失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '更新用户状态失败',
@@ -812,7 +813,7 @@ class UserController {
         }
       })
     } catch (error) {
-      console.error('获取个人中心统计失败:', error)
+      logger.error('获取个人中心统计失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取统计失败'

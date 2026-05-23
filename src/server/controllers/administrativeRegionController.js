@@ -1,5 +1,6 @@
 import AdministrativeRegion from '../models/AdministrativeRegion.js'
 import sequelize from '../config/database.js'
+import { logger } from '../utils/logger.js'
 
 // Helper to format region data based on locale
 const formatRegion = (region, locale) => {
@@ -24,7 +25,7 @@ export const getProvinces = async (req, res) => {
       data: provinces
     })
   } catch (error) {
-    console.error('获取省份列表失败:', error)
+    logger.error('获取省份列表失败', { err: error?.message, stack: error?.stack })
     res.status(500).json({
       success: false,
       message: '获取省份列表失败'
@@ -44,7 +45,7 @@ export const getDistricts = async (req, res) => {
       data: districts
     })
   } catch (error) {
-    console.error('获取市区列表失败:', error)
+    logger.error('获取市区列表失败', { err: error?.message, stack: error?.stack })
     res.status(500).json({
       success: false,
       message: '获取市区列表失败'
@@ -64,7 +65,7 @@ export const getSubDistricts = async (req, res) => {
       data: subDistricts
     })
   } catch (error) {
-    console.error('获取子区列表失败:', error)
+    logger.error('获取子区列表失败', { err: error?.message, stack: error?.stack })
     res.status(500).json({
       success: false,
       message: '获取子区列表失败'
@@ -105,7 +106,7 @@ export const getRegionByPostalCode = async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('根据邮编查找行政区域失败:', error)
+    logger.error('根据邮编查找行政区域失败', { err: error?.message, stack: error?.stack })
     res.status(500).json({
       success: false,
       message: '查找失败'
@@ -140,7 +141,7 @@ export const getAllRegions = async (req, res) => {
       data: regions
     })
   } catch (error) {
-    console.error('获取所有行政区域失败:', error)
+    logger.error('获取所有行政区域失败', { err: error?.message, stack: error?.stack })
     res.status(500).json({
       success: false,
       message: '获取数据失败'

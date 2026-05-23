@@ -2,6 +2,7 @@ import Cart from '../models/Cart.js'
 import Product from '../models/Product.js'
 import ProductCategory from '../models/ProductCategory.js'
 import { Op } from 'sequelize'
+import { logger } from '../utils/logger.js'
 
 class CartController {
   // 获取购物车内容
@@ -57,7 +58,7 @@ class CartController {
         data: items
       })
     } catch (error) {
-      console.error('获取购物车失败:', error)
+      logger.error('获取购物车失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取购物车失败',
@@ -156,7 +157,7 @@ class CartController {
         })
       }
     } catch (error) {
-      console.error('添加到购物车失败:', error)
+      logger.error('添加到购物车失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '添加到购物车失败',
@@ -231,7 +232,7 @@ class CartController {
         data: cartItem
       })
     } catch (error) {
-      console.error('更新购物车失败:', error)
+      logger.error('更新购物车失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '更新购物车失败',
@@ -277,7 +278,7 @@ class CartController {
         message: '已从购物车删除'
       })
     } catch (error) {
-      console.error('删除购物车项目失败:', error)
+      logger.error('删除购物车项目失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '删除购物车项目失败',
@@ -313,7 +314,7 @@ class CartController {
         message: '购物车已清空'
       })
     } catch (error) {
-      console.error('清空购物车失败:', error)
+      logger.error('清空购物车失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '清空购物车失败',

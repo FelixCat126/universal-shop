@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
+import { logger } from '../utils/logger.js'
 
 const SystemConfig = sequelize.define('SystemConfig', {
   id: {
@@ -80,7 +81,7 @@ SystemConfig.getConfig = async function(key, defaultValue = null) {
         return config.config_value
     }
   } catch (error) {
-    console.error('获取系统配置失败:', error)
+    logger.error('获取系统配置失败', { err: error?.message, stack: error?.stack })
     return defaultValue
   }
 }
@@ -118,7 +119,7 @@ SystemConfig.setConfig = async function(key, value, type = 'text', description =
     
     return config
   } catch (error) {
-    console.error('设置系统配置失败:', error)
+    logger.error('设置系统配置失败', { err: error?.message, stack: error?.stack })
     throw error
   }
 }
@@ -131,7 +132,7 @@ SystemConfig.deleteConfig = async function(key) {
     })
     return result > 0
   } catch (error) {
-    console.error('删除系统配置失败:', error)
+    logger.error('删除系统配置失败', { err: error?.message, stack: error?.stack })
     throw error
   }
 }
@@ -171,7 +172,7 @@ SystemConfig.getAllConfigs = async function() {
     
     return result
   } catch (error) {
-    console.error('获取所有系统配置失败:', error)
+    logger.error('获取所有系统配置失败', { err: error?.message, stack: error?.stack })
     throw error
   }
 }

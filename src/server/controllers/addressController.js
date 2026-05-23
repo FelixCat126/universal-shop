@@ -2,6 +2,7 @@ import Address from '../models/Address.js'
 import User from '../models/User.js'
 import sequelize from '../config/database.js'
 import { createUserAddress } from '../services/addressService.js'
+import { logger } from '../utils/logger.js'
 
 class AddressController {
   // 获取用户地址列表
@@ -26,7 +27,7 @@ class AddressController {
       })
 
     } catch (error) {
-      console.error('获取地址列表失败:', error)
+      logger.error('获取地址列表失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取地址列表失败',
@@ -142,7 +143,7 @@ class AddressController {
 
     } catch (error) {
       await transaction.rollback()
-      console.error('创建地址失败:', error)
+      logger.error('创建地址失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '创建地址失败',
@@ -283,7 +284,7 @@ class AddressController {
 
     } catch (error) {
       await transaction.rollback()
-      console.error('更新地址失败:', error)
+      logger.error('更新地址失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '更新地址失败',
@@ -344,7 +345,7 @@ class AddressController {
 
     } catch (error) {
       await transaction.rollback()
-      console.error('设置默认地址失败:', error)
+      logger.error('设置默认地址失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '设置默认地址失败',
@@ -407,7 +408,7 @@ class AddressController {
 
     } catch (error) {
       await transaction.rollback()
-      console.error('删除地址失败:', error)
+      logger.error('删除地址失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '删除地址失败',
@@ -446,7 +447,7 @@ class AddressController {
       })
 
     } catch (error) {
-      console.error('获取地址详情失败:', error)
+      logger.error('获取地址详情失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取地址详情失败',
@@ -487,7 +488,7 @@ class AddressController {
       })
 
     } catch (error) {
-      console.error('获取用户地址列表失败:', error)
+      logger.error('获取用户地址列表失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取用户地址列表失败',

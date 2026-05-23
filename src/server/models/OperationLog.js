@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
+import { logger } from '../utils/logger.js'
 
 const OperationLog = sequelize.define('OperationLog', {
   id: {
@@ -110,7 +111,7 @@ OperationLog.logOperation = async function(params) {
       user_agent: userAgent
     })
   } catch (error) {
-    console.error('记录操作日志失败:', error)
+    logger.error('记录操作日志失败', { err: error?.message, stack: error?.stack })
     // 不抛出错误，避免影响主业务流程
   }
 }

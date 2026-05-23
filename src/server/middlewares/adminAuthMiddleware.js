@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import Administrator from '../models/Administrator.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * 可选：请求中带合法管理员 Bearer 时设置 req.admin，否则 req.admin 为 null（不返回 401）
@@ -90,7 +91,7 @@ export const authenticateAdmin = async (req, res, next) => {
     
     next()
   } catch (error) {
-    console.error('管理员Token验证失败:', error)
+    logger.error('管理员Token验证失败', { err: error?.message, stack: error?.stack })
     return res.status(403).json({
       success: false,
       message: '无效的认证令牌'
@@ -113,7 +114,7 @@ export const requirePermission = (resource) => {
       
       next()
     } catch (error) {
-      console.error('权限验证失败:', error)
+      logger.error('权限验证失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({
         success: false,
         message: '权限验证失败'
@@ -134,7 +135,7 @@ export const requireSuperAdmin = async (req, res, next) => {
     
     next()
   } catch (error) {
-    console.error('超级管理员权限验证失败:', error)
+    logger.error('超级管理员权限验证失败', { err: error?.message, stack: error?.stack })
     return res.status(500).json({
       success: false,
       message: '权限验证失败'
@@ -171,7 +172,7 @@ export const logOperation = (action, resource) => {
           userAgent: req.get('User-Agent')
         })
       } catch (error) {
-        console.error('记录操作日志失败:', error)
+        logger.error('记录操作日志失败', { err: error?.message, stack: error?.stack })
       }
     }
 

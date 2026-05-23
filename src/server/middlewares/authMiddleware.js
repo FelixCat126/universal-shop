@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken'
 import { LRUCache } from 'lru-cache'
 import User from '../models/User.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * 用户存活/启用状态短缓存：
@@ -59,7 +60,7 @@ export const authenticateToken = async (req, res, next) => {
     req.user = decoded
     next()
   } catch (error) {
-    console.error('Token验证失败:', error)
+    logger.error('Token验证失败', { err: error?.message, stack: error?.stack })
     return res.status(403).json({
       success: false,
       message: '无效的认证令牌'

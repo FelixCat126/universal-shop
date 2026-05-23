@@ -13,6 +13,7 @@ import { normalizeExchangeRates, thbToBillingAmount, normalizeCheckoutCurrency }
 import * as pointsService from '../services/pointsService.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import AuditLog from '../models/AuditLog.js'
+import { logger } from '../utils/logger.js'
 
 class OrderController {
   // 创建订单
@@ -111,7 +112,7 @@ class OrderController {
           userId = newUser.id
           isGuestOrder = true
         } catch (error) {
-          console.error('创建用户失败:', error)
+          logger.error('创建用户失败', { err: error?.message, stack: error?.stack })
           return res.status(400).json({
             success: false,
             message: error.message
@@ -457,7 +458,7 @@ class OrderController {
           }
         }
       } catch (earnErr) {
-        console.error('购物积分发放失败:', earnErr)
+        logger.error('购物积分发放失败', { err: earnErr?.message, stack: earnErr?.stack })
       }
 
       // 返回创建的订单信息
@@ -517,7 +518,7 @@ class OrderController {
 
     } catch (error) {
       await transaction.rollback()
-      console.error('创建订单失败:', error)
+      logger.error('创建订单失败', { err: error?.message, stack: error?.stack })
       if (error && error.message === 'POINTS_INSUFFICIENT') {
         return res.status(400).json({
           success: false,
@@ -585,7 +586,7 @@ class OrderController {
             await pointsService.grantPurchasePoints(userId, order.id, qtySum)
           }
         } catch (earnErr) {
-          console.error('购物积分发放失败:', earnErr)
+          logger.error('购物积分发放失败', { err: earnErr?.message, stack: earnErr?.stack })
         }
         AuditLog.logUser({
           user: { id: userId },
@@ -619,7 +620,7 @@ class OrderController {
         data: createdOrder
       })
     } catch (error) {
-      console.error('确认在线支付失败:', error)
+      logger.error('确认在线支付失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({ success: false, message: '确认支付失败' })
     }
   }
@@ -674,7 +675,7 @@ class OrderController {
       })
 
     } catch (error) {
-      console.error('获取用户订单失败:', error)
+      logger.error('获取用户订单失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取订单列表失败',
@@ -763,7 +764,7 @@ class OrderController {
       })
 
     } catch (error) {
-      console.error('获取订单详情失败:', error)
+      logger.error('获取订单详情失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取订单详情失败',
@@ -859,7 +860,7 @@ class OrderController {
       })
 
     } catch (error) {
-      console.error('获取所有订单失败:', error)
+      logger.error('获取所有订单失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '获取订单列表失败'
@@ -890,7 +891,7 @@ class OrderController {
       })
 
     } catch (error) {
-      console.error('更新订单状态失败:', error)
+      logger.error('更新订单状态失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '更新订单状态失败'
@@ -958,7 +959,7 @@ class OrderController {
 
     } catch (error) {
       await transaction.rollback()
-      console.error('删除订单失败:', error)
+      logger.error('删除订单失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '删除订单失败: ' + error.message
@@ -1013,7 +1014,7 @@ class OrderController {
       })
 
     } catch (error) {
-      console.error('导出订单失败:', error)
+      logger.error('导出订单失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
         message: '导出订单失败'
