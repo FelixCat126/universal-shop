@@ -16,14 +16,17 @@ Universal Shop 是一个轻量化的全栈电商系统，采用现代化的前�
 
 | 层级 | 技术栈 | 说明 |
 |------|--------|------|
-| 前端框架 | Vue 3 + Vite | 现代化前端开发体验 |
-| UI组件库 | Element Plus + Tailwind CSS | 丰富的组件生态 |
-| 状态管理 | Pinia | Vue 3推荐的状态管理方案 |
-| 后端框架 | Node.js + Express | 轻量级高性能服务器 |
-| ORM框架 | Sequelize | 支持多种数据库的ORM |
-| 数据库 | SQLite | 轻量级嵌入式数据库 |
-| 认证方式 | JWT | 无状态认证机制 |
-| 文件存储 | 本地存储 | 简化部署复杂度 |
+| 前端框架 | Vue 3 + Vite | 三独立 SPA：portal / admin / partner |
+| UI 组件库 | Element Plus + Tailwind CSS | Admin 用 Element，Portal 用 Tailwind |
+| 状态管理 | Pinia | Vue 3 官方推荐 |
+| 国际化 | vue-i18n | zh-CN / en-US / th-TH |
+| 后端框架 | Node.js (≥18) + Express 4 | 单进程单 app，PM2 守护 |
+| ORM 框架 | Sequelize 6 | 行级原子 UPDATE + 死锁重试 |
+| 数据库 | **PostgreSQL 16** | MVCC 真并发；Docker Compose 一键起 |
+| 认证方式 | JWT（user/admin/partner 独立 secret） | 无状态 |
+| 安全栈 | Helmet + express-rate-limit + LRU 缓存 + 自包含验证码 | 详见 `security-and-edge-defense.md` |
+| 文件存储 | 本地（multer + magic-byte 校验） | 头像 + 商品图 + 系统配置图 |
+| 测试 | Vitest + Supertest + @vue/test-utils + happy-dom | 270 用例 |
 
 ## 2. 系统架构
 
@@ -65,11 +68,9 @@ Universal Shop 是一个轻量化的全栈电商系统，采用现代化的前�
 ├─────────────────────────────────────────────────────────────┤
 │  数据持久层 (Data Layer)                                      │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │                    SQLite 数据库                         │ │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐      │ │
-│  │  │   用户表     │ │   商品表     │ │   订单表     │      │ │
-│  │  │  (users)    │ │ (products)  │ │  (orders)   │      │ │
-│  │  └─────────────┘ └─────────────┘ └─────────────┘      │ │
+│  │                    PostgreSQL 16                        │ │
+│  │  users / products / orders / partners / partner_orders  │ │
+│  │  audit_logs / operation_logs / system_config / ...      │ │
 │  └─────────────────────────────────────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
 │  文件存储层 (Storage Layer)                                   │
@@ -200,15 +201,19 @@ src/server/
 
 | 模块 | 端点前缀 | 说明 |
 |------|----------|------|
-| 用户认证 | `/api/auth` | 登录、注册、token验证 |
-| 用户管理 | `/api/users` | 用户CRUD操作 |
-| 商品管理 | `/api/products` | 商品CRUD操作 |
-| 购物车 | `/api/cart` | 购物车操作 |
-| 订单管理 | `/api/orders` | 订单CRUD操作 |
-| 地址管理 | `/api/addresses` | 地址CRUD操作 |
-| 文件上传 | `/api/upload` | 图片上传接口 |
-| 管理后台 | `/api/admin` | 管理员专用接口 |
-| 系统配置 | `/api/system-config` | 系统参数配置 |
+| 用户认证/资料 | `/api/users` | 注册/登录/资料/积分/手机号校验/推荐码校验 |
+| 商品/分类 | `/api/products` `/api/product-categories` | 公开列表、admin 写 |
+| 购物车 | `/api/cart` | 用户/匿名（Session-ID）共用 |
+| 订单 | `/api/orders` | 创建（含游客）/确认在线支付/查询 |
+| 地址 | `/api/addresses` | 用户地址 CRUD + 默认切换 |
+| 行政区划 | `/api/administrative-regions` | 省/区/子区/邮编 |
+| 合作方门户 | `/api/partner` | 登录/Catalog/下单/支付/地址/订单 |
+| 上传 | `/api/upload` | avatar / product-image（admin 写） |
+| 管理后台 | `/api/admin` | 用户/订单/合作方/管理员/分类/操作日志 |
+| 导出 | `/api/admin/export` | xlsx 用户/订单/合作方订单 |
+| 统计 | `/api/admin/statistics` | overview / 趋势 / comprehensive |
+| 系统配置 | `/api/system-config` | 公开 + 超管 |
+| 安全 | `/api/security` | 自包含验证码 |
 
 #### 3.3.2 响应格式统一
 
@@ -247,8 +252,8 @@ src/server/
 │  └─────────────────────────────────┘│
 │                                     │
 │  ┌─────────────────────────────────┐│
-│  │        SQLite 数据库            ││
-│  │     (本地文件存储)               ││
+│  │     PostgreSQL 16（独立进程）   ││
+│  │     compose.prod.pg.yml 起      ││
 │  └─────────────────────────────────┘│
 │                                     │
 │  ┌─────────────────────────────────┐│
@@ -275,7 +280,7 @@ src/server/
 
 #### 4.2.2 核心配置项
 - **应用配置**: 端口、环境、应用名称
-- **数据库配置**: SQLite路径、日志级别  
+- **数据库配置**: `DATABASE_URL` / `DATABASE_URL_TEST` / `PG_POOL_*` / `PG_SSL`  
 - **JWT配置**: 密钥、过期时间
 - **文件上传**: 路径、大小限制、文件类型
 - **系统配置**: 语言、货币、免邮费阈值
@@ -322,21 +327,41 @@ src/server/
 ## 6. 安全架构
 
 ### 6.1 认证安全
-- **密码策略**: bcrypt加密 + 10轮加盐
-- **JWT安全**: 强随机密钥 + 过期机制
-- **会话管理**: 无状态JWT认证
+- **密码策略**: bcrypt + `assertPasswordPolicy`（≥8 位 + 字母 + 数字）
+- **JWT 安全**: user / admin / partner 三套独立 secret + 失活检测
+- **登录守卫**: `loginGuard` 失败次数过阈值 → 强制 `/api/security/captcha` 自包含验证码
 
-### 6.2 数据安全
-- **输入验证**: Joi库进行数据校验
-- **SQL注入防护**: Sequelize ORM参数化查询
-- **XSS防护**: 前端输出转义
-- **CSRF防护**: CORS配置限制
+### 6.2 限流与边界
+- `globalLimiter` 600/min · `loginLimiter` 10/15min · `writeLimiter` 60/min · `enumerationLimiter` 30/min
+- 测试环境 `RATE_LIMIT_DISABLED=1` 自动 no-op
 
-### 6.3 系统安全
-- **文件上传**: 文件类型限制 + 大小控制
-- **权限控制**: 基于角色的访问控制(RBAC)
-- **操作审计**: 管理员操作日志记录
-- **错误处理**: 统一错误处理，避免信息泄露
+### 6.3 数据安全
+- **输入验证**: Joi `validate` 中间件统一拦截 body / query / params
+- **SQL 注入防护**: 全部走 Sequelize 参数化
+- **XSS / Clickjacking**: helmet + CSP（`script-src 'self' 'unsafe-inline' 'unsafe-eval'` 兼容 SPA）+ `frame-ancestors 'self'`
+- **CORS**: `ALLOWED_ORIGINS` 白名单 + credentials 显式回写
+
+### 6.4 上传安全
+- **MIME + magic byte 双校验**（`file-type`）
+- **写权限**: 只有 admin + `products` 权限才能写商品图，普通用户仅能写 avatar
+
+### 6.5 审计
+- **AuditLog**：用户/合作方/管理员 的登录失败/成功、下单（含游客）、支付确认、幂等命中
+- **OperationLog**：管理员 CRUD / 危险操作（删除订单/重置密码/系统配置删除）/ 数据导出
+- 中间件 `logOperation` 同时拦截 `res.json` 与 `res.send`，导出 xlsx 也写日志
+
+## 7. 测试体系
+
+| 类别 | 路径 | 配置 | 用例数 |
+|---|---|---|---|
+| 单元/接口（Node + 真实 PG） | `tests/api/**` | `vitest.config.js` + happy-dom 关闭 | 207 |
+| 集成（并发/跨端 + 真实 PG） | `tests/integration/**` | 同上 | 13 |
+| 前端单元（happy-dom） | `tests/vue/**` | `vitest.vue.config.js` | 39 |
+| 合计 | | | **259+ 持续增长** |
+
+- `npm run test:integration` / `test:api` / `test:vue` / `test:all`
+- 数据隔离：`TestDatabase.clearAllData()` 用 `TRUNCATE … RESTART IDENTITY CASCADE`
+- 测试基线：`tests/setup/test-baseline.js` 提供 SystemConfig / 分类 / 行政区划 fixtures
 
 ## 7. 监控与维护
 
@@ -354,9 +379,9 @@ src/server/
 ## 8. 扩展性设计
 
 ### 8.1 水平扩展
-- **数据库**: 可替换为MySQL/PostgreSQL
-- **文件存储**: 可扩展至云存储服务
-- **缓存系统**: 可集成Redis缓存
+- **数据库**: 已使用 PostgreSQL，可平滑切换到云托管 RDS / Aurora / Cloud SQL
+- **文件存储**: 当前本地，可扩展至 OSS/S3
+- **缓存系统**: 当前 in-process LRU；可平滑替换为 Redis
 
 ### 8.2 功能扩展
 - **支付集成**: 预留支付网关接口

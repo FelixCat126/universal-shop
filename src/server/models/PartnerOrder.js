@@ -54,6 +54,11 @@ const PartnerOrder = sequelize.define('PartnerOrder', {
     type: DataTypes.INTEGER,
     allowNull: true,
     comment: '选用的合作方保存地址 ID（仅存引用，快照在 contact_/delivery_*）'
+  },
+  online_paid_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: '合作方在线支付确认时间；用于支付确认接口幂等'
   }
 }, {
   tableName: 'partner_orders',

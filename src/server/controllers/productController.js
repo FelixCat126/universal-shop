@@ -490,56 +490,64 @@ class ProductController {
     }
   }
 
-  // 调整库存
-  static async adjustStock(req, res) {
+  /**
+   * 调整库存：原子化（不再 read-then-write 丢更新）
+   * - set:      UPDATE stock = q
+   * - add:      UPDATE stock = stock + q
+   * - subtract: UPDATE stock = stock - q WHERE stock >= q（不足直接拒绝）
+   */
+  static async adjustStock (req, res) {
     try {
-      const { id } = req.params
-      const { type, quantity } = req.body // type: 'set' | 'add' | 'subtract'
+      const id = parseInt(req.params.id, 10)
+      const q = parseInt(req.body.quantity, 10)
+      const { type } = req.body
+      if (!Number.isInteger(id) || id < 1) {
+        return res.status(400).json({ success: false, message: '无效的产品 ID' })
+      }
+      if (!['set', 'add', 'subtract'].includes(type)) {
+        return res.status(400).json({ success: false, message: '无效的调整类型' })
+      }
+      if (!Number.isInteger(q) || q < 0 || q > 1000000) {
+        return res.status(400).json({ success: false, message: '调整数量无效（0-1000000）' })
+      }
 
       const product = await Product.findByPk(id, { paranoid: !req.admin })
       if (!product) {
-        return res.status(404).json({
-          success: false,
-          message: '产品不存在'
-        })
+        return res.status(404).json({ success: false, message: '产品不存在' })
+      }
+      const oldStock = product.stock
+
+      let affected = 0
+      if (type === 'set') {
+        ;[affected] = await Product.update({ stock: q }, { where: { id } })
+      } else if (type === 'add') {
+        ;[affected] = await Product.update(
+          { stock: sequelize.literal(`stock + ${q}`) },
+          { where: { id } }
+        )
+      } else {
+        ;[affected] = await Product.update(
+          { stock: sequelize.literal(`stock - ${q}`) },
+          { where: { id, stock: { [Op.gte]: q } } }
+        )
+        if (!affected) {
+          return res.status(400).json({ success: false, message: '库存不足，无法扣减' })
+        }
       }
 
-      let newStock = product.stock
-      switch (type) {
-        case 'set':
-          newStock = parseInt(quantity)
-          break
-        case 'add':
-          newStock = product.stock + parseInt(quantity)
-          break
-        case 'subtract':
-          newStock = Math.max(0, product.stock - parseInt(quantity))
-          break
-        default:
-          return res.status(400).json({
-            success: false,
-            message: '无效的调整类型'
-          })
-      }
-
-      await product.update({ stock: newStock })
-
+      const fresh = await Product.findByPk(id, { paranoid: !req.admin })
       res.json({
         success: true,
         message: '库存调整成功',
         data: {
-          oldStock: product.stock,
-          newStock: newStock,
-          product: product
+          oldStock,
+          newStock: fresh ? fresh.stock : null,
+          product: fresh
         }
       })
     } catch (error) {
       console.error('调整库存失败:', error)
-      res.status(500).json({
-        success: false,
-        message: '调整库存失败',
-        error: error.message
-      })
+      res.status(500).json({ success: false, message: '调整库存失败' })
     }
   }
 

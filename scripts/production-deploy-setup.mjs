@@ -9,6 +9,7 @@
  * - 不重置管理员密码、不 DROP 业务表；生产环境跳过含 DROP/重建 的约束自动修复
  * 由 scripts/deploy-aliyun.sh / deploy-on-server.sh 以 NODE_ENV=production 调用。
  */
+import 'dotenv/config'
 import DataSeeder from '../src/server/seeds/index.js'
 
 await DataSeeder.runProductionUpdate()

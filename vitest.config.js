@@ -1,14 +1,24 @@
 import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
+/**
+ * 测试矩阵：当前保留的回归覆盖（PostgreSQL 实库）
+ *   - tests/api/security.test.js              止血鉴权/CORS/CSP/错误响应
+ *   - tests/api/inputValidation.test.js       Joi 校验 / 上传魔法字节 / 游客密码
+ *   - tests/api/securityHardening.test.js     验证码 / 登录强制守卫 / 审计日志
+ *   - tests/integration/concurrencySafety.test.js  库存原子 / 支付幂等 / 默认地址原子
+ *
+ * 老的与现行 schema/接口已脱节的旧测试已删除，避免误报。
+ */
+
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
     setupFiles: ['./tests/setup/test-setup.js'],
-    // SQLite不支持高并发，禁用文件级并发
+    exclude: ['node_modules/**', 'dist/**'],
+    // PostgreSQL 支持高并发，但测试间共享同一个数据库需要串行避免互相 TRUNCATE
     fileParallelism: false,
-    // 每个测试文件内部的测试可以并发
     sequence: {
       concurrent: false
     },

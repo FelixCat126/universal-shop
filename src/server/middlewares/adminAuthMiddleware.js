@@ -143,60 +143,57 @@ export const requireSuperAdmin = async (req, res, next) => {
 }
 
 // 操作日志中间件
+// 同时拦截 res.json 与 res.send：
+//   - JSON 响应（CRUD/状态变更）通过 data.success 判断
+//   - Buffer 响应（xlsx 等导出）通过 res.statusCode<400 判断
+// 用 logged 标志位防止两种路径同时触发（res.json 内部也会调 res.send）
 export const logOperation = (action, resource) => {
   return async (req, res, next) => {
-    // 保存原始的 res.json 方法
-    const originalJson = res.json
+    let logged = false
 
-    // 重写 res.json 方法来拦截响应
-    res.json = function(data) {
-      // 如果操作成功，记录日志
-      if (data.success) {
-        // 异步记录日志，不阻塞响应
-        setImmediate(async () => {
-          try {
-            const OperationLog = (await import('../models/OperationLog.js')).default
-            
-            let description = `${action}: ${resource}`
-            let resourceId = null
-            let newData = null
-            let oldData = null
-            
-            // 尝试从响应数据中提取信息
-            if (data.data) {
-              if (data.data.id) {
-                resourceId = data.data.id
-              }
-              newData = data.data
-            }
-            
-            // 尝试从请求参数中提取资源ID
-            if (!resourceId && req.params.id) {
-              resourceId = req.params.id
-            }
-            
-            await OperationLog.logOperation({
-              adminId: req.admin.id,
-              adminUsername: req.admin.username,
-              action,
-              resource,
-              resourceId,
-              description,
-              oldData,
-              newData,
-              ipAddress: req.ip,
-              userAgent: req.get('User-Agent')
-            })
-          } catch (error) {
-            console.error('记录操作日志失败:', error)
-          }
+    const writeLog = async (extractedId, newData) => {
+      if (logged) return
+      logged = true
+      try {
+        const OperationLog = (await import('../models/OperationLog.js')).default
+        const description = `${action}: ${resource}`
+        const resourceId = extractedId ?? (req.params?.id ?? null)
+        await OperationLog.logOperation({
+          adminId: req.admin?.id,
+          adminUsername: req.admin?.username,
+          action,
+          resource,
+          resourceId,
+          description,
+          oldData: null,
+          newData,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
         })
+      } catch (error) {
+        console.error('记录操作日志失败:', error)
       }
-      
-      // 调用原始的 res.json 方法
+    }
+
+    const originalJson = res.json
+    res.json = function (data) {
+      if (data && data.success) {
+        const id = data.data?.id ?? null
+        setImmediate(() => { writeLog(id, data.data ?? null) })
+      }
       return originalJson.call(this, data)
     }
-    
+
+    const originalSend = res.send
+    res.send = function (body) {
+      // 仅对成功响应记录；对 Buffer/text 也覆盖（如 xlsx 导出）
+      // res.json 内部也会调 res.send，由 logged 标志防止重复
+      if (!logged && res.statusCode < 400) {
+        setImmediate(() => { writeLog(null, null) })
+      }
+      return originalSend.call(this, body)
+    }
+
     next()
   }
 }

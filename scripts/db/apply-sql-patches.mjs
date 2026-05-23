@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const PATCHES_DIR = path.join(__dirname, 'patches')
 
-/** 去掉行注释、按分号拆分，逐条执行（避免 SQLite 下整段 SQL 只执行第一条而跳过后面的 ALTER） */
+/** 去掉行注释、按分号拆分，逐条执行（PG 一般支持多语句，但拆开方便错误定位） */
 function toExecutableStatements (sql) {
   const noLineComments = sql.replace(/--[^\r\n]*/g, '')
   return noLineComments
@@ -46,7 +46,7 @@ export async function applySqlPatches (sequelize) {
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS _sql_patches_applied (
       name TEXT PRIMARY KEY NOT NULL,
-      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
 

@@ -19,6 +19,8 @@ import {
   PARTNER_AGENT_MOQ_MULTIPLIER,
   PARTNER_AGENT_MOQ_UNIT
 } from '../constants/partnerAccountKind.js'
+import AuditLog from '../models/AuditLog.js'
+import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 
 function genPartnerOrderNo () {
   const r = Math.floor(Math.random() * 9000) + 1000
@@ -82,21 +84,40 @@ class PartnerPortalController {
 
       const partner = await Partner.findOne({ where: { login } })
       if (!partner || !partner.is_active) {
+        recordLoginFailure(req, login)
+        AuditLog.logPartner({
+          partner: partner || { id: null, code: login },
+          event: 'partner.login.fail',
+          success: false,
+          detail: { reason: partner ? 'inactive' : 'not_found' },
+          req
+        }).catch(() => {})
         return res.status(401).json({ success: false, message: '登录名或密码错误' })
       }
       const ok = await partner.validatePassword(password)
       if (!ok) {
+        recordLoginFailure(req, login)
+        AuditLog.logPartner({
+          partner,
+          event: 'partner.login.fail',
+          success: false,
+          detail: { reason: 'bad_password' },
+          req
+        }).catch(() => {})
         return res.status(401).json({ success: false, message: '登录名或密码错误' })
       }
 
       partner.last_login_at = new Date()
       await partner.save()
+      clearLoginFailures(req, login)
 
       const token = jwt.sign(
         { type: 'partner', partnerId: partner.id, login: partner.login },
         JWT_SECRET,
         { expiresIn: '14d' }
       )
+
+      AuditLog.logPartner({ partner, event: 'partner.login.success', req }).catch(() => {})
 
       return res.json({
         success: true,
@@ -331,14 +352,34 @@ class PartnerPortalController {
         return res.status(500).json({ success: false, message: '生成订单号失败' })
       }
 
+      /**
+       * 防超卖：用条件 UPDATE 原子扣减 Product.stock，且仅在 stock>=qty 时生效
+       * 之前的实现完全未扣库存（可永远超卖），本次一并修复。
+       */
       for (const line of lines) {
-        await PartnerOrderItem.create(
+        const [affected] = await Product.update(
+          { stock: sequelize.literal(`stock - ${parseInt(line.quantity, 10)}`) },
           {
-            partner_order_id: order.id,
-            ...line
-          },
-          { transaction }
+            where: {
+              id: line.product_id,
+              stock: { [Op.gte]: parseInt(line.quantity, 10) }
+            },
+            transaction
+          }
         )
+        if (!affected) {
+          await transaction.rollback()
+          return res.status(400).json({
+            success: false,
+            message: `商品库存不足（商品 ID ${line.product_id}）`
+          })
+        }
+      }
+
+      // 一次性写入订单明细
+      const itemRows = lines.map((line) => ({ partner_order_id: order.id, ...line }))
+      if (itemRows.length > 0) {
+        await PartnerOrderItem.bulkCreate(itemRows, { transaction })
       }
 
       await transaction.commit()
@@ -346,6 +387,19 @@ class PartnerPortalController {
       const full = await PartnerOrder.findByPk(order.id, {
         include: [{ model: PartnerOrderItem, as: 'items' }]
       })
+
+      AuditLog.logPartner({
+        partner: req.partnerFull || { id: req.partner?.partnerId },
+        event: 'partner_order.create',
+        resource: 'partner_order',
+        resourceId: order.id,
+        detail: {
+          payment_method: order.payment_method,
+          item_count: lines.length,
+          total_amount: order.total_amount
+        },
+        req
+      }).catch(() => {})
 
       return res.status(201).json({
         success: true,
@@ -359,6 +413,10 @@ class PartnerPortalController {
     }
   }
 
+  /**
+   * 合作方支付确认幂等：条件 UPDATE 只在 status='pending_payment' 且 online_paid_at IS NULL 时生效；
+   * 已经确认过的并发/重放请求直接返回最新数据，不会重复变更状态。
+   */
   static async confirmPartnerOrderPayment (req, res) {
     try {
       const id = parseInt(req.params.id, 10)
@@ -367,10 +425,36 @@ class PartnerPortalController {
         where: { id, partner_id: req.partner.id }
       })
       if (!order) return res.status(404).json({ success: false, message: '订单不存在' })
-      if (order.status !== 'pending_payment') {
-        return res.status(400).json({ success: false, message: '当前订单无需确认支付或已处理' })
+
+      if (order.status !== 'pending_payment' && order.online_paid_at) {
+        const full = await PartnerOrder.findByPk(order.id, {
+          include: [{ model: PartnerOrderItem, as: 'items' }]
+        })
+        return res.json({ success: true, message: '支付已确认', data: full })
       }
-      await order.update({ status: 'submitted' })
+
+      const [affected] = await PartnerOrder.update(
+        { status: 'submitted', online_paid_at: new Date() },
+        {
+          where: {
+            id: order.id,
+            partner_id: req.partner.id,
+            status: 'pending_payment',
+            online_paid_at: null
+          }
+        }
+      )
+
+      AuditLog.logPartner({
+        partner: req.partnerFull || { id: req.partner?.partnerId || req.partner?.id },
+        event: affected === 1
+          ? 'partner_order.payment.confirm'
+          : 'partner_order.payment.confirm.idempotent_hit',
+        resource: 'partner_order',
+        resourceId: order.id,
+        req
+      }).catch(() => {})
+
       const full = await PartnerOrder.findByPk(order.id, {
         include: [{ model: PartnerOrderItem, as: 'items' }]
       })
@@ -580,16 +664,54 @@ class PartnerPortalController {
     }
   }
 
+  /**
+   * 设置默认地址：单条 UPDATE 把同 partner 全部地址按 id=目标 改成对应 is_default。
+   *
+   * 一条语句的好处：
+   *   1) PG 锁行顺序由表扫描决定（同 partner 范围内一致），不会出现两个事务以相反顺序拿锁的死锁。
+   *   2) 真原子：要么所有行成功翻转，要么全都不翻；并发时绝不会出现 0 行或 2 行 is_default=true。
+   *   3) 自动幂等：再点一次结果一样。
+   *
+   * 仍包一层 PG 死锁/序列化失败重试（最多 3 次），兜底极小概率的并发碰撞。
+   */
   static async setDefaultAddress (req, res) {
     try {
       const id = parseInt(req.params.id, 10)
       const partner_id = req.partner.id
       const row = await PartnerAddress.findOne({ where: { id, partner_id } })
-      if (!row) return res.status(404).json({ success: false, message: '地址不存在' })
-      await PartnerAddress.update({ is_default: false }, { where: { partner_id } })
-      row.is_default = true
-      await row.save()
-      return res.json({ success: true, data: row })
+      if (!row) {
+        return res.status(404).json({ success: false, message: '地址不存在' })
+      }
+
+      let attempt = 0
+      let lastErr
+      while (attempt < 3) {
+        attempt++
+        try {
+          await sequelize.query(
+            `UPDATE partner_addresses
+                SET is_default = (id = :targetId),
+                    updated_at = NOW()
+              WHERE partner_id = :partnerId`,
+            { replacements: { targetId: id, partnerId: partner_id } }
+          )
+          lastErr = null
+          break
+        } catch (e) {
+          lastErr = e
+          // PG: 40P01 deadlock_detected, 40001 serialization_failure
+          const code = e?.parent?.code || e?.original?.code
+          if (code === '40P01' || code === '40001') {
+            await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 30)))
+            continue
+          }
+          throw e
+        }
+      }
+      if (lastErr) throw lastErr
+
+      const fresh = await PartnerAddress.findByPk(id)
+      return res.json({ success: true, data: fresh })
     } catch (e) {
       console.error('PartnerPortalController.setDefaultAddress:', e)
       return res.status(500).json({ success: false, message: '设置默认地址失败' })

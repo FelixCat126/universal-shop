@@ -18,6 +18,7 @@ import Address from './Address.js'
 import AdministrativeRegion from './AdministrativeRegion.js'
 import SystemConfig from './SystemConfig.js'
 import OperationLog from './OperationLog.js'
+import AuditLog from './AuditLog.js'
 import './UserPointBalance.js'
 import './PointTransaction.js'
 import Partner from './Partner.js'
@@ -42,6 +43,7 @@ export {
   AdministrativeRegion,
   SystemConfig,
   OperationLog,
+  AuditLog,
   Partner,
   PartnerOrder,
   PartnerOrderItem,
@@ -62,6 +64,7 @@ export default {
   AdministrativeRegion,
   SystemConfig,
   OperationLog,
+  AuditLog,
   Partner,
   PartnerOrder,
   PartnerOrderItem,

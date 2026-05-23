@@ -467,6 +467,7 @@ export default {
     network: 'Network error, please check your connection',
     server: 'Server error, please try again later',
     notFound: 'Page not found',
+    notFoundDesc: 'Sorry, the page you are looking for does not exist or has been removed.',
     unauthorized: 'Unauthorized access',
     forbidden: 'Access denied',
     unknown: 'Unknown error',

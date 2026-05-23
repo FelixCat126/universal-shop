@@ -125,6 +125,12 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: true,
     comment: '最后登录时间'
+  },
+  must_reset_password: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: '强制下次登录修改密码（如游客自动注册随机密码）'
   }
 }, {
   tableName: 'users',

@@ -1,11 +1,12 @@
 import express from 'express'
 import SystemConfigController from '../controllers/systemConfigController.js'
 import { authenticateAdmin, requireSuperAdmin, logOperation } from '../middlewares/adminAuthMiddleware.js'
+import { cacheGet, clearResponseCache } from '../utils/responseCache.js'
 
 const router = express.Router()
 
-// 公开路由（无需认证）
-router.get('/public', SystemConfigController.getPublicConfigs)
+// 公开路由（无需认证）：30s LRU 缓存
+router.get('/public', cacheGet({ ttlMs: 30_000 }), SystemConfigController.getPublicConfigs)
 
 // 以下路由需要超级管理员权限
 router.use(authenticateAdmin)
@@ -14,8 +15,13 @@ router.use(requireSuperAdmin)
 // 获取所有配置
 router.get('/', logOperation('view', 'system_config'), SystemConfigController.getAllConfigs)
 
-// 设置配置
-router.post('/', logOperation('update', 'system_config'), SystemConfigController.setConfig)
+// 设置配置：写入后立刻清缓存，避免读旧值
+router.post(
+  '/',
+  logOperation('update', 'system_config'),
+  (req, res, next) => { clearResponseCache(); next() },
+  SystemConfigController.setConfig
+)
 
 // 上传首页长图
 router.post('/upload/home-banner', logOperation('upload', 'home_banner'), SystemConfigController.uploadHomeBanner)

@@ -90,14 +90,9 @@ class DataSeeder {
       if (isFirstInstall) {
         console.log('🆕 全新安装：根据模型创建表（不使用 force，避免误删生产数据）')
       } else {
-        // 旧库缺列时必须先 ALTER，再 sync；否则 sync 会先建索引而报 no such column: deleted_at
         console.log('🔄 已有数据库：先执行 SQL 补丁（补列等），再 Sequelize sync')
         await this.applySqlPatchesOnly()
       }
-
-      // 兜底：补丁已记录但 ALTER 未生效时（如 SQLite 单条 query 未执行到 ALTER），仍保证列存在
-      await this.ensureSqliteProductDeletedAtColumn()
-      await this.ensureSqlitePartnersAccountKindColumn()
 
       // 绝不使用 sync({ force: true })，以免 DROP 表；新建库时空库 sync 仅 CREATE
       await sequelize.sync()
@@ -106,11 +101,6 @@ class DataSeeder {
         await this.applySqlPatchesOnly()
       }
 
-      if (process.env.NODE_ENV === 'production') {
-        console.log('ℹ️  生产环境：跳过含 DROP/重建 的购物车约束自动修复（避免影响线上数据）')
-      } else {
-        await this.fixIncorrectConstraints()
-      }
     } catch (error) {
       console.error('❌ 数据库同步失败:', error)
       throw error
@@ -129,126 +119,6 @@ class DataSeeder {
     }
   }
 
-  /** SQLite：若 products 表存在但无 deleted_at，则补列（与 Product 模型 paranoid 一致） */
-  static async ensureSqliteProductDeletedAtColumn() {
-    if (sequelize.getDialect() !== 'sqlite') return
-
-    const [tables] = await sequelize.query(`
-      SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'products' LIMIT 1
-    `)
-    if (tables.length === 0) return
-
-    const [cols] = await sequelize.query('PRAGMA table_info(products)')
-    const hasDeletedAt = cols.some((c) => c.name === 'deleted_at')
-    if (hasDeletedAt) return
-
-    console.log('🔧 products 表缺少 deleted_at，正在执行 ALTER ADD COLUMN（软删除列）...')
-    await sequelize.query('ALTER TABLE products ADD COLUMN deleted_at DATETIME')
-  }
-
-  /** SQLite：若 partners 表存在但无 account_kind，则补列（与合作方 Partner 模型一致） */
-  static async ensureSqlitePartnersAccountKindColumn () {
-    if (sequelize.getDialect() !== 'sqlite') return
-
-    const [tables] = await sequelize.query(`
-      SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'partners' LIMIT 1
-    `)
-    if (tables.length === 0) return
-
-    const [cols] = await sequelize.query('PRAGMA table_info(partners)')
-    const has = cols.some((c) => c.name === 'account_kind')
-    if (has) return
-
-    console.log('🔧 partners 表缺少 account_kind，正在执行 ALTER ADD COLUMN...')
-    await sequelize.query(`ALTER TABLE partners ADD COLUMN account_kind VARCHAR(16) NOT NULL DEFAULT 'dealer'`)
-  }
-  
-  static async fixIncorrectConstraints() {
-    try {
-      console.log('🔧 检查并修复错误的数据库约束...')
-      
-      // 检查购物车表是否有错误的约束
-      const [cartTableInfo] = await sequelize.query(`
-        SELECT sql FROM sqlite_master 
-        WHERE type='table' AND name='carts'
-      `)
-      
-      if (cartTableInfo.length > 0) {
-        const tableSQL = cartTableInfo[0].sql
-        
-        // 检查是否有错误的单字段UNIQUE约束
-        const hasUserIdUnique = tableSQL.includes('user_id') && tableSQL.includes('UNIQUE') && !tableSQL.includes('user_id`, `product_id')
-        const hasProductIdUnique = tableSQL.includes('product_id') && tableSQL.includes('UNIQUE') && !tableSQL.includes('user_id`, `product_id')
-        
-        if (hasUserIdUnique || hasProductIdUnique) {
-          console.log('🔨 发现购物车表的错误约束，正在重建表结构...')
-          
-          // 备份数据
-          await sequelize.query(`CREATE TABLE carts_backup AS SELECT * FROM carts`)
-          
-          // 删除原表
-          await sequelize.query(`DROP TABLE carts`)
-          
-          // 重新创建正确的表结构
-          await sequelize.query(`
-            CREATE TABLE carts (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              user_id INTEGER REFERENCES users(id),
-              session_id VARCHAR(200),
-              product_id INTEGER NOT NULL REFERENCES products(id),
-              quantity INTEGER NOT NULL DEFAULT 1,
-              price DECIMAL(10,2) NOT NULL,
-              created_at DATETIME NOT NULL,
-              updated_at DATETIME NOT NULL
-            )
-          `)
-          
-          // 创建正确的索引
-          await sequelize.query(`CREATE INDEX carts_user_id ON carts(user_id)`)
-          await sequelize.query(`CREATE INDEX carts_session_id ON carts(session_id)`)  
-          await sequelize.query(`CREATE INDEX carts_product_id ON carts(product_id)`)
-          await sequelize.query(`CREATE UNIQUE INDEX unique_user_product ON carts(user_id, product_id)`)
-          
-          // 恢复数据（如果有的话）
-          try {
-            await sequelize.query(`INSERT INTO carts SELECT * FROM carts_backup`)
-            console.log('✅ 购物车数据已恢复')
-          } catch (error) {
-            console.log('ℹ️  没有需要恢复的购物车数据')
-          }
-          
-          // 删除备份表
-          await sequelize.query(`DROP TABLE carts_backup`)
-          
-          console.log('✅ 购物车表约束已修复')
-        }
-      }
-      
-      // 检查用户表的约束问题
-      const [userTableInfo] = await sequelize.query(`
-        SELECT sql FROM sqlite_master 
-        WHERE type='table' AND name='users'
-      `)
-      
-      if (userTableInfo.length > 0) {
-        const tableSQL = userTableInfo[0].sql
-        
-        // 检查是否有错误的单字段UNIQUE约束（country_code或phone单独unique）
-        const hasCountryCodeUnique = tableSQL.includes('country_code') && tableSQL.includes('UNIQUE') && !tableSQL.includes('country_code`, `phone')
-        const hasPhoneUnique = tableSQL.includes('phone') && tableSQL.includes('UNIQUE') && !tableSQL.includes('country_code`, `phone')
-        
-        if (hasCountryCodeUnique || hasPhoneUnique) {
-          console.log('🔨 发现用户表的错误约束，需要手动修复')
-          console.log('⚠️  用户表包含重要数据，请在合适的时机手动执行约束修复')
-        }
-      }
-      
-      console.log('✅ 数据库约束检查完成')
-    } catch (error) {
-      console.warn('⚠️  修复约束时出现错误:', error.message)
-    }
-  }
-  
   static async createDefaultAdmin(options = {}) {
     const allowPasswordReset = options.allowPasswordReset !== false
     
@@ -374,11 +244,9 @@ class DataSeeder {
     try {
       console.log('🔍 验证数据库完整性...')
       
-      // 检查关键表是否存在必要字段
-      const [orderColumns] = await sequelize.query(`PRAGMA table_info(orders)`)
-      const hasExchangeRate = orderColumns.some(col => col.name === 'exchange_rate')
-      
-      if (hasExchangeRate) {
+      // 检查关键表是否存在必要字段（PG）
+      const orderDesc = await sequelize.getQueryInterface().describeTable('orders').catch(() => ({}))
+      if ('exchange_rate' in orderDesc) {
         console.log('✅ Order表包含exchange_rate字段')
       } else {
         console.warn('⚠️  Order表缺少exchange_rate字段')

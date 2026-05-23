@@ -13,7 +13,7 @@
         </h2>
         
         <p class="text-gray-600 mb-8">
-          抱歉，您访问的页面不存在或已被移除。
+          {{ $t('error.notFoundDesc') }}
         </p>
         
         <!-- 操作按钮 -->
@@ -39,4 +39,15 @@
 
 <script setup>
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { useI18n } from 'vue-i18n'
+import { onMounted, watch } from 'vue'
+
+const { t, locale } = useI18n()
+
+// 跟随当前语言更新页面标题，避免 router 守卫阶段写死中文
+const syncTitle = () => {
+  document.title = `${t('error.notFound')} - Universal Shop`
+}
+onMounted(syncTitle)
+watch(locale, syncTitle)
 </script>

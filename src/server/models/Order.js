@@ -101,6 +101,11 @@ const Order = sequelize.define('Order', {
     allowNull: false,
     defaultValue: 1.0000,
     comment: '下单时汇率（用于金额显示）'
+  },
+  online_paid_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: '在线支付确认时间；用于支付确认接口幂等（已确认则不再发放积分/不再变更状态）'
   }
 }, {
   tableName: 'orders',

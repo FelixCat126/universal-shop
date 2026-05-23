@@ -4,17 +4,22 @@ import UserController from '../controllers/userController.js'
 import AdministratorController from '../controllers/administratorController.js'
 import AddressController from '../controllers/addressController.js'
 import { authenticateAdmin, requirePermission, requireSuperAdmin, logOperation } from '../middlewares/adminAuthMiddleware.js'
+import { loginLimiter } from '../middlewares/security.js'
+import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
 
 import ProductCategoryController from '../controllers/productCategoryController.js'
 import PartnerAdminController from '../controllers/partnerAdminController.js'
 
 const router = express.Router()
 
-// 管理员登录（无需认证）
-router.post('/login', AdministratorController.login)
+// 管理员登录：限流 + 失败次数过阈值时强制验证码，防暴力破解
+router.post('/login', loginLimiter, requireCaptchaAfterFailures(), AdministratorController.login)
 
-// 初始化超级管理员（无需认证，仅在没有管理员时可用）
-router.post('/init', AdministratorController.initSuperAdmin)
+/**
+ * 初始化超级管理员：必须 INIT_SECRET 校验（控制器内强制）；
+ * 同时保留每 IP 极低限速避免被持续探测
+ */
+router.post('/init', loginLimiter, AdministratorController.initSuperAdmin)
 
 // 验证token（需要认证）
 router.get('/validate-token', authenticateAdmin, (req, res) => {
@@ -31,11 +36,12 @@ router.get('/validate-token', authenticateAdmin, (req, res) => {
 router.use(authenticateAdmin)
 
 // 管理员订单路由（需要orders权限）
+// 注意：具体路径必须放在 /:id 通配之前，否则 GET /orders/export 会被 /orders/:id 抢先匹配
+router.get('/orders/export', requirePermission('orders'), OrderController.exportOrders)
 router.get('/orders', requirePermission('orders'), OrderController.getAllOrders)
 router.get('/orders/:id', requirePermission('orders'), OrderController.getOrderDetail)
 router.put('/orders/:id/status', requirePermission('orders'), logOperation('update_order_status', 'order'), OrderController.updateOrderStatus)
 router.delete('/orders/:id', requirePermission('orders'), logOperation('delete_order', 'order'), OrderController.deleteOrder)
-router.get('/orders/export', requirePermission('orders'), OrderController.exportOrders)
 
 // 合作方（批发）与普通用户菜单隔离：独立 permission partners
 router.get('/partners', requirePermission('partners'), PartnerAdminController.listPartners)

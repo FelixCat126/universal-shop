@@ -37,12 +37,10 @@ export default {
   silent: false,
   verbose: true,
   
-  // 环境变量设置
+  // 环境变量设置（CI 环境用 PostgreSQL，DATABASE_URL_TEST 由 CI 注入）
   env: {
     NODE_ENV: 'test',
     CI: 'true',
-    // CI环境使用内存数据库
-    DATABASE_PATH: ':memory:',
     JWT_SECRET: 'ci-test-jwt-secret-key-for-ci-testing-only-32-chars'
   }
 }

@@ -459,6 +459,7 @@ export default {
     network: '网络错误，请检查网络连接',
     server: '服务器错误，请稍后重试',
     notFound: '页面未找到',
+    notFoundDesc: '抱歉，您访问的页面不存在或已被移除。',
     unauthorized: '未授权访问',
     forbidden: '没有权限访问',
     unknown: '未知错误',

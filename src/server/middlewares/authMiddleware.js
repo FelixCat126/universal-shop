@@ -45,23 +45,27 @@ export const authenticateToken = async (req, res, next) => {
   }
 }
 
-// 可选的身份验证（不强制要求token）
+/**
+ * 可选认证：若头部带 token 但无效/过期/账号停用，应返回 401 而非静默放行；
+ * 这样下游若误用 req.user 不会触发 NPE，也避免"似登未登"的状态歧义。
+ */
 export const optionalAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers['authorization']
-    const token = authHeader && authHeader.split(' ')[1]
+  const authHeader = req.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1]
+  if (!token) return next()
 
-    if (token) {
-      const decoded = jwt.verify(token, JWT_SECRET)
-      const user = await User.findByPk(decoded.userId)
-      if (user && user.is_active) {
-        req.user = decoded
-      }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    if (decoded?.type === 'admin' || decoded?.type === 'partner') {
+      // 不是普通用户态：当作未登录处理
+      return next()
     }
-    
-    next()
+    const user = await User.findByPk(decoded.userId)
+    if (!user) return res.status(401).json({ success: false, message: '无效的认证令牌' })
+    if (!user.is_active) return res.status(403).json({ success: false, message: '账户已被禁用' })
+    req.user = decoded
+    return next()
   } catch (error) {
-    // 忽略token验证错误，继续处理请求
-    next()
+    return res.status(401).json({ success: false, message: '认证令牌无效或已过期' })
   }
 }

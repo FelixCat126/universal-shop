@@ -2,9 +2,27 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+import { fileTypeFromFile } from 'file-type'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+/**
+ * 通过读取文件魔法字节确认是否为白名单图片格式；
+ * 不是则删除文件并抛错。挂在上传成功后，紧贴 multer 之后执行。
+ */
+async function assertImageMagicBytes (filePath) {
+  const sig = await fileTypeFromFile(filePath).catch(() => null)
+  const ok = sig && ALLOWED_IMAGE_MIMES.has(sig.mime)
+  if (!ok) {
+    try { fs.unlinkSync(filePath) } catch {}
+    const err = new Error('文件内容并非允许的图片格式（魔法字节校验失败）')
+    err.status = 400
+    throw err
+  }
+}
 
 // 配置multer存储（商品图）
 const storage = multer.diskStorage({
@@ -99,6 +117,13 @@ class UploadController {
         })
       }
 
+      // 魔法字节校验（防止改后缀名上传）
+      try {
+        await assertImageMagicBytes(req.file.path)
+      } catch (e) {
+        return res.status(e.status || 400).json({ success: false, message: e.message })
+      }
+
       // 构建文件URL
       const fileUrl = `/uploads/products/${req.file.filename}`
 
@@ -129,6 +154,12 @@ class UploadController {
           success: false,
           message: '没有上传文件'
         })
+      }
+
+      try {
+        await assertImageMagicBytes(req.file.path)
+      } catch (e) {
+        return res.status(e.status || 400).json({ success: false, message: e.message })
       }
 
       const fileUrl = `/uploads/avatars/${req.file.filename}`

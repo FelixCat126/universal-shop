@@ -1,12 +1,20 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import compression from 'compression'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import sequelize from './config/database.js'
 import { DataTypes } from 'sequelize'
 import { ensureProductCategoriesMigrate } from './utils/ensureProductCategoriesMigrate.js'
+import {
+  buildCorsOptions,
+  globalLimiter,
+  loginLimiter
+} from './middlewares/security.js'
+import { logger, requestLogger } from './utils/logger.js'
 import productRoutes from './routes/productRoutes.js'
 import productCategoryRoutes from './routes/productCategoryRoutes.js'
 import uploadRoutes from './routes/uploadRoutes.js'
@@ -20,6 +28,7 @@ import statisticsRoutes from './routes/statisticsRoutes.js'
 import systemConfigRoutes from './routes/systemConfigRoutes.js'
 import administrativeRegionsRoutes from './routes/administrativeRegions.js'
 import partnerRoutes from './routes/partnerRoutes.js'
+import securityRoutes from './routes/securityRoutes.js'
 
 // 导入模型以确保数据库同步
 import './models/User.js'
@@ -55,19 +64,104 @@ const PORT = process.env.PORT || 3000
 console.log('🚀 Universal Shop 服务器启动中...')
 console.log('📍 工作目录:', __dirname)
 
-// 基础中间件
-app.use(cors({
-  origin: true,
-  credentials: true
-}))
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+/**
+ * 反代场景下取真实客户端 IP（用于限流/日志/审计）
+ * 通过 TRUST_PROXY 环境变量配置；默认为 'loopback' 安全策略
+ */
+const trustProxyRaw = process.env.TRUST_PROXY
+if (trustProxyRaw != null && trustProxyRaw !== '') {
+  const n = Number(trustProxyRaw)
+  if (Number.isFinite(n)) app.set('trust proxy', n)
+  else if (trustProxyRaw === 'true') app.set('trust proxy', true)
+  else if (trustProxyRaw === 'false') app.set('trust proxy', false)
+  else app.set('trust proxy', trustProxyRaw)
+} else {
+  app.set('trust proxy', 'loopback')
+}
 
-// 请求日志中间件
+/**
+ * Helmet 安全响应头：
+ * - 开发环境关闭 CSP，便于调试；
+ * - 生产环境严格 CSP（保留 'unsafe-inline' 是为兼容当前 SPA 内联脚本/样式，
+ *   后续若改为 nonce/SRI 可下调）；
+ * - HSTS 长期开启，需在 Nginx/SSL 终端 + HTTPS 才会生效；
+ * - 支持通过环境变量追加 CDN/支付域，免改码：
+ *     CSP_EXTRA_SCRIPT_SRC, CSP_EXTRA_STYLE_SRC, CSP_EXTRA_IMG_SRC,
+ *     CSP_EXTRA_CONNECT_SRC, CSP_EXTRA_FRAME_SRC, CSP_EXTRA_FONT_SRC
+ *   值为空格分隔的来源。
+ */
+const isProd = process.env.NODE_ENV === 'production'
+const splitOrigins = (raw) => (raw || '').split(/\s+/).map(s => s.trim()).filter(Boolean)
+
+app.use(helmet({
+  contentSecurityPolicy: isProd
+    ? {
+        useDefaults: true,
+        directives: {
+          'default-src': ["'self'"],
+          'base-uri': ["'self'"],
+          'object-src': ["'none'"],
+          'form-action': ["'self'"],
+          'frame-ancestors': ["'self'"],
+          'upgrade-insecure-requests': [],
+          'img-src': ["'self'", 'data:', 'blob:', ...splitOrigins(process.env.CSP_EXTRA_IMG_SRC)],
+          'font-src': ["'self'", 'data:', ...splitOrigins(process.env.CSP_EXTRA_FONT_SRC)],
+          // 'unsafe-eval' 兼容 echarts / element-plus / vue-i18n 内部 new Function 用法；
+          // 没有它会让前端整页白屏。等切换到 strict-dynamic + nonce 后可下调。
+          'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", ...splitOrigins(process.env.CSP_EXTRA_SCRIPT_SRC)],
+          'style-src': ["'self'", "'unsafe-inline'", ...splitOrigins(process.env.CSP_EXTRA_STYLE_SRC)],
+          // 支持 wss/ws（websocket 实时刷新），data: blob: 用于部分 SDK
+          'connect-src': ["'self'", 'ws:', 'wss:', 'data:', 'blob:', ...splitOrigins(process.env.CSP_EXTRA_CONNECT_SRC)],
+          'frame-src': ["'self'", ...splitOrigins(process.env.CSP_EXTRA_FRAME_SRC)],
+          'worker-src': ["'self'", 'blob:']
+        }
+      }
+    : false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  hsts: isProd
+    ? { maxAge: 60 * 60 * 24 * 365, includeSubDomains: true, preload: false }
+    : false,
+  noSniff: true,
+  xssFilter: true,
+  hidePoweredBy: true
+}))
+
+/** 显式追加 Permissions-Policy，限制不必要的浏览器特性以减少 0day 暴露面 */
 app.use((req, res, next) => {
-  console.log(`📝 ${new Date().toISOString()} - ${req.method} ${req.path}`)
+  res.setHeader(
+    'Permissions-Policy',
+    [
+      'camera=()',
+      'microphone=()',
+      'geolocation=()',
+      'usb=()',
+      'magnetometer=()',
+      'accelerometer=()',
+      'gyroscope=()',
+      'payment=(self)',
+      'fullscreen=(self)',
+      'autoplay=(self)'
+    ].join(', ')
+  )
   next()
 })
+
+app.use(compression())
+app.use(cors(buildCorsOptions()))
+
+/** 1MB 兜底：上传走 multer 路径；JSON/表单不应超过 1MB */
+app.use(express.json({ limit: '1mb' }))
+app.use(express.urlencoded({ extended: true, limit: '1mb' }))
+
+/** 全站兜底限流（CC/扫描时拦截爆点；正常用户无感知） */
+app.use('/api', globalLimiter)
+/** 登录类聚焦限流（先 narrow 再放行） */
+app.use(['/api/admin/login', '/api/users/login', '/api/auth/login', '/api/partner/login'], loginLimiter)
+
+// 请求日志中间件（生产用 winston 落盘；开发/测试用控制台）
+app.use(requestLogger())
 
 // Content-Type修复中间件
 app.use((req, res, next) => {
@@ -81,24 +175,6 @@ app.use((req, res, next) => {
   next()
 })
 
-/** SQLite：旧库 products 无 deleted_at 时先于 sync 补列，否则建索引会因缺列失败 */
-async function ensureSqliteProductDeletedAtColumn () {
-  if (sequelize.getDialect() !== 'sqlite') return
-
-  const [tables] = await sequelize.query(`
-    SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'products' LIMIT 1
-  `)
-  if (tables.length === 0) return
-
-  const [cols] = await sequelize.query('PRAGMA table_info(products)')
-  const hasDeletedAt = cols.some((c) => c.name === 'deleted_at')
-  if (hasDeletedAt) return
-
-  console.log('🔧 products 表缺少 deleted_at，正在执行 ALTER ADD COLUMN（软删除列）...')
-  await sequelize.query('ALTER TABLE products ADD COLUMN deleted_at DATETIME')
-  console.log('✅ 已为 products 表添加 deleted_at 字段')
-}
-
 async function ensureUserAvatarUrlColumn () {
   const qi = sequelize.getQueryInterface()
   const desc = await qi.describeTable('users')
@@ -108,6 +184,14 @@ async function ensureUserAvatarUrlColumn () {
       allowNull: true
     })
     console.log('✅ 已为 users 表添加 avatar_url 字段')
+  }
+  if (!desc.must_reset_password) {
+    await qi.addColumn('users', 'must_reset_password', {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    })
+    console.log('✅ 已为 users 表添加 must_reset_password 字段')
   }
 }
 
@@ -121,6 +205,13 @@ async function ensureProductPointsColumn () {
       defaultValue: 0
     })
     console.log('✅ 已为 products 表添加 points 字段')
+  }
+  if (!desc.name_th) {
+    await qi.addColumn('products', 'name_th', {
+      type: DataTypes.STRING(200),
+      allowNull: true
+    })
+    console.log('✅ 已为 products 表添加 name_th 字段')
   }
 }
 
@@ -184,6 +275,14 @@ async function ensurePartnerOrderSchemaColumns () {
     console.log('✅ 已为 partner_orders 添加 partner_address_id')
   }
 
+  if (!orderDesc.online_paid_at) {
+    await qi.addColumn('partner_orders', 'online_paid_at', {
+      type: DataTypes.DATE,
+      allowNull: true
+    })
+    console.log('✅ 已为 partner_orders 添加 online_paid_at（支付幂等）')
+  }
+
   const itemDesc = await qi.describeTable('partner_order_items').catch(() => null)
   if (!itemDesc) return
 
@@ -193,6 +292,20 @@ async function ensurePartnerOrderSchemaColumns () {
       allowNull: true
     })
     console.log('✅ 已为 partner_order_items 添加 product_image_snapshot')
+  }
+}
+
+/** Order 表补列：online_paid_at（用于支付确认幂等） */
+async function ensureOrderOnlinePaidAtColumn () {
+  const qi = sequelize.getQueryInterface()
+  const desc = await qi.describeTable('orders').catch(() => null)
+  if (!desc) return
+  if (!desc.online_paid_at) {
+    await qi.addColumn('orders', 'online_paid_at', {
+      type: DataTypes.DATE,
+      allowNull: true
+    })
+    console.log('✅ 已为 orders 表添加 online_paid_at（支付幂等）')
   }
 }
 
@@ -239,32 +352,35 @@ async function ensureExchangeRatesConfig () {
   console.log('✅ 已补全 exchange_rates 配置（由旧 exchange_rate 迁移）')
 }
 
-// 数据库连接和同步（SQLite 须先补齐 deleted_at 再 sync，否则索引创建失败）
-sequelize.authenticate()
-  .then(() => ensureSqliteProductDeletedAtColumn())
-  .then(() => {
-    console.log('✅ 数据库连接成功')
-    return sequelize.sync({ alter: false })
-  })
-  .then(() => ensureUserAvatarUrlColumn())
-  .then(() => ensureProductPointsColumn())
-  .then(() => ensureOrderBillingColumns())
-  .then(() => ensureOrderPointsRedeemedColumn())
-  .then(() => ensureOrderItemPointsLineCostColumn())
-  .then(() => ensurePartnerOrderSchemaColumns())
-  .then(() => ensurePartnerAddressSchemaColumns())
-  .then(() => ensureExchangeRatesConfig())
-  .then(() => ensureProductCategoriesMigrate())
-  .then(() => {
-    console.log('✅ 数据库模型同步成功')
-  })
-  .catch(err => {
-    console.error('❌ 数据库连接或同步失败:', err.message)
-    console.error('📋 详细错误信息:', err)
-    if (err.sql) {
-      console.error('📝 SQL语句:', err.sql)
-    }
-  })
+// 数据库连接和同步（PostgreSQL）
+// 测试环境由 TestDatabase 接管 sync，避免与 vitest setup 重复跑出"relation does not exist"
+if (process.env.NODE_ENV !== 'test') {
+  sequelize.authenticate()
+    .then(() => {
+      console.log('✅ 数据库连接成功')
+      return sequelize.sync({ alter: false })
+    })
+    .then(() => ensureUserAvatarUrlColumn())
+    .then(() => ensureProductPointsColumn())
+    .then(() => ensureOrderBillingColumns())
+    .then(() => ensureOrderPointsRedeemedColumn())
+    .then(() => ensureOrderItemPointsLineCostColumn())
+    .then(() => ensureOrderOnlinePaidAtColumn())
+    .then(() => ensurePartnerOrderSchemaColumns())
+    .then(() => ensurePartnerAddressSchemaColumns())
+    .then(() => ensureExchangeRatesConfig())
+    .then(() => ensureProductCategoriesMigrate())
+    .then(() => {
+      console.log('✅ 数据库模型同步成功')
+    })
+    .catch(err => {
+      console.error('❌ 数据库连接或同步失败:', err.message)
+      console.error('📋 详细错误信息:', err)
+      if (err.sql) {
+        console.error('📝 SQL语句:', err.sql)
+      }
+    })
+}
 
 // API路由
 console.log('🔧 注册API路由...')
@@ -282,6 +398,7 @@ app.use('/api/admin/statistics', statisticsRoutes)
 app.use('/api/system-config', systemConfigRoutes)
 app.use('/api/auth', userRoutes)
 app.use('/api/partner', partnerRoutes)
+app.use('/api/security', securityRoutes)
 
 console.log('✅ API路由注册完成')
 

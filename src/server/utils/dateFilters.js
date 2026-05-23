@@ -1,8 +1,7 @@
 import { Op } from 'sequelize'
-import sequelize from '../config/database.js'
 
 /**
- * 规范化 yyyy-MM-dd，非法则返回 null（仅用于 SQLite 中与 strftime 结果比较）
+ * 规范化 yyyy-MM-dd，非法则返回 null
  */
 export function sanitizeYmdInput (input) {
   if (input == null || input === '') return null
@@ -10,9 +9,6 @@ export function sanitizeYmdInput (input) {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : null
 }
 
-/**
- * @deprecated 仅用非 SQLite方言；SQLite 日历筛选见 applyCreatedBetween
- */
 export function parseDayStart (dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return null
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim())
@@ -35,30 +31,18 @@ export function parseDayEnd (dateStr) {
   return Number.isNaN(dt.getTime()) ? null : dt
 }
 
-/**
- * created_from / created_to（或 start_date / end_date）与「日历日」一致。
- * SQLite：用 strftime('%Y-%m-%d', created_at) 与 yyyy-MM-DD 字符串比较，避免与时区 Timestamp 手写 Date 偏移导致漏筛选。
- * 其它方言：沿用 Date + Op.gte/Op.lte。
- *
- * @param {string} [options.column] 时间字段（模型属性名），默认 created_at。
- *   SQLite 若在 JOIN 后列名混淆，可写成 `主模型别名.created_at`，如 `PointTransaction.created_at`，会生成 `"PointTransaction"."created_at"`。
- */
 function bareColumnAttr (columnSpec) {
   if (!columnSpec.includes('.')) return columnSpec
   return columnSpec.slice(columnSpec.lastIndexOf('.') + 1).trim()
 }
 
-function sqliteDatetimeExprQuoted (columnSpec) {
-  const esc = (id) => `"${String(id).replace(/"/g, '""')}"`
-  if (columnSpec.includes('.')) {
-    const dot = columnSpec.lastIndexOf('.')
-    const table = columnSpec.slice(0, dot).trim()
-    const col = columnSpec.slice(dot + 1).trim()
-    return `${esc(table)}.${esc(col)}`
-  }
-  return esc(columnSpec)
-}
-
+/**
+ * created_from / created_to（或 start_date / end_date）按"日历日"筛选。
+ * 已切换为 PostgreSQL：直接 Date + Op.gte/Op.lte，由 PG 处理 timestamptz。
+ *
+ * @param {object} options
+ * @param {string} [options.column] 时间字段（模型属性名），默认 created_at
+ */
 export function applyCreatedBetween (whereBase, reqQuery, options = {}) {
   const fromRaw = reqQuery.created_from ?? reqQuery.start_date
   const toRaw = reqQuery.created_to ?? reqQuery.end_date
@@ -69,31 +53,6 @@ export function applyCreatedBetween (whereBase, reqQuery, options = {}) {
   const columnSpec = typeof options.column === 'string' && options.column.trim() ? options.column.trim() : 'created_at'
   const columnAttr = bareColumnAttr(columnSpec)
 
-  if (sequelize.getDialect() === 'sqlite') {
-    const colExpr = sqliteDatetimeExprQuoted(columnSpec)
-    /** @type {string[]} */
-    const parts = []
-    if (fm) {
-      parts.push(`strftime('%Y-%m-%d', ${colExpr}) >= ${sequelize.escape(fm)}`)
-    }
-    if (tm) {
-      parts.push(`strftime('%Y-%m-%d', ${colExpr}) <= ${sequelize.escape(tm)}`)
-    }
-    if (parts.length === 0) return whereBase
-
-    const literalExpr = sequelize.literal(parts.join(' AND '))
-
-    const merged = { ...whereBase }
-    const prev = merged[Op.and]
-    delete merged[Op.and]
-
-    return {
-      ...merged,
-      [Op.and]: [...(Array.isArray(prev) ? prev : prev ? [prev] : []), literalExpr]
-    }
-  }
-
-  /** 默认：与其它数据库驱动一致 */
   const range = {}
   if (fm) {
     const a = parseDayStart(fm)

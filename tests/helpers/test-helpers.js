@@ -25,6 +25,19 @@ export class TestHelpers {
       { expiresIn }
     )
   }
+
+  // 生成合作方 JWT Token（payload 与 partnerAuthMiddleware 一致：type=partner, partnerId）
+  static generatePartnerToken(partner, expiresIn = '8h') {
+    return jwt.sign(
+      {
+        partnerId: partner.id,
+        login: partner.login,
+        type: 'partner'
+      },
+      process.env.JWT_SECRET,
+      { expiresIn }
+    )
+  }
   
   // 创建完整的用户（包含地址）
   static async createUserWithAddress(userOverrides = {}, addressOverrides = {}) {
@@ -95,6 +108,95 @@ export class TestHelpers {
     const admin = await Administrator.create(adminData)
     
     return admin
+  }
+
+  // 创建合作方 + 默认地址 + token
+  static async createPartnerWithAddress(partnerOverrides = {}, addressOverrides = {}) {
+    const sequelize = TestDatabase.getSequelize()
+    const { Partner, PartnerAddress } = sequelize.models
+
+    const partnerData = TestDataFactory.createPartner(partnerOverrides)
+    const partner = await Partner.create(partnerData)
+
+    const addressData = TestDataFactory.createPartnerAddress(partner.id, {
+      is_default: true,
+      ...addressOverrides
+    })
+    const address = await PartnerAddress.create(addressData)
+
+    const token = TestHelpers.generatePartnerToken(partner)
+    return { partner, address, token }
+  }
+
+  // 创建商品分类 + N 个挂在该分类下的商品（默认 active 库存 100）
+  static async createCategoryWithProducts({
+    count = 1,
+    categoryName,
+    productOverrides = {}
+  } = {}) {
+    const sequelize = TestDatabase.getSequelize()
+    const { ProductCategory, Product } = sequelize.models
+
+    const category = await ProductCategory.create(
+      TestDataFactory.createProductCategory(categoryName ? { name: categoryName } : {})
+    )
+
+    const products = []
+    for (let i = 0; i < count; i++) {
+      const productData = TestDataFactory.createProduct({
+        stock: 100,
+        status: 'active',
+        category_id: category.id,
+        ...productOverrides
+      })
+      products.push(await Product.create(productData))
+    }
+    return { category, products }
+  }
+
+  // 给用户充值积分（直接落库，绕过业务流程）
+  static async topUpUserPoints(user, amount) {
+    const sequelize = TestDatabase.getSequelize()
+    const { UserPointBalance, PointTransaction } = sequelize.models
+
+    const [bal, created] = await UserPointBalance.findOrCreate({
+      where: { user_id: user.id },
+      defaults: { user_id: user.id, balance: 0 }
+    })
+    const next = Number(bal.balance) + Number(amount)
+    await bal.update({ balance: next })
+
+    await PointTransaction.create({
+      user_id: user.id,
+      order_id: null,
+      type: 'earn_purchase',
+      delta: amount,
+      balance_after: next,
+      note: 'test top-up'
+    })
+    return next
+  }
+
+  // 写入指定汇率/币种的 SystemConfig（覆盖式）。默认 THB:1, USD:0.029, CNY:0.20, MYR:0.13
+  static async createCurrenciesConfig(overrides = {}) {
+    const sequelize = TestDatabase.getSequelize()
+    const { SystemConfig } = sequelize.models
+
+    const rates = {
+      USD: '0.03',
+      CNY: '0.20',
+      MYR: '0.13',
+      ...overrides
+    }
+    await SystemConfig.setConfig(
+      'exchange_rates',
+      rates,
+      'json',
+      '测试默认汇率'
+    )
+    await SystemConfig.setConfig('exchange_rate', rates.USD, 'text', '兼容字段')
+    await SystemConfig.setConfig('currency_unit', 'THB', 'text', '默认币种')
+    return rates
   }
   
   // 等待异步操作完成

@@ -1,0 +1,48 @@
+# 生产专用 PostgreSQL 容器
+# 与 docker-compose.yml（开发用）分离，避免端口/数据库名冲突
+#
+# 关键点：
+#   - 仅 127.0.0.1:5432 暴露，外网/公网/内网都连不到
+#   - 数据卷为本机相对路径 ./database/pg-data/，跟 SQLite 备份同目录方便整体备份
+#   - 容器名 universal-shop-pg；与同机其他业务隔离
+#
+# 使用：
+#   docker compose -f compose.prod.pg.yml up -d
+#   docker compose -f compose.prod.pg.yml logs -f
+#   docker compose -f compose.prod.pg.yml down       # 仅停容器（保留数据）
+#   docker compose -f compose.prod.pg.yml down -v    # 停且销毁数据卷（不可逆）
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: universal-shop-pg
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${PG_BOOT_USER:-shop_app}
+      POSTGRES_PASSWORD: ${PG_BOOT_PASSWORD:?must set PG_BOOT_PASSWORD}
+      POSTGRES_DB: ${PG_BOOT_DB:-shop_prod}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./database/pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_BOOT_USER:-shop_app} -d ${PG_BOOT_DB:-shop_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    shm_size: 256mb
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "work_mem=8MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "log_min_duration_statement=500"

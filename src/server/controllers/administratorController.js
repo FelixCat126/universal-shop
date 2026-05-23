@@ -2,7 +2,9 @@ import { Op } from 'sequelize'
 import jwt from 'jsonwebtoken'
 import Administrator from '../models/Administrator.js'
 import OperationLog from '../models/OperationLog.js'
+import AuditLog from '../models/AuditLog.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
+import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 
 class AdministratorController {
   // 管理员登录
@@ -29,6 +31,14 @@ class AdministratorController {
       })
 
       if (!admin) {
+        recordLoginFailure(req, username)
+        AuditLog.logAdmin({
+          admin: { username },
+          event: 'admin.login.fail',
+          success: false,
+          detail: { reason: 'not_found_or_inactive' },
+          req
+        }).catch(() => {})
         return res.status(401).json({
           success: false,
           message: '用户名或密码错误'
@@ -38,6 +48,14 @@ class AdministratorController {
       // 验证密码
       const isValidPassword = await admin.validatePassword(password)
       if (!isValidPassword) {
+        recordLoginFailure(req, username)
+        AuditLog.logAdmin({
+          admin,
+          event: 'admin.login.fail',
+          success: false,
+          detail: { reason: 'bad_password' },
+          req
+        }).catch(() => {})
         return res.status(401).json({
           success: false,
           message: '用户名或密码错误'
@@ -47,6 +65,7 @@ class AdministratorController {
       // 更新最后登录时间
       admin.last_login_at = new Date()
       await admin.save()
+      clearLoginFailures(req, username)
 
       // 生成JWT token
       const token = jwt.sign(
@@ -478,7 +497,20 @@ class AdministratorController {
   // 初始化超级管理员（仅在没有任何管理员时可用）
   static async initSuperAdmin(req, res) {
     try {
-      // 检查是否已存在管理员
+      /**
+       * 修复 A4 拒绝抢占：必须 INIT_SECRET 校验通过；生产环境若未配置则禁用此路由
+       * 仍保留"已存在则拒绝"的双保险
+       */
+      const expected = process.env.INIT_SECRET ? String(process.env.INIT_SECRET) : ''
+      if (process.env.NODE_ENV === 'production' && !expected) {
+        return res.status(404).json({ success: false, message: 'NOT_FOUND' })
+      }
+      const headerVal = req.headers['x-init-secret']
+      const provided = (Array.isArray(headerVal) ? headerVal[0] : headerVal) || req.body?.init_secret || ''
+      if (!expected || String(provided) !== expected) {
+        return res.status(403).json({ success: false, message: '初始化口令缺失或不正确' })
+      }
+
       const existingAdmin = await Administrator.findOne()
       if (existingAdmin) {
         return res.status(400).json({
@@ -487,10 +519,20 @@ class AdministratorController {
         })
       }
 
-      // 创建默认超级管理员
+      const presetPassword = process.env.INIT_ADMIN_PASSWORD && process.env.INIT_ADMIN_PASSWORD.length >= 8
+        ? String(process.env.INIT_ADMIN_PASSWORD)
+        : null
+      if (!presetPassword && process.env.NODE_ENV === 'production') {
+        return res.status(400).json({
+          success: false,
+          message: '生产环境必须通过 INIT_ADMIN_PASSWORD 设置初始密码（≥8 字符）'
+        })
+      }
+      const finalPassword = presetPassword || 'admin123'
+
       const superAdmin = await Administrator.create({
         username: 'admin',
-        password: 'admin123',
+        password: finalPassword,
         role: 'super_admin',
         real_name: '超级管理员',
         is_active: true
@@ -501,8 +543,8 @@ class AdministratorController {
         message: '超级管理员初始化成功',
         data: {
           username: 'admin',
-          password: 'admin123',
-          message: '请立即登录并修改密码'
+          message: '请立即登录并修改密码',
+          ...(presetPassword ? {} : { password: finalPassword })
         }
       })
     } catch (error) {

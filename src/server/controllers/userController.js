@@ -1,10 +1,13 @@
 import User from '../models/User.js'
 import jwt from 'jsonwebtoken'
 import { Op } from 'sequelize'
+import crypto from 'crypto'
 import Order from '../models/Order.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import * as pointsService from '../services/pointsService.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
+import AuditLog from '../models/AuditLog.js'
+import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 
 class UserController {
   // 用户注册
@@ -100,6 +103,13 @@ class UserController {
         JWT_SECRET,
         { expiresIn: '7d' }
       )
+
+      AuditLog.logUser({
+        user,
+        event: 'user.register.success',
+        detail: { has_referral: Boolean(referral_code) },
+        req
+      }).catch(() => {})
 
       res.status(201).json({
         success: true,
@@ -307,6 +317,13 @@ class UserController {
       }
 
       if (!user) {
+        recordLoginFailure(req, phone || email)
+        AuditLog.logUser({
+          event: 'user.login.fail',
+          success: false,
+          detail: { reason: 'user_not_found', identifier: email || phone || null },
+          req
+        }).catch(() => {})
         return res.status(401).json({
           success: false,
           message: '用户名或密码错误'
@@ -315,6 +332,13 @@ class UserController {
 
       // 检查用户是否被禁用
       if (!user.is_active) {
+        AuditLog.logUser({
+          user,
+          event: 'user.login.fail',
+          success: false,
+          detail: { reason: 'inactive' },
+          req
+        }).catch(() => {})
         return res.status(403).json({
           success: false,
           message: '账户已被禁用，请联系管理员'
@@ -324,6 +348,14 @@ class UserController {
       // 验证密码
       const isValidPassword = await user.validatePassword(password)
       if (!isValidPassword) {
+        recordLoginFailure(req, phone || email)
+        AuditLog.logUser({
+          user,
+          event: 'user.login.fail',
+          success: false,
+          detail: { reason: 'bad_password' },
+          req
+        }).catch(() => {})
         return res.status(401).json({
           success: false,
           message: '用户名或密码错误'
@@ -333,6 +365,8 @@ class UserController {
       // 更新最后登录时间
       user.last_login_at = new Date()
       await user.save()
+      clearLoginFailures(req, phone || email)
+      AuditLog.logUser({ user, event: 'user.login.success', req }).catch(() => {})
 
       // 生成JWT token
       const token = jwt.sign(
@@ -563,14 +597,15 @@ class UserController {
     }
   }
 
-  // 统一的用户创建服务方法（用于订单自动注册）
+  /**
+   * 统一的用户创建服务方法（用于订单自动注册）
+   * 安全要点：默认密码不再用"手机号后 8 位"（可被字典/撞库猜测），
+   *   改为 32 字节强随机；must_reset_password=true，强制下次登录改密。
+   */
   static async createUserForOrder(fullPhoneWithCode, contactName, referralCode = null) {
     try {
-      // 解析完整手机号中的国家区号和手机号
-      let countryCode = '+66' // 默认值
+      let countryCode = '+66'
       let phoneNumber = fullPhoneWithCode
-      
-      // 检查是否包含国家区号并解析
       const supportedCodes = ['+86', '+66', '+60']
       for (const code of supportedCodes) {
         if (fullPhoneWithCode.startsWith(code)) {
@@ -579,20 +614,19 @@ class UserController {
           break
         }
       }
-      
-      // 生成默认密码（手机号后8位）
-      const defaultPassword = phoneNumber.slice(-8)
-      
-      // 调用统一的用户创建核心逻辑
+
+      // 32 字节随机 + 一个大写/小写/数字/符号锚点，确保通过任何强度策略
+      const defaultPassword = `Aa1!${crypto.randomBytes(24).toString('base64url')}`
+
       return await UserController._createUserCore({
         nickname: contactName || `用户${phoneNumber.slice(-4)}`,
         country_code: countryCode,
         phone: phoneNumber,
         password: defaultPassword,
         email: null,
-        referral_code: referralCode
-      }, true) // true表示是自动注册
-      
+        referral_code: referralCode,
+        must_reset_password: true
+      }, true)
     } catch (error) {
       console.error('createUserForOrder 执行失败:', error)
       throw error
@@ -601,7 +635,7 @@ class UserController {
   
   // 统一的用户创建核心逻辑
   static async _createUserCore(userData, isAutoRegister = false) {
-    const { nickname, country_code, phone, password, email, referral_code } = userData
+    const { nickname, country_code, phone, password, email, referral_code, must_reset_password } = userData
     
     // 验证手机号格式 - 使用统一的验证逻辑
     const phoneValidation = UserController._validatePhoneNumber(phone, country_code)
@@ -653,17 +687,17 @@ class UserController {
       validReferralCode = code
     }
     
-    // 创建用户
     const finalUserData = {
-      username: isAutoRegister ? phone : `${country_code}${phone}`, // 自动注册时用户名不含区号，正常注册含区号
+      username: isAutoRegister ? phone : `${country_code}${phone}`,
       nickname,
       email: email || null,
       country_code,
       phone,
       password,
-      referred_by_code: validReferralCode
+      referred_by_code: validReferralCode,
+      must_reset_password: must_reset_password === true
     }
-    
+
     const user = await User.create(finalUserData)
 
     return user

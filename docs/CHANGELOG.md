@@ -1,5 +1,42 @@
 # 📋 Universal Shop 更新日志
 
+## 2026 年更新记录
+
+### v1.4 — 测试覆盖里程碑（2026-05）
+
+#### 后端业务覆盖（≈ 220 用例）
+- P0 测试基建：扩展 `TestDataFactory`/`TestHelpers`，新增 `seedTestBaseline`（SystemConfig / 分类 / 行政区划）。
+- P1 用户面 67 用例：注册 / 登录 / 资料 / 商品目录 / 购物车（含匿名 Session-ID）/ 地址 / 下单 / 支付 / 查询 / 积分。
+- P2 合作方面 31 用例：登录、Catalog（MOQ + 折扣边界）、下单、支付确认、地址 CRUD、订单查询。
+- P3 Admin 面 71 用例：登录 / 商品 / 分类 / 订单 / 用户 / 合作方 / 管理员 / 系统配置 / 统计 / 导出。
+- P4 跨端 18 用例：3 角色 × 4 关键端点权限矩阵 + 10 条跨端集成（用户禁用、汇率热更新、AuditLog 落库、OperationLog 危险操作）。
+- P5 安全 15 用例：限流真触发（mini-app + `X-Forwarded-For`）、CSP/HSTS/COOP 头巡检、AuditLog（admin/partner/user/订单）。
+- P6 接口补遗 17 用例：行政区划 5 GET、用户公开/资料接口、`/system-config/public`、匿名购物车完整流程、库存检查/调整/恢复、合作方订单导出、上传鉴权。
+
+#### 前端 Vue 组件级测试（39 用例）
+- 工具：`phoneValidation` / `passwordPolicy` / `exchangeRatesDisplay` / `orderBillingDisplay`。
+- Pinia Store：`cart`（计算属性、游客/登录路径、合并、清空）。
+- 组件：`NotFound.vue`（多语言切换 + 路由跳转）、`CountrySelector.vue`（emit/disabled/error）。
+- 独立 `vitest.vue.config.js`（happy-dom），不连数据库。
+
+#### 同步修复的真实 bug
+- `Product` 缺 `name_th` 字段 → catalog 关键词搜索 500
+- `referral_code` 空字符串触发 Joi `must be a string`
+- `/api/admin/orders/export` 被 `/orders/:id` 抢先匹配
+- `logOperation` 仅拦截 `res.json`，xlsx 导出（`res.send(buffer)`）漏审计 → 同时拦截 `res.send`
+- 合作方默认地址并发死锁 → 单条原子 `UPDATE` + 重试
+- 管理员登录失败完全无审计 → 新增 `AuditLog.logAdmin('admin.login.fail')`
+
+### v1.3 — PostgreSQL 切换 + 安全强化（2026-05）
+
+- 数据库：SQLite → PostgreSQL 16（Docker Compose）；删除全部 SQLite 兼容代码与历史补丁脚本。
+- 并发：库存超卖 / 默认地址 / 支付幂等 全部走原子 UPDATE + 死锁重试。
+- 限流：`globalLimiter` / `loginLimiter` / `writeLimiter` / `enumerationLimiter`（测试环境自动 no-op）。
+- 验证码：自包含 token，`loginGuard` 阈值后强制 captcha；登录请求与登录失败均落 `audit_logs`。
+- Helmet：production 模式 CSP + HSTS + Permissions-Policy；写权限严守（products 写仅 admin、avatar 仅本人）。
+- 上传：MIME + magic byte 双校验（`file-type`）。
+- 部署：`scripts/deploy-on-server.sh` 加迁移闸 / `pg_dump` 备份 / `compose.prod.pg.yml`。
+
 ## 2024年更新记录
 
 ### 🔧 系统全面优化与修复 (v1.2)

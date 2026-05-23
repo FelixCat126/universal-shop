@@ -44,10 +44,13 @@ cp nodemon.json "${PACKAGE_DIR}/" 2>/dev/null || true
 cp start-https-production.js "${PACKAGE_DIR}/"
 cp README.md DEPLOYMENT_GUIDE.md "${PACKAGE_DIR}/" 2>/dev/null || true
 
+# PG 部署相关：Docker Compose（生产专用，仅 127.0.0.1:5432 暴露）
+cp compose.prod.pg.yml "${PACKAGE_DIR}/" 2>/dev/null || true
+
 # 复制文档目录
 cp -r docs "${PACKAGE_DIR}/" 2>/dev/null || true
 
-# 复制脚本目录
+# 复制脚本目录（含 migrate-prod-to-postgres.sh、deploy-on-server.sh、迁移工具脚本等）
 cp -r scripts "${PACKAGE_DIR}/" 2>/dev/null || true
 chmod +x "${PACKAGE_DIR}/scripts/deploy-on-server.sh" 2>/dev/null || true
 

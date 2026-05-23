@@ -12,6 +12,7 @@ import { createUserAddress } from '../services/addressService.js'
 import { normalizeExchangeRates, thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
 import * as pointsService from '../services/pointsService.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
+import AuditLog from '../models/AuditLog.js'
 
 class OrderController {
   // 创建订单
@@ -150,7 +151,7 @@ class OrderController {
         productMap.set(product.id, product)
       })
 
-      // 验证商品库存和计算总价
+      // 验证商品库存和计算总价（仅做"友好"预检；真正扣减用条件 UPDATE 防超卖）
       for (const item of items) {
         const product = productMap.get(item.product_id)
         if (!product) {
@@ -161,7 +162,16 @@ class OrderController {
           })
         }
 
-        if (product.stock < item.quantity) {
+        const qty = parseInt(item.quantity, 10)
+        if (!Number.isInteger(qty) || qty < 1 || qty > 5000) {
+          await transaction.rollback()
+          return res.status(400).json({
+            success: false,
+            message: `商品 ${product.name} 数量无效（需为 1-5000 的整数）`
+          })
+        }
+
+        if (product.stock < qty) {
           await transaction.rollback()
           return res.status(400).json({
             success: false,
@@ -309,45 +319,83 @@ class OrderController {
 
       }
 
-      // 生成订单号
-      const orderNo = `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-
       const initialOrderStatus = paymentMethod === 'online' ? 'pending' : 'shipping'
 
-      // 创建订单
-      const order = await Order.create({
-        order_no: orderNo,
-        user_id: userId,
-        total_amount: totalBilling,
-        total_amount_thb: totalAmountThb,
-        currency_code: checkoutCurrency,
-        payment_method: paymentMethod,
-        points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
-        status: initialOrderStatus,
-        contact_name: orderContactName,
-        contact_phone: orderContactPhone,
-        delivery_address: orderDeliveryAddress,
-        province: orderProvince, // 保存分字段地址信息
-        city: orderCity,
-        district: orderDistrict,
-        postal_code: orderPostalCode,
-        notes,
-        exchange_rate: exchangeRateSnapshot // 下单时 USD 汇算（与历史 USDT 展示兼容）
-      }, { transaction })
-
-      // 创建订单项
-      for (const orderItem of orderItems) {
-        await OrderItem.create({
-          order_id: order.id,
-          ...orderItem
-        }, { transaction })
-
-        // 减少商品库存
-        await Product.decrement('stock', {
-          by: orderItem.quantity,
-          where: { id: orderItem.product_id },
-          transaction
+      /**
+       * 订单号生成 + 唯一冲突重试（最多 5 次）：
+       * 高并发下 Date.now+random 仍有概率撞 unique 约束，撞了就重生
+       */
+      const buildOrderNo = () => `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+      let order = null
+      let createTries = 0
+      while (createTries < 5 && !order) {
+        try {
+          order = await Order.create({
+            order_no: buildOrderNo(),
+            user_id: userId,
+            total_amount: totalBilling,
+            total_amount_thb: totalAmountThb,
+            currency_code: checkoutCurrency,
+            payment_method: paymentMethod,
+            points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
+            status: initialOrderStatus,
+            contact_name: orderContactName,
+            contact_phone: orderContactPhone,
+            delivery_address: orderDeliveryAddress,
+            province: orderProvince,
+            city: orderCity,
+            district: orderDistrict,
+            postal_code: orderPostalCode,
+            notes,
+            exchange_rate: exchangeRateSnapshot
+          }, { transaction })
+        } catch (err) {
+          if (err && err.name === 'SequelizeUniqueConstraintError') {
+            createTries++
+            continue
+          }
+          throw err
+        }
+      }
+      if (!order) {
+        await transaction.rollback()
+        return res.status(500).json({
+          success: false,
+          message: '生成订单号失败，请稍后重试'
         })
+      }
+
+      /**
+       * 防超卖核心：用条件 UPDATE 原子扣库存。
+       *   UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty
+       * 受影响行 0 即视为库存不足；事务回滚整单。
+       * 这一段同时承担"批量创建订单项"。
+       */
+      const orderItemRows = []
+      for (const orderItem of orderItems) {
+        const [affected] = await Product.update(
+          { stock: sequelize.literal(`stock - ${parseInt(orderItem.quantity, 10)}`) },
+          {
+            where: {
+              id: orderItem.product_id,
+              stock: { [Op.gte]: parseInt(orderItem.quantity, 10) }
+            },
+            transaction
+          }
+        )
+        if (!affected) {
+          await transaction.rollback()
+          return res.status(400).json({
+            success: false,
+            message: `商品库存不足（商品 ID ${orderItem.product_id}）`
+          })
+        }
+        orderItemRows.push({ order_id: order.id, ...orderItem })
+      }
+
+      // 订单项一次性写入（避免循环 N 次插入）
+      if (orderItemRows.length > 0) {
+        await OrderItem.bulkCreate(orderItemRows, { transaction })
       }
 
       if (paymentMethod === 'points') {
@@ -448,6 +496,19 @@ class OrderController {
         responseData.autoRegistered = true
       }
 
+      AuditLog.logUser({
+        user: req.user || (isGuestOrder ? { id: userId } : null),
+        event: isGuestOrder ? 'order.create.guest' : 'order.create',
+        resource: 'order',
+        resourceId: order.id,
+        detail: {
+          payment_method: paymentMethod,
+          item_count: items.length,
+          total_amount: order.total_amount
+        },
+        req
+      }).catch(() => {})
+
       res.status(201).json({
         success: true,
         message: '订单创建成功',
@@ -471,7 +532,12 @@ class OrderController {
     }
   }
 
-  /** 在线支付订单：用户在支付弹窗内确认后转为送货中（并发放购物积分） */
+  /**
+   * 在线支付订单：用户在支付弹窗内确认后转为送货中（并发放购物积分）
+   * 幂等保障：用条件 UPDATE，仅当 status='pending' 且 online_paid_at IS NULL 时才置位；
+   *   - 受影响行数 = 1：本次确认成功，发积分；
+   *   - 受影响行数 = 0：已被并发请求/重复点击处理过，直接返回成功（幂等），不再发积分。
+   */
   static async confirmOnlinePayment (req, res) {
     try {
       const userId = req.user?.userId
@@ -492,28 +558,58 @@ class OrderController {
       if (order.payment_method !== 'online') {
         return res.status(400).json({ success: false, message: '该订单不需要在线支付确认' })
       }
-      if (order.status !== 'pending') {
-        return res.status(400).json({ success: false, message: '订单无需确认支付或已处理' })
+      if (order.status !== 'pending' && order.online_paid_at) {
+        // 已确认过：幂等返回成功
+        const ordered = await Order.findByPk(order.id, {
+          include: [{ model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', paranoid: false }] }]
+        })
+        return res.json({ success: true, message: '支付已确认', data: ordered })
       }
-      await order.update({ status: 'shipping' })
-      try {
-        const qtySum = (order.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0)
-        if (qtySum > 0) {
-          await pointsService.grantPurchasePoints(userId, order.id, qtySum)
+
+      const [affected] = await Order.update(
+        { status: 'shipping', online_paid_at: new Date() },
+        {
+          where: {
+            id: order.id,
+            user_id: userId,
+            status: 'pending',
+            online_paid_at: null
+          }
         }
-      } catch (earnErr) {
-        console.error('购物积分发放失败:', earnErr)
+      )
+
+      if (affected === 1) {
+        try {
+          const qtySum = (order.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0)
+          if (qtySum > 0) {
+            await pointsService.grantPurchasePoints(userId, order.id, qtySum)
+          }
+        } catch (earnErr) {
+          console.error('购物积分发放失败:', earnErr)
+        }
+        AuditLog.logUser({
+          user: { id: userId },
+          event: 'order.payment.confirm',
+          resource: 'order',
+          resourceId: order.id,
+          req
+        }).catch(() => {})
+      } else {
+        AuditLog.logUser({
+          user: { id: userId },
+          event: 'order.payment.confirm.idempotent_hit',
+          resource: 'order',
+          resourceId: order.id,
+          req
+        }).catch(() => {})
       }
+
       const createdOrder = await Order.findByPk(order.id, {
         include: [
           {
             model: OrderItem,
             as: 'items',
-            include: [{
-              model: Product,
-              as: 'product',
-              paranoid: false
-            }]
+            include: [{ model: Product, as: 'product', paranoid: false }]
           }
         ]
       })

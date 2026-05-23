@@ -4,6 +4,7 @@
  */
 
 import { ValidationError, UniqueConstraintError, ForeignKeyConstraintError } from 'sequelize'
+import { logger } from '../utils/logger.js'
 
 class ApiError extends Error {
   constructor(message, statusCode = 500, code = null) {
@@ -26,25 +27,26 @@ const sendErrorResponse = (res, statusCode, message, code = null, details = null
     response.code = code
   }
 
-  // 仅在开发环境返回详细错误信息
-  if (process.env.NODE_ENV !== 'production' && details) {
-    response.details = details
-  }
+  /**
+   * 永远不向客户端返回原始 details（含 stack/SQL 等）。
+   * 详情只写日志；客户端仅看到稳定 message + code。
+   * details 留作日志变量，不进 response。
+   */
+  void details
 
   res.status(statusCode).json(response)
 }
 
 // 主要错误处理中间件
 export const errorHandler = (err, req, res, next) => {
-  // 记录错误日志
-  console.error('🔥 Error caught by errorHandler:', {
+  // 记录错误日志（落盘 + 控制台；生产携带 stack 但不返给前端）
+  logger.error('error', {
     name: err.name,
     message: err.message,
-    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
+    stack: err.stack,
     url: req.originalUrl,
     method: req.method,
-    ip: req.ip,
-    timestamp: new Date().toISOString()
+    ip: req.ip
   })
 
   // 处理不同类型的错误
@@ -93,18 +95,26 @@ export const errorHandler = (err, req, res, next) => {
     return sendErrorResponse(res, 400, '请求数据格式错误', 'INVALID_JSON')
   }
 
-  // 默认服务器错误
-  const message = process.env.NODE_ENV === 'production' 
-    ? '服务器内部错误' 
+  // 默认服务器错误：客户端永远只看到通用提示
+  const message = process.env.NODE_ENV === 'production'
+    ? '服务器内部错误'
     : err.message || '未知错误'
-  
-  sendErrorResponse(res, 500, message, 'INTERNAL_SERVER_ERROR', {
-    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined
-  })
+
+  sendErrorResponse(res, 500, message, 'INTERNAL_SERVER_ERROR')
 }
 
-// 404错误处理中间件
+// 404错误处理中间件：浏览器跳网站风格 404 页，API/curl 仍返 JSON
 export const notFoundHandler = (req, res) => {
+  const url = req.originalUrl || ''
+  const isApi = url.startsWith('/api/')
+  const isAsset = /\.(js|css|png|jpe?g|gif|ico|svg|woff2?|ttf|eot|map|webp|avif)(\?|$)/i.test(url)
+  const wantsHtml = !isApi && !isAsset && req.accepts(['html', 'json']) === 'html'
+
+  if (wantsHtml) {
+    // 跳 portal SPA 的通配 NotFound 路由（含返回首页按钮、品牌风格）
+    return res.redirect(302, '/portal/404')
+  }
+
   sendErrorResponse(res, 404, `路径 ${req.originalUrl} 不存在`, 'NOT_FOUND')
 }
 

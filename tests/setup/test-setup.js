@@ -1,61 +1,40 @@
-// ⚠️ 重要：必须在导入任何模块之前设置环境变量！
-import path from 'path'
-import { fileURLToPath } from 'url'
+/**
+ * 测试入口：在导入任何模块之前必须设置环境变量。
+ *
+ * 必备：
+ *   DATABASE_URL_TEST   测试库连接串（推荐 postgres://shop:shop@127.0.0.1:5432/shop_test）
+ *   未设则回退到本地默认；本地用 `npm run db:up` 一键启动 docker PG。
+ */
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// 设置测试环境变量 - 使用绝对路径
-const projectRoot = path.join(__dirname, '../../')
 process.env.NODE_ENV = 'test'
-process.env.DATABASE_PATH = path.join(projectRoot, 'database/test.sqlite')
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only-32-chars-long'
 process.env.JWT_ADMIN_SECRET = 'test-admin-jwt-secret-key-for-testing-only'
+process.env.CAPTCHA_SECRET = 'test-captcha-secret-key-for-testing-only'
 
-// console.log('📍 项目根目录:', projectRoot)
-// console.log('📍 测试数据库路径:', process.env.DATABASE_PATH)
+// 默认测试库
+if (!process.env.DATABASE_URL_TEST) {
+  process.env.DATABASE_URL_TEST = 'postgres://shop:shop@127.0.0.1:5432/shop_test'
+}
+// 并发测试需要较大的连接池（默认 10 在 50 并发时会触发 acquire 超时）
+process.env.PG_POOL_MAX = process.env.PG_POOL_MAX || '40'
+process.env.PG_POOL_ACQUIRE_MS = process.env.PG_POOL_ACQUIRE_MS || '60000'
 
-import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import fs from 'fs'
+import { beforeAll, afterAll, beforeEach } from 'vitest'
 import { TestDatabase } from './test-database.js'
 
-// 测试数据库路径
-const TEST_DB_PATH = process.env.DATABASE_PATH
-
 beforeAll(async () => {
-  console.log('🧪 初始化测试环境...')
-  
-  // 初始化测试数据库
+  console.log('🧪 初始化测试环境（PostgreSQL）...')
   await TestDatabase.initialize()
   await TestDatabase.syncModels()
-  
   console.log('✅ 测试环境初始化完成')
 })
 
 afterAll(async () => {
   console.log('🧹 清理测试环境...')
-  
-  // 清理数据库连接
   await TestDatabase.cleanup()
-  
-  // 清理测试数据库文件
-  if (fs.existsSync(TEST_DB_PATH)) {
-    try {
-      fs.unlinkSync(TEST_DB_PATH)
-      console.log('✅ 测试数据库文件已清理')
-    } catch (error) {
-      console.warn('⚠️ 清理测试数据库文件失败:', error.message)
-    }
-  }
-  
   console.log('✅ 测试环境清理完成')
 })
 
 beforeEach(async () => {
-  // 每个测试前清理所有数据（保持表结构）
   await TestDatabase.clearAllData()
-})
-
-afterEach(async () => {
-  // 每个测试后的清理工作（如果需要）
 })

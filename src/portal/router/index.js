@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import i18n from '../i18n'
 
 const router = createRouter({
   history: createWebHistory('/portal/'),  // 修复：添加base路径
@@ -55,15 +56,17 @@ const router = createRouter({
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: () => import('../views/NotFound.vue'),
-      meta: { title: '页面未找到' }
+      meta: { titleKey: 'error.notFound' }
     }
   ]
 })
 
 // 路由守卫
 router.beforeEach((to, from, next) => {
-  // 设置页面标题
-  if (to.meta.title) {
+  // 设置页面标题：优先 i18n key（titleKey），向后兼容硬编码 title
+  if (to.meta.titleKey) {
+    document.title = i18n.global.t(to.meta.titleKey) + ' - Universal Shop'
+  } else if (to.meta.title) {
     document.title = to.meta.title + ' - Universal Shop'
   }
 

@@ -13,6 +13,11 @@ const Product = sequelize.define('Product', {
     allowNull: false,
     comment: '产品名称'
   },
+  name_th: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
+    comment: '泰文名称（用于多语种搜索）'
+  },
   alias: {
     type: DataTypes.STRING(200),
     allowNull: true,
