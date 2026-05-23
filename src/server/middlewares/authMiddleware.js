@@ -1,6 +1,38 @@
 import jwt from 'jsonwebtoken'
+import { LRUCache } from 'lru-cache'
 import User from '../models/User.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
+
+/**
+ * 用户存活/启用状态短缓存：
+ *   - key: userId
+ *   - value: { exists, isActive }
+ *   - TTL 5s：保护 DB（高频 cart/orders/profile 不必每次 findByPk）
+ *     同时管理员禁用动作最多 5s 后生效，业务可接受
+ *
+ * 测试或外部需要"立即生效"时调 `_clearAuthCacheForTests()`。
+ */
+const userStatusCache = new LRUCache({ max: 5000, ttl: 5_000 })
+
+export function _clearAuthCacheForTests () {
+  userStatusCache.clear()
+}
+
+/** 当管理端禁用/启用用户、删用户后调一次，使缓存中的状态立即失效 */
+export function invalidateAuthCache (userId) {
+  userStatusCache.delete(userId)
+}
+
+async function loadUserStatus (userId) {
+  const cached = userStatusCache.get(userId)
+  if (cached) return cached
+  const user = await User.findByPk(userId, { attributes: ['id', 'is_active'] })
+  const status = user
+    ? { exists: true, isActive: user.is_active !== false }
+    : { exists: false, isActive: false }
+  userStatusCache.set(userId, status)
+  return status
+}
 
 // 验证JWT token
 export const authenticateToken = async (req, res, next) => {
@@ -16,22 +48,12 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET)
-    
-    // 验证用户是否存在
-    const user = await User.findByPk(decoded.userId)
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: '无效的认证令牌'
-      })
+    const status = await loadUserStatus(decoded.userId)
+    if (!status.exists) {
+      return res.status(401).json({ success: false, message: '无效的认证令牌' })
     }
-
-    // 检查用户是否被禁用
-    if (!user.is_active) {
-      return res.status(403).json({
-        success: false,
-        message: '账户已被禁用，请联系管理员'
-      })
+    if (!status.isActive) {
+      return res.status(403).json({ success: false, message: '账户已被禁用，请联系管理员' })
     }
 
     req.user = decoded
@@ -60,9 +82,9 @@ export const optionalAuth = async (req, res, next) => {
       // 不是普通用户态：当作未登录处理
       return next()
     }
-    const user = await User.findByPk(decoded.userId)
-    if (!user) return res.status(401).json({ success: false, message: '无效的认证令牌' })
-    if (!user.is_active) return res.status(403).json({ success: false, message: '账户已被禁用' })
+    const status = await loadUserStatus(decoded.userId)
+    if (!status.exists) return res.status(401).json({ success: false, message: '无效的认证令牌' })
+    if (!status.isActive) return res.status(403).json({ success: false, message: '账户已被禁用' })
     req.user = decoded
     return next()
   } catch (error) {

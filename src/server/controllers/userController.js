@@ -756,6 +756,9 @@ class UserController {
       }
 
       await user.update({ is_active })
+      // 立即失效 authMiddleware 5s 缓存，确保该 token 下次请求即被拒绝
+      const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
+      invalidateAuthCache(user.id)
 
       res.json({
         success: true,

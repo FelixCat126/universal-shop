@@ -14,9 +14,10 @@
 | `TRUST_PROXY` | 反代信任跳数（Nginx 在前面=1） | `1` |
 | `LOG_DIR` | 日志目录 | `/var/log/universal-shop` |
 | `RATE_LIMIT_DISABLED` | 内网压测时可临时设 `1`，**生产必为空** | — |
-| `DB_DIALECT` | `sqlite` 或 `postgres`（迁移后） | `postgres` |
-| `DATABASE_URL` | PG 连接串（迁移后） | `postgres://user:pwd@host:5432/shop` |
+| `DATABASE_URL` | PostgreSQL 连接串 | `postgres://user:pwd@host:5432/shop` |
 | `PG_POOL_MAX` | PG 连接池上限 | `20` |
+| `PG_POOL_ACQUIRE_MS` | 获取连接最长等待 | `60000` |
+| `PG_SSL` | 1 时启用 SSL（云 RDS 多用） | `0` |
 
 ## 2. Nginx 配置范本（与 trust proxy=1 配合）
 
@@ -115,6 +116,7 @@ bantime = 3600
 
 ## 5. 审计建议
 
-- 登录失败、支付确认、订单状态变更应统一进入 `OperationLog`（目前仅管理员路由覆盖；后续可拓展到普通用户/合作方）。
-- 日志（`logs/error.log`、`logs/combined.log`）按天滚动，14 天保留；接入 ELK / SLS 做集中检索。
-- 保留 `database/shop.sqlite*` 每日快照（迁 PG 后改为 PG `pg_dump`）。
+- 用户/合作方/管理员四类登录失败、登录成功、下单、支付确认、危险操作均已落 `audit_logs` 与 `operation_logs`。
+- `logOperation` 中间件同时拦截 `res.json` 与 `res.send`，xlsx 等导出操作也会写审计。
+- 日志（`logs/error.log`、`logs/combined.log`）按天滚动，14 天保留；建议接入 ELK / SLS 集中检索。
+- 数据库每日快照：`pg_dump shop_prod | gzip > /backup/pg-$(date +%F).sql.gz`，保留 7-30 天。

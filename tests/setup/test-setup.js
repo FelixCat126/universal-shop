@@ -37,4 +37,10 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await TestDatabase.clearAllData()
+  // 清掉 authMiddleware 5s 用户状态 LRU 缓存
+  // 否则 PG TRUNCATE RESTART IDENTITY 后新建用户会复用旧 id，命中陈旧 cache
+  try {
+    const { _clearAuthCacheForTests } = await import('../../src/server/middlewares/authMiddleware.js')
+    _clearAuthCacheForTests()
+  } catch (_) { /* 早于 module 加载时忽略 */ }
 })

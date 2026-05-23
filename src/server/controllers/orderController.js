@@ -825,15 +825,25 @@ class OrderController {
         offset: parseInt(offset)
       })
 
-      // 查询推荐人信息
-      for (const order of orders) {
-        if (order.user?.referred_by_code) {
-          const referrer = await User.findOne({
-            where: { referral_code: order.user.referred_by_code },
-            attributes: ['id', 'nickname', 'phone']
-          })
-          if (referrer) {
-            order.user.dataValues.referrer = referrer
+      // 推荐人批量查询：先收集本页所有出现过的 referred_by_code，一次 IN 查询
+      // 之前是 N+1（每条订单一次 User.findOne），50 条/页时多 50 次 SQL
+      const referralCodes = [
+        ...new Set(
+          orders
+            .map((o) => o.user?.referred_by_code)
+            .filter((c) => typeof c === 'string' && c.length > 0)
+        )
+      ]
+      if (referralCodes.length > 0) {
+        const referrers = await User.findAll({
+          where: { referral_code: { [Op.in]: referralCodes } },
+          attributes: ['id', 'nickname', 'phone', 'referral_code']
+        })
+        const refMap = new Map(referrers.map((r) => [r.referral_code, r]))
+        for (const order of orders) {
+          const code = order.user?.referred_by_code
+          if (code && refMap.has(code)) {
+            order.user.dataValues.referrer = refMap.get(code)
           }
         }
       }

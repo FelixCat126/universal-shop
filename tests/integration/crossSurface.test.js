@@ -20,11 +20,13 @@ import { TestHelpers } from '../helpers/test-helpers.js'
 import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
 import { clearResponseCache } from '@server/utils/responseCache.js'
 import { _resetLoginGuardForTests } from '@server/middlewares/loginGuard.js'
+import { _clearAuthCacheForTests } from '@server/middlewares/authMiddleware.js'
 
 beforeEach(async () => {
   await TestDatabase.clearAllData()
   clearResponseCache()
   _resetLoginGuardForTests()
+  _clearAuthCacheForTests()
 })
 
 async function adminToken (role = 'super_admin') {

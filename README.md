@@ -51,9 +51,9 @@ npm run dev
 ```
 
 访问：
-- 用户门户：<http://localhost:5173/>
-- 管理后台：<http://localhost:5174/>
-- 合作方门户：<http://localhost:5175/>
+- 用户门户：<http://localhost:3001/>
+- 管理后台：<http://localhost:3002/>
+- 合作方门户：<http://localhost:3003/>
 - API：<http://localhost:3000/api>
 
 ## 4. 运行测试
