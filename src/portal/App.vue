@@ -1,7 +1,10 @@
 <template>
   <div id="app" class="min-h-screen bg-gray-50">
-    <!-- 顶部导航栏 -->
-    <header class="bg-white shadow-sm border-b">
+    <!-- 顶部导航栏（滚动时 backdrop-blur 渐变） -->
+    <header
+      class="bg-white/85 backdrop-blur-md border-b sticky top-0 z-40 transition-shadow duration-300"
+      :class="{ 'shadow-sm': hasScrolled }"
+    >
       <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between gap-2 sm:gap-4 h-16 min-w-0">
           <!-- 网站标题（窄屏可截断避免顶栏爆裂） -->
@@ -97,8 +100,12 @@
       </div>
     </header>
     
-    <!-- 路由视图 -->
-    <router-view />
+    <!-- 路由视图：spring 页面切换（苹果风） -->
+    <router-view v-slot="{ Component, route }">
+      <Transition name="spring-page" mode="out-in">
+        <component :is="Component" :key="route.path" />
+      </Transition>
+    </router-view>
     
     <!-- Toast 提示容器 -->
     <ToastContainer />
@@ -106,7 +113,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from './stores/cart.js'
@@ -133,6 +140,17 @@ const portalCurrency = usePortalCurrencyStore()
 const currentLanguage = computed({
   get: () => locale.value,
   set: (val) => { locale.value = val }
+})
+
+// 顶栏滚动阴影
+const hasScrolled = ref(false)
+const onScroll = () => {
+  hasScrolled.value = window.scrollY > 8
+}
+
+// 卸载时清理
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
 })
 
 // 更新页面标题
@@ -227,9 +245,11 @@ watch(() => userStore.isLoggedIn, async (newValue, oldValue) => {
 
 // 初始化
 onMounted(async () => {
+  // 顶栏滚动监听
+  window.addEventListener('scroll', onScroll, { passive: true })
+
   // 从localStorage恢复语言设置，默认中文
   const savedLanguage = localStorage.getItem('language')
-  
   if (savedLanguage) {
     currentLanguage.value = savedLanguage
   } else {

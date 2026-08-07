@@ -14,9 +14,12 @@
         </p>
       </div>
 
-      <!-- 首页长图 -->
+      <!-- 首页长图（滚动视差：banner 比内容滚动慢 30%） -->
       <div v-if="homeBanner" class="mb-6">
-        <div class="w-full max-w-4xl mx-auto">
+        <div
+          v-motion-parallax="{ from: 0, to: 1, translateY: [0, 30] }"
+          class="w-full max-w-4xl mx-auto overflow-hidden rounded-lg"
+        >
           <img
             :src="getImageUrl(homeBanner)"
             alt="首页横幅"
@@ -71,20 +74,33 @@
         @touchstart.passive="onProductAreaTouchStart"
         @touchend.passive="onProductAreaTouchEnd"
       >
-      <!-- 首次加载 -->
-      <div v-if="isLoading && !products.length" class="flex justify-center py-12">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <!-- 首次加载：骨架屏替代 spinner -->
+      <div
+        v-if="isLoading && !products.length"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch"
+      >
+        <SkeletonCard v-for="i in 8" :key="`sk-${i}`" />
       </div>
-      
-      <!-- 产品网格（卡片等高，按钮贴底） -->
+
+      <!-- 产品网格（卡片等高，按钮贴底；spring 弹簧入场） -->
       <div
         v-else-if="products.length > 0"
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch"
       >
         <div
-          v-for="product in products"
+          v-for="(product, idx) in products"
           :key="product.id"
-          class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer transform hover:scale-[1.02] flex flex-col h-full min-h-0"
+          v-motion
+          :initial="{ opacity: 0, y: 20, scale: 0.96 }"
+          :enter="{
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            transition: { ...appleSpring, delay: Math.min(idx * 50, 500) }
+          }"
+          :hovered="{ scale: 1.04, transition: subtleSpring }"
+          :tap="{ scale: 0.97, transition: bouncySpring }"
+          class="bg-white rounded-xl shadow-sm hover:shadow-lg cursor-pointer flex flex-col h-full min-h-0 transition-shadow duration-300"
           @click="goToProductDetail(product.id)"
         >
           <div class="aspect-w-1 aspect-h-1 w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
@@ -108,14 +124,14 @@
                 {{ t('product.pointsExchangeBadge') }}
               </span>
             </div>
-            <img
+            <ImageFade
               :src="product.image_url || defaultImage"
               :alt="getCurrentLanguageValue(product, 'name')"
-              class="w-full h-48 object-cover"
+              custom-class="w-full h-48 object-cover"
               loading="lazy"
               @error="handleImageError"
               @load="handleImageLoad"
-            >
+            />
           </div>
           
           <div class="p-4 flex flex-col flex-1 min-h-0">
@@ -255,6 +271,9 @@ import { productAPI } from '../api/products.js'
 import config from '../../config/index.js'
 import { useToast } from '../composables/useToast.js'
 import { usePortalCurrencyStore } from '../stores/portalCurrency.js'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
+import ImageFade from '../components/ui/ImageFade.vue'
+import { appleSpring, subtleSpring, bouncySpring } from '../composables/useSpring.js'
 
 const portalCurrency = usePortalCurrencyStore()
 

@@ -1,6 +1,10 @@
 <template>
   <div id="app">
-    <router-view />
+    <router-view v-slot="{ Component, route }">
+      <Transition name="admin-page" mode="out-in">
+        <component :is="Component" :key="route.path" />
+      </Transition>
+    </router-view>
   </div>
 </template>
 
@@ -78,6 +82,16 @@ body {
   margin: 0;
   padding: 0;
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+}
+
+/* 极简高级风：admin 路由切换 120ms fade，不打扰运营任务流 */
+.admin-page-enter-active,
+.admin-page-leave-active {
+  transition: opacity 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.admin-page-enter-from,
+.admin-page-leave-to {
+  opacity: 0;
 }
 
 /* 按钮图标与文案间距见 styles/admin-ui-overrides.css（main.js 末尾引入，保证覆盖 EP） */

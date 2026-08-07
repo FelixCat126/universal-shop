@@ -8,7 +8,7 @@
     </div>
 
     <!-- 登录卡片 -->
-    <el-card class="login-card" shadow="always">
+    <el-card class="login-card admin-login-card" shadow="always">
       <!-- 语言切换 -->
       <div class="language-switch">
         <el-select 
@@ -200,6 +200,15 @@ const changeLanguage = (lang) => {
   position: relative;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   overflow: hidden;
+}
+
+/* 极简高级风：登录卡片入场（克制、不打扰） */
+@keyframes admin-login-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.admin-login-card {
+  animation: admin-login-in 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* 背景装饰 */

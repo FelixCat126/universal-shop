@@ -38,7 +38,21 @@ export default {
     or: 'or',
     free: 'Free',
     unit: 'item',
-    selectCountry: 'Select Country'
+    selectCountry: 'Select Country',
+    /* 与 zh-CN 对齐：补齐之前缺失的 key */
+    error: 'Error',
+    success: 'Success',
+    clear: 'Clear',
+    home: 'Home',
+    more: 'More',
+    language: 'Language',
+    chinese: '中文',
+    thai: 'ไทย',
+    english: 'English',
+    quantity: 'Quantity',
+    remove: 'Remove',
+    summary: 'Summary',
+    submitting: 'Submitting...'
   },
 
   // 导航
@@ -71,6 +85,9 @@ export default {
     registerSuccess: 'Registration successful',
     registerFailed: 'Registration failed',
     logoutSuccess: 'Logout successful',
+    /* 与 zh-CN 对齐 */
+    oldPassword: 'Current password',
+    newPassword: 'New password',
     profileUpdated: 'Profile updated successfully',
     nicknamePlaceholder: 'Please enter nickname',
     emailPlaceholder: 'Please enter email address',
@@ -193,6 +210,11 @@ export default {
     addToCart: 'Add to Cart',
     addSuccess: 'Added to cart',
     addFailed: 'Add failed',
+    /* 与 zh-CN 对齐 */
+    item: 'Item',
+    added: 'Added to cart',
+    updated: 'Cart updated',
+    removed: 'Item removed',
     updateSuccess: 'Cart updated',
     updateFailed: 'Update failed',
     removeSuccess: 'Item removed',
@@ -364,6 +386,12 @@ export default {
     contactPhoneRequired: 'Please enter contact phone',
     countryRequired: 'Please select a country',
     provinceRequired: 'Please enter province',
+    /* 与 zh-CN 对齐 */
+    phone: 'Please enter a valid phone number',
+    password: 'Please meet the password complexity requirements below',
+    username: 'Username must be 3-20 characters',
+    minLength: 'Must be at least {min} characters',
+    maxLength: 'Must not exceed {max} characters',
     cityRequired: 'Please enter city',
     districtRequired: 'Please enter district',
     detailAddressRequired: 'Please enter detailed address',
@@ -486,7 +514,9 @@ export default {
     orders: 'My Orders',
     orderDetail: 'Order Details',
     login: 'Login',
-    register: 'Register'
+    register: 'Register',
+    /* 与 zh-CN 对齐 */
+    notFound: 'Page Not Found'
   },
 
   // 成功消息

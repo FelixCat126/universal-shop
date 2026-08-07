@@ -55,4 +55,36 @@ describe('VU.utils.exchangeRatesDisplay', () => {
     expect(PORTAL_CURRENCIES.length).toBeGreaterThanOrEqual(4)
     expect(FX_DISPLAY_ORDER.map((x) => x.key)).toEqual(['USD', 'CNY', 'MYR'])
   })
+
+  it('FX-6 convertedAmountLines 按 FX_DISPLAY_ORDER 排序', () => {
+    const lines = convertedAmountLines(100, { USD: '0.03', CNY: '0.20', MYR: '0.13' })
+    expect(lines.map((x) => x.key)).toEqual(['USD', 'CNY', 'MYR'])
+  })
+
+  it('FX-7 convertThbToCurrency 边界（字符串 / NaN / 负数）', () => {
+    expect(convertThbToCurrency('100', 'USD', { USD: '0.03' })).toBe(3)
+    expect(convertThbToCurrency('abc', 'USD', { USD: '0.03' })).toBe(0)
+    expect(convertThbToCurrency(100, 'USD', { USD: '-0.01' })).toBe(0)
+    expect(convertThbToCurrency(100, 'USD', { USD: 'abc' })).toBe(0)
+  })
+
+  it('FX-8 formatConvertedMoney THB 直接显示', () => {
+    expect(formatConvertedMoney(99.99, 'THB', {})).toBe('฿99.99')
+    expect(formatConvertedMoney(0, 'THB', {})).toBe('฿0.00')
+  })
+
+  it('FX-9 formatConvertedMoney 汇率为 0 回退 THB', () => {
+    expect(formatConvertedMoney(100, 'USD', { USD: '0' })).toBe('฿100.00')
+    expect(formatConvertedMoney(100, 'USD', {})).toBe('฿100.00')
+    expect(formatConvertedMoney(100, 'USD', null)).toBe('฿100.00')
+  })
+
+  it('FX-10 formatConvertedMoney 非法 currencyCode 兜底', () => {
+    // 修复后：未知币种 code 时回退 THB（带 ฿ 前缀）
+    expect(formatConvertedMoney(100, 'XXX', { XXX: '0.5' })).toBe('฿100.00')
+  })
+
+  it('FX-11 formatConvertedMoney 大数', () => {
+    expect(formatConvertedMoney(1234567.89, 'USD', { USD: '0.03' })).toBe('$37037.04')
+  })
 })

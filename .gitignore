@@ -44,6 +44,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# AI 工具本地工作目录（plan mode 临时产物等）
+.zcode/
+
 # Uploads
 public/uploads/*
 !public/uploads/.gitkeep

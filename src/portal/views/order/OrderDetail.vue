@@ -19,9 +19,16 @@
       </div>
     </header>
 
-    <!-- 加载状态 -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <!-- 加载状态：骨架屏 -->
+    <div v-if="loading" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">
+      <div class="sk-kpi" />
+      <div class="sk-list-item">
+        <div class="sk-avatar" />
+        <div class="sk-body">
+          <div class="sk-line sk-line-lg w-3/4" />
+          <div class="sk-line" />
+        </div>
+      </div>
     </div>
 
     <!-- 错误状态 -->
@@ -38,7 +45,7 @@
     </div>
 
     <!-- 订单详情内容 -->
-    <div v-else-if="order" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+    <div v-else-if="order" class="ui-slide-up max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
       <!-- 订单状态卡片 -->
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
         <div class="flex items-center justify-between mb-4">

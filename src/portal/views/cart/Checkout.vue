@@ -19,13 +19,19 @@
       </div>
     </header>
 
-    <!-- 加载状态 -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <!-- 加载状态：骨架屏 -->
+    <div v-if="loading" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">
+      <div class="sk-list-item" v-for="i in 2" :key="i">
+        <div class="sk-avatar" />
+        <div class="sk-body">
+          <div class="sk-line sk-line-lg w-3/4" />
+          <div class="sk-line" />
+        </div>
+      </div>
     </div>
 
     <!-- 订单确认内容 -->
-    <div v-else class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+    <div v-else class="ui-slide-up max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
       <div class="lg:grid lg:grid-cols-12 lg:gap-x-12">
         <!-- 主要内容区域 -->
         <div class="lg:col-span-8">

@@ -27,15 +27,22 @@
       </div>
     </header>
 
-    <!-- 加载状态 -->
-    <div v-if="cartStore.isLoading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <!-- 加载状态：骨架屏 -->
+    <div v-if="cartStore.isLoading" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4">
+      <div class="sk-list-item" v-for="i in 3" :key="i">
+        <div class="sk-avatar" />
+        <div class="sk-body">
+          <div class="sk-line sk-line-lg w-3/4" />
+          <div class="sk-line" />
+          <div class="sk-line sk-line-sm w-1/2" />
+        </div>
+      </div>
     </div>
 
     <!-- 购物车内容 -->
     <div v-else class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
       <!-- 空购物车状态 -->
-      <div v-if="cartStore.isEmpty" class="text-center py-8 sm:py-12">
+      <div v-if="cartStore.isEmpty" class="ui-slide-up text-center py-8 sm:py-12">
         <div class="mx-auto h-24 w-24 text-gray-400 mb-4">
           <ShoppingCartIcon class="h-full w-full" />
         </div>
@@ -45,9 +52,9 @@
         <p class="text-gray-500 mb-6">
           {{ t('cart.emptyDesc') }}
         </p>
-        <router-link 
+        <router-link
           :to="{ name: 'Home' }"
-          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors ui-hover-lift"
         >
           {{ t('cart.continue') }}
         </router-link>
@@ -539,16 +546,25 @@ onMounted(async () => {
 }
 
 .cart-item-enter-active, .cart-item-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 240ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 240ms cubic-bezier(0.34, 1.4, 0.64, 1); /* spring 感 */
 }
 
-.cart-item-enter-from, .cart-item-leave-to {
+.cart-item-enter-from {
   opacity: 0;
-  transform: translateX(-30px);
+  transform: translateY(-12px) scale(0.98);
+}
+.cart-item-leave-to {
+  opacity: 0;
+  transform: translateX(-24px) scale(0.96);
+}
+.cart-item-leave-active {
+  position: absolute;
+  width: 100%;
 }
 
 .cart-item-move {
-  transition: transform 0.3s ease;
+  transition: transform 240ms cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .line-clamp-2 {

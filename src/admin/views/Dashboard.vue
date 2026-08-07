@@ -10,9 +10,11 @@
     <div class="stats-section">
       <el-row :gutter="20">
         <el-col :span="6">
-          <el-card class="stats-card" shadow="hover">
+          <el-card class="stats-card admin-stagger" shadow="hover" :style="{ '--ui-stagger-index': 0 }">
             <div class="stats-content">
-              <div class="stats-value">{{ overviewStats.totalOrders || 0 }}</div>
+              <div class="stats-value">
+                <CountUp :value="overviewStats.totalOrders || 0" />
+              </div>
               <div class="stats-label">{{ t('dashboard.totalOrders') }}</div>
             </div>
             <div class="stats-icon">
@@ -21,7 +23,7 @@
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card" shadow="hover">
+          <el-card class="stats-card admin-stagger" shadow="hover" :style="{ '--ui-stagger-index': 1 }">
             <div class="stats-content">
               <div class="stats-value">{{ t('common.currency') }}{{ overviewStats.totalAmount || '0.00' }}</div>
               <div class="stats-label">{{ t('dashboard.totalAmount') }}</div>
@@ -32,9 +34,11 @@
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card" shadow="hover">
+          <el-card class="stats-card admin-stagger" shadow="hover" :style="{ '--ui-stagger-index': 2 }">
             <div class="stats-content">
-              <div class="stats-value">{{ overviewStats.totalUsers || 0 }}</div>
+              <div class="stats-value">
+                <CountUp :value="overviewStats.totalUsers || 0" />
+              </div>
               <div class="stats-label">{{ t('dashboard.totalUsers') }}</div>
             </div>
             <div class="stats-icon">
@@ -43,9 +47,11 @@
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card" shadow="hover">
+          <el-card class="stats-card admin-stagger" shadow="hover" :style="{ '--ui-stagger-index': 3 }">
             <div class="stats-content">
-              <div class="stats-value">{{ overviewStats.activeUsers || 0 }}</div>
+              <div class="stats-value">
+                <CountUp :value="overviewStats.activeUsers || 0" />
+              </div>
               <div class="stats-label">{{ t('dashboard.activeUsers') }}</div>
             </div>
             <div class="stats-icon">
@@ -110,6 +116,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { TrendCharts, Coin, User, UserFilled, Refresh } from '@element-plus/icons-vue'
+import CountUp from '../components/CountUp.vue'
 
 // 国际化
 const { t } = useI18n()
@@ -297,11 +304,25 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+/* 极简高级风：stagger 入场（克制感） */
+@keyframes admin-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.admin-stagger {
+  animation: admin-slide-up 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--ui-stagger-index, 0) * 60ms);
+}
+
 .stats-card {
   position: relative;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
   height: 120px;
+}
+.stats-card:hover {
+  transform: translateY(-2px);
 }
 
 .stats-card:hover {

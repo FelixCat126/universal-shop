@@ -3,6 +3,11 @@ import i18n from '../i18n'
 
 const router = createRouter({
   history: createWebHistory('/portal/'),  // 修复：添加base路径
+  /* 路由切换时回到顶部；从二级页返回时保持滚动位置 */
+  scrollBehavior (to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0, behavior: 'smooth' }
+  },
   routes: [
     {
       path: '/',

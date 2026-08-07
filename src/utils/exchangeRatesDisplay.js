@@ -81,6 +81,8 @@ export function formatConvertedMoney (thbAmount, currencyCode, rates) {
   /** 底价非 0 但所选外币汇率缺失或为 0 时仍按泰铢标价展示，避免出现 ¥0.00/$0 */
   const asThb = () => `${symbolForCurrencyCode('THB')}${thbNum.toFixed(2)}`
   if (code === 'THB') return asThb()
+  /** 未识别的币种 code（如 XXX）也回退 THB，避免无符号裸金额 */
+  if (!symbolForCurrencyCode(code)) return asThb()
   let rateNum = 0
   const raw = rates?.[code]
   if (raw != null && raw !== '') {

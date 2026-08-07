@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-50 p-4 sm:p-8">
-    <div class="max-w-6xl mx-auto">
+    <div class="ui-slide-up max-w-6xl mx-auto">
       <!-- 返回按钮 -->
       <div class="mb-6">
         <button 

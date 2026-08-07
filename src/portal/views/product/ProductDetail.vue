@@ -31,26 +31,37 @@
       </div>
     </header>
 
-    <!-- 加载状态 -->
-    <div v-if="isLoading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <!-- 加载状态：骨架屏替代 spinner -->
+    <div v-if="isLoading" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <SkeletonDetail />
     </div>
 
-    <!-- 产品详情内容 -->
-    <div v-else-if="product" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- 产品详情内容（spring 入场） -->
+    <div
+      v-else-if="product"
+      v-motion
+      :initial="{ opacity: 0, y: 12 }"
+      :enter="{ opacity: 1, y: 0, transition: softSpring }"
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+    >
       <div class="lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
         <!-- 产品图片区域 -->
         <div class="flex flex-col-reverse">
-          <!-- 主图片 -->
-          <div class="aspect-w-1 aspect-h-1 w-full">
-            <img
+          <!-- 主图片（点击进 modal + fade-in；hover 弹簧缩放） -->
+          <div
+            class="aspect-w-1 aspect-h-1 w-full cursor-zoom-in"
+            v-motion
+            :hovered="{ scale: 1.02, transition: subtleSpring }"
+            @click="showImageModal = true"
+          >
+            <ImageFade
               :src="product.image_url || defaultImage"
               :alt="getCurrentLanguageValue(product, 'name')"
-              class="w-full h-96 object-cover rounded-lg cursor-pointer"
-              @click="showImageModal = true"
+              custom-class="w-full h-96 object-cover rounded-lg"
+              loading="eager"
               @error="handleImageError"
               @load="handleImageLoad"
-            >
+            />
           </div>
         </div>
 
@@ -130,22 +141,22 @@
               </div>
             </div>
 
-            <!-- 操作按钮 -->
+            <!-- 操作按钮（加 ripple + pop） -->
             <div class="flex space-x-4">
               <button
                 @click="handleAddToCart"
                 :disabled="addingToCart"
-                class="flex-1 bg-blue-600 border border-transparent rounded-md py-3 px-8 flex items-center justify-center text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="ui-btn-ripple flex-1 bg-blue-600 border border-transparent rounded-md py-3 px-8 flex items-center justify-center text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ShoppingCartIcon v-if="!addingToCart" class="h-5 w-5 mr-2" />
                 <div v-else class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 {{ addingToCart ? t('product.addingToCart') : t('product.addToCart') }}
               </button>
-              
+
               <button
                 @click="handleBuyNow"
                 :disabled="buyingNow"
-                class="flex-1 bg-orange-600 border border-transparent rounded-md py-3 px-8 flex items-center justify-center text-base font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="ui-btn-ripple flex-1 bg-orange-600 border border-transparent rounded-md py-3 px-8 flex items-center justify-center text-base font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <div v-if="buyingNow" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 {{ buyingNow ? t('product.processing') : t('product.buyNow') }}
@@ -175,35 +186,37 @@
       </router-link>
     </div>
 
-    <!-- 图片预览模态框 -->
-    <div 
-      v-if="showImageModal" 
-      class="fixed inset-0 z-50 overflow-y-auto"
-      @click="showImageModal = false"
-    >
-      <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 bg-black bg-opacity-75 transition-opacity"></div>
-        
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
-          <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <img
-              :src="product.image_url || defaultImage"
-              :alt="getCurrentLanguageValue(product, 'name')"
-              class="w-full h-auto"
-              @error="handleImageError"
-            >
-          </div>
-          <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-            <button
-              @click="showImageModal = false"
-              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-gray-600 text-base font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:ml-3 sm:w-auto sm:text-sm"
-            >
-              {{ t('product.close') }}
-            </button>
+    <!-- 图片预览模态框（极简高级感：缩放 + 模糊背景） -->
+    <Transition name="modal">
+      <div
+        v-if="showImageModal"
+        class="fixed inset-0 z-50 overflow-y-auto"
+        @click="showImageModal = false"
+      >
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div class="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true"></div>
+
+          <div class="modal-panel inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <img
+                :src="product.image_url || defaultImage"
+                :alt="getCurrentLanguageValue(product, 'name')"
+                class="w-full h-auto rounded-lg"
+                @error="handleImageError"
+              >
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button
+                @click="showImageModal = false"
+                class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-gray-900 text-base font-medium text-white hover:bg-gray-700 transition-colors sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                {{ t('product.close') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- 消息提示 -->
     <Transition name="fade">
@@ -233,6 +246,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import config from '../../../config/index.js'
 import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
+import SkeletonDetail from '../../components/ui/SkeletonDetail.vue'
+import ImageFade from '../../components/ui/ImageFade.vue'
+import { softSpring, subtleSpring } from '../../composables/useSpring.js'
 
 const portalCurrency = usePortalCurrencyStore()
 

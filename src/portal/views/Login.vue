@@ -1,9 +1,9 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
     <!-- 头部 -->
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
+    <div class="ui-slide-up sm:mx-auto sm:w-full sm:max-w-md">
       <div class="flex justify-center">
-        <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
+        <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center ui-scale-in shadow-md">
           <UserIcon class="w-8 h-8 text-white" />
         </div>
       </div>
@@ -11,16 +11,16 @@
         {{ t('user.login') }}
       </h2>
       <p class="mt-2 text-center text-sm text-gray-600">
-        {{ t('user.noAccount') }} 
-        <router-link to="/register" class="font-medium text-blue-600 hover:text-blue-500">
+        {{ t('user.noAccount') }}
+        <router-link to="/register" class="font-medium text-blue-600 hover:text-blue-500 transition-colors">
           {{ t('user.goToRegister') }}
         </router-link>
       </p>
     </div>
 
     <!-- 登录表单 -->
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-      <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md ui-slide-up" style="--ui-delay: 80ms">
+      <div class="bg-white py-8 px-4 shadow-md sm:rounded-lg sm:px-10">
         <form class="space-y-6" @submit.prevent="handleLogin">
           <!-- 手机号登录 -->
           <div>
@@ -43,7 +43,7 @@
                   required
                   autocomplete="tel"
                   :maxlength="currentCountry?.phoneLength || 11"
-                  class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  class="ui-input-focus block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none"
                   :class="{ 'border-red-500': errors.phone }"
                   :placeholder="t('user.phoneInputPlaceholder', { length: currentCountry?.phoneLength || 11 })"
                 />
@@ -64,17 +64,17 @@
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="current-password"
                 required
-                class="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                class="ui-input-focus appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none sm:text-sm"
                 :class="{ 'border-red-500': errors.password }"
                 :placeholder="t('user.passwordPlaceholder')"
               />
               <button
                 type="button"
                 @click="showPassword = !showPassword"
-                class="absolute inset-y-0 right-0 pr-3 flex items-center"
+                class="absolute inset-y-0 right-0 pr-3 flex items-center transition-opacity hover:opacity-70"
               >
-                <EyeIcon v-if="!showPassword" class="h-5 w-5 text-gray-400 hover:text-gray-500" />
-                <EyeSlashIcon v-else class="h-5 w-5 text-gray-400 hover:text-gray-500" />
+                <EyeIcon v-if="!showPassword" class="h-5 w-5 text-gray-400" />
+                <EyeSlashIcon v-else class="h-5 w-5 text-gray-400" />
               </button>
             </div>
             <p v-if="errors.password" class="mt-2 text-sm text-red-600">
@@ -111,7 +111,7 @@
             <button
               type="submit"
               :disabled="isLoading"
-              class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="ui-btn-ripple w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <div v-if="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
               {{ isLoading ? t('common.loading') : t('user.login') }}

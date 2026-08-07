@@ -90,6 +90,12 @@ export const errorHandler = (err, req, res, next) => {
     return sendErrorResponse(res, 400, '文件数量超出限制', 'TOO_MANY_FILES')
   }
 
+  // 请求体超 express.json 限制（默认 100kb / 项目 1mb）
+  // body-parser 抛 err.type === 'entity.too.large' + err.status === 413
+  if (err.type === 'entity.too.large' || err.status === 413) {
+    return sendErrorResponse(res, 413, '请求体过大', 'PAYLOAD_TOO_LARGE')
+  }
+
   // 语法错误（通常是请求体解析错误）
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return sendErrorResponse(res, 400, '请求数据格式错误', 'INVALID_JSON')
