@@ -38,6 +38,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getPhoneLengthRange } from '../utils/phoneValidation.js'
 
 // 国际化
 const { t } = useI18n()
@@ -77,25 +78,25 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['update:modelValue', 'country-change'])
 
-// 国家数据 - 使用国际化
+// 国家数据 - 使用国际化（phoneLength 取各国长度范围的最大值，供输入框 maxlength 使用）
 const countries = computed(() => [
   {
     code: '+66',
     name: t('country.thailand'),
     flag: '🇹🇭',
-    phoneLength: 9
+    phoneLength: getPhoneLengthRange('+66').max
   },
   {
     code: '+86',
     name: t('country.china'),
     flag: '🇨🇳',
-    phoneLength: 11
+    phoneLength: getPhoneLengthRange('+86').max
   },
   {
     code: '+60',
     name: t('country.malaysia'),
     flag: '🇲🇾',
-    phoneLength: 11
+    phoneLength: getPhoneLengthRange('+60').max
   }
 ])
 
@@ -129,8 +130,9 @@ defineExpose({
   selectedCountry,
   getCountryByCode: (code) => countries.value.find(c => c.code === code),
   validatePhoneLength: (phone, countryCode) => {
-    const country = countries.value.find(c => c.code === countryCode)
-    return country ? phone.length === country.phoneLength : false
+    const range = getPhoneLengthRange(countryCode)
+    if (!range) return false
+    return phone.length >= range.min && phone.length <= range.max
   }
 })
 </script>

@@ -28,6 +28,18 @@ export default {
     hintPwd: 'Toggle password visibility',
     forgotHint: 'Forgot password? Contact your administrator.'
   },
+  captcha: {
+    title: 'Security check',
+    slideTip: 'Drag the slider to fit the puzzle piece into the gap',
+    success: 'Verified',
+    failed: 'Verification failed, please try again',
+    loading: 'Loading captcha…',
+    loadFailed: 'Failed to load captcha, tap to retry'
+  },
+  notFound: {
+    title: 'Page not found or removed',
+    backHome: 'Back to home'
+  },
   shop: {
     title: 'Catalog',
     search: 'Search product name',
@@ -151,8 +163,8 @@ export default {
     unsupportedCountryCode: 'Unsupported country code',
     phoneDigitsOnly: 'Phone number digits only',
     phonePatternChina: 'China mobile: starts with 1, second digit 3–9',
-    phonePatternThailand: 'Thailand mobile: first digit 2–9',
-    phonePatternMalaysia: 'Malaysia mobile: starts with 1',
+    phonePatternThailand: 'Thailand mobile: 9-10 digits, first digit 6, 8 or 9',
+    phonePatternMalaysia: 'Malaysia mobile: 9-10 digits, starts with 1',
     phoneInvalidFormat: 'Invalid phone format'
   },
   address: {

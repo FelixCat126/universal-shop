@@ -2,7 +2,7 @@
 export const CURRENCY_I18N_LOCALES = ['zh-CN', 'en-US', 'th-TH']
 
 /** 数据库存储的货币代码（与 config_key currency_unit 的值一致） */
-export const CURRENCY_CODES = ['THB', 'USD', 'CNY']
+export const CURRENCY_CODES = ['THB', 'USD', 'CNY', 'MYR']
 
 /**
  * 金额前缀仅用符号；currencyName 为当前语言「名称 + 空格 + 符号」
@@ -12,17 +12,20 @@ const DISPLAY_BY_LOCALE = {
   'zh-CN': {
     THB: { currency: '฿', currencyName: '泰铢 ฿' },
     USD: { currency: '$', currencyName: '美元 $' },
-    CNY: { currency: '¥', currencyName: '人民币 ¥' }
+    CNY: { currency: '¥', currencyName: '人民币 ¥' },
+    MYR: { currency: 'RM', currencyName: '马来西亚令吉 RM' }
   },
   'en-US': {
     THB: { currency: '฿', currencyName: 'Thai Baht ฿' },
     USD: { currency: '$', currencyName: 'US Dollar $' },
-    CNY: { currency: '¥', currencyName: 'Chinese Yuan ¥' }
+    CNY: { currency: '¥', currencyName: 'Chinese Yuan ¥' },
+    MYR: { currency: 'RM', currencyName: 'Malaysian Ringgit RM' }
   },
   'th-TH': {
     THB: { currency: '฿', currencyName: 'บาทไทย ฿' },
     USD: { currency: '$', currencyName: 'ดอลลาร์สหรัฐ $' },
-    CNY: { currency: '¥', currencyName: 'หยวนจีน ¥' }
+    CNY: { currency: '¥', currencyName: 'หยวนจีน ¥' },
+    MYR: { currency: 'RM', currencyName: 'ริงกิตมาเลเซีย RM' }
   }
 }
 
@@ -39,6 +42,7 @@ export function normalizeCurrencyCode (raw) {
   const u = s.toUpperCase()
   if (CURRENCY_CODES.includes(u)) return u
   if (s === '¥' || u === 'RMB' || s === '元' || u === '人民币') return 'CNY'
+  if (s === 'RM' || u === 'RINGGIT') return 'MYR'
   if (s === '$' || s === '＄' || u === 'US$' || u === 'DOLLAR') return 'USD'
   if (s === '฿' || u === 'BAHT') return 'THB'
   return 'THB'

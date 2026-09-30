@@ -71,10 +71,10 @@ api.interceptors.response.use(
         localStorage.removeItem('token')
         localStorage.removeItem('user')
         
-        // 如果不是登录或注册页面，则跳转到登录页
+        // 如果不是登录或注册页面，则跳转到登录页（带应用 base，生产为 /portal/）
         if (!window.location.pathname.includes('/login') && 
             !window.location.pathname.includes('/register')) {
-          window.location.href = '/login'
+          window.location.href = `${import.meta.env.BASE_URL || '/'}login`
         }
         
         console.error('登录已过期，请重新登录')

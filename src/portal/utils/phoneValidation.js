@@ -1,23 +1,49 @@
 // 国家配置信息
+// phoneLength 为 [最小长度, 最大长度]，与后端 userController 的校验规则保持一致
 export const COUNTRIES = {
   '+86': {
     name: 'china',
     flag: '🇨🇳',
-    phoneLength: 11,
+    phoneLength: [11, 11],
     pattern: /^1[3-9]\d{9}$/
   },
   '+66': {
     name: 'thailand', 
     flag: '🇹🇭',
-    phoneLength: 9,
-    pattern: /^[2-9]\d{8}$/
+    phoneLength: [9, 10],
+    pattern: /^[689]\d{8,9}$/
   },
   '+60': {
     name: 'malaysia',
     flag: '🇲🇾', 
-    phoneLength: 11,
-    pattern: /^1[0-9]\d{8,9}$/
+    phoneLength: [9, 10],
+    pattern: /^1\d{8,9}$/
   }
+}
+
+/**
+ * 获取国家手机号长度范围
+ * @param {string} countryCode - 国家区号
+ * @returns {Object|null} { min, max }，不支持的区号返回 null
+ */
+export function getPhoneLengthRange(countryCode) {
+  const country = COUNTRIES[countryCode]
+  if (!country) return null
+  const [min, max] = Array.isArray(country.phoneLength)
+    ? country.phoneLength
+    : [country.phoneLength, country.phoneLength]
+  return { min, max }
+}
+
+/**
+ * 获取手机号长度的展示文案（如 '11' 或 '9-10'）
+ * @param {string} countryCode - 国家区号
+ * @returns {string} 长度文案
+ */
+export function getPhoneLengthText(countryCode) {
+  const range = getPhoneLengthRange(countryCode)
+  if (!range) return ''
+  return range.min === range.max ? String(range.min) : `${range.min}-${range.max}`
 }
 
 /**
@@ -56,13 +82,14 @@ export function validatePhoneI18n(phone, countryCode, t) {
     }
   }
 
-  // 长度验证
-  if (cleanPhone.length !== country.phoneLength) {
+  // 长度验证（范围校验）
+  const { min, max } = getPhoneLengthRange(countryCode)
+  if (cleanPhone.length < min || cleanPhone.length > max) {
     return {
       isValid: false,
       message: t('user.phoneRequirement', { 
         country: t(`country.${country.name}`), 
-        length: country.phoneLength 
+        length: getPhoneLengthText(countryCode) 
       })
     }
   }
@@ -130,11 +157,12 @@ export function validatePhone(phone, countryCode) {
     }
   }
 
-  // 长度验证
-  if (cleanPhone.length !== country.phoneLength) {
+  // 长度验证（范围校验）
+  const range = getPhoneLengthRange(countryCode)
+  if (cleanPhone.length < range.min || cleanPhone.length > range.max) {
     return {
       isValid: false,
-      message: `${country.name}手机号必须为${country.phoneLength}位数字`
+      message: `${country.name}手机号必须为${getPhoneLengthText(countryCode)}位数字`
     }
   }
 
@@ -146,10 +174,10 @@ export function validatePhone(phone, countryCode) {
         message = '中国手机号必须以1开头，第二位为3-9'
         break
       case '+66':
-        message = '泰国手机号必须以2-9开头'
+        message = '泰国手机号必须为9-10位数字，以6、8或9开头'
         break
       case '+60':
-        message = '马来西亚手机号必须以1开头'
+        message = '马来西亚手机号必须为9-10位数字，以1开头'
         break
       default:
         message = '手机号格式不正确'

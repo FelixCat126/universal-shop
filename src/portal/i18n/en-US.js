@@ -226,6 +226,8 @@ export default {
     backToCart: 'Back to Cart',
     emptyCannotSubmit: 'Cart is empty, cannot submit order',
     stockIssue: 'Some items are out of stock',
+    productUnavailable: 'Item unavailable',
+    productUnavailableDesc: 'This product has been removed. Please remove it before checkout.',
     confirmClearMessage: 'Are you sure you want to clear all items from your cart?',
     confirmClear: 'Clear All',
     clearing: 'Clearing...',
@@ -405,8 +407,8 @@ export default {
     confirmPasswordRequired: 'Please confirm password',
     email: 'Please enter a valid email address',
     phonePatternChina: 'China mobile number must start with 1, second digit 3-9',
-    phonePatternThailand: 'Thailand mobile number must start with 2-9',
-    phonePatternMalaysia: 'Malaysia mobile number must start with 1',
+    phonePatternThailand: 'Thailand mobile number must be 9-10 digits and start with 6, 8 or 9',
+    phonePatternMalaysia: 'Malaysia mobile number must be 9-10 digits and start with 1',
     phoneEmptyFields: 'Phone number and country code cannot be empty',
     unsupportedCountryCode: 'Unsupported country code',
     phoneDigitsOnly: 'Phone number can only contain digits',
@@ -475,6 +477,8 @@ export default {
     pointTxBalanceAfter: 'Balance after',
     pointTypeEarn: 'Earned from purchase',
     pointTypeRedeem: 'Redeemed for order',
+    pointTypeRefund: 'Refunded on cancellation',
+    pointTypeRevoke: 'Revoked on cancellation',
     noPointTransactions: 'No ledger entries for the selected dates',
     loadPointsLedgerFailed: 'Could not load points ledger',
     changePassword: 'Change password',
@@ -501,6 +505,15 @@ export default {
     unknown: 'Unknown error',
     tryLater: 'Please try again later',
     loadFailed: 'Loading failed'
+  },
+
+  // 滑块验证码
+  captcha: {
+    title: 'Security verification',
+    slideTip: 'Drag the slider to fit the puzzle piece into the gap',
+    success: 'Verified',
+    failed: 'Verification failed, please try again',
+    loading: 'Loading'
   },
 
   // 页面标题

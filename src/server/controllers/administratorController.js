@@ -6,6 +6,7 @@ import AuditLog from '../models/AuditLog.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { logger } from '../utils/logger.js'
+import { resolvePagination } from '../utils/pagination.js'
 
 class AdministratorController {
   // 管理员登录
@@ -113,8 +114,9 @@ class AdministratorController {
   // 获取所有管理员
   static async getAllAdministrators(req, res) {
     try {
-      const { page = 1, limit = 20, role, keyword } = req.query
-      const offset = (page - 1) * limit
+      const { role, keyword } = req.query
+      // 该端点分页参数名为 limit：统一 clamp（下限 1、上限 200 兼容管理端全量拉取、非法回退默认）
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { pageSizeKey: 'limit', defaultPageSize: 20, maxPageSize: 200 })
 
       const where = {}
       if (role) {
@@ -130,7 +132,7 @@ class AdministratorController {
 
       const { count, rows } = await Administrator.findAndCountAll({
         where,
-        limit: parseInt(limit),
+        limit,
         offset,
         order: [['created_at', 'DESC']],
         attributes: { exclude: ['password'] }
@@ -141,8 +143,8 @@ class AdministratorController {
         data: {
           administrators: rows,
           total: count,
-          page: parseInt(page),
-          totalPages: Math.ceil(count / limit)
+          page,
+          totalPages: Math.ceil(count / pageSize)
         }
       })
     } catch (error) {
@@ -205,19 +207,7 @@ class AdministratorController {
         created_by: currentAdmin.id
       })
 
-      // 记录操作日志
-      await OperationLog.logOperation({
-        adminId: currentAdmin.id,
-        adminUsername: currentAdmin.username,
-        action: 'create_administrator',
-        resource: 'administrator',
-        resourceId: newAdmin.id,
-        description: `创建管理员: ${username} (${role || 'operator'})`,
-        newData: newAdmin.toSafeJSON(),
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      })
-
+      // 操作日志由路由层 logOperation 中间件统一记录（响应 data 即 newData，含 id 作为 resourceId）
       res.status(201).json({
         success: true,
         message: '管理员创建成功',
@@ -305,24 +295,12 @@ class AdministratorController {
 
       await admin.save()
 
-      // 记录操作日志
-      await OperationLog.logOperation({
-        adminId: currentAdmin.id,
-        adminUsername: currentAdmin.username,
-        action: 'update_administrator',
-        resource: 'administrator',
-        resourceId: admin.id,
-        description: `更新管理员: ${admin.username}`,
-        oldData,
-        newData: admin.toSafeJSON(),
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      })
-
+      // 操作日志由路由层 logOperation 中间件统一记录；
+      // 中间件固定以响应 data 作为 newData，故把变更前快照挂到 data.old_data 传递，避免审计信息丢失
       res.json({
         success: true,
         message: '管理员更新成功',
-        data: admin.toSafeJSON()
+        data: { ...admin.toSafeJSON(), old_data: oldData }
       })
     } catch (error) {
       logger.error('更新管理员失败', { err: error?.message, stack: error?.stack })
@@ -367,22 +345,12 @@ class AdministratorController {
       const oldData = admin.toSafeJSON()
       await admin.destroy()
 
-      // 记录操作日志
-      await OperationLog.logOperation({
-        adminId: currentAdmin.id,
-        adminUsername: currentAdmin.username,
-        action: 'delete_administrator',
-        resource: 'administrator',
-        resourceId: admin.id,
-        description: `删除管理员: ${admin.username}`,
-        oldData,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      })
-
+      // 操作日志由路由层 logOperation 中间件统一记录；
+      // 中间件固定以响应 data 作为 newData，故把已删除管理员的快照经响应体传递给中间件存档
       res.json({
         success: true,
-        message: '管理员删除成功'
+        message: '管理员删除成功',
+        data: oldData
       })
     } catch (error) {
       logger.error('删除管理员失败', { err: error?.message, stack: error?.stack })
@@ -427,21 +395,12 @@ class AdministratorController {
       admin.password = password
       await admin.save()
 
-      // 记录操作日志
-      await OperationLog.logOperation({
-        adminId: currentAdmin.id,
-        adminUsername: currentAdmin.username,
-        action: 'reset_password',
-        resource: 'administrator',
-        resourceId: admin.id,
-        description: `重置管理员密码: ${admin.username}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      })
-
+      // 操作日志由路由层 logOperation 中间件统一记录；
+      // 经响应体把操作对象（不含密码）传给中间件，保证 resourceId/用户名不丢失
       res.json({
         success: true,
-        message: '密码重置成功'
+        message: '密码重置成功',
+        data: { id: admin.id, username: admin.username }
       })
     } catch (error) {
       logger.error('重置密码失败', { err: error?.message, stack: error?.stack })
@@ -456,8 +415,9 @@ class AdministratorController {
   // 获取操作日志
   static async getOperationLogs(req, res) {
     try {
-      const { page = 1, limit = 50, admin_id, action, resource, start_date, end_date } = req.query
-      const offset = (page - 1) * limit
+      const { admin_id, action, resource, start_date, end_date } = req.query
+      // 该端点分页参数名为 limit：统一 clamp（下限 1、上限 100、非法回退默认）
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { pageSizeKey: 'limit', defaultPageSize: 50 })
 
       const where = {}
       if (admin_id) where.admin_id = admin_id
@@ -471,7 +431,7 @@ class AdministratorController {
 
       const { count, rows } = await OperationLog.findAndCountAll({
         where,
-        limit: parseInt(limit),
+        limit,
         offset,
         order: [['created_at', 'DESC']]
       })
@@ -481,8 +441,8 @@ class AdministratorController {
         data: {
           logs: rows,
           total: count,
-          page: parseInt(page),
-          totalPages: Math.ceil(count / limit)
+          page,
+          totalPages: Math.ceil(count / pageSize)
         }
       })
     } catch (error) {

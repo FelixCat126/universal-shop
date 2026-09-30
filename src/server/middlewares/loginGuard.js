@@ -8,6 +8,11 @@ import { verifyCaptcha } from '../utils/captcha.js'
  * - 本中间件挡住"低速密码爆破"：同一 IP+identity 连续失败 N 次以后必须带正确验证码
  * - 仅内存计数（适合单实例 / 入门规模），多实例需要换 Redis
  *
+ * 设计取舍：登录成功只清精确键 ip::identity，不清松散键 ip::*——
+ * 否则攻击者用"自己的账号登录成功"即可清零同 IP 下他人身份的失败计数，
+ * 绕过验证码锁定。松散键按 TTL 自然过期；代价是共享出口（NAT）下的
+ * 合法用户在 TTL 内可能仍需验证码，属可接受范围。
+ *
  * 接入：
  *   1) 路由前置 requireCaptchaAfterFailures()
  *   2) 控制器密码错误时调用 recordLoginFailure(req, identity)
@@ -43,11 +48,10 @@ export function recordLoginFailure (req, identity) {
   failCache.set(ipK, (failCache.get(ipK) || 0) + 1)
 }
 
+// 只删精确键 ip::identity；松散键 ip::* 保留并按 TTL 自然过期（见顶部设计取舍）
 export function clearLoginFailures (req, identity) {
   const k = buildKey(req, identity)
   failCache.delete(k)
-  const ipK = buildLooseKey(req)
-  failCache.delete(ipK)
 }
 
 /**
@@ -76,7 +80,7 @@ export function requireCaptchaAfterFailures () {
       return res.status(428).json({
         success: false,
         code: 'CAPTCHA_REQUIRED',
-        message: '为安全起见，请先完成图形/数字验证码'
+        message: '为安全起见，请先完成滑块验证码'
       })
     }
     if (!verifyCaptcha(token, answer)) {

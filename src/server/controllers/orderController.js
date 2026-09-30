@@ -13,7 +13,86 @@ import { normalizeExchangeRates, thbToBillingAmount, normalizeCheckoutCurrency }
 import * as pointsService from '../services/pointsService.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import AuditLog from '../models/AuditLog.js'
+import PointTransaction from '../models/PointTransaction.js'
+import { resolvePagination } from '../utils/pagination.js'
+import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { logger } from '../utils/logger.js'
+
+/** 金额统一舍入到分：消除浮点误差，保证 Σ(行价×数量) 与订单总额严格一致 */
+const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
+
+// 订单状态合法值（与 exportController 的标签映射保持一致）
+const ORDER_STATUS_VALUES = ['pending', 'paid', 'shipping', 'shipped', 'delivered', 'completed', 'cancelled']
+
+// 订单状态机：completed / cancelled 为终态，不允许任何变更
+const ORDER_STATUS_TRANSITIONS = {
+  pending: ['paid', 'shipping', 'cancelled'],
+  paid: ['shipping', 'cancelled'],
+  shipping: ['shipped', 'delivered', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['completed'],
+  completed: [],
+  cancelled: []
+}
+
+// 删除订单时需要回补资源的状态：仅未进入履约流程的单才回补（已发货/已履约删除不回补，否则库存与积分虚增）
+const RESTORE_ON_DELETE_STATUSES = ['pending', 'paid', 'shipping']
+
+/**
+ * 订单取消/删除时的资源回补（必须在事务内调用，order.items 需已加载）：
+ * 1) 逐订单项回补库存（paranoid:false，商品被软删也要回补，否则库存静默丢失）；
+ * 2) 积分换购单退回已扣积分；
+ * 3) 已确认在线支付（已发购物积分）的单收回等量积分：一单可能有多条 earn_purchase
+ *    流水（补发/重复发放），findAll 汇总收回总量；余额不足按 0 截断并记 warn
+ */
+export async function restoreOrderResources (order, transaction) {
+  const items = Array.isArray(order.items) ? order.items : []
+  for (const item of items) {
+    const qty = parseInt(item.quantity, 10)
+    if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue
+    await Product.update(
+      { stock: sequelize.literal(`stock + ${qty}`) },
+      // paranoid:false —— Product 是软删模型，默认过滤会让已软删商品的库存静默丢失
+      { where: { id: item.product_id }, transaction, paranoid: false }
+    )
+  }
+
+  const pointsRedeemed = Number(order.points_redeemed) || 0
+  if (order.payment_method === 'points' && pointsRedeemed > 0) {
+    await pointsService.refundPointsForOrder(transaction, {
+      userId: order.user_id,
+      orderId: order.id,
+      points: pointsRedeemed,
+      note: `订单取消退回积分 ${order.order_no}`
+    })
+  }
+
+  if (order.online_paid_at) {
+    // 一单可能有多条 earn_purchase 流水，findAll 汇总后按总量收回
+    const earnTxs = await PointTransaction.findAll({
+      where: { order_id: order.id, type: 'earn_purchase' },
+      transaction
+    })
+    const earned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
+    if (earned > 0) {
+      const revokeResult = await pointsService.revokePurchasePoints(transaction, {
+        userId: order.user_id,
+        orderId: order.id,
+        points: earned,
+        note: `订单取消收回购物积分 ${order.order_no}`
+      })
+      if (revokeResult.truncated > 0) {
+        logger.warn('订单取消收回购物积分时余额不足，已按 0 截断', {
+          orderId: order.id,
+          orderNo: order.order_no,
+          userId: order.user_id,
+          requested: revokeResult.requested,
+          revoked: revokeResult.revoked
+        })
+      }
+    }
+  }
+}
 
 class OrderController {
   // 创建订单
@@ -180,15 +259,14 @@ class OrderController {
           })
         }
 
-        // 计算实际价格（考虑折扣）
-        let actualPrice = product.price
+        // 计算实际价格（考虑折扣），行价与行小计统一舍入到分
+        let actualPrice = round2(product.price)
         if (product.discount && product.discount > 0) {
-          actualPrice = product.price * (1 - product.discount / 100)
-          actualPrice = parseFloat(actualPrice.toFixed(2))
+          actualPrice = round2(product.price * (1 - product.discount / 100))
         }
 
-        const itemTotal = actualPrice * item.quantity
-        totalAmountThb += itemTotal
+        const itemTotal = round2(actualPrice * qty)
+        totalAmountThb = round2(totalAmountThb + itemTotal)
 
         const ptsUnit = Number(product.points) || 0
         const pointsLineCost = ptsUnit > 0 ? ptsUnit * item.quantity : 0
@@ -249,7 +327,7 @@ class OrderController {
         }
       }
 
-      totalAmountThb = parseFloat(totalAmountThb.toFixed(2))
+      totalAmountThb = round2(totalAmountThb)
 
       let totalBilling
       if (paymentMethod === 'points') {
@@ -274,7 +352,8 @@ class OrderController {
       let orderPostalCode = postal_code
       // 对于游客下单，优先使用分字段信息组装完整地址（确保包含邮编）
       let orderDeliveryAddress = delivery_address
-      if (!userId && province && city && detail_address) {
+      // 注意：游客在此前已自动注册并把 userId 赋成新用户 id，不能用 !userId 判断游客，须用 isGuestOrder
+      if (isGuestOrder && province && city && detail_address) {
         // 游客下单：重新组装地址确保包含邮编
         const addressParts = [province.trim(), city.trim()]
         if (district && district.trim()) {
@@ -448,18 +527,16 @@ class OrderController {
         )
       }
 
-      await transaction.commit()
-
-      try {
-        if (paymentMethod !== 'points' && paymentMethod !== 'online' && userId) {
-          const qtySum = items.reduce((s, it) => s + Number(it.quantity || 0), 0)
-          if (qtySum > 0) {
-            await pointsService.grantPurchasePoints(userId, order.id, qtySum)
-          }
+      // COD 单在下单事务内直接发积分（与库存/订单同生共死；发放失败整单回滚，客户端可安全重试；
+      // 若在提交后独立事务发放，取消窗口内 revoke 会查不到 earn 流水，用户白得积分）
+      if (paymentMethod !== 'points' && paymentMethod !== 'online' && userId) {
+        const qtySum = items.reduce((s, it) => s + Number(it.quantity || 0), 0)
+        if (qtySum > 0) {
+          await pointsService.grantPurchasePoints(userId, order.id, qtySum, { transaction })
         }
-      } catch (earnErr) {
-        logger.error('购物积分发放失败', { err: earnErr?.message, stack: earnErr?.stack })
       }
+
+      await transaction.commit()
 
       // 返回创建的订单信息
       const createdOrder = await Order.findByPk(order.id, {
@@ -559,35 +636,55 @@ class OrderController {
       if (order.payment_method !== 'online') {
         return res.status(400).json({ success: false, message: '该订单不需要在线支付确认' })
       }
-      if (order.status !== 'pending' && order.online_paid_at) {
-        // 已确认过：幂等返回成功
+      if (order.online_paid_at) {
+        // 已确认过（online_paid_at 已置位）：幂等返回成功，不重复发积分、不变更状态
         const ordered = await Order.findByPk(order.id, {
           include: [{ model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', paranoid: false }] }]
         })
         return res.json({ success: true, message: '支付已确认', data: ordered })
       }
+      if (order.status !== 'pending') {
+        // 从未支付但被管理端改走（如已取消/已发货）：不允许再确认支付
+        return res.status(409).json({ success: false, message: '订单当前状态不允许支付确认' })
+      }
 
-      const [affected] = await Order.update(
-        { status: 'shipping', online_paid_at: new Date() },
-        {
-          where: {
-            id: order.id,
-            user_id: userId,
-            status: 'pending',
-            online_paid_at: null
+      /**
+       * 条件 UPDATE 与发放购物积分必须在同一事务提交：
+       * 原实现先提交 UPDATE、再在独立事务发积分，管理员若在该窗口取消订单，
+       * 取消时的 revoke 查不到 earn 流水，用户会白得积分。
+       * 发积分失败则整事务回滚、接口 500；客户端重试支付确认走幂等分支，安全。
+       */
+      const transaction = await sequelize.transaction()
+      let affected = 0
+      try {
+        const updateResult = await Order.update(
+          { status: 'shipping', online_paid_at: new Date() },
+          {
+            where: {
+              id: order.id,
+              user_id: userId,
+              status: 'pending',
+              online_paid_at: null
+            },
+            transaction
           }
-        }
-      )
+        )
+        affected = updateResult[0]
 
-      if (affected === 1) {
-        try {
+        if (affected === 1) {
           const qtySum = (order.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0)
           if (qtySum > 0) {
-            await pointsService.grantPurchasePoints(userId, order.id, qtySum)
+            await pointsService.grantPurchasePoints(userId, order.id, qtySum, { transaction })
           }
-        } catch (earnErr) {
-          logger.error('购物积分发放失败', { err: earnErr?.message, stack: earnErr?.stack })
         }
+        await transaction.commit()
+      } catch (error) {
+        await transaction.rollback().catch(() => {})
+        logger.error('确认在线支付失败', { err: error?.message, stack: error?.stack })
+        return res.status(500).json({ success: false, message: '确认支付失败' })
+      }
+
+      if (affected === 1) {
         AuditLog.logUser({
           user: { id: userId },
           event: 'order.payment.confirm',
@@ -776,8 +873,9 @@ class OrderController {
   // 管理员获取所有订单
   static async getAllOrders(req, res) {
     try {
-      const { page = 1, limit = 20, status, startDate, endDate, keyword } = req.query
-      const offset = (page - 1) * limit
+      const { status, startDate, endDate, keyword } = req.query
+      // 分页参数统一 clamp：该端点页大小参数名为 limit，上限 100
+      const { page, limit, offset } = resolvePagination(req.query, { pageSizeKey: 'limit', maxPageSize: 100 })
 
       const where = {}
       if (status) {
@@ -822,8 +920,8 @@ class OrderController {
           }
         ],
         order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        limit,
+        offset
       })
 
       // 推荐人批量查询：先收集本页所有出现过的 referred_by_code，一次 IN 查询
@@ -849,13 +947,41 @@ class OrderController {
         }
       }
 
+      // 服务端统计：基于当前筛选条件（不含分页），供管理端订单页统计卡片使用
+      // todayAmount 取"今日 0 点起"与筛选条件中 created_at 范围的交集
+      const toFiniteNumber = (v) => {
+        const n = Number(v)
+        return Number.isFinite(n) ? n : 0
+      }
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      const todayWhere = {
+        ...where,
+        created_at: {
+          ...(where.created_at && typeof where.created_at === 'object' ? where.created_at : {}),
+          [Op.gte]: todayStart
+        }
+      }
+      const [completedCount, totalAmountRaw, todayAmountRaw] = await Promise.all([
+        Order.count({ where: { ...where, status: 'completed' } }),
+        Order.sum('total_amount_thb', { where }),
+        Order.sum('total_amount_thb', { where: todayWhere })
+      ])
+      const stats = {
+        total: toFiniteNumber(count),
+        completed: toFiniteNumber(completedCount),
+        totalAmount: toFiniteNumber(totalAmountRaw),
+        todayAmount: toFiniteNumber(todayAmountRaw)
+      }
+
       res.json({
         success: true,
         data: {
           orders,
           total: count,
-          page: parseInt(page),
-          totalPages: Math.ceil(count / limit)
+          page,
+          totalPages: Math.ceil(count / limit),
+          stats
         }
       })
 
@@ -868,29 +994,77 @@ class OrderController {
     }
   }
 
-  // 管理员更新订单状态
+  // 管理员更新订单状态（状态白名单 + 状态机校验 + 取消回补，全部在同一事务内）
   static async updateOrderStatus(req, res) {
+    const transaction = await sequelize.transaction()
+
     try {
       const { id } = req.params
       const { status } = req.body
 
-      const order = await Order.findByPk(id)
+      if (!ORDER_STATUS_VALUES.includes(status)) {
+        await transaction.rollback()
+        return res.status(400).json({
+          success: false,
+          message: `无效的订单状态：${status}（合法值：${ORDER_STATUS_VALUES.join('/')}）`
+        })
+      }
+
+      // 行锁防并发双转移
+      const order = await Order.findByPk(id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
       if (!order) {
+        await transaction.rollback()
         return res.status(404).json({
           success: false,
           message: '订单不存在'
         })
       }
 
-      await order.update({ status })
+      const fromStatus = order.status
+      const allowedTargets = ORDER_STATUS_TRANSITIONS[fromStatus] || []
+      if (!allowedTargets.includes(status)) {
+        await transaction.rollback()
+        return res.status(400).json({
+          success: false,
+          message: `订单状态不允许从「${fromStatus}」变更为「${status}」`
+        })
+      }
+
+      // 进入 cancelled 时回补库存与积分（原状态在此不可能是 cancelled，状态机已拦截）
+      if (status === 'cancelled') {
+        order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
+        await restoreOrderResources(order, transaction)
+      }
+
+      await order.update({ status }, { transaction })
+      await transaction.commit()
+
+      // 返回更新后的订单（含 items）
+      const updatedOrder = await Order.findByPk(order.id, {
+        include: [
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [{
+              model: Product,
+              as: 'product',
+              paranoid: false
+            }]
+          }
+        ]
+      })
 
       res.json({
         success: true,
         message: '订单状态更新成功',
-        data: order
+        data: updatedOrder
       })
 
     } catch (error) {
+      await transaction.rollback()
       logger.error('更新订单状态失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
@@ -907,14 +1081,10 @@ class OrderController {
       const { id } = req.params
 
       const order = await Order.findByPk(id, {
-        include: [
-          {
-            model: OrderItem,
-            as: 'items'
-          }
-        ]
+        transaction,
+        lock: transaction.LOCK.UPDATE
       })
-      
+
       if (!order) {
         await transaction.rollback()
         return res.status(404).json({
@@ -922,6 +1092,8 @@ class OrderController {
           message: '订单不存在'
         })
       }
+
+      order.items = await OrderItem.findAll({ where: { order_id: id }, transaction })
 
       // 保存订单信息用于日志记录
       const orderInfo = {
@@ -932,6 +1104,21 @@ class OrderController {
         status: order.status,
         items_count: order.items ? order.items.length : 0
       }
+
+      /**
+       * 仅未履约状态（pending/paid/shipping）删除才回补库存与积分；
+       * shipped/delivered/completed 已发货或已履约，直接删除不回补（避免库存/积分虚增）；
+       * cancelled 在状态变更为取消时已回补过，不在此重复回补
+       */
+      if (RESTORE_ON_DELETE_STATUSES.includes(order.status)) {
+        await restoreOrderResources(order, transaction)
+      }
+
+      // 先清理积分流水：order_id FK 为 ON DELETE SET NULL，直接删单会把流水 order_id 静默置 NULL、断审计链
+      await PointTransaction.destroy({
+        where: { order_id: id },
+        transaction
+      })
 
       // 先删除订单项
       if (order.items && order.items.length > 0) {
@@ -991,20 +1178,22 @@ class OrderController {
             attributes: ['nickname', 'phone']
           }
         ],
-        order: [['created_at', 'DESC']]
+        order: [['created_at', 'DESC']],
+        // 安全上限：防止无上限 findAll 拖垮内存
+        limit: 50000
       })
 
-      // 简化的CSV导出
+      // 简化的CSV导出（用户可控字段过 sanitizeCell，防 Excel 公式注入）
       const csvData = orders.map(order => ({
         订单号: order.order_no,
-        用户昵称: order.user?.nickname || '未知',
-        用户手机: order.user?.phone || '未知',
+        用户昵称: sanitizeCell(order.user?.nickname) || '未知',
+        用户手机: sanitizeCell(order.user?.phone) || '未知',
         总金额: order.total_amount,
         支付方式: order.payment_method === 'cod' ? '货到付款' : '在线付款',
         订单状态: order.status === 'completed' ? '已完成' : order.status,
-        联系人: order.contact_name,
-        联系电话: order.contact_phone,
-        收货地址: order.delivery_address,
+        联系人: sanitizeCell(order.contact_name),
+        联系电话: sanitizeCell(order.contact_phone),
+        收货地址: sanitizeCell(order.delivery_address),
         创建时间: order.created_at
       }))
 

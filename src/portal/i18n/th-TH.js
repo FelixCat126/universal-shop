@@ -135,6 +135,8 @@ export default {
     confirmClear: 'ยืนยันล้าง',
     confirmClearMessage: 'คุณแน่ใจหรือไม่ที่จะล้างตะกร้าสินค้า? การดำเนินการนี้ไม่สามารถยกเลิกได้',
     stockIssue: 'สินค้าบางรายการมีสต็อกไม่เพียงพอ',
+    productUnavailable: 'สินค้าไม่พร้อมจำหน่าย',
+    productUnavailableDesc: 'สินค้านี้ถูกลบหรือปิดการขายแล้ว กรุณานำออกก่อนชำระเงิน',
     itemCount: 'จำนวนสินค้า',
     backToCart: 'กลับไปตะกร้าสินค้า',
     emptyCannotSubmit: 'ตะกร้าสินค้าว่าง ไม่สามารถสั่งซื้อได้',
@@ -369,8 +371,8 @@ export default {
     districtRequired: 'กรุณาใส่ตำบล',
     detailAddressRequired: 'กรุณาใส่ที่อยู่รายละเอียด',
     phonePatternChina: 'เบอร์โทรศัพท์จีนต้องขึ้นต้นด้วย 1 หลักที่สองเป็น 3-9',
-    phonePatternThailand: 'เบอร์โทรศัพท์ไทยต้องขึ้นต้นด้วย 2-9',
-    phonePatternMalaysia: 'เบอร์โทรศัพท์มาเลเซียต้องขึ้นต้นด้วย 1',
+    phonePatternThailand: 'เบอร์โทรศัพท์ไทยต้องมี 9-10 หลักและขึ้นต้นด้วย 6, 8 หรือ 9',
+    phonePatternMalaysia: 'เบอร์โทรศัพท์มาเลเซียต้องมี 9-10 หลักและขึ้นต้นด้วย 1',
     phoneEmptyFields: 'เบอร์โทรศัพท์และรหัสประเทศไม่สามารถว่างได้',
     unsupportedCountryCode: 'ไม่สนับสนุนรหัสประเทศ',
     phoneDigitsOnly: 'เบอร์โทรศัพท์สามารถมีได้เฉพาะตัวเลข',
@@ -439,6 +441,8 @@ export default {
     pointTxBalanceAfter: 'คงเหลือหลังทำรายการ',
     pointTypeEarn: 'ได้รับจากการสั่งซื้อ',
     pointTypeRedeem: 'แลกใช้แต้ม',
+    pointTypeRefund: 'คืนแต้มเมื่อยกเลิกคำสั่งซื้อ',
+    pointTypeRevoke: 'เรียกคืนแต้มเมื่อยกเลิกคำสั่งซื้อ',
     noPointTransactions: 'ไม่มีรายการแต้มในช่วงเวลาที่เลือก',
     loadPointsLedgerFailed: 'โหลดรายละเอียดแต้มไม่สำเร็จ',
     changePassword: 'เปลี่ยนรหัสผ่าน',
@@ -465,6 +469,15 @@ export default {
     unknown: 'ข้อผิดพลาดที่ไม่ทราบสาเหตุ',
     tryLater: 'กรุณาลองใหม่อีกครั้ง',
     loadFailed: 'โหลดไม่สำเร็จ'
+  },
+
+  // 滑块验证码
+  captcha: {
+    title: 'การยืนยันความปลอดภัย',
+    slideTip: 'ลากแถบเลื่อนเพื่อวางชิ้นส่วนจิ๊กซอว์ให้ตรงช่องว่าง',
+    success: 'ยืนยันสำเร็จ',
+    failed: 'การยืนยันล้มเหลว โปรดลองอีกครั้ง',
+    loading: 'กำลังโหลด'
   },
 
   // 页面标题

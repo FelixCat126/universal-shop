@@ -10,12 +10,7 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    // 可以在这里添加认证token
-    const token = localStorage.getItem('user-token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    
+    // 产品接口为公开接口，无需认证头
     // 添加语言标识
     const language = localStorage.getItem('language') || 'th-TH'
     config.headers['Accept-Language'] = language
@@ -34,11 +29,6 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('API请求失败:', error)
-    if (error.response?.status === 401) {
-      // 处理未授权错误
-      localStorage.removeItem('user-token')
-      // 可以跳转到登录页面
-    }
     return Promise.reject(error)
   }
 )

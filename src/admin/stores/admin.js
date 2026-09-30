@@ -64,7 +64,8 @@ export const useAdminStore = defineStore('admin', () => {
         
         return { success: true, message: data.message }
       } else {
-        return { success: false, message: data.message }
+        // 透传 HTTP 状态码与业务 code（如 428 CAPTCHA_REQUIRED / CAPTCHA_INVALID），供登录页做验证码分流
+        return { success: false, message: data.message, status: response.status, code: data.code }
       }
     } catch (error) {
       console.error('登录失败:', error)

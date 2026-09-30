@@ -76,9 +76,12 @@ export const useUserStore = defineStore('user', () => {
       }
     } catch (error) {
       console.error('Login error:', error)
-      return { 
-        success: false, 
-        message: error.response?.data?.message || '登录失败，请检查网络连接' 
+      return {
+        success: false,
+        // 透传 HTTP 状态与业务码（如 428 CAPTCHA_REQUIRED / CAPTCHA_INVALID），供登录页触发滑块验证码
+        status: error.response?.status,
+        code: error.response?.data?.code,
+        message: error.response?.data?.message || '登录失败，请检查网络连接'
       }
     } finally {
       isLoading.value = false

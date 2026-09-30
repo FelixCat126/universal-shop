@@ -34,6 +34,42 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 
+// 发版后旧页面持有的 chunk 哈希已失效，动态 import 会失败：自动刷新拉取新资源
+// sessionStorage 时间戳节流（60s 内最多刷一次），防止部署异常时无限刷新循环
+const CHUNK_RELOAD_KEY = 'admin-chunk-reload-at'
+const CHUNK_RELOAD_INTERVAL = 60 * 1000
+let chunkReloadAttempted = false
+
+const reloadForStaleChunk = () => {
+  if (chunkReloadAttempted) return
+  chunkReloadAttempted = true
+  try {
+    const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+    if (last && Date.now() - last < CHUNK_RELOAD_INTERVAL) return
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+  } catch (e) {
+    // sessionStorage 不可用（隐私模式等）时仅靠内存标记兜底
+  }
+  window.location.reload()
+}
+
+const isChunkLoadError = (error) =>
+  /dynamically imported module|importing a module script failed|failed to fetch/i.test(error?.message || '')
+
+router.onError((error) => {
+  if (isChunkLoadError(error)) {
+    reloadForStaleChunk()
+    return
+  }
+  console.error('路由错误:', error)
+})
+
+// Vite 预加载失败（link preload / modulepreload）同样走刷新兜底
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  reloadForStaleChunk()
+})
+
 app.use(createPinia())
 app.use(ElementPlus)
 app.use(i18n)

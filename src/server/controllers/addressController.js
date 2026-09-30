@@ -154,8 +154,17 @@ class AddressController {
 
   // 更新地址
   static async updateAddress(req, res) {
+    // 路径参数先校验：非正整数 id 会让 PG 抛 invalid input syntax（500）
+    const addressId = Number(req.params.id)
+    if (!Number.isInteger(addressId) || addressId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的地址ID'
+      })
+    }
+
     const transaction = await sequelize.transaction()
-    
+
     try {
       const userId = req.user?.userId
       const { id } = req.params
@@ -176,7 +185,7 @@ class AddressController {
         district,
         detail_address,
         postal_code,
-        is_default = false,
+        is_default,
         address_type = 'home'
       } = req.body
 
@@ -185,6 +194,37 @@ class AddressController {
         return res.status(400).json({
           success: false,
           message: '收货人姓名、电话和详细地址为必填项'
+        })
+      }
+
+      // 字段长度上限（对齐模型列宽，超长直接 400，避免 PG 报错变 500）
+      if (String(contact_name).length > 100) {
+        return res.status(400).json({
+          success: false,
+          message: '收货人姓名不能超过100个字符'
+        })
+      }
+
+      if (String(contact_phone).length > 20) {
+        return res.status(400).json({
+          success: false,
+          message: '联系电话不能超过20个字符'
+        })
+      }
+
+      if (postal_code != null && String(postal_code).length > 10) {
+        return res.status(400).json({
+          success: false,
+          message: '邮政编码不能超过10个字符'
+        })
+      }
+
+      // 地址类型白名单（模型定义：home-家庭, office-公司, other-其他）
+      const allowedAddressTypes = ['home', 'office', 'other']
+      if (!allowedAddressTypes.includes(address_type)) {
+        return res.status(400).json({
+          success: false,
+          message: '无效的地址类型'
         })
       }
 
@@ -248,13 +288,16 @@ class AddressController {
       const regionPart = addressParts.join(' ')
       const full_address = regionPart ? `${regionPart} ${detail_address}` : detail_address
 
+      // 未传 is_default 时保留当前默认标志；传了才按传值（避免 PUT 不带该字段时静默清掉默认地址）
+      const nextIsDefault = is_default === undefined ? address.is_default : is_default
+
       // 如果设置为默认地址，先取消其他默认地址
-      if (is_default && !address.is_default) {
+      if (nextIsDefault && !address.is_default) {
         await Address.update(
           { is_default: false },
-          { 
+          {
             where: { user_id: userId, is_default: true },
-            transaction 
+            transaction
           }
         )
       }
@@ -270,7 +313,7 @@ class AddressController {
         detail_address,
         full_address,
         postal_code,
-        is_default,
+        is_default: nextIsDefault,
         address_type
       }, { transaction })
 
@@ -295,6 +338,11 @@ class AddressController {
 
   // 设置默认地址
   static async setDefaultAddress(req, res) {
+    // 非法 id 在开启事务前拦截，避免白占连接与 PG 类型错误 500
+    const rawId = req.params.id
+    if (!Number.isInteger(Number(rawId)) || Number(rawId) < 1) {
+      return res.status(400).json({ success: false, message: '无效的地址ID' })
+    }
     const transaction = await sequelize.transaction()
     
     try {
@@ -356,6 +404,10 @@ class AddressController {
 
   // 删除地址
   static async deleteAddress(req, res) {
+    const rawId = req.params.id
+    if (!Number.isInteger(Number(rawId)) || Number(rawId) < 1) {
+      return res.status(400).json({ success: false, message: '无效的地址ID' })
+    }
     const transaction = await sequelize.transaction()
     
     try {
@@ -430,6 +482,10 @@ class AddressController {
         })
       }
 
+      if (!Number.isInteger(Number(id)) || Number(id) < 1) {
+        return res.status(400).json({ success: false, message: '无效的地址ID' })
+      }
+
       const address = await Address.findOne({
         where: { id, user_id: userId }
       })
@@ -466,6 +522,10 @@ class AddressController {
           success: false,
           message: '用户ID不能为空'
         })
+      }
+
+      if (!Number.isInteger(Number(userId)) || Number(userId) < 1) {
+        return res.status(400).json({ success: false, message: '无效的用户ID' })
       }
 
       // 验证用户是否存在

@@ -19,6 +19,14 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // token 过期/无效：清空管理员凭据并跳转登录页（与 admin store 的 apiRequest 行为对齐）
+    if (error.response?.status === 401) {
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_info')
+      if (typeof window !== 'undefined') {
+        window.location.href = `${import.meta.env.BASE_URL || '/'}login`
+      }
+    }
     return Promise.reject(error)
   }
 )

@@ -113,7 +113,7 @@ describe('P3-Workflow.guestAutoRegister', () => {
 })
 
 describe('P3-Workflow.orderLifecycle', () => {
-  it('W-3 下单 → admin 状态推进（shipping → delivered → completed）', async () => {
+  it('W-3 下单 → admin 状态推进（shipping → shipped → delivered → completed）', async () => {
     await seedSystemConfigBaseline()
     const user = await TestHelpers.createUserWithAddress()
     const token = TestHelpers.generateToken(user.user)
@@ -132,8 +132,8 @@ describe('P3-Workflow.orderLifecycle', () => {
     expect(create.status).toBe(201)
     const orderId = create.body.data.order.id
 
-    // admin 推进状态
-    for (const status of ['shipping', 'delivered', 'completed']) {
+    // admin 推进状态（订单创建即为 shipping，按状态机逐步推进）
+    for (const status of ['shipped', 'delivered', 'completed']) {
       const r = await request(app).put(`/api/admin/orders/${orderId}/status`)
         .set('Authorization', `Bearer ${admin}`)
         .send({ status })
@@ -180,8 +180,8 @@ describe('P3-Workflow.partnerLifecycle', () => {
   })
 })
 
-describe('P3-Workflow.pointsNotRefunded', () => {
-  it('W-5 积分下单 → admin 取消订单 → 积分不退回', async () => {
+describe('P3-Workflow.pointsRefundedOnCancel', () => {
+  it('W-5 积分下单 → admin 取消订单 → 积分退回', async () => {
     await seedSystemConfigBaseline()
     const user = await TestHelpers.createUserWithAddress()
     const token = TestHelpers.generateToken(user.user)
@@ -210,13 +210,14 @@ describe('P3-Workflow.pointsNotRefunded', () => {
     expect(Number(after1.balance)).toBe(90)
 
     // admin 取消订单
-    await request(app).put(`/api/admin/orders/${orderId}/status`)
+    const cancel = await request(app).put(`/api/admin/orders/${orderId}/status`)
       .set('Authorization', `Bearer ${admin}`)
       .send({ status: 'cancelled' })
+    expect(cancel.status).toBe(200)
 
-    // 积分不退回
+    // 取消后积分退回
     const after2 = await UserPointBalance.findOne({ where: { user_id: user.user.id } })
-    expect(Number(after2.balance)).toBe(90)
+    expect(Number(after2.balance)).toBe(100)
   })
 })
 

@@ -55,6 +55,12 @@
                 </button>
               </div>
             </div>
+            <SliderCaptcha
+              v-if="showCaptcha"
+              ref="captchaRef"
+              class="pt-1"
+              @verify="onCaptchaVerify"
+            />
             <button
               type="submit"
               :disabled="loading"
@@ -100,6 +106,7 @@ import { useI18n } from 'vue-i18n'
 import { BuildingStorefrontIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
+import SliderCaptcha from '../components/SliderCaptcha.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -122,20 +129,54 @@ const login = ref('')
 const password = ref('')
 const loading = ref(false)
 const showPassword = ref(false)
+const showCaptcha = ref(false)
+const captchaRef = ref(null)
 
-async function onSubmit () {
+async function runLogin (captcha) {
   loading.value = true
   try {
-    const r = await partnerStore.login(login.value, password.value)
+    const r = await partnerStore.login(login.value, password.value, captcha)
     if (r.success) {
+      captchaRef.value?.succeed()
       toast.success(t('login.loginSuccess'))
       const red = route.query.redirect || '/shop'
       router.push(red)
-    } else {
-      toast.error(r.message || t('login.loginFail'))
+      return
     }
+    if (r.code === 'CAPTCHA_INVALID') {
+      // 拼图位置不对：组件提示失败并自动换新图
+      showCaptcha.value = true
+      captchaRef.value?.fail()
+      return
+    }
+    if (r.code === 'CAPTCHA_REQUIRED') {
+      // token 一次性：已展示验证码时先换新，未展示则挂载组件（onMounted 自动加载）
+      if (showCaptcha.value && captchaRef.value) captchaRef.value.refresh()
+      showCaptcha.value = true
+      return
+    }
+    toast.error(r.message || t('login.loginFail'))
+    if (showCaptcha.value) captchaRef.value?.refresh()
+  } catch (err) {
+    console.error('[partner-login] submit failed:', err)
+    toast.error(t('login.loginFail'))
   } finally {
     loading.value = false
   }
+}
+
+function onSubmit () {
+  if (loading.value) return
+  runLogin(null)
+}
+
+function onCaptchaVerify (x) {
+  if (loading.value) return
+  const token = captchaRef.value?.token
+  if (!token) {
+    captchaRef.value?.refresh()
+    return
+  }
+  runLogin({ token, answer: x })
 }
 </script>

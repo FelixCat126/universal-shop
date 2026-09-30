@@ -859,6 +859,14 @@ export default {
         if (response.data.success) {
           products.value = response.data.data.products
           totalProducts.value = response.data.data.total
+
+          // 删除/操作后当前页可能超出新的总页数，自动回退到最后一页再加载
+          const totalPages = Math.ceil(totalProducts.value / pageSize.value)
+          if (totalPages > 0 && currentPage.value > totalPages) {
+            currentPage.value = totalPages
+            await loadProducts()
+            return
+          }
         }
       } catch (error) {
         console.error('加载产品数据失败:', error)

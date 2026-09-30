@@ -65,7 +65,7 @@
           <template #default="{ row }">{{ row.partner?.login }} {{ row.partner?.display_name ? `（${row.partner.display_name}）` : '' }}</template>
         </el-table-column>
         <el-table-column prop="total_amount_thb" :label="t('partnerOrdersMgmt.totalThb')" width="120">
-          <template #default="{ row }">{{ parseFloat(row.total_amount_thb)?.toFixed(2) }}</template>
+          <template #default="{ row }">{{ formatTotalThb(row.total_amount_thb) }}</template>
         </el-table-column>
         <el-table-column prop="status" :label="t('partnerOrdersMgmt.status')" width="124">
           <template #default="{ row }">
@@ -77,9 +77,10 @@
                 :teleported="true"
                 :fit-input-width="false"
                 popper-class="partner-order-status-popper"
+                :disabled="isTerminalStatus(row.status)"
                 @change="(v) => onStatusChange(row, v)"
               >
-                <el-option v-for="s in statusOptions" :key="s" :label="partnerOrderStatusLabel(s)" :value="s" />
+                <el-option v-for="s in statusOptionsFor(row.status)" :key="s" :label="partnerOrderStatusLabel(s)" :value="s" />
               </el-select>
             </div>
           </template>
@@ -126,6 +127,27 @@ const { t } = useI18n()
 const adminStore = useAdminStore()
 
 const statusOptions = ['pending_payment', 'submitted', 'processing', 'shipped', 'settled', 'cancelled']
+
+// 合作方订单状态机（与服务端 partnerAdminController 保持一致）：settled / cancelled 为终态
+const STATUS_TRANSITIONS = {
+  pending_payment: ['submitted', 'cancelled'],
+  submitted: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['settled'],
+  settled: [],
+  cancelled: []
+}
+
+/** 每行可选状态：当前状态 + 合法目标状态（保留当前状态避免 el-select 显示异常） */
+function statusOptionsFor (status) {
+  const targets = STATUS_TRANSITIONS[status] || []
+  return [status, ...targets]
+}
+
+/** 终态不可再改，禁用编辑入口 */
+function isTerminalStatus (status) {
+  return (STATUS_TRANSITIONS[status] || []).length === 0
+}
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -249,6 +271,12 @@ function itemImg (it) {
   const p = it?.product_image_snapshot
   if (!p) return ''
   return config.buildStaticUrl(p)
+}
+
+/** 总金额展示：null/非数值兜底为 '—'，避免 NaN */
+function formatTotalThb (v) {
+  const n = parseFloat(v)
+  return Number.isFinite(n) ? n.toFixed(2) : '—'
 }
 
 function formatCreatedAt (raw) {

@@ -295,6 +295,9 @@ async function confirmPartnerOrderPay () {
     payModalOrderId.value = null
     toast.success(t('payment.complete'))
     await loadFirstPage()
+  } catch (err) {
+    console.error('[partner-orders] confirm payment failed:', err)
+    toast.error(t('common.error'))
   } finally {
     payConfirming.value = false
   }

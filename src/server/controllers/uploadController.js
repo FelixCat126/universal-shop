@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { fileTypeFromFile } from 'file-type'
 import { logger } from '../utils/logger.js'
+import { ApiError } from '../middlewares/errorHandler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -71,19 +72,20 @@ const fileFilter = (req, file, cb) => {
   const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
   
   // 检查MIME类型
+  // fileFilter 的错误会进入全局 errorHandler：用 ApiError 携带 400，否则按默认分支落成 500
   if (!allowedMimes.includes(file.mimetype)) {
-    return cb(new Error('不支持的文件类型，仅支持 JPG, PNG, GIF, WebP 格式图片'), false)
+    return cb(new ApiError('不支持的文件类型，仅支持 JPG, PNG, GIF, WebP 格式图片', 400), false)
   }
-  
+
   // 检查文件扩展名
   const ext = path.extname(file.originalname).toLowerCase()
   if (!allowedExts.includes(ext)) {
-    return cb(new Error('不支持的文件扩展名'), false)
+    return cb(new ApiError('不支持的文件扩展名', 400), false)
   }
-  
+
   // 检查文件名安全性（防止路径遍历）
   if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
-    return cb(new Error('文件名包含非法字符'), false)
+    return cb(new ApiError('文件名包含非法字符', 400), false)
   }
   
   cb(null, true)

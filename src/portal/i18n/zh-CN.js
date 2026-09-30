@@ -135,6 +135,8 @@ export default {
     confirmClear: '确定清空',
     confirmClearMessage: '确定要清空购物车吗？此操作不可撤销。',
     stockIssue: '有商品库存不足',
+    productUnavailable: '商品已失效',
+    productUnavailableDesc: '该商品已被下架或删除，请移除后再结算',
     itemCount: '商品数量',
     backToCart: '返回购物车',
     emptyCannotSubmit: '购物车为空，无法提交订单',
@@ -369,8 +371,8 @@ export default {
     districtRequired: '请输入区县',
     detailAddressRequired: '请输入详细地址',
     phonePatternChina: '中国手机号必须以1开头，第二位为3-9',
-    phonePatternThailand: '泰国手机号必须以2-9开头',
-    phonePatternMalaysia: '马来西亚手机号必须以1开头',
+    phonePatternThailand: '泰国手机号必须为9-10位数字，以6、8或9开头',
+    phonePatternMalaysia: '马来西亚手机号必须为9-10位数字，以1开头',
     phoneEmptyFields: '手机号和国家区号不能为空',
     unsupportedCountryCode: '不支持的国家区号',
     phoneDigitsOnly: '手机号只能包含数字',
@@ -439,6 +441,8 @@ export default {
     pointTxBalanceAfter: '变动后结余',
     pointTypeEarn: '购物获得积分',
     pointTypeRedeem: '积分换购扣减',
+    pointTypeRefund: '订单取消退回积分',
+    pointTypeRevoke: '订单取消收回积分',
     noPointTransactions: '所选时间范围内暂无积分变动',
     loadPointsLedgerFailed: '加载积分明细失败',
     changePassword: '修改密码',
@@ -465,6 +469,15 @@ export default {
     unknown: '未知错误',
     tryLater: '请稍后重试',
     loadFailed: '加载失败'
+  },
+
+  // 滑块验证码
+  captcha: {
+    title: '安全验证',
+    slideTip: '拖动滑块，将拼图放入缺口',
+    success: '验证通过',
+    failed: '验证失败，请重试',
+    loading: '加载中'
   },
 
   // 页面标题

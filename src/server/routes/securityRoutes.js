@@ -5,7 +5,7 @@ import { enumerationLimiter } from '../middlewares/security.js'
 const router = express.Router()
 
 /**
- * 颁发轻量验证码：返回 question + token
+ * 颁发滑块拼图验证码：返回 token + bg/piece SVG（data URL）等契约字段
  * 使用 enumerationLimiter 防止有人无限刷题穷举答案
  */
 router.get('/captcha', enumerationLimiter, (req, res) => {

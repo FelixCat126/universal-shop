@@ -42,10 +42,10 @@
                   type="tel"
                   required
                   autocomplete="tel"
-                  :maxlength="currentCountry?.phoneLength || 11"
+                  :maxlength="currentCountry?.phoneLengthMax || 11"
                   class="ui-input-focus block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none"
                   :class="{ 'border-red-500': errors.phone }"
-                  :placeholder="t('user.phoneInputPlaceholder', { length: currentCountry?.phoneLength || 11 })"
+                  :placeholder="t('user.phoneInputPlaceholder', { length: currentCountry?.phoneLengthText || '11' })"
                 />
                 <p v-if="errors.phone" class="mt-1 text-xs text-red-600">{{ errors.phone }}</p>
               </div>
@@ -104,6 +104,11 @@
                 {{ t('user.forgotPassword') }}
               </a>
             </div>
+          </div>
+
+          <!-- 滑块验证码（登录失败过多时服务端返回 428 触发） -->
+          <div v-if="captchaVisible" class="flex justify-center">
+            <SliderCaptcha ref="captchaRef" @verify="onCaptchaVerify" />
           </div>
 
           <!-- 登录按钮 -->
@@ -180,7 +185,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/user.js'
 import CountrySelector from '../components/CountrySelector.vue'
-import { validatePhone, getCountryInfo } from '../utils/phoneValidation.js'
+import SliderCaptcha from '../components/SliderCaptcha.vue'
+import { validatePhone, getCountryInfo, getPhoneLengthRange, getPhoneLengthText } from '../utils/phoneValidation.js'
 import { 
   UserIcon, 
   EyeIcon, 
@@ -214,6 +220,10 @@ const formData = ref({
 // 表单验证错误
 const errors = ref({})
 
+// 滑块验证码（428 CAPTCHA_REQUIRED 时展示）
+const captchaVisible = ref(false)
+const captchaRef = ref(null)
+
 // 计算属性
 const messageClass = computed(() => {
   return messageType.value === 'success' 
@@ -238,7 +248,9 @@ const currentCountry = computed(() => {
       ...countryInfo,
       // 翻译国家名称
       name: t(`country.${countryInfo.name}`),
-      phoneLength: countryInfo.phoneLength
+      // phoneLength 为 [min, max] 范围：maxlength 取最大值，提示文案用范围文本
+      phoneLengthMax: getPhoneLengthRange(formData.value.countryCode).max,
+      phoneLengthText: getPhoneLengthText(formData.value.countryCode)
     }
   }
   return null
@@ -271,39 +283,91 @@ const validateForm = () => {
   return Object.keys(errors.value).length === 0
 }
 
+// 组装登录请求体；captcha 存在时附带 captcha_token / captcha_answer
+const buildLoginData = (captcha = null) => {
+  const loginData = {
+    password: formData.value.password,
+    rememberMe: formData.value.rememberMe
+  }
+
+  loginData.country_code = formData.value.countryCode
+  loginData.phone = formData.value.phone
+
+  if (captcha?.token) {
+    loginData.captcha_token = captcha.token
+    loginData.captcha_answer = captcha.answer
+  }
+
+  return loginData
+}
+
+// 统一处理登录结果：成功跳转；428 触发/刷新滑块验证码；其余弹错误提示
+const handleLoginResult = (result) => {
+  if (result.success) {
+    // 隐藏并重置验证码，下次登录重新按 428 触发
+    captchaVisible.value = false
+    showMessageToast(t('user.loginSuccess'), 'success')
+
+    // 延迟跳转，让用户看到成功消息
+    setTimeout(() => {
+      // 获取登录前的页面，如果没有则跳转到首页
+      const redirectTo = route.query.redirect || '/'
+      router.push(redirectTo)
+    }, 1000)
+    return
+  }
+
+  if (result.status === 428) {
+    if (result.code === 'CAPTCHA_REQUIRED') {
+      // 已展示时保留当前题目（token 未消耗，仍可作答）
+      captchaVisible.value = true
+    } else if (result.code === 'CAPTCHA_INVALID') {
+      // token 一次性，无论对错都已消耗：提示并自动换新题
+      captchaVisible.value = true
+      captchaRef.value?.showFailed()
+    }
+    return
+  }
+
+  showMessageToast(result.message || t('user.loginFailed'), 'error')
+}
+
+// 滑块松手：用同一表单数据 + captcha_token/answer 重试登录
+const onCaptchaVerify = async (answer) => {
+  const token = captchaRef.value?.token
+  if (!token) return
+
+  try {
+    isLoading.value = true
+    const result = await userStore.login(buildLoginData({ token, answer }))
+    if (result.success) {
+      captchaRef.value?.showSuccess()
+    } else if (!(result.status === 428 && result.code === 'CAPTCHA_INVALID')) {
+      // token 一次性（无论对错都已消耗）：密码错误等非验证码失败也先静默换新题，
+      // 保证下次拖动用的是未消耗的新 token
+      captchaRef.value?.refresh()
+    }
+    handleLoginResult(result)
+  } catch (error) {
+    console.error('Login error:', error)
+    showMessageToast(t('error.network'), 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
+
 // 处理登录
 const handleLogin = async () => {
   if (!validateForm()) {
     return
   }
-  
+
   try {
     isLoading.value = true
-    
-    const loginData = {
-      password: formData.value.password,
-      rememberMe: formData.value.rememberMe
-    }
-    
-    loginData.country_code = formData.value.countryCode
-    loginData.phone = formData.value.phone
-    
-    const result = await userStore.login(loginData)
-    
-    if (result.success) {
-      showMessageToast(t('user.loginSuccess'), 'success')
-      
-      // 延迟跳转，让用户看到成功消息
-      setTimeout(() => {
-        // 获取登录前的页面，如果没有则跳转到首页
-        const redirectTo = route.query.redirect || '/'
-        router.push(redirectTo)
-      }, 1000)
-      
-    } else {
-      showMessageToast(result.message || t('user.loginFailed'), 'error')
-    }
-    
+
+    const result = await userStore.login(buildLoginData())
+    handleLoginResult(result)
+
   } catch (error) {
     console.error('Login error:', error)
     showMessageToast(t('error.network'), 'error')

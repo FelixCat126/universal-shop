@@ -9,6 +9,7 @@ import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { logger } from '../utils/logger.js'
+import { resolvePagination } from '../utils/pagination.js'
 
 class UserController {
   // 用户注册
@@ -100,7 +101,7 @@ class UserController {
 
       // 生成JWT token
       const token = jwt.sign(
-        { userId: user.id, username: user.username },
+        { userId: user.id, username: user.username, type: 'user' },
         JWT_SECRET,
         { expiresIn: '7d' }
       )
@@ -371,7 +372,7 @@ class UserController {
 
       // 生成JWT token
       const token = jwt.sign(
-        { userId: user.id, username: user.username },
+        { userId: user.id, username: user.username, type: 'user' },
         JWT_SECRET,
         { expiresIn: '7d' }
       )
@@ -397,9 +398,7 @@ class UserController {
   // 获取用户列表（管理端）
   static async getAllUsers(req, res) {
     try {
-      const { 
-        page = 1, 
-        pageSize = 10, 
+      const {
         email = '',
         phone = '',
         referral_code = '',
@@ -407,8 +406,8 @@ class UserController {
         id: userIdParam = ''
       } = req.query
 
-      const limit = parseInt(pageSize)
-      const offset = (parseInt(page) - 1) * limit
+      // 分页参数统一 clamp（下限 1、上限 100、非法回退默认）
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { defaultPageSize: 10 })
 
       // 构建查询条件
       const whereConditions = []
@@ -459,17 +458,33 @@ class UserController {
         attributes: { exclude: ['password'] } // 排除密码字段
       })
 
-      const totalPages = Math.ceil(count / limit)
+      const totalPages = Math.ceil(count / pageSize)
+
+      // 服务端统计：今日/近7日/近30日新增用户数（按 created_at，不受分页与筛选影响）
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+      const startOfWeek = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000)
+      const startOfMonth = new Date(startOfToday.getTime() - 29 * 24 * 60 * 60 * 1000)
+      const [today, week, month] = await Promise.all([
+        User.count({ where: { created_at: { [Op.gte]: startOfToday } } }),
+        User.count({ where: { created_at: { [Op.gte]: startOfWeek } } }),
+        User.count({ where: { created_at: { [Op.gte]: startOfMonth } } })
+      ])
 
       res.json({
         success: true,
         data: {
           users: rows,
           pagination: {
-            currentPage: parseInt(page),
-            pageSize: limit,
+            currentPage: page,
+            pageSize,
             totalPages,
             total: count
+          },
+          stats: {
+            today: Number(today) || 0,
+            week: Number(week) || 0,
+            month: Number(month) || 0
           }
         }
       })

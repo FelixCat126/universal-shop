@@ -15,19 +15,37 @@ export const useCartStore = defineStore('cart', () => {
 
   const totalAmount = computed(() => {
     return items.value.reduce((total, item) => {
+      // 跳过失效项（商品被删除等，加载时已打上 unavailable 标记），不参与总价计算
+      if (item.unavailable) return total
       return total + (item.price * item.quantity)
     }, 0)
   })
 
   const isEmpty = computed(() => items.value.length === 0)
 
-  // 计算商品实际价格（考虑折扣）
+  // 计算商品实际价格（考虑折扣）；商品数据缺失时返回 0，由调用方标记为不可用
   const getActualPrice = (product) => {
-    if (!product.discount || product.discount <= 0) {
-      return product.price
+    const basePrice = Number(product?.price)
+    if (!Number.isFinite(basePrice)) {
+      return 0
     }
-    const discountPrice = product.price * (1 - product.discount / 100)
+    const discount = Number(product.discount)
+    if (!Number.isFinite(discount) || discount <= 0) {
+      return basePrice
+    }
+    const discountPrice = basePrice * (1 - discount / 100)
     return parseFloat(discountPrice.toFixed(2))
+  }
+
+  // 加载购物车数据时逐项防御：商品被删除（product 为 null）的项标记为不可用，不影响其他正常项
+  const normalizeLoadedItem = (item) => {
+    if (!item || !item.product) {
+      return { ...item, product: null, price: 0, unavailable: true }
+    }
+    return {
+      ...item,
+      price: getActualPrice(item.product)
+    }
   }
 
   // 加载购物车
@@ -42,10 +60,7 @@ export const useCartStore = defineStore('cart', () => {
         
         if (response.data.success) {
           // 重新计算价格以确保使用最新的折扣价格
-          items.value = response.data.data.map(item => ({
-            ...item,
-            price: getActualPrice(item.product)
-          }))
+          items.value = response.data.data.map(normalizeLoadedItem)
         } else {
           console.error('加载购物车失败:', response.data.message)
           items.value = []
@@ -57,10 +72,7 @@ export const useCartStore = defineStore('cart', () => {
           try {
             const guestItems = JSON.parse(guestCart)
             // 重新计算价格以确保使用最新的折扣价格
-            items.value = guestItems.map(item => ({
-              ...item,
-              price: getActualPrice(item.product)
-            }))
+            items.value = guestItems.map(normalizeLoadedItem)
             // 保存更新后的价格
             saveGuestCart()
           } catch (e) {
@@ -290,6 +302,7 @@ export const useCartStore = defineStore('cart', () => {
         
         // 更新购物车中商品的库存信息
         items.value.forEach(item => {
+          if (!item.product) return // 失效项无商品数据，跳过库存更新
           const stock = stockInfo.find(s => s.id === item.product_id)
           if (stock) {
             item.product.stock = stock.stock
@@ -300,8 +313,8 @@ export const useCartStore = defineStore('cart', () => {
           }
         })
         
-        // 移除没有库存的商品
-        items.value = items.value.filter(item => item.product.stock > 0)
+        // 移除没有库存的商品（失效项保留展示，由用户手动移除）
+        items.value = items.value.filter(item => !item.product || item.product.stock > 0)
       }
       
       return { success: true }
@@ -370,12 +383,9 @@ export const useCartStore = defineStore('cart', () => {
 
 
 
-      // 备份游客购物车数据，以防合并失败
-      const guestCartBackup = guestCart
-      let successCount = 0
-      let failureCount = 0
+      // 逐个添加游客购物车的商品到用户购物车，逐项记录实际失败的商品
+      const failedItems = []
 
-      // 逐个添加游客购物车的商品到用户购物车
       for (const guestItem of guestItems) {
         try {
           const response = await api.post('/cart', {
@@ -383,33 +393,30 @@ export const useCartStore = defineStore('cart', () => {
             quantity: guestItem.quantity
           })
 
-          if (response.data.success) {
-            successCount++
-          } else {
-            failureCount++
+          if (!response.data.success) {
+            failedItems.push(guestItem)
           }
         } catch (error) {
           console.error(`❌ 合并商品出错: ${guestItem.product_id}`, error)
-          failureCount++
+          failedItems.push(guestItem)
           // 继续处理其他商品，不中断整个合并过程
         }
       }
 
+      const successCount = guestItems.length - failedItems.length
+      const failureCount = failedItems.length
+
       // 根据成功情况决定是否清理localStorage
-      if (successCount > 0 && failureCount === 0) {
+      if (failureCount === 0) {
         // 全部成功，清空游客购物车
         localStorage.removeItem('guest_cart')
 
-      } else if (successCount > 0 && failureCount > 0) {
-        // 部分成功，保留失败的商品
-        const failedItems = guestItems.filter((_, index) => 
-          index >= successCount // 简化处理，假设前面的成功了
-        )
-        localStorage.setItem('guest_cart', JSON.stringify(failedItems))
-
       } else {
-        // 全部失败，保留原数据
-        console.error(`❌ 购物车合并失败，保留游客购物车数据`)
+        // 部分或全部失败：只保留真正失败的商品，避免已成功项被重复合并
+        localStorage.setItem('guest_cart', JSON.stringify(failedItems))
+        if (successCount === 0) {
+          console.error(`❌ 购物车合并失败，保留游客购物车数据`)
+        }
       }
       
       // 重新加载购物车数据，确保前端状态同步

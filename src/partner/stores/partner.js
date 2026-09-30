@@ -54,7 +54,15 @@ export const usePartnerStore = defineStore('partner', () => {
     }
     const normalized = path.startsWith('/') ? path : `/${path}`
     const url = config.buildApiUrl(`/api/partner${normalized}`)
-    return fetch(url, { ...options, headers })
+    const res = await fetch(url, { ...options, headers })
+    if (res.status === 401) {
+      // token 过期/无效：清空合作方凭据并跳转登录页，避免用户卡死
+      logout()
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = `${import.meta.env.BASE_URL || '/'}login`
+      }
+    }
+    return res
   }
 
   async function refreshProfile () {
@@ -72,21 +80,36 @@ export const usePartnerStore = defineStore('partner', () => {
     return null
   }
 
-  async function login (loginName, password) {
+  async function login (loginName, password, captcha) {
     clearRetailAuth()
-    const res = await fetch(config.buildApiUrl('/api/partner/login'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: loginName, password })
-    })
-    const json = await res.json()
-    if (!json.success) {
-      return { success: false, message: json.message || '登录失败' }
+    try {
+      const body = { login: loginName, password }
+      if (captcha && captcha.token) {
+        body.captcha_token = captcha.token
+        body.captcha_answer = Math.round(Number(captcha.answer) || 0)
+      }
+      const res = await fetch(config.buildApiUrl('/api/partner/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const json = await res.json().catch(() => null)
+      // 失败次数过多触发滑块验证：把 code 透传给视图层
+      if (res.status === 428) {
+        return { success: false, code: json?.code || 'CAPTCHA_REQUIRED', message: json?.message || '' }
+      }
+      if (!json || !json.success) {
+        return { success: false, message: (json && json.message) || '登录失败' }
+      }
+      setToken(json.data.token)
+      persistProfile(json.data.partner)
+      cart.value = []
+      return { success: true }
+    } catch (error) {
+      // 网络异常等：记录日志并返回空 message，由调用方用 i18n 文案提示
+      console.error('[partner] login failed:', error)
+      return { success: false, message: '' }
     }
-    setToken(json.data.token)
-    persistProfile(json.data.partner)
-    cart.value = []
-    return { success: true }
   }
 
   function logout () {

@@ -49,9 +49,10 @@ api.interceptors.response.use(
   (error) => {
     console.error('API请求失败:', error)
     if (error.response?.status === 401) {
-      // 处理未授权错误
+      // 处理未授权错误（与 admin store 的 apiRequest 行为对齐）
       localStorage.removeItem('admin_token')
-      window.location.href = '/login'
+      localStorage.removeItem('admin_info')
+      window.location.href = `${import.meta.env.BASE_URL || '/'}login`
     }
     return Promise.reject(error)
   }

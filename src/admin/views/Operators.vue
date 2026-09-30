@@ -296,8 +296,11 @@ const resetForm = () => {
 }
 
 const handleSubmit = async () => {
+  // 校验失败：Element 已在表单项标红，静默返回，不误报操作失败
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
+
   try {
-    await formRef.value.validate()
     submitting.value = true
     
     const res = await adminStore.apiRequest('/api/admin/administrators', {
@@ -364,8 +367,11 @@ const showResetPassword = (admin) => {
 }
 
 const handleResetPassword = async () => {
+  // 校验失败：Element 已在表单项标红，静默返回，不误报操作失败
+  const valid = await passwordFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
   try {
-    await passwordFormRef.value.validate()
     submitting.value = true
     
     const res = await adminStore.apiRequest(`/api/admin/administrators/${currentEditAdmin.value.id}/reset-password`, {

@@ -541,6 +541,9 @@ async function finishAgentPaymentUi () {
     paymentQRCode.value = null
     toast.success(t('payment.complete'))
     router.push('/orders')
+  } catch (err) {
+    console.error('[partner-shop] confirm payment failed:', err)
+    toast.error(t('common.error'))
   } finally {
     submittingPay.value = false
   }
@@ -580,6 +583,9 @@ async function doSubmit () {
       return
     }
     toast.success(t('shop.orderOk'))
+  } catch (err) {
+    console.error('[partner-shop] submit order failed:', err)
+    toast.error(t('common.error'))
   } finally {
     submitting.value = false
   }

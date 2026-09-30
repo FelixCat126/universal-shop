@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useUserStore } from '../stores/user.js'
 
 const API_BASE_URL = '/api/users'
 
@@ -26,10 +27,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token过期或无效，清除本地存储并跳转到登录页
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      // window.location.href = '/login' // 这里可能需要根据路由调整
+      // Token过期或无效：同步清除 store 内存态与本地存储，并跳转登录页（带应用 base）
+      const userStore = useUserStore()
+      userStore.clearAuth()
+      if (!window.location.pathname.includes('/login') &&
+          !window.location.pathname.includes('/register')) {
+        window.location.href = `${import.meta.env.BASE_URL || '/'}login`
+      }
     }
     return Promise.reject(error)
   }

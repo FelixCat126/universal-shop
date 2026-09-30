@@ -5,6 +5,33 @@ import Order from '../models/Order.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
 
+/**
+ * 趋势统计按"服务器本地时区"的自然日分桶，SQL 与 JS 两侧口径必须一致：
+ * - Sequelize 默认把每个连接的会话时区 SET 为 UTC（options.timezone='+00:00'），
+ *   直接 DATE(created_at) 会按 UTC 分桶；故 SQL 侧显式 AT TIME ZONE <本地偏移> 得到本地日期。
+ * - JS 侧日期键用本地 getFullYear/getMonth/getDate 拼接（不能用 toISOString，那是 UTC 日期，
+ *   与本地分桶在日界错位，本机 UTC+8 时每天 00:00-08:00 会错一天）。
+ * PG 的 AT TIME ZONE 数字偏移是 POSIX 方向（东负西正），与 getTimezoneOffset 的符号天然一致。
+ * 注：偏移按查询时刻计算，跨越夏令时切换的历史行可能有 ±1h 误差（部署地无夏令时，可忽略）。
+ */
+const localDateKey = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const localTzOffsetLiteral = () => {
+  const offMin = new Date().getTimezoneOffset()
+  const sign = offMin <= 0 ? '-' : '+'
+  const abs = Math.abs(offMin)
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`
+}
+
+// 本地自然日的 SQL 分桶表达式（以下查询均为单表查询，created_at 无歧义）
+const localDateBucket = () =>
+  sequelize.fn('DATE', sequelize.literal(`created_at AT TIME ZONE '${localTzOffsetLiteral()}'`))
+
 class StatisticsController {
   // 获取统计总览数据
   static async getOverviewStats(req, res) {
@@ -65,7 +92,7 @@ class StatisticsController {
       // 获取过去7天的订单数据
       const orderTrend = await Order.findAll({
         attributes: [
-          [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
+          [localDateBucket(), 'date'],
           [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
           [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'amount']
         ],
@@ -74,8 +101,8 @@ class StatisticsController {
             [Op.gte]: sevenDaysAgo
           }
         },
-        group: [sequelize.fn('DATE', sequelize.col('created_at'))],
-        order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']]
+        group: [localDateBucket()],
+        order: [[localDateBucket(), 'ASC']]
       })
 
       // 生成完整的7天数据，包括没有订单的日期
@@ -83,7 +110,7 @@ class StatisticsController {
       for (let i = 6; i >= 0; i--) {
         const date = new Date()
         date.setDate(date.getDate() - i)
-        const dateStr = date.toISOString().split('T')[0]
+        const dateStr = localDateKey(date)
         
         const dayData = orderTrend.find(item => item.dataValues.date === dateStr)
         
@@ -119,7 +146,7 @@ class StatisticsController {
       // 获取过去7天的注册用户数据
       const userTrend = await User.findAll({
         attributes: [
-          [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
+          [localDateBucket(), 'date'],
           [sequelize.fn('COUNT', sequelize.col('id')), 'count']
         ],
         where: {
@@ -127,8 +154,8 @@ class StatisticsController {
             [Op.gte]: sevenDaysAgo
           }
         },
-        group: [sequelize.fn('DATE', sequelize.col('created_at'))],
-        order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']]
+        group: [localDateBucket()],
+        order: [[localDateBucket(), 'ASC']]
       })
 
       // 生成完整的7天数据，包括没有注册用户的日期
@@ -136,7 +163,7 @@ class StatisticsController {
       for (let i = 6; i >= 0; i--) {
         const date = new Date()
         date.setDate(date.getDate() - i)
-        const dateStr = date.toISOString().split('T')[0]
+        const dateStr = localDateKey(date)
         
         const dayData = userTrend.find(item => item.dataValues.date === dateStr)
         
@@ -230,24 +257,25 @@ class StatisticsController {
 
     const orderTrend = await Order.findAll({
       attributes: [
-        [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
+        [localDateBucket(), 'date'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('total_amount')), 'amount']
+        // 与公共 getOrderTrend 口径一致：优先泰铢底价，缺省回退结算金额
+        [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'amount']
       ],
       where: {
         created_at: {
           [Op.gte]: sevenDaysAgo
         }
       },
-      group: [sequelize.fn('DATE', sequelize.col('created_at'))],
-      order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']]
+      group: [localDateBucket()],
+      order: [[localDateBucket(), 'ASC']]
     })
 
     const trendData = []
     for (let i = 6; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = localDateKey(date)
       
       const dayData = orderTrend.find(item => item.dataValues.date === dateStr)
       
@@ -270,7 +298,7 @@ class StatisticsController {
 
     const userTrend = await User.findAll({
       attributes: [
-        [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
+        [localDateBucket(), 'date'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'count']
       ],
       where: {
@@ -278,15 +306,15 @@ class StatisticsController {
           [Op.gte]: sevenDaysAgo
         }
       },
-      group: [sequelize.fn('DATE', sequelize.col('created_at'))],
-      order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']]
+      group: [localDateBucket()],
+      order: [[localDateBucket(), 'ASC']]
     })
 
     const trendData = []
     for (let i = 6; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = localDateKey(date)
       
       const dayData = userTrend.find(item => item.dataValues.date === dateStr)
       

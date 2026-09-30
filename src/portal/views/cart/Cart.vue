@@ -71,6 +71,32 @@
                 :key="item.id"
                 class="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-200"
               >
+                <!-- 失效商品：商品已被删除，展示占位并禁选，仅允许移除 -->
+                <div v-if="item.unavailable || !item.product" class="flex items-center justify-between gap-4">
+                  <div class="flex items-center space-x-4 min-w-0">
+                    <img
+                      :src="defaultImage"
+                      alt=""
+                      class="h-16 w-16 sm:h-20 sm:w-20 rounded-md object-cover opacity-50"
+                    />
+                    <div class="min-w-0">
+                      <h3 class="text-base sm:text-lg font-medium text-gray-400">
+                        {{ t('cart.productUnavailable') }}
+                      </h3>
+                      <p class="text-sm text-gray-400 mt-1">
+                        {{ t('cart.productUnavailableDesc') }}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    @click="removeItem(item)"
+                    :disabled="updating.has(item.id)"
+                    class="flex-shrink-0 text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
+                  >
+                    <TrashIcon class="h-4 w-4" />
+                  </button>
+                </div>
+                <template v-else>
                 <!-- 桌面端布局 -->
                 <div class="hidden sm:flex sm:items-center sm:space-x-4">
                   <!-- 商品图片 -->
@@ -253,6 +279,7 @@
                     </div>
                   </div>
                 </div>
+                </template>
               </div>
             </TransitionGroup>
           </div>
@@ -289,10 +316,10 @@
           <div class="mt-6">
             <button
               @click="goToCheckout"
-              :disabled="cartStore.isEmpty || hasStockIssues"
+              :disabled="cartStore.isEmpty || hasStockIssues || hasUnavailableItems"
               class="w-full bg-blue-600 border border-transparent rounded-md shadow-sm py-3 px-4 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {{ hasStockIssues ? t('cart.stockIssue') : t('cart.checkout') }}
+              {{ hasUnavailableItems ? t('cart.productUnavailable') : hasStockIssues ? t('cart.stockIssue') : t('cart.checkout') }}
             </button>
           </div>
 
@@ -409,7 +436,12 @@ const messageClass = computed(() => {
 })
 
 const hasStockIssues = computed(() => {
-  return cartStore.items.some(item => item.quantity > item.product.stock)
+  return cartStore.items.some(item => item.product && item.quantity > item.product.stock)
+})
+
+// 失效商品（商品已被删除）存在时禁止结算，需先移除
+const hasUnavailableItems = computed(() => {
+  return cartStore.items.some(item => item.unavailable || !item.product)
 })
 
 // 获取当前语言的值
@@ -489,7 +521,7 @@ const confirmClearCart = async () => {
 
 // 去结算
 const goToCheckout = () => {
-  if (cartStore.isEmpty || hasStockIssues.value) return
+  if (cartStore.isEmpty || hasStockIssues.value || hasUnavailableItems.value) return
   router.push('/checkout')
 }
 

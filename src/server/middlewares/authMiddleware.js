@@ -49,6 +49,15 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET)
+    // 三套身份（user/admin/partner）共用 JWT_SECRET：拒绝 admin/partner token 进入用户接口；
+    // type 为 undefined 的存量旧 token 放行，兼容已签发 token。
+    // 返回 401 而非 403：与"用户不存在"分支及既有 API 契约（跨端 token 一律 401）保持一致
+    if (decoded.type && decoded.type !== 'user') {
+      return res.status(401).json({
+        success: false,
+        message: '无效的认证令牌'
+      })
+    }
     const status = await loadUserStatus(decoded.userId)
     if (!status.exists) {
       return res.status(401).json({ success: false, message: '无效的认证令牌' })

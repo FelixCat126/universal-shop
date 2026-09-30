@@ -29,6 +29,7 @@ import systemConfigRoutes from './routes/systemConfigRoutes.js'
 import administrativeRegionsRoutes from './routes/administrativeRegions.js'
 import partnerRoutes from './routes/partnerRoutes.js'
 import securityRoutes from './routes/securityRoutes.js'
+import { startOrderTimeoutSweeper } from './services/orderTimeoutService.js'
 
 // 导入模型以确保数据库同步
 import './models/User.js'
@@ -354,8 +355,13 @@ async function ensureExchangeRatesConfig () {
 
 // 数据库连接和同步（PostgreSQL）
 // 测试环境由 TestDatabase 接管 sync，避免与 vitest setup 重复跑出"relation does not exist"
+// dbReady/dbReadyState 供 startServer 等待、/api/health 上报就绪状态；
+// 测试环境该链不执行，直接视为就绪，保证 import app 不受影响
+let dbReady
+let dbReadyState
 if (process.env.NODE_ENV !== 'test') {
-  sequelize.authenticate()
+  dbReadyState = 'pending'
+  dbReady = sequelize.authenticate()
     .then(() => {
       console.log('✅ 数据库连接成功')
       return sequelize.sync({ alter: false })
@@ -371,15 +377,32 @@ if (process.env.NODE_ENV !== 'test') {
     .then(() => ensureExchangeRatesConfig())
     .then(() => ensureProductCategoriesMigrate())
     .then(() => {
+      dbReadyState = 'ready'
       console.log('✅ 数据库模型同步成功')
     })
+    .then(() => {
+      // 启动 pending 在线支付订单超时清扫（默认 10 分钟未支付自动删单回补库存）
+      // 测试环境整条链不执行；startOrderTimeoutSweeper 内部也有 NODE_ENV==='test' 双保险
+      // try/catch 兜底：清扫器启动失败不影响 dbReadyState='ready'，避免 /api/health 误报 503
+      try {
+        startOrderTimeoutSweeper()
+      } catch (err) {
+        console.error('⚠️ 订单超时清扫器启动失败（不影响主服务）:', err.message)
+      }
+    })
     .catch(err => {
+      dbReadyState = 'failed'
       console.error('❌ 数据库连接或同步失败:', err.message)
       console.error('📋 详细错误信息:', err)
       if (err.sql) {
         console.error('📝 SQL语句:', err.sql)
       }
+      // 保留原有错误输出后继续抛出，startServer 据此拒绝启动
+      throw err
     })
+} else {
+  dbReadyState = 'ready'
+  dbReady = Promise.resolve()
 }
 
 // API路由
@@ -404,15 +427,26 @@ console.log('✅ API路由注册完成')
 
 // 健康检查（必须在API 404处理之前）
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true, 
+  // 数据库未就绪时返回 503，供探活/负载均衡摘流，避免冷启动窗口请求打到未同步的表
+  if (dbReadyState !== 'ready') {
+    return res.status(503).json({
+      success: false,
+      ready: false,
+      message: '数据库未就绪',
+      timestamp: new Date().toISOString(),
+      port: PORT
+    })
+  }
+  res.json({
+    success: true,
+    ready: true,
     message: '服务器运行正常 (HTTP模式)',
     timestamp: new Date().toISOString(),
     port: PORT
   })
 })
 
-/** 排查部署：返回 package 版本与 dist/portal/index.html 修改时间（确认是否已同步新前端） */
+/** 排查部署：返回 package 版本与 dist/portal/index.html 修改时间（确认是否已同步新前端；不暴露服务器绝对路径） */
 app.get('/api/portal-build', (req, res) => {
   try {
     const pkgPath = path.join(projectRoot, 'package.json')
@@ -423,7 +457,6 @@ app.get('/api/portal-build', (req, res) => {
       success: true,
       appVersion: pkg.version,
       portalIndexModified: st.mtime.toISOString(),
-      portalDir,
       hint: '若公网仍为旧界面：对比 portalIndexModified 是否为本次部署时间；过旧则多为 Nginx/OSS 未指向本机 dist，或 CDN 缓存未刷新'
     })
   } catch (e) {
@@ -585,7 +618,15 @@ app.use('*', notFoundHandler)
 app.use(errorHandler)
 
 // 启动服务器函数
-export function startServer() {
+export async function startServer() {
+  // 先等待数据库就绪；失败即退出（非零码），避免冷启动窗口内请求打到未同步的表返回 500
+  try {
+    await dbReady
+  } catch {
+    console.error('❌ 数据库未就绪，服务器拒绝启动')
+    process.exit(1)
+  }
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log('')
     console.log('🎉 Universal Shop 启动成功！')

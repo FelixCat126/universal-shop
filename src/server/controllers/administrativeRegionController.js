@@ -36,6 +36,13 @@ export const getProvinces = async (req, res) => {
 export const getDistricts = async (req, res) => {
   try {
     const { id } = req.params
+    // 非正整数 id 会让 PG 抛 invalid input syntax（500），提前返回 400
+    if (!/^\d+$/.test(String(id)) || Number(id) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的区域ID'
+      })
+    }
     const { locale = 'th-TH' } = req.query
     
     const districts = await AdministrativeRegion.getDistricts(id, locale)
@@ -56,6 +63,13 @@ export const getDistricts = async (req, res) => {
 export const getSubDistricts = async (req, res) => {
   try {
     const { id } = req.params
+    // 非正整数 id 会让 PG 抛 invalid input syntax（500），提前返回 400
+    if (!/^\d+$/.test(String(id)) || Number(id) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的区域ID'
+      })
+    }
     const { locale = 'th-TH' } = req.query
     
     const subDistricts = await AdministrativeRegion.getSubDistricts(id, locale)

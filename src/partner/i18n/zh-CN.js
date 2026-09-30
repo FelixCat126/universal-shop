@@ -28,6 +28,18 @@ export default {
     hintPwd: '显示密码',
     forgotHint: '忘记密码请联系运营管理员重置'
   },
+  captcha: {
+    title: '安全验证',
+    slideTip: '按住滑块拖动，将拼图拼合到缺口处',
+    success: '验证通过',
+    failed: '验证未通过，请重试',
+    loading: '验证码加载中…',
+    loadFailed: '验证码加载失败，点击重试'
+  },
+  notFound: {
+    title: '页面不存在或已被移除',
+    backHome: '返回首页'
+  },
   shop: {
     title: '商品目录',
     search: '搜索商品名称',
@@ -151,8 +163,8 @@ export default {
     unsupportedCountryCode: '不支持的国家区号',
     phoneDigitsOnly: '手机号只能包含数字',
     phonePatternChina: '中国手机号必须以1开头，第二位为3-9',
-    phonePatternThailand: '泰国手机号必须以2-9开头',
-    phonePatternMalaysia: '马来西亚手机号必须以1开头',
+    phonePatternThailand: '泰国手机号必须为9-10位数字，以6、8或9开头',
+    phonePatternMalaysia: '马来西亚手机号必须为9-10位数字，以1开头',
     phoneInvalidFormat: '手机号格式不正确'
   },
   address: {

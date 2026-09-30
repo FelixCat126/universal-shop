@@ -4,12 +4,14 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
+import { fileTypeFromFile } from 'file-type'
+import { ApiError } from '../middlewares/errorHandler.js'
 import { logger } from '../utils/logger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const CURRENCY_CODES = ['THB', 'USD', 'CNY']
+const CURRENCY_CODES = ['THB', 'USD', 'CNY', 'MYR']
 
 function normalizeCurrencyCodeForApi (raw) {
   if (raw == null || raw === '') return 'THB'
@@ -50,6 +52,25 @@ function parseExchangeRatesBody (raw) {
   }
   return null
 }
+// 与 uploadController 保持一致的真实图片类型白名单（按魔法字节判定）
+const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+/**
+ * 通过读取文件魔法字节确认真实类型是否为白名单图片；
+ * 不是则删除已写入的文件并抛出带 status=400 的错误。
+ * 挂在 multer 写盘之后、业务处理之前执行，防止伪造 Content-Type / 改后缀上传。
+ */
+async function assertImageMagicBytes (filePath) {
+  const sig = await fileTypeFromFile(filePath).catch(() => null)
+  const ok = sig && ALLOWED_IMAGE_MIMES.has(sig.mime)
+  if (!ok) {
+    try { await fs.unlink(filePath) } catch {}
+    const err = new Error('文件内容并非允许的图片格式（魔法字节校验失败）')
+    err.status = 400
+    throw err
+  }
+}
+
 // 配置文件上传
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -74,26 +95,27 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB限制
   },
+  // fileFilter 的错误会进入全局 errorHandler：用 ApiError 携带 400，否则按默认分支落成 500
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
-    
+
     // 检查MIME类型
     if (!allowedTypes.includes(file.mimetype)) {
-      return cb(new Error('只允许上传图片文件 (JPEG, PNG, GIF, WebP)'), false)
+      return cb(new ApiError('只允许上传图片文件 (JPEG, PNG, GIF, WebP)', 400), false)
     }
-    
+
     // 检查文件扩展名
     const ext = path.extname(file.originalname).toLowerCase()
     if (!allowedExts.includes(ext)) {
-      return cb(new Error('不支持的文件扩展名'), false)
+      return cb(new ApiError('不支持的文件扩展名', 400), false)
     }
-    
+
     // 检查文件名安全性（防止路径遍历）
     if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
-      return cb(new Error('文件名包含非法字符'), false)
+      return cb(new ApiError('文件名包含非法字符', 400), false)
     }
-    
+
     cb(null, true)
   }
 })
@@ -153,20 +175,20 @@ class SystemConfigController {
         })
       }
       
-      // 货币单位：仅允许 THB / USD / CNY，默认泰铢
+      // 货币单位：仅允许 THB / USD / CNY / MYR，默认泰铢
       if (key === 'currency_unit') {
         const raw = value == null ? '' : String(value).trim().toUpperCase()
         if (!CURRENCY_CODES.includes(raw)) {
           return res.status(400).json({
             success: false,
-            message: '货币单位必须是 THB（泰铢）、USD（美元）或 CNY（人民币）之一'
+            message: '货币单位必须是 THB（泰铢）、USD（美元）、CNY（人民币）或 MYR（马来西亚令吉）之一'
           })
         }
         const config = await SystemConfig.setConfig(
           key,
           raw,
           type || 'text',
-          description || '全站货币代码 THB|USD|CNY'
+          description || '全站货币代码 THB|USD|CNY|MYR'
         )
         return res.json({
           success: true,
@@ -188,7 +210,22 @@ class SystemConfigController {
         for (const k of FX_KEYS) {
           const rawV = parsed[k]
           if (rawV != null && rawV !== '') {
-            const dec = String(rawV).split('.')
+            // 只接受 string/number 标量；数组/对象/boolean 等直接拒绝，防止强转出脏值
+            if (typeof rawV !== 'string' && typeof rawV !== 'number') {
+              return res.status(400).json({
+                success: false,
+                message: `${k} 汇率必须是有效的数字`
+              })
+            }
+            const n = Number(String(rawV).trim())
+            if (!Number.isFinite(n) || n < 0) {
+              return res.status(400).json({
+                success: false,
+                message: `${k} 汇率必须是 ≥ 0 的有限数字`
+              })
+            }
+            // 先 trim 再拆小数位（与下方单笔 exchange_rate 路径一致），避免 "7.25 " 被误判超 2 位小数
+            const dec = String(rawV).trim().split('.')
             if (dec.length > 1 && dec[1].length > 2) {
               return res.status(400).json({
                 success: false,
@@ -213,9 +250,18 @@ class SystemConfigController {
 
       // 兼容：单笔 exchange_rate 视为美元/USDT 比例，并写回 exchange_rates.USD
       if (key === 'exchange_rate') {
-        const numValue = parseFloat(value)
+        // 只接受 string/number 标量；数组/对象/boolean 直接 400，防止 parseFloat 强转出脏值
+        if (typeof value !== 'string' && typeof value !== 'number') {
+          return res.status(400).json({
+            success: false,
+            message: '汇算比例必须是有效的数字'
+          })
+        }
+        const text = typeof value === 'string' ? value.trim() : String(value)
+        // Number('') / Number('   ') 会被强转为 0，空串按无效数字拒绝
+        const numValue = text === '' ? NaN : Number(text)
 
-        if (isNaN(numValue)) {
+        if (!Number.isFinite(numValue)) {
           return res.status(400).json({
             success: false,
             message: '汇算比例必须是有效的数字'
@@ -229,7 +275,7 @@ class SystemConfigController {
           })
         }
 
-        const decimalParts = value.toString().split('.')
+        const decimalParts = text.split('.')
         if (decimalParts.length > 1 && decimalParts[1].length > 2) {
           return res.status(400).json({
             success: false,
@@ -323,6 +369,13 @@ class SystemConfigController {
           })
         }
 
+        // 魔法字节校验（防止伪造 Content-Type / 改后缀名上传），失败时文件已被删除
+        try {
+          await assertImageMagicBytes(req.file.path)
+        } catch (e) {
+          return res.status(e.status || 400).json({ success: false, message: e.message })
+        }
+
         const imageUrl = `/uploads/system/${req.file.filename}`
         
         // 删除旧的首页长图
@@ -376,6 +429,13 @@ class SystemConfigController {
             success: false,
             message: '请选择要上传的二维码图片'
           })
+        }
+
+        // 魔法字节校验（防止伪造 Content-Type / 改后缀名上传），失败时文件已被删除
+        try {
+          await assertImageMagicBytes(req.file.path)
+        } catch (e) {
+          return res.status(e.status || 400).json({ success: false, message: e.message })
         }
 
         const imageUrl = `/uploads/system/${req.file.filename}`

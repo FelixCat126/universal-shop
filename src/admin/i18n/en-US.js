@@ -71,6 +71,21 @@ export default {
     copyright: '© 2024 Mall Management System. All rights reserved.'
   },
 
+  // Slider captcha
+  captcha: {
+    title: 'Security Verification',
+    slideTip: 'Hold and drag the slider to fit the puzzle piece into the notch',
+    success: 'Verified',
+    failed: 'Verification failed, please try again',
+    loading: 'Loading captcha...'
+  },
+
+  // 404 page
+  notFound: {
+    title: 'Page Not Found',
+    backHome: 'Back to Home'
+  },
+
   // Form validation
   validation: {
     usernameRequired: 'Please enter username',
@@ -333,7 +348,8 @@ export default {
     currencyOptions: {
       THB: 'Thai Baht ฿',
       USD: 'US Dollar $',
-      CNY: 'Chinese Yuan ¥'
+      CNY: 'Chinese Yuan ¥',
+      MYR: 'Malaysian Ringgit RM'
     },
 
     uploadTips: {
@@ -617,6 +633,8 @@ export default {
     statusOptions: {
       completed: 'Completed',
       pending: 'Pending',
+      paid: 'Paid',
+      delivered: 'Delivered',
       cancelled: 'Cancelled',
       processing: 'Processing',
       shipped: 'Shipped',

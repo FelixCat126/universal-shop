@@ -4,14 +4,13 @@ import Cart from '../models/Cart.js'
 import sequelize from '../config/database.js'
 import { Op } from 'sequelize'
 import { logger } from '../utils/logger.js'
+import { resolvePagination } from '../utils/pagination.js'
 
 class ProductController {
   // 获取所有产品（分页和搜索）
   static async getProducts(req, res) {
     try {
       const {
-        page = 1,
-        pageSize = 20,
         name = '',
         category_id: categoryIdParam = '',
         category: categoryLegacy = '',
@@ -19,8 +18,8 @@ class ProductController {
         listingStatus = ''
       } = req.query
 
-      const offset = (page - 1) * pageSize
-      const limit = parseInt(pageSize)
+      // 公开接口：分页参数统一 clamp，防止负 offset / 超大 limit 打到数据库
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { maxPageSize: 100 })
 
       // 构建查询条件
       const where = {}
@@ -119,8 +118,8 @@ class ProductController {
         data: {
           products: products,
           total: count,
-          page: parseInt(page),
-          pageSize: parseInt(pageSize),
+          page,
+          pageSize,
           totalPages: Math.ceil(count / pageSize)
         }
       })
@@ -239,14 +238,45 @@ class ProductController {
         })
       }
 
+      // 价格：0-99999999 的有限数值，拒绝 NaN/Infinity/null/空串（Number(null|Number('') 为 0，需显式拦截）
+      const priceNum = (price === null || price === '') ? NaN : Number(price)
+      if (!Number.isFinite(priceNum) || priceNum < 0 || priceNum > 99999999) {
+        return res.status(400).json({
+          success: false,
+          message: '价格必须为 0-99999999 之间的有效数字'
+        })
+      }
+
+      // 库存：0-100000000 的非负整数，拒绝小数与字符串拼接（如 "10abc"）
+      const stockNum = (stock === null || stock === '') ? NaN : Number(stock)
+      if (!Number.isInteger(stockNum) || stockNum < 0 || stockNum > 100000000) {
+        return res.status(400).json({
+          success: false,
+          message: '库存必须为 0-100000000 之间的整数'
+        })
+      }
+
+      // 折扣：null/'' 视为无折扣；否则必须是 0-100 的整数（在控制器层拦截，避免落到模型校验变 500）
+      let discountNum = null
+      if (discount !== undefined && discount !== null && discount !== '') {
+        const d = Number(discount)
+        if (!Number.isInteger(d) || d < 0 || d > 100) {
+          return res.status(400).json({
+            success: false,
+            message: '折扣必须为 0-100 之间的整数'
+          })
+        }
+        discountNum = d
+      }
+
       const product = await Product.create({
         name,
         alias: alias || null,
         description,
         category_id: cid,
-        price: parseFloat(price),
-        stock: parseInt(stock),
-        discount: discount !== undefined && discount !== null && discount !== '' ? parseInt(discount) : null,
+        price: priceNum,
+        stock: stockNum,
+        discount: discountNum,
         image: image || null,
         points: pts
       })
@@ -346,14 +376,57 @@ class ProductController {
         nextCategoryId = u
       }
 
+      // 价格：仅在传入时校验，0-99999999 的有限数值
+      let nextPrice = product.price
+      if (price !== undefined) {
+        const p = (price === null || price === '') ? NaN : Number(price)
+        if (!Number.isFinite(p) || p < 0 || p > 99999999) {
+          return res.status(400).json({
+            success: false,
+            message: '价格必须为 0-99999999 之间的有效数字'
+          })
+        }
+        nextPrice = p
+      }
+
+      // 库存：仅在传入时校验，0-100000000 的非负整数，拒绝小数与字符串拼接
+      let nextStock = product.stock
+      if (stock !== undefined) {
+        const s = (stock === null || stock === '') ? NaN : Number(stock)
+        if (!Number.isInteger(s) || s < 0 || s > 100000000) {
+          return res.status(400).json({
+            success: false,
+            message: '库存必须为 0-100000000 之间的整数'
+          })
+        }
+        nextStock = s
+      }
+
+      // 折扣：null/'' 表示清除折扣；否则必须是 0-100 的整数（在控制器层拦截，避免落到模型校验变 500）
+      let nextDiscount = product.discount
+      if (discount !== undefined) {
+        if (discount === null || discount === '') {
+          nextDiscount = null
+        } else {
+          const d = Number(discount)
+          if (!Number.isInteger(d) || d < 0 || d > 100) {
+            return res.status(400).json({
+              success: false,
+              message: '折扣必须为 0-100 之间的整数'
+            })
+          }
+          nextDiscount = d
+        }
+      }
+
       await product.update({
         name: name || product.name,
         alias: alias !== undefined ? (alias || null) : product.alias,
         description: description !== undefined ? description : product.description,
         category_id: nextCategoryId,
-        price: price !== undefined ? parseFloat(price) : product.price,
-        stock: stock !== undefined ? parseInt(stock) : product.stock,
-        discount: discount !== undefined ? (discount === null || discount === '' ? null : parseInt(discount)) : product.discount,
+        price: nextPrice,
+        stock: nextStock,
+        discount: nextDiscount,
         image: image !== undefined ? image : product.image,
         points: nextPoints
       })

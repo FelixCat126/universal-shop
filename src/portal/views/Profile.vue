@@ -1103,8 +1103,10 @@ const getStatusStyle = (status) => {
 const getStatusText = (status) => {
   const statusMap = {
     pending: t('order.status.pending'),
+    paid: t('order.status.paid'),
     shipping: t('order.status.shipping'),
     shipped: t('order.status.shipped'),
+    delivered: t('order.status.delivered'),
     completed: t('order.status.completed'),
     cancelled: t('order.status.cancelled')
   }
@@ -1338,6 +1340,8 @@ const setupPointsIntersection = () => {
 const pointTxTitle = (tx) => {
   if (tx.type === 'earn_purchase') return t('profile.pointTypeEarn')
   if (tx.type === 'redeem_order') return t('profile.pointTypeRedeem')
+  if (tx.type === 'refund_cancel') return t('profile.pointTypeRefund')
+  if (tx.type === 'revoke_cancel') return t('profile.pointTypeRevoke')
   return tx.type || '—'
 }
 
@@ -1586,15 +1590,15 @@ const validateProfile = () => {
   let isValid = true
   
   if (!profileForm.value.nickname || profileForm.value.nickname.trim().length === 0) {
-    profileErrors.value.nickname = '请输入昵称'
+    profileErrors.value.nickname = t('validation.nicknameRequired')
     isValid = false
   } else if (profileForm.value.nickname.trim().length > 50) {
-    profileErrors.value.nickname = '昵称不能超过50个字符'
+    profileErrors.value.nickname = t('validation.nicknameMaxLength')
     isValid = false
   }
   
   if (profileForm.value.email && !/^\S+@\S+\.\S+$/.test(profileForm.value.email)) {
-    profileErrors.value.email = '请输入有效的邮箱地址'
+    profileErrors.value.email = t('validation.email')
     isValid = false
   }
   

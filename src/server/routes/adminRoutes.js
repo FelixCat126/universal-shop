@@ -37,7 +37,7 @@ router.use(authenticateAdmin)
 
 // 管理员订单路由（需要orders权限）
 // 注意：具体路径必须放在 /:id 通配之前，否则 GET /orders/export 会被 /orders/:id 抢先匹配
-router.get('/orders/export', requirePermission('orders'), OrderController.exportOrders)
+router.get('/orders/export', requirePermission('orders'), logOperation('export', 'orders'), OrderController.exportOrders)
 router.get('/orders', requirePermission('orders'), OrderController.getAllOrders)
 router.get('/orders/:id', requirePermission('orders'), OrderController.getOrderDetail)
 router.put('/orders/:id/status', requirePermission('orders'), logOperation('update_order_status', 'order'), OrderController.updateOrderStatus)
@@ -48,7 +48,7 @@ router.get('/partners', requirePermission('partners'), PartnerAdminController.li
 router.post('/partners', requirePermission('partners'), logOperation('create_partner', 'partner'), PartnerAdminController.createPartner)
 router.put('/partners/:id', requirePermission('partners'), logOperation('update_partner', 'partner'), PartnerAdminController.updatePartner)
 router.put('/partners/:id/password', requirePermission('partners'), logOperation('reset_partner_password', 'partner'), PartnerAdminController.resetPartnerPassword)
-router.get('/partner-orders/export', requirePermission('partners'), PartnerAdminController.exportPartnerOrders)
+router.get('/partner-orders/export', requirePermission('partners'), logOperation('export', 'partner_orders'), PartnerAdminController.exportPartnerOrders)
 router.get('/partner-orders', requirePermission('partners'), PartnerAdminController.listPartnerOrders)
 router.put('/partner-orders/:id/status', requirePermission('partners'), logOperation('update_partner_order_status', 'partner_order'), PartnerAdminController.updatePartnerOrderStatus)
 

@@ -64,6 +64,31 @@ const observeVisibilityDirective = {
 }
 app.directive('observe-visibility', observeVisibilityDirective)
 
+/**
+ * 前端错误兜底：发新版后浏览器仍缓存旧 index.html，引用已不存在的旧 chunk，
+ * 路由懒加载/预加载动态 import 会失败。检测到后整页刷新拉取新资源；
+ * sessionStorage 记录上次刷新时间，10 秒内最多刷新一次，防止刷新循环。
+ */
+const CHUNK_RELOAD_KEY = 'portal:last-chunk-reload'
+
+const isChunkLoadError = (err) => {
+  const msg = String(err?.message || err || '')
+  return /dynamically imported module|Importing a module script failed|error loading/i.test(msg)
+}
+
+router.onError((err) => {
+  if (!isChunkLoadError(err)) return
+  const now = Date.now()
+  const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+  if (now - last < 10000) return
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now))
+  window.location.reload()
+})
+
+window.addEventListener('vite:preloadError', () => {
+  window.location.reload()
+})
+
 app.mount('#app')
 
 // 应用已挂载到DOM

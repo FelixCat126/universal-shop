@@ -13,6 +13,7 @@ import {
   validateMoqOrThrow
 } from '../services/partnerPricingService.js'
 import { getPartnerMoqFromDb } from '../utils/partnerMoq.js'
+import { withDeadlockRetry } from '../utils/dbRetry.js'
 import {
   isPartnerAgent,
   PARTNER_AGENT_MAX_DISTINCT_PRODUCTS,
@@ -61,14 +62,21 @@ function formatPartnerDeliveryBlock (addr) {
   return lines.join('\n')
 }
 
+/** 严格正整数解析：先 Number()，非整数或 <1 抛 400，不做 parseInt 式静默截断（如 3.7→3） */
+function requirePositiveInt (value, label) {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 1) {
+    throw Object.assign(new Error(`${label}必须是不小于 1 的整数`), { status: 400 })
+  }
+  return n
+}
+
 /** 合并同一 SKU 多行（防重复提交），返回去重后的 [{ product_id, quantity }] */
 function mergePartnerOrderLineItems (items) {
   const m = new Map()
   for (const raw of items || []) {
-    const productId = parseInt(raw.product_id, 10)
-    const qty = parseInt(raw.quantity, 10)
-    if (!Number.isInteger(productId) || productId < 1) continue
-    if (!Number.isInteger(qty) || qty < 1) continue
+    const productId = requirePositiveInt(raw?.product_id, '商品 ID')
+    const qty = requirePositiveInt(raw?.quantity, '商品数量')
     m.set(productId, (m.get(productId) || 0) + qty)
   }
   return [...m.entries()].map(([product_id, quantity]) => ({ product_id, quantity }))
@@ -229,194 +237,229 @@ class PartnerPortalController {
   }
 
   static async createOrder (req, res) {
-    const transaction = await sequelize.transaction()
+    // —— 事务外：请求级解析（控制器自带整数防御，不依赖路由层 Joi）——
+    const partnerRow = req.partnerFull
+    const body = req.body || {}
+    const itemsRaw = Array.isArray(body.items) ? body.items : []
+    let mergedItems
     try {
-      const partnerRow = req.partnerFull
-      const body = req.body || {}
-      const itemsRaw = Array.isArray(body.items) ? body.items : []
-      const mergedItems = mergePartnerOrderLineItems(itemsRaw)
-      const notes = body.notes != null ? String(body.notes) : ''
-      const partner_address_id = parseInt(body.partner_address_id, 10)
+      mergedItems = mergePartnerOrderLineItems(itemsRaw)
+    } catch (e) {
+      return res.status(e.status || 400).json({ success: false, message: e.message })
+    }
+    const notes = body.notes != null ? String(body.notes) : ''
+    const partner_address_id = parseInt(body.partner_address_id, 10)
 
-      const agent = isPartnerAgent(partnerRow)
+    const agent = isPartnerAgent(partnerRow)
+
+    /**
+     * 下单事务整体包 withDeadlockRetry：PG 40P01/40001 时重建事务重试。
+     * fn 可重入（所有 DB 写都在事务内，重试从头再来）；业务校验失败返回
+     * { ok:false, status, message } 不触发重试；res.json 等响应副作用一律在事务外。
+     */
+    let result
+    try {
       const moqResolved = agent
         ? { moqUnit: PARTNER_AGENT_MOQ_UNIT, moqMultiplier: PARTNER_AGENT_MOQ_MULTIPLIER }
         : await getPartnerMoqFromDb()
       const moqUnit = moqResolved.moqUnit
       const moqMultiplier = moqResolved.moqMultiplier
 
-      if (!partner_address_id || partner_address_id < 1) {
-        await transaction.rollback()
-        return res.status(400).json({ success: false, message: '请选择收货地址' })
-      }
-
-      const addrRow = await PartnerAddress.findOne({
-        where: { id: partner_address_id, partner_id: partnerRow.id },
-        transaction
-      })
-      if (!addrRow) {
-        await transaction.rollback()
-        return res.status(400).json({ success: false, message: '收货地址不存在或不属于当前账号' })
-      }
-
-      const contact_name = addrRow.recipient_name
-      const contact_phone = formatPartnerPhoneOnly(addrRow)
-      const delivery_address = formatPartnerDeliveryBlock(addrRow)
-
-      if (mergedItems.length === 0) {
-        await transaction.rollback()
-        return res.status(400).json({ success: false, message: '订货明细不能为空或 SKU/数量无效' })
-      }
-
-      const discountPercent = parseFloat(partnerRow.discount_percent) || 0
-
-      if (agent && mergedItems.length > PARTNER_AGENT_MAX_DISTINCT_PRODUCTS) {
-        await transaction.rollback()
-        return res.status(400).json({
-          success: false,
-          message: `代理账号每笔订单最多订购 ${PARTNER_AGENT_MAX_DISTINCT_PRODUCTS} 种不同商品`
-        })
-      }
-
-      const ids = mergedItems.map((it) => it.product_id)
-      const products = await Product.findAll({
-        where: { id: { [Op.in]: ids }, status: 'active' },
-        paranoid: true,
-        transaction
-      })
-      const map = new Map(products.map((p) => [p.id, p]))
-
-      let total = 0
-      const lines = []
-
-      for (const raw of mergedItems) {
-        const productId = parseInt(raw.product_id, 10)
-        const qty = parseInt(raw.quantity, 10)
+      result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
         try {
-          validateMoqOrThrow(qty, moqUnit, moqMultiplier)
-        } catch (err) {
-          await transaction.rollback()
-          const code = err.status || 400
-          return res.status(code).json({ success: false, message: err.message })
-        }
-
-        const product = map.get(productId)
-        if (!product) {
-          await transaction.rollback()
-          return res.status(400).json({ success: false, message: `商品不存在或已下架: ${productId}` })
-        }
-
-        const pj = product.toJSON()
-        const baseUnit = retailBaseUnitThb(pj)
-        const unitPrice = partnerUnitPriceAfterDiscount(pj, discountPercent)
-        const lineTotal = Math.round(unitPrice * qty * 100) / 100
-
-        lines.push({
-          product_id: productId,
-          quantity: qty,
-          base_unit_thb: baseUnit,
-          unit_price_thb: unitPrice,
-          line_total_thb: lineTotal,
-          partner_discount_percent_snapshot: discountPercent,
-          product_name_snapshot: pj.name || pj.alias || '',
-          product_image_snapshot: pj.image || null
-        })
-
-        total = Math.round((total + lineTotal) * 100) / 100
-      }
-
-      let order_no = genPartnerOrderNo()
-      let order
-      let tries = 0
-      while (tries < 5) {
-        try {
-          order = await PartnerOrder.create({
-            partner_id: partnerRow.id,
-            partner_address_id,
-            order_no,
-            currency_code: 'THB',
-            total_amount_thb: total,
-            status: agent ? 'pending_payment' : 'submitted',
-            notes,
-            contact_name,
-            contact_phone,
-            delivery_address
-          }, { transaction })
-          break
-        } catch {
-          tries++
-          order_no = genPartnerOrderNo()
-        }
-      }
-      if (!order) {
-        await transaction.rollback()
-        return res.status(500).json({ success: false, message: '生成订单号失败' })
-      }
-
-      /**
-       * 防超卖：用条件 UPDATE 原子扣减 Product.stock，且仅在 stock>=qty 时生效
-       * 之前的实现完全未扣库存（可永远超卖），本次一并修复。
-       */
-      for (const line of lines) {
-        const [affected] = await Product.update(
-          { stock: sequelize.literal(`stock - ${parseInt(line.quantity, 10)}`) },
-          {
-            where: {
-              id: line.product_id,
-              stock: { [Op.gte]: parseInt(line.quantity, 10) }
-            },
-            transaction
+          if (!partner_address_id || partner_address_id < 1) {
+            await transaction.rollback()
+            return { ok: false, status: 400, message: '请选择收货地址' }
           }
-        )
-        if (!affected) {
-          await transaction.rollback()
-          return res.status(400).json({
-            success: false,
-            message: `商品库存不足（商品 ID ${line.product_id}）`
+
+          const addrRow = await PartnerAddress.findOne({
+            where: { id: partner_address_id, partner_id: partnerRow.id },
+            transaction
           })
+          if (!addrRow) {
+            await transaction.rollback()
+            return { ok: false, status: 400, message: '收货地址不存在或不属于当前账号' }
+          }
+
+          const contact_name = addrRow.recipient_name
+          const contact_phone = formatPartnerPhoneOnly(addrRow)
+          const delivery_address = formatPartnerDeliveryBlock(addrRow)
+
+          if (mergedItems.length === 0) {
+            await transaction.rollback()
+            return { ok: false, status: 400, message: '订货明细不能为空或 SKU/数量无效' }
+          }
+
+          const discountPercent = parseFloat(partnerRow.discount_percent) || 0
+
+          if (agent && mergedItems.length > PARTNER_AGENT_MAX_DISTINCT_PRODUCTS) {
+            await transaction.rollback()
+            return {
+              ok: false,
+              status: 400,
+              message: `代理账号每笔订单最多订购 ${PARTNER_AGENT_MAX_DISTINCT_PRODUCTS} 种不同商品`
+            }
+          }
+
+          const ids = mergedItems.map((it) => it.product_id)
+          const products = await Product.findAll({
+            where: { id: { [Op.in]: ids }, status: 'active' },
+            paranoid: true,
+            transaction
+          })
+          const map = new Map(products.map((p) => [p.id, p]))
+
+          let total = 0
+          const lines = []
+
+          for (const raw of mergedItems) {
+            // mergedItems 已经过严格正整数校验，直接使用，不再 parseInt 截断
+            const productId = raw.product_id
+            const qty = raw.quantity
+            try {
+              validateMoqOrThrow(qty, moqUnit, moqMultiplier)
+            } catch (err) {
+              await transaction.rollback()
+              return { ok: false, status: err.status || 400, message: err.message }
+            }
+
+            const product = map.get(productId)
+            if (!product) {
+              await transaction.rollback()
+              return { ok: false, status: 400, message: `商品不存在或已下架: ${productId}` }
+            }
+
+            const pj = product.toJSON()
+            const baseUnit = retailBaseUnitThb(pj)
+            const unitPrice = partnerUnitPriceAfterDiscount(pj, discountPercent)
+            const lineTotal = Math.round(unitPrice * qty * 100) / 100
+
+            lines.push({
+              product_id: productId,
+              quantity: qty,
+              base_unit_thb: baseUnit,
+              unit_price_thb: unitPrice,
+              line_total_thb: lineTotal,
+              partner_discount_percent_snapshot: discountPercent,
+              product_name_snapshot: pj.name || pj.alias || '',
+              product_image_snapshot: pj.image || null
+            })
+
+            total = Math.round((total + lineTotal) * 100) / 100
+          }
+
+          let order_no = genPartnerOrderNo()
+          let order
+          let tries = 0
+          while (tries < 5) {
+            try {
+              order = await PartnerOrder.create({
+                partner_id: partnerRow.id,
+                partner_address_id,
+                order_no,
+                currency_code: 'THB',
+                total_amount_thb: total,
+                status: agent ? 'pending_payment' : 'submitted',
+                notes,
+                contact_name,
+                contact_phone,
+                delivery_address
+              }, { transaction })
+              break
+            } catch (err) {
+              // 只吞订单号唯一冲突重生单号；死锁等错误上抛给 withDeadlockRetry 重建事务
+              if (err && err.name === 'SequelizeUniqueConstraintError') {
+                tries++
+                order_no = genPartnerOrderNo()
+                continue
+              }
+              throw err
+            }
+          }
+          if (!order) {
+            await transaction.rollback()
+            return { ok: false, status: 500, message: '生成订单号失败' }
+          }
+
+          /**
+           * 防超卖：用条件 UPDATE 原子扣减 Product.stock，且仅在 stock>=qty 时生效
+           * 之前的实现完全未扣库存（可永远超卖），本次一并修复。
+           */
+          for (const line of lines) {
+            const [affected] = await Product.update(
+              { stock: sequelize.literal(`stock - ${line.quantity}`) },
+              {
+                where: {
+                  id: line.product_id,
+                  stock: { [Op.gte]: line.quantity }
+                },
+                transaction
+              }
+            )
+            if (!affected) {
+              await transaction.rollback()
+              return {
+                ok: false,
+                status: 400,
+                message: `商品库存不足（商品 ID ${line.product_id}）`
+              }
+            }
+          }
+
+          // 一次性写入订单明细
+          const itemRows = lines.map((line) => ({ partner_order_id: order.id, ...line }))
+          if (itemRows.length > 0) {
+            await PartnerOrderItem.bulkCreate(itemRows, { transaction })
+          }
+
+          await transaction.commit()
+          return { ok: true, order, lines }
+        } catch (e) {
+          await transaction.rollback().catch(() => {})
+          throw e
         }
-      }
-
-      // 一次性写入订单明细
-      const itemRows = lines.map((line) => ({ partner_order_id: order.id, ...line }))
-      if (itemRows.length > 0) {
-        await PartnerOrderItem.bulkCreate(itemRows, { transaction })
-      }
-
-      await transaction.commit()
-
-      const full = await PartnerOrder.findByPk(order.id, {
-        include: [{ model: PartnerOrderItem, as: 'items' }]
-      })
-
-      AuditLog.logPartner({
-        partner: req.partnerFull || { id: req.partner?.partnerId },
-        event: 'partner_order.create',
-        resource: 'partner_order',
-        resourceId: order.id,
-        detail: {
-          payment_method: order.payment_method,
-          item_count: lines.length,
-          total_amount: order.total_amount
-        },
-        req
-      }).catch(() => {})
-
-      return res.status(201).json({
-        success: true,
-        message: '提交成功',
-        data: full
       })
     } catch (e) {
-      await transaction.rollback()
       logger.error('PartnerPortalController.createOrder', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '提交订单失败', error: e.message })
     }
+
+    if (!result.ok) {
+      return res.status(result.status).json({ success: false, message: result.message })
+    }
+
+    const { order, lines } = result
+
+    const full = await PartnerOrder.findByPk(order.id, {
+      include: [{ model: PartnerOrderItem, as: 'items' }]
+    })
+
+    AuditLog.logPartner({
+      partner: req.partnerFull || { id: req.partner?.partnerId },
+      event: 'partner_order.create',
+      resource: 'partner_order',
+      resourceId: order.id,
+      detail: {
+        payment_method: order.payment_method,
+        item_count: lines.length,
+        total_amount: order.total_amount
+      },
+      req
+    }).catch(() => {})
+
+    return res.status(201).json({
+      success: true,
+      message: '提交成功',
+      data: full
+    })
   }
 
   /**
    * 合作方支付确认幂等：条件 UPDATE 只在 status='pending_payment' 且 online_paid_at IS NULL 时生效；
-   * 已经确认过的并发/重放请求直接返回最新数据，不会重复变更状态。
+   *   - online_paid_at 已置位（已确认过的并发/重放请求）：幂等返回最新数据，不重复变更状态；
+   *   - 状态已被改走（如已取消）但从未支付：409 冲突，不允许再确认；
+   *   - 其余走条件 UPDATE，受影响行数 0 即幂等命中。
    */
   static async confirmPartnerOrderPayment (req, res) {
     try {
@@ -427,11 +470,14 @@ class PartnerPortalController {
       })
       if (!order) return res.status(404).json({ success: false, message: '订单不存在' })
 
-      if (order.status !== 'pending_payment' && order.online_paid_at) {
+      if (order.online_paid_at) {
         const full = await PartnerOrder.findByPk(order.id, {
           include: [{ model: PartnerOrderItem, as: 'items' }]
         })
         return res.json({ success: true, message: '支付已确认', data: full })
+      }
+      if (order.status !== 'pending_payment') {
+        return res.status(409).json({ success: false, message: '订单当前状态不允许支付确认' })
       }
 
       const [affected] = await PartnerOrder.update(

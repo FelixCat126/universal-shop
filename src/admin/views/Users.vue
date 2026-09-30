@@ -395,6 +395,9 @@ const totalUsers = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
 
+// 后端新增用户统计（新契约 /api/admin/users 响应的 stats 字段）；无该字段时回退到当前页计算
+const serverStats = ref(null)
+
 // 搜索表单
 const searchForm = reactive({
   email: '',
@@ -410,6 +413,9 @@ const loadingAddresses = ref(false)
 
 // 统计数据计算
 const todayRegistrations = computed(() => {
+  const s = serverStats.value
+  if (s && Number.isFinite(Number(s.today))) return Number(s.today)
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today)
@@ -422,6 +428,9 @@ const todayRegistrations = computed(() => {
 })
 
 const weekRegistrations = computed(() => {
+  const s = serverStats.value
+  if (s && Number.isFinite(Number(s.week))) return Number(s.week)
+
   const now = new Date()
   const startOfWeek = new Date(now)
   startOfWeek.setDate(now.getDate() - now.getDay()) // 本周开始（周日）
@@ -434,6 +443,9 @@ const weekRegistrations = computed(() => {
 })
 
 const monthRegistrations = computed(() => {
+  const s = serverStats.value
+  if (s && Number.isFinite(Number(s.month))) return Number(s.month)
+
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   
@@ -461,7 +473,16 @@ const loadUsers = async () => {
     if (response.data.success) {
       userList.value = response.data.data.users
       totalUsers.value = response.data.data.pagination.total
+      serverStats.value = response.data.data?.stats || null
       // 用户数据加载完成
+
+      // 操作后当前页可能超出新的总页数，自动回退到最后一页再加载
+      const totalPages = Math.ceil(totalUsers.value / pageSize.value)
+      if (totalPages > 0 && currentPage.value > totalPages) {
+        currentPage.value = totalPages
+        await loadUsers()
+        return
+      }
     } else {
       ElMessage.error(t('users.messages.loadFailed') + ': ' + response.data.message)
     }

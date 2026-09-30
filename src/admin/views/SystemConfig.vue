@@ -199,6 +199,7 @@
               <el-option value="THB" :label="t('systemConfig.currencyOptions.THB')" />
               <el-option value="USD" :label="t('systemConfig.currencyOptions.USD')" />
               <el-option value="CNY" :label="t('systemConfig.currencyOptions.CNY')" />
+              <el-option value="MYR" :label="t('systemConfig.currencyOptions.MYR')" />
             </el-select>
             <el-button
               type="primary"
@@ -223,6 +224,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Delete, Refresh } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin.js'
+import config from '../../config/index.js'
 import { normalizeCurrencyCode, mergeCurrencyCodeIntoLocales } from '../../utils/currencyI18n.js'
 
 // 国际化
@@ -250,24 +252,15 @@ const deleting = reactive({
   paymentQR: false
 })
 
-// 上传配置
-const uploadUrl = `${window.location.protocol}//${window.location.hostname}:3000/api/system-config`
+// 上传配置（经 config 构建，生产环境走 nginx 同源代理，不硬编码端口）
+const uploadUrl = config.buildApiUrl('/api/system-config')
 const uploadHeaders = {
   'Authorization': `Bearer ${adminStore.token}`
 }
 
 // 获取完整的图片URL
 const getImageUrl = (imagePath) => {
-  if (!imagePath) return null
-  
-  // 如果已经是完整URL，直接返回
-  if (imagePath.startsWith('http')) {
-    return imagePath
-  }
-  
-  // 构建完整URL
-  const baseUrl = `${window.location.protocol}//${window.location.hostname}:3000`
-  return `${baseUrl}${imagePath}`
+  return config.buildStaticUrl(imagePath)
 }
 
 // 加载配置

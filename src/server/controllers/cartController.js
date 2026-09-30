@@ -74,16 +74,32 @@ class CartController {
       const userId = req.user?.userId
       const sessionId = req.headers['session-id'] || req.sessionID
 
-      // 验证必填字段
-      if (!product_id) {
+      // 产品ID：正整数（字符串数字先转数值再校验）
+      if (product_id === undefined || product_id === null || product_id === '') {
         return res.status(400).json({
           success: false,
           message: '产品ID不能为空'
         })
       }
+      const productId = Number(product_id)
+      if (!Number.isInteger(productId) || productId < 1) {
+        return res.status(400).json({
+          success: false,
+          message: '无效的产品ID'
+        })
+      }
+
+      // 数量：1-5000 的整数，拒绝小数/非数字/超大值
+      const quantityNum = Number(quantity)
+      if (!Number.isInteger(quantityNum) || quantityNum < 1 || quantityNum > 5000) {
+        return res.status(400).json({
+          success: false,
+          message: '数量必须为 1-5000 之间的整数'
+        })
+      }
 
       // 验证产品是否存在
-      const product = await Product.findByPk(product_id)
+      const product = await Product.findByPk(productId)
       if (!product) {
         return res.status(404).json({
           success: false,
@@ -92,7 +108,7 @@ class CartController {
       }
 
       // 检查库存
-      if (product.stock < quantity) {
+      if (product.stock < quantityNum) {
         return res.status(400).json({
           success: false,
           message: '库存不足'
@@ -100,10 +116,10 @@ class CartController {
       }
 
       // 构建查询和创建条件
-      const where = { product_id }
+      const where = { product_id: productId }
       const cartData = {
-        product_id,
-        quantity,
+        product_id: productId,
+        quantity: quantityNum,
         price: product.price
       }
 
@@ -125,8 +141,8 @@ class CartController {
       const existingItem = await Cart.findOne({ where })
 
       if (existingItem) {
-        // 更新数量
-        const newQuantity = existingItem.quantity + quantity
+        // 更新数量（数值相加，quantityNum 已校验为整数）
+        const newQuantity = existingItem.quantity + quantityNum
         
         // 再次检查库存
         if (product.stock < newQuantity) {
@@ -174,11 +190,12 @@ class CartController {
       const userId = req.user?.userId
       const sessionId = req.headers['session-id'] || req.sessionID
 
-      // 验证数量
-      if (!quantity || quantity < 1) {
+      // 验证数量：1-5000 的整数，拒绝小数/字符串/超大值
+      const quantityNum = Number(quantity)
+      if (!Number.isInteger(quantityNum) || quantityNum < 1 || quantityNum > 5000) {
         return res.status(400).json({
           success: false,
-          message: '数量必须大于0'
+          message: '数量必须为 1-5000 之间的整数'
         })
       }
 
@@ -214,15 +231,15 @@ class CartController {
       }
 
       // 检查库存
-      if (cartItem.product.stock < quantity) {
+      if (cartItem.product.stock < quantityNum) {
         return res.status(400).json({
           success: false,
           message: `库存不足，当前库存：${cartItem.product.stock}`
         })
       }
 
-      await cartItem.update({ 
-        quantity,
+      await cartItem.update({
+        quantity: quantityNum,
         price: cartItem.product.price // 更新价格为当前价格
       })
 

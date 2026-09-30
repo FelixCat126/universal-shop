@@ -187,7 +187,9 @@ const resetForm = () => {
 
 const save = async () => {
   if (!formRef.value) return
-  await formRef.value.validate()
+  // 校验失败：Element 已在表单项标红，静默返回
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
   saving.value = true
   try {
     if (isEdit.value) {
@@ -206,9 +208,7 @@ const save = async () => {
     dialogVisible.value = false
     await loadData()
   } catch (e) {
-    if (e !== false) {
-      ElMessage.error(e.response?.data?.message || e.message)
-    }
+    ElMessage.error(e.response?.data?.message || e.message)
   } finally {
     saving.value = false
   }

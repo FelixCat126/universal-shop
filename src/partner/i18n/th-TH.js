@@ -28,6 +28,18 @@ export default {
     hintPwd: 'แสดง/ซ่อนรหัส',
     forgotHint: 'ลืมรหัสผ่าน โปรดติดต่อผู้ดูแลระบบ'
   },
+  captcha: {
+    title: 'การยืนยันความปลอดภัย',
+    slideTip: 'ลากแถบเลื่อนเพื่อจับคู่ชิ้นส่วนเข้ากับช่องว่าง',
+    success: 'ยืนยันสำเร็จ',
+    failed: 'ยืนยันไม่ผ่าน โปรดลองอีกครั้ง',
+    loading: 'กำลังโหลดรหัสยืนยัน…',
+    loadFailed: 'โหลดรหัสยืนยันไม่สำเร็จ แตะเพื่อลองใหม่'
+  },
+  notFound: {
+    title: 'ไม่พบหน้านี้หรือถูกย้ายแล้ว',
+    backHome: 'กลับหน้าหลัก'
+  },
   shop: {
     title: 'รายการสินค้า',
     search: 'ค้นหาชื่อสินค้า',
@@ -151,8 +163,8 @@ export default {
     unsupportedCountryCode: 'รหัสประเทศไม่รองรับ',
     phoneDigitsOnly: 'ใส่เฉพาะตัวเลข',
     phonePatternChina: 'เบอร์จีนต้องขึ้นต้นด้วย 1 และหลักที่สองเป็น 3–9',
-    phonePatternThailand: 'เบอร์ไทยหลักแรกต้องเป็น 2–9',
-    phonePatternMalaysia: 'เบอร์มาเลเซียต้องขึ้นต้นด้วย 1',
+    phonePatternThailand: 'เบอร์ไทยต้องมี 9-10 หลัก หลักแรกต้องเป็น 6, 8 หรือ 9',
+    phonePatternMalaysia: 'เบอร์มาเลเซียต้องมี 9-10 หลักและขึ้นต้นด้วย 1',
     phoneInvalidFormat: 'รูปแบบเบอร์ไม่ถูกต้อง'
   },
   address: {

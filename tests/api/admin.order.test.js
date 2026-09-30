@@ -2,8 +2,8 @@
  * P3 Admin — 订单（8 用例）
  *   AO-1 GET /api/admin/orders 列表 happy → 200 + 分页
  *   AO-2 GET /api/admin/orders/:id 详情 happy（admin 可任意查）
- *   AO-3 PUT /api/admin/orders/:id/status 改状态 → 200
- *   AO-4 PUT /api/admin/orders/:id/status 状态校验：传任意值（控制器未校验）→ 200，仅记录回归
+ *   AO-3 PUT /api/admin/orders/:id/status 合法跳转 shipping → shipped → 200
+ *   AO-4 PUT /api/admin/orders/:id/status 不存在订单 → 404
  *   AO-5 DELETE /api/admin/orders/:id 删除订单 + 子项 → 200
  *   AO-6 GET /api/admin/orders/export 导出（JSON 数组）→ 200 + 数据
  *   AO-7 GET /api/export/orders 导出 xlsx → 200 + Content-Disposition
@@ -66,14 +66,14 @@ describe('P3.admin.order', () => {
     expect(res.body.data.id).toBe(order.id)
   })
 
-  it('AO-3 PUT /:id/status 改状态 → 200', async () => {
+  it('AO-3 PUT /:id/status 合法跳转 shipping → shipped → 200', async () => {
     const { token } = await adminCtx()
     const { order } = await orderWithItems()
     const res = await request(app).put(`/api/admin/orders/${order.id}/status`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ status: 'completed' })
+      .send({ status: 'shipped' })
     expect(res.status).toBe(200)
-    expect(res.body.data.status).toBe('completed')
+    expect(res.body.data.status).toBe('shipped')
   })
 
   it('AO-4 PUT /:id/status 不存在订单 → 404', async () => {

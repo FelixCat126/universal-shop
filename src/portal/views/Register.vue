@@ -55,16 +55,16 @@
                   v-model="form.phone"
                   type="tel"
                   required
-                  :maxlength="currentCountry?.phoneLength || 11"
+                  :maxlength="currentCountry?.phoneLengthMax || 11"
                   class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   :class="{ 'border-red-300': errors.phone }"
-                  :placeholder="t('user.phoneInputPlaceholder', { length: currentCountry?.phoneLength || 11 })"
+                  :placeholder="t('user.phoneInputPlaceholder', { length: currentCountry?.phoneLengthText || '11' })"
                 >
                 <p v-if="errors.phone" class="mt-1 text-xs text-red-600">{{ errors.phone }}</p>
               </div>
             </div>
             <p v-if="currentCountry" class="mt-1 text-xs text-gray-500">
-              {{ t('user.phoneRequirement', { country: currentCountry.name, length: currentCountry.phoneLength }) }}
+              {{ t('user.phoneRequirement', { country: currentCountry.name, length: currentCountry.phoneLengthText }) }}
             </p>
           </div>
 
@@ -167,8 +167,9 @@ import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { userAPI } from '../api/users.js'
+import { useUserStore } from '../stores/user.js'
 import CountrySelector from '../components/CountrySelector.vue'
-import { validatePhoneI18n, getCountryInfo } from '../utils/phoneValidation.js'
+import { validatePhoneI18n, getCountryInfo, getPhoneLengthRange, getPhoneLengthText } from '../utils/phoneValidation.js'
 import { useToast } from '../composables/useToast.js'
 import { describePasswordPolicyFailure } from '../utils/passwordPolicy.js'
 
@@ -176,6 +177,7 @@ import { describePasswordPolicyFailure } from '../utils/passwordPolicy.js'
 const { t } = useI18n()
 
 const router = useRouter()
+const userStore = useUserStore()
 const { success, error: showError } = useToast()
 
 // 表单数据
@@ -203,7 +205,9 @@ const currentCountry = computed(() => {
       ...countryInfo,
       // 翻译国家名称
       name: t(`country.${countryInfo.name}`),
-      phoneLength: countryInfo.phoneLength
+      // phoneLength 为 [min, max] 范围：maxlength 取最大值，提示文案用范围文本
+      phoneLengthMax: getPhoneLengthRange(form.countryCode).max,
+      phoneLengthText: getPhoneLengthText(form.countryCode)
     }
   }
   return null
@@ -296,9 +300,9 @@ const handleSubmit = async () => {
     const response = await userAPI.register(userData)
 
     if (response.data.success) {
-      // 保存用户信息和token
-      localStorage.setItem('token', response.data.data.token)
-      localStorage.setItem('user', JSON.stringify(response.data.data.user))
+      // 通过 userStore 写入认证信息：同步更新 Pinia 内存态，
+      // 并触发 App.vue 的登录监听（导航状态、游客购物车合并）
+      userStore.setAuth(response.data.data.user, response.data.data.token)
       
       success(t('user.registerSuccess'))
       

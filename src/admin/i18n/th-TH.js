@@ -73,6 +73,21 @@ export default {
     copyright: '© 2024 ระบบจัดการร้านค้า สงวนลิขสิทธิ์'
   },
 
+  // 滑块验证码
+  captcha: {
+    title: 'การยืนยันความปลอดภัย',
+    slideTip: 'ลากแถบเลื่อนไปทางขวาเพื่อให้ชิ้นส่วนจิ๊กซอว์เข้าช่องว่าง',
+    success: 'ยืนยันสำเร็จ',
+    failed: 'การยืนยันล้มเหลว โปรดลองอีกครั้ง',
+    loading: 'กำลังโหลดรหัสยืนยัน...'
+  },
+
+  // 404 页面
+  notFound: {
+    title: 'ไม่พบหน้าที่ต้องการ',
+    backHome: 'กลับหน้าแรก'
+  },
+
   // 表单验证
   validation: {
     usernameRequired: 'กรุณาใส่ชื่อผู้ใช้',
@@ -335,7 +350,8 @@ export default {
     currencyOptions: {
       THB: 'บาทไทย ฿',
       USD: 'ดอลลาร์สหรัฐ $',
-      CNY: 'หยวนจีน ¥'
+      CNY: 'หยวนจีน ¥',
+      MYR: 'ริงกิตมาเลเซีย RM'
     },
 
     uploadTips: {
@@ -619,6 +635,8 @@ export default {
     statusOptions: {
       completed: 'เสร็จสิ้น',
       pending: 'รอดำเนินการ',
+      paid: 'ชำระแล้ว',
+      delivered: 'ส่งแล้ว',
       cancelled: 'ยกเลิก',
       processing: 'กำลังดำเนินการ',
       shipped: 'จัดส่งแล้ว',

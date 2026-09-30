@@ -23,17 +23,37 @@ router.post(
   SystemConfigController.setConfig
 )
 
-// 上传首页长图
-router.post('/upload/home-banner', logOperation('upload', 'home_banner'), SystemConfigController.uploadHomeBanner)
+// 上传首页长图：写入后清缓存，避免公开配置读到旧值
+router.post(
+  '/upload/home-banner',
+  logOperation('upload', 'home_banner'),
+  (req, res, next) => { clearResponseCache(); next() },
+  SystemConfigController.uploadHomeBanner
+)
 
-// 上传支付二维码
-router.post('/upload/payment-qr', logOperation('upload', 'payment_qrcode'), SystemConfigController.uploadPaymentQR)
+// 上传支付二维码：写入后清缓存，避免公开配置读到旧值
+router.post(
+  '/upload/payment-qr',
+  logOperation('upload', 'payment_qrcode'),
+  (req, res, next) => { clearResponseCache(); next() },
+  SystemConfigController.uploadPaymentQR
+)
 
-// 删除首页长图
-router.delete('/home-banner', logOperation('delete', 'home_banner'), SystemConfigController.deleteHomeBanner)
+// 删除首页长图：删除后清缓存，避免公开配置读到旧值
+router.delete(
+  '/home-banner',
+  logOperation('delete', 'home_banner'),
+  (req, res, next) => { clearResponseCache(); next() },
+  SystemConfigController.deleteHomeBanner
+)
 
-// 删除支付二维码
-router.delete('/payment-qr', logOperation('delete', 'payment_qrcode'), SystemConfigController.deletePaymentQR)
+// 删除支付二维码：删除后清缓存，避免公开配置读到旧值
+router.delete(
+  '/payment-qr',
+  logOperation('delete', 'payment_qrcode'),
+  (req, res, next) => { clearResponseCache(); next() },
+  SystemConfigController.deletePaymentQR
+)
 
 // 获取单个配置
 router.get('/:key', logOperation('view', 'system_config'), SystemConfigController.getConfig)

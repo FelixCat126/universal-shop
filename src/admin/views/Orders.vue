@@ -14,6 +14,10 @@
             >
               <el-option :label="t('orders.statusOptions.completed')" value="completed" />
               <el-option :label="t('orders.statusOptions.pending')" value="pending" />
+              <el-option :label="t('orders.statusOptions.paid')" value="paid" />
+              <el-option :label="t('orders.statusOptions.shipping')" value="shipping" />
+              <el-option :label="t('orders.statusOptions.shipped')" value="shipped" />
+              <el-option :label="t('orders.statusOptions.delivered')" value="delivered" />
               <el-option :label="t('orders.statusOptions.cancelled')" value="cancelled" />
             </el-select>
           </el-form-item>
@@ -168,7 +172,7 @@
                   v-if="scope.row.currency_code && scope.row.currency_code !== 'THB' && scope.row.total_amount_thb != null"
                   class="original-amount"
                 >
-                  ≈ {{ t('common.currency') }}{{ Number(scope.row.total_amount_thb).toFixed(2) }} THB
+                  ≈ {{ t('common.currency') }}{{ formatThbAmount(scope.row.total_amount_thb) }} THB
                 </div>
               </template>
             </div>
@@ -243,7 +247,7 @@
             :disabled="loading"
             :background="true"
             layout="total, sizes, prev, pager, next, jumper"
-            :total="stats.total"
+            :total="pagination.total"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
           />
@@ -296,7 +300,7 @@
                         v-if="selectedOrder.currency_code && selectedOrder.currency_code !== 'THB' && selectedOrder.total_amount_thb != null"
                         class="original-amount-detail"
                       >
-                        ≈ {{ t('common.currency') }}{{ Number(selectedOrder.total_amount_thb).toFixed(2) }} THB
+                        ≈ {{ t('common.currency') }}{{ formatThbAmount(selectedOrder.total_amount_thb) }} THB
                       </div>
                     </template>
                   </span>
@@ -485,8 +489,20 @@ const pagination = reactive({
   totalPages: 0
 })
 
+// 后端全量聚合统计（新契约 /api/admin/orders 响应的 stats 字段）；无该字段时回退到当前页计算
+const serverStats = ref(null)
+
 // 统计信息
 const stats = computed(() => {
+  const s = serverStats.value
+  if (s && ['total', 'completed', 'totalAmount', 'todayAmount'].every(k => Number.isFinite(Number(s[k])))) {
+    return {
+      total: Number(s.total),
+      completed: Number(s.completed),
+      totalAmount: Number(s.totalAmount).toFixed(2),
+      todayAmount: Number(s.todayAmount).toFixed(2)
+    }
+  }
   const total = orders.value.length
   const completed = orders.value.filter(order => order.status === 'completed').length
   const sumOrderThb = (order) => {
@@ -539,9 +555,19 @@ const loadOrders = async () => {
       const data = await response.json()
       if (data.success) {
         orders.value = data.data?.orders || []
-        pagination.total = data.data?.total || 0
-        pagination.totalPages = data.data?.totalPages || 1
-        
+        // 分页信息：优先取 pagination 子对象（新契约），兼容旧的扁平字段
+        const pg = data.data?.pagination
+        pagination.total = pg?.total ?? data.data?.total ?? 0
+        pagination.totalPages = pg?.totalPages ?? data.data?.totalPages ?? 1
+        serverStats.value = data.data?.stats || null
+
+        // 删除/操作后当前页可能超出新的总页数，自动回退到最后一页再加载
+        if (pagination.totalPages > 0 && pagination.page > pagination.totalPages) {
+          pagination.page = pagination.totalPages
+          currentPage.value = pagination.totalPages
+          await loadOrders()
+          return
+        }
       }
     } else {
       const errorData = await response.json()
@@ -749,6 +775,8 @@ const getStatusText = (status) => {
   const statusMap = {
     completed: t('orders.statusOptions.completed'),
     pending: t('orders.statusOptions.pending'),
+    paid: t('orders.statusOptions.paid'),
+    delivered: t('orders.statusOptions.delivered'),
     cancelled: t('orders.statusOptions.cancelled'),
     processing: t('orders.statusOptions.processing'),
     shipped: t('orders.statusOptions.shipped'),
@@ -760,6 +788,8 @@ const getStatusText = (status) => {
 const getStatusTagType = (status) => {
   const tagTypeMap = {
     completed: 'success',
+    delivered: 'success',
+    paid: 'info',
     pending: 'warning',
     cancelled: 'danger',
     shipping: 'info'
@@ -787,6 +817,12 @@ const adminUsdtHint = (row) => {
   const r = parseFloat(row.exchange_rate)
   if (!(Number.isFinite(thb) && Number.isFinite(r))) return '0.00'
   return (thb * r).toFixed(2)
+}
+
+// THB 金额展示：非有限数值兜底为 0.00，避免 NaN
+const formatThbAmount = (v) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00'
 }
 
 /** 管理端列表/详情：积分换购订单展示本单扣除积分 */

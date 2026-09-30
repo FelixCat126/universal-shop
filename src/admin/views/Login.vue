@@ -101,6 +101,21 @@
     <div class="footer">
       <p>{{ t('login.copyright') }}</p>
     </div>
+
+    <!-- 滑块验证码弹窗（登录失败次数过多时由后端 428 触发） -->
+    <el-dialog
+      v-model="captchaDialogVisible"
+      :title="t('captcha.title')"
+      width="360px"
+      style="max-width: 92vw"
+      align-center
+      destroy-on-close
+      :close-on-click-modal="false"
+    >
+      <div class="captcha-dialog-body">
+        <SliderCaptcha ref="captchaRef" @verify="onCaptchaVerify" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -111,6 +126,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Right, Warning } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin.js'
+import SliderCaptcha from '../components/SliderCaptcha.vue'
 
 // 国际化
 const { t, locale } = useI18n()
@@ -122,6 +138,10 @@ const loginFormRef = ref()
 // 响应式数据
 const isLoading = ref(false)
 const currentLanguage = ref(locale.value)
+
+// 滑块验证码（登录失败次数过多时后端返回 428 触发）
+const captchaDialogVisible = ref(false)
+const captchaRef = ref(null)
 
 // 登录表单
 const loginForm = reactive({
@@ -142,45 +162,83 @@ const formRules = {
   ]
 }
 
-// 处理登录
-const handleLogin = async () => {
+// 处理登录（captcha：滑块验证回调传入的 { token, answer }；普通点击/回车登录不传）
+const handleLogin = async (captcha) => {
   if (!loginFormRef.value) return
-  
+
+  // @click/@keyup.enter 会把事件对象作为第一个参数传入，此处仅接受明确的验证码载荷
+  const captchaPayload = (
+    captcha &&
+    typeof captcha === 'object' &&
+    typeof captcha.token === 'string' &&
+    typeof captcha.answer === 'number'
+  ) ? captcha : null
+
+  // 表单验证：失败时 Element 已在表单项标红，静默返回，不误报网络错误
+  const valid = await loginFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
   try {
-    // 表单验证
-    const valid = await loginFormRef.value.validate()
-    if (!valid) {
-      // 验证失败时给出提示
-      ElMessage.warning(t('login.pleaseComplete'))
+    isLoading.value = true
+
+    const payload = {
+      username: loginForm.username.trim(),
+      password: loginForm.password
+    }
+    if (captchaPayload) {
+      payload.captcha_token = captchaPayload.token
+      payload.captcha_answer = captchaPayload.answer
+    }
+
+    const result = await adminStore.login(payload)
+
+    if (result.success) {
+      captchaRef.value?.notifySuccess()
+      ElMessage.success(t('login.loginSuccess'))
+
+      // 延迟跳转到管理后台首页，同时关闭并重置验证码弹窗
+      setTimeout(() => {
+        resetCaptchaState()
+        router.push('/dashboard')
+      }, 800)
       return
     }
 
-    isLoading.value = true
-    
-    const result = await adminStore.login({
-      username: loginForm.username.trim(),
-      password: loginForm.password
-    })
-    
-    if (result.success) {
-      ElMessage.success(t('login.loginSuccess'))
-      
-      // 延迟跳转到管理后台首页
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 800)
-      
-    } else {
-      // 不使用后端返回的中文消息，统一使用国际化文本
-      ElMessage.error(t('login.loginFailed'))
+    // 428：失败次数过多需滑块验证 / 滑块答案错误（token 一次性，须换新题后重试）
+    if (result.status === 428) {
+      captchaDialogVisible.value = true
+      if (result.code === 'CAPTCHA_INVALID') {
+        captchaRef.value?.notifyFailed()
+      } else if (captchaRef.value) {
+        captchaRef.value.refresh()
+      }
+      return
     }
-    
+
+    // 不使用后端返回的中文消息，统一使用国际化文本
+    ElMessage.error(t('login.loginFailed'))
+
   } catch (error) {
     console.error('登录失败:', error)
     ElMessage.error(t('login.networkError'))
   } finally {
     isLoading.value = false
   }
+}
+
+// 滑块松手回调：取当前 token + 滑块 x（像素，已 Math.round）重试登录
+const onCaptchaVerify = (answer) => {
+  const token = captchaRef.value?.getToken()
+  if (!token) {
+    captchaRef.value?.refresh()
+    return
+  }
+  handleLogin({ token, answer })
+}
+
+// 关闭并重置验证码状态（destroy-on-close 卸载组件，题目随之作废）
+const resetCaptchaState = () => {
+  captchaDialogVisible.value = false
 }
 
 // 切换语言
@@ -442,6 +500,13 @@ const changeLanguage = (lang) => {
 .login-form :deep(.el-checkbox__label) {
   color: #606266;
   font-size: 14px;
+}
+
+/* 滑块验证码弹窗 */
+.captcha-dialog-body {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
 }
 
 .login-form :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {

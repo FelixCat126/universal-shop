@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 import ProductCategory from '../models/ProductCategory.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
+import { clearResponseCache } from '../utils/responseCache.js'
 
 class ProductCategoryController {
   /** 前台 / 公共：全部类别，按排序 */
@@ -65,6 +66,8 @@ class ProductCategoryController {
         name,
         sort_order: Number.isFinite(sort_order) ? sort_order : 0
       })
+      // 分类变更后清 GET 响应缓存，避免前台读到旧分类列表
+      clearResponseCache()
       return res.status(201).json({ success: true, data: row })
     } catch (e) {
       logger.error('create category', { err: e?.message, stack: e?.stack })
@@ -95,6 +98,8 @@ class ProductCategoryController {
         patch.sort_order = Number.isFinite(s) ? s : row.sort_order
       }
       await row.update(patch)
+      // 分类变更后清 GET 响应缓存，避免前台读到旧分类列表
+      clearResponseCache()
       return res.json({ success: true, data: row })
     } catch (e) {
       logger.error('update category', { err: e?.message, stack: e?.stack })
@@ -120,6 +125,8 @@ class ProductCategoryController {
         })
       }
       await row.destroy()
+      // 分类变更后清 GET 响应缓存，避免前台读到旧分类列表
+      clearResponseCache()
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
       logger.error('remove category', { err: e?.message, stack: e?.stack })

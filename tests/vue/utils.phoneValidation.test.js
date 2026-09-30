@@ -3,8 +3,8 @@
  *   覆盖：
  *     PV-1 中国 11 位 1XX → valid
  *     PV-2 中国 10 位 → invalid（length）
- *     PV-3 泰国 9 位（首位 2-9） → valid
- *     PV-4 马来西亚 1XXX… → valid
+ *     PV-3 泰国 9-10 位（首位 6/8/9） → valid；其他首位 → invalid
+ *     PV-4 马来西亚 9-10 位 1XXX… → valid；11 位 → invalid
  *     PV-5 不支持的国家区号 → invalid
  *     PV-6 空字符串 → invalid
  *     PV-7 中文 isSamePhone / formatPhoneDisplay
@@ -26,12 +26,17 @@ describe('VU.utils.phoneValidation', () => {
   it('PV-2 中国 10 位 → length 不对', () => {
     expect(validatePhone('1391234567', '+86').isValid).toBe(false)
   })
-  it('PV-3 泰国 9 位', () => {
+  it('PV-3 泰国 9-10 位，首位 6/8/9', () => {
     expect(validatePhone('912345678', '+66').isValid).toBe(true)
+    expect(validatePhone('8123456789', '+66').isValid).toBe(true)
     expect(validatePhone('012345678', '+66').isValid).toBe(false)
+    expect(validatePhone('512345678', '+66').isValid).toBe(false)
   })
-  it('PV-4 马来西亚 11 位', () => {
-    expect(validatePhone('11234567890', '+60').isValid).toBe(true)
+  it('PV-4 马来西亚 9-10 位，首位 1', () => {
+    expect(validatePhone('1123456789', '+60').isValid).toBe(true)
+    expect(validatePhone('123456789', '+60').isValid).toBe(true)
+    expect(validatePhone('11234567890', '+60').isValid).toBe(false)
+    expect(validatePhone('2123456789', '+60').isValid).toBe(false)
   })
   it('PV-5 不支持的区号', () => {
     expect(validatePhone('12345', '+99').isValid).toBe(false)
@@ -44,7 +49,8 @@ describe('VU.utils.phoneValidation', () => {
     expect(formatPhoneDisplay('13912345678', '+86')).toBe('+86 13912345678')
     expect(isSamePhone('a', '+86', 'a', '+86')).toBe(true)
     expect(isSamePhone('a', '+86', 'a', '+66')).toBe(false)
-    expect(getCountryInfo('+86').phoneLength).toBe(11)
+    expect(getCountryInfo('+86').phoneLength).toEqual([11, 11])
+    expect(getCountryInfo('+66').phoneLength).toEqual([9, 10])
     expect(getCountryInfo('+99')).toBeNull()
     expect(getSupportedCountries().length).toBe(3)
     expect(generatePhoneId('123', '+86')).toBe('+86:123')

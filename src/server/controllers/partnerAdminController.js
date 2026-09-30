@@ -1,7 +1,9 @@
 import { Op } from 'sequelize'
+import sequelize from '../config/database.js'
 import Partner from '../models/Partner.js'
 import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
+import Product from '../models/Product.js'
 import { parsePartnerAccountKind } from '../constants/partnerAccountKind.js'
 import XLSX from 'xlsx'
 import { logger } from '../utils/logger.js'
@@ -12,6 +14,16 @@ const PARTNER_ORDER_STATUS_ZH = {
   shipped: '已发货',
   settled: '已结算',
   cancelled: '已取消'
+}
+
+// 合作方订单状态机：settled / cancelled 为终态，不允许任何变更
+const PARTNER_ORDER_STATUS_TRANSITIONS = {
+  pending_payment: ['submitted', 'cancelled'],
+  submitted: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['settled'],
+  settled: [],
+  cancelled: []
 }
 
 function formatDatetimeLocalDigits (input) {
@@ -60,6 +72,10 @@ class PartnerAdminController {
         return res.status(400).json({ success: false, message: '登录名不少于2字符，密码不少于6字符' })
       }
 
+      if (!Number.isFinite(discount_percent)) {
+        return res.status(400).json({ success: false, message: '折扣必须是有效数字（0-100）' })
+      }
+
       const exists = await Partner.findOne({ where: { login } })
       if (exists) return res.status(400).json({ success: false, message: '登录名已存在' })
 
@@ -89,7 +105,11 @@ class PartnerAdminController {
         row.display_name = String(req.body.display_name).trim() || null
       }
       if (req.body.discount_percent !== undefined) {
-        row.discount_percent = Math.min(100, Math.max(0, Number(req.body.discount_percent) || 0))
+        const dp = Number(req.body.discount_percent)
+        if (!Number.isFinite(dp)) {
+          return res.status(400).json({ success: false, message: '折扣必须是有效数字（0-100）' })
+        }
+        row.discount_percent = Math.min(100, Math.max(0, dp))
       }
       if (req.body.account_kind !== undefined) {
         row.account_kind = parsePartnerAccountKind(req.body.account_kind)
@@ -206,22 +226,59 @@ class PartnerAdminController {
   }
 
   static async updatePartnerOrderStatus (req, res) {
+    const transaction = await sequelize.transaction()
     try {
       const id = parseInt(req.params.id, 10)
       const status = req.body.status != null ? String(req.body.status).trim() : ''
 
-      const allowed = ['pending_payment', 'submitted', 'processing', 'shipped', 'settled', 'cancelled']
+      const allowed = Object.keys(PARTNER_ORDER_STATUS_TRANSITIONS)
       if (!allowed.includes(status)) {
+        await transaction.rollback()
         return res.status(400).json({ success: false, message: '无效状态' })
       }
 
-      const order = await PartnerOrder.findByPk(id)
-      if (!order) return res.status(404).json({ success: false, message: '订单不存在' })
+      // 行锁防并发双转移
+      const order = await PartnerOrder.findByPk(id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+      if (!order) {
+        await transaction.rollback()
+        return res.status(404).json({ success: false, message: '订单不存在' })
+      }
+
+      const fromStatus = order.status
+      const allowedTargets = PARTNER_ORDER_STATUS_TRANSITIONS[fromStatus] || []
+      if (!allowedTargets.includes(status)) {
+        await transaction.rollback()
+        return res.status(400).json({
+          success: false,
+          message: `订单状态不允许从「${PARTNER_ORDER_STATUS_ZH[fromStatus] || fromStatus}」变更为「${PARTNER_ORDER_STATUS_ZH[status] || status}」`
+        })
+      }
+
+      // 进入 cancelled（原状态在此不可能是 cancelled，状态机已拦截）：同事务回补库存
+      if (status === 'cancelled') {
+        const items = await PartnerOrderItem.findAll({
+          where: { partner_order_id: order.id },
+          transaction
+        })
+        for (const item of items) {
+          const qty = parseInt(item.quantity, 10)
+          if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue
+          await Product.update(
+            { stock: sequelize.literal(`stock + ${qty}`) },
+            { where: { id: item.product_id }, transaction }
+          )
+        }
+      }
 
       order.status = status
-      await order.save()
+      await order.save({ transaction })
+      await transaction.commit()
       return res.json({ success: true, data: order })
     } catch (e) {
+      await transaction.rollback()
       logger.error('PartnerAdminController.updatePartnerOrderStatus', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '更新失败' })
     }

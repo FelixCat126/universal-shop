@@ -20,21 +20,32 @@ import { ensureProductCategoriesMigrate } from '../utils/ensureProductCategories
 class DataSeeder {
   static async run() {
     console.log('🌱 开始数据种子初始化...')
-    
+
+    // 生产事故守卫：本入口历史行为会把 admin 密码强制重置为 123456，
+    // 误对生产 DATABASE_URL 执行即事故。生产环境下拒绝重置密码
+    // （结构同步/默认配置/行政区数据仍执行），生产部署请使用 runProductionUpdate()
+    const isProduction = process.env.NODE_ENV === 'production'
+    if (isProduction) {
+      console.warn('🚫 检测到 NODE_ENV=production：本次 seed 不会重置管理员密码')
+      console.warn('   生产环境增量部署请改用 runProductionUpdate()（见 scripts/production-deploy-setup.mjs）')
+    } else {
+      console.warn('⚠️  警告：本命令会将 admin 密码强制重置为 123456，仅限本地/测试环境，切勿对生产数据库执行！')
+    }
+
     try {
       // 1. 确保数据库连接
       await sequelize.authenticate()
       console.log('✅ 数据库连接成功')
-      
+
       // 2. 智能同步表结构
       await this.smartSync()
       console.log('✅ 数据库表结构同步完成')
-      
+
       // 3. 创建默认系统配置
       await this.createDefaultSystemConfig()
-      
-      // 4. 创建默认管理员（本地/首次安装：允许重置为默认密码）
-      await this.createDefaultAdmin({ allowPasswordReset: true })
+
+      // 4. 创建默认管理员（本地/首次安装：允许重置为默认密码；生产环境禁止重置）
+      await this.createDefaultAdmin({ allowPasswordReset: !isProduction })
       
       // 5. 导入泰国行政区数据
       await this.importAdministrativeRegions()

@@ -106,7 +106,7 @@ describe('P3.admin.partner', () => {
     const sequelize = TestDatabase.getSequelize()
     const { Partner, PartnerOrder } = sequelize.models
     const p = await Partner.create(TestDataFactory.createPartner())
-    const o = await PartnerOrder.create(TestDataFactory.createPartnerOrder(p.id, { status: 'submitted' }))
+    const o = await PartnerOrder.create(TestDataFactory.createPartnerOrder(p.id, { status: 'processing' }))
 
     const res = await request(app).put(`/api/admin/partner-orders/${o.id}/status`)
       .set('Authorization', `Bearer ${token}`)

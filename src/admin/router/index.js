@@ -78,6 +78,13 @@ const router = createRouter({
           meta: { title: '系统配置', requiresAuth: true, requiresSuperAdmin: true }
         }
       ]
+    },
+    // 兜底 404：不挂 requiresAuth，未登录访问未知路径也直接展示 404 而不是跳登录页
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('../views/NotFound.vue'),
+      meta: { title: '404', hideLayout: true }
     }
   ]
 })

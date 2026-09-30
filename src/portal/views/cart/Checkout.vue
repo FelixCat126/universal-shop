@@ -39,12 +39,12 @@
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
             <h2 class="text-lg font-semibold mb-4 flex items-center">
               <ShoppingBagIcon class="h-5 w-5 mr-2 text-blue-600" />
-              {{ t('order.items') }} ({{ cartStore.itemCount }} {{ t('common.unit') }})
+              {{ t('order.items') }} ({{ availableItemCount }} {{ t('common.unit') }})
             </h2>
             
             <div class="space-y-4">
               <div
-                v-for="item in cartStore.items"
+                v-for="item in availableCartItems"
                 :key="item.id"
                 class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg"
               >
@@ -659,6 +659,15 @@ const checkoutAddressRegion = ref({
 // 超过2件禁用货到付款
 const codDisabled = computed(() => cartStore.itemCount > 2)
 
+// 失效商品（商品已被删除）不可下单，渲染与提交时均过滤掉
+const availableCartItems = computed(() =>
+  cartStore.items.filter(item => item.product && !item.unavailable)
+)
+
+const availableItemCount = computed(() =>
+  availableCartItems.value.reduce((total, item) => total + item.quantity, 0)
+)
+
 const cartSupportsPointsPayment = computed(() =>
   userStore.isLoggedIn &&
   cartStore.items.length > 0 &&
@@ -746,7 +755,8 @@ const paymentModalThbDisplay = computed(() =>
 
 // 计算USDT金额（支付弹窗以内用订单底价 THB；未建单前兜底购物车合计）
 const usdtAmount = computed(() => {
-  return (paymentModalThb.value * exchangeRate.value).toFixed(2)
+  const v = paymentModalThb.value * exchangeRate.value
+  return Number.isFinite(v) ? v.toFixed(2) : '0.00'
 })
 
 // 显示消息
@@ -961,6 +971,12 @@ const handleSubmitOrder = async () => {
     return
   }
 
+  // 购物车内商品全部失效（已被删除）时无法提交
+  if (availableCartItems.value.length === 0) {
+    showMessage(t('cart.productUnavailable'), 'error')
+    return
+  }
+
   // 游客下单：检查手机号是否已注册
   if (!userStore.isLoggedIn) {
     try {
@@ -998,9 +1014,9 @@ const submitOrder = async () => {
   submitting.value = true
 
   try {
-    // 准备订单数据
+    // 准备订单数据（过滤失效商品）
     const orderData = {
-      items: cartStore.items.map(item => ({
+      items: availableCartItems.value.map(item => ({
         product_id: item.product_id,
         quantity: item.quantity
       })),

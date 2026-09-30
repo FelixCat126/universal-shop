@@ -73,6 +73,21 @@ export default {
     copyright: '© 2024 商城管理系统. All rights reserved.'
   },
 
+  // 滑块验证码
+  captcha: {
+    title: '安全验证',
+    slideTip: '按住滑块向右拖动，将拼图块移到缺口处',
+    success: '验证成功',
+    failed: '验证失败，请重试',
+    loading: '验证码加载中...'
+  },
+
+  // 404 页面
+  notFound: {
+    title: '页面不存在',
+    backHome: '返回首页'
+  },
+
   // 表单验证
   validation: {
     usernameRequired: '请输入用户名',
@@ -334,7 +349,8 @@ export default {
     currencyOptions: {
       THB: '泰铢 ฿',
       USD: '美元 $',
-      CNY: '人民币 ¥'
+      CNY: '人民币 ¥',
+      MYR: '马来西亚令吉 RM'
     },
 
     uploadTips: {
@@ -618,6 +634,8 @@ export default {
     statusOptions: {
       completed: '已完成',
       pending: '待处理',
+      paid: '已支付',
+      delivered: '已送达',
       cancelled: '已取消',
       processing: '处理中',
       shipped: '已发货',

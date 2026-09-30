@@ -4,25 +4,41 @@ import Order from '../models/Order.js'
 import OrderItem from '../models/OrderItem.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
+import { sanitizeCell } from '../utils/sanitizeCell.js'
+
+// 单次导出行数安全上限（两个导出原本都是无上限 findAll）；超出截断并在文件末尾追加说明行
+const EXPORT_ROW_LIMIT = 50000
+
+// 截断时在表格末尾追加一行说明（origin:-1 追加到最后一行之后）
+const appendTruncationNote = (worksheet) => {
+  XLSX.utils.sheet_add_aoa(
+    worksheet,
+    [[`数据量超过上限，仅导出前 ${EXPORT_ROW_LIMIT} 行（按创建时间倒序）`]],
+    { origin: -1 }
+  )
+}
 
 class ExportController {
   // 导出用户数据
   static async exportUsers(req, res) {
     try {
-      // 获取所有用户数据
-      const users = await User.findAll({
-        order: [['created_at', 'DESC']]
+      // 获取用户数据（多取 1 行用于判断是否截断）
+      let users = await User.findAll({
+        order: [['created_at', 'DESC']],
+        limit: EXPORT_ROW_LIMIT + 1
       })
+      const usersTruncated = users.length > EXPORT_ROW_LIMIT
+      if (usersTruncated) users = users.slice(0, EXPORT_ROW_LIMIT)
 
-      // 准备Excel数据
+      // 准备Excel数据（用户可控字段统一过 sanitizeCell 防公式注入）
       const excelData = users.map(user => ({
         'ID': user.id,
-        '用户名': user.username || '',
-        '昵称': user.nickname,
-        '邮箱': user.email || '',
-        '手机号': user.phone,
-        '推荐码': user.referral_code || '',
-        '被推荐码': user.referred_by_code || '',
+        '用户名': sanitizeCell(user.username || ''),
+        '昵称': sanitizeCell(user.nickname),
+        '邮箱': sanitizeCell(user.email || ''),
+        '手机号': sanitizeCell(user.phone),
+        '推荐码': sanitizeCell(user.referral_code || ''),
+        '被推荐码': sanitizeCell(user.referred_by_code || ''),
         '注册时间': user.created_at ? new Date(user.created_at).toLocaleString('zh-CN') : '',
         '更新时间': user.updated_at ? new Date(user.updated_at).toLocaleString('zh-CN') : ''
       }))
@@ -30,6 +46,8 @@ class ExportController {
       // 创建工作簿
       const workbook = XLSX.utils.book_new()
       const worksheet = XLSX.utils.json_to_sheet(excelData)
+
+      if (usersTruncated) appendTruncationNote(worksheet)
 
       // 设置列宽
       worksheet['!cols'] = [
@@ -71,8 +89,8 @@ class ExportController {
   // 导出订单数据
   static async exportOrders(req, res) {
     try {
-      // 获取所有订单数据，包含关联的用户和订单项
-      const orders = await Order.findAll({
+      // 获取订单数据（多取 1 行用于判断是否截断），包含关联的用户和订单项
+      let orders = await Order.findAll({
         include: [
           {
             model: User,
@@ -90,8 +108,11 @@ class ExportController {
             }]
           }
         ],
-        order: [['created_at', 'DESC']]
+        order: [['created_at', 'DESC']],
+        limit: EXPORT_ROW_LIMIT + 1
       })
+      const ordersTruncated = orders.length > EXPORT_ROW_LIMIT
+      if (ordersTruncated) orders = orders.slice(0, EXPORT_ROW_LIMIT)
 
       // 解析地址的辅助函数
       const parseAddress = (address) => {
@@ -223,17 +244,17 @@ class ExportController {
         return {
           'หมายเลขคำสั่งซื้อ（电商订单号、Order Number）': order.order_no || '',
           'น้ำหนักสินค้า（货物重量(kg)、Weight(kg)）': '', // 暂时留空
-          'ชื่อผู้รับ（收件人姓名、Recipient Name）': order.contact_name || '',
-          'เบอร์โทรผู้รับ（收件人手机、Recipient Mobile）': order.contact_phone || '',
-          'เบอร์โทรศัพท์ผู้รับ（收件人电话、Recipient Phone）': order.contact_phone || '', // 复用手机号
-          'จังหวัด（目的府、Province）': province,
-          'อำเภอ/เขต（目的区县、District）': city,
-          'ตำบล/แขวง（目的镇、Sub-district）': district,
-          'รหัสไปรษณีย์（目的邮编、Postal Code）': order.postal_code || '',
-          'ที่อยู่ผู้รับ（收件地址、Delivery Address）': detailAddress,
-          'ชื่อสินค้า（物品名称、Product Name）': productNames,
+          'ชื่อผู้รับ（收件人姓名、Recipient Name）': sanitizeCell(order.contact_name || ''),
+          'เบอร์โทรผู้รับ（收件人手机、Recipient Mobile）': sanitizeCell(order.contact_phone || ''),
+          'เบอร์โทรศัพท์ผู้รับ（收件人电话、Recipient Phone）': sanitizeCell(order.contact_phone || ''), // 复用手机号
+          'จังหวัด（目的府、Province）': sanitizeCell(province),
+          'อำเภอ/เขต（目的区县、District）': sanitizeCell(city),
+          'ตำบล/แขวง（目的镇、Sub-district）': sanitizeCell(district),
+          'รหัสไปรษณีย์（目的邮编、Postal Code）': sanitizeCell(order.postal_code || ''),
+          'ที่อยู่ผู้รับ（收件地址、Delivery Address）': sanitizeCell(detailAddress),
+          'ชื่อสินค้า（物品名称、Product Name）': sanitizeCell(productNames),
           'มูลค่าสินค้า（物品价值、Product Value）': (order.total_amount_thb != null && order.total_amount_thb !== '' ? Number(order.total_amount_thb).toFixed(2) : order.total_amount) || '',
-          'หมายเหตุ（备注、Remarks）': order.notes || '',
+          'หมายเหตุ（备注、Remarks）': sanitizeCell(order.notes || ''),
           'เก็บเงินปลายทาง（代收货款、Cash on Delivery）': codAmount,
           'สถานะคำสั่งซื้อ（订单状态、Order Status）': getStatusText(order.status),
           'ยาว（长(cm)、Length(cm)）': '', // 留空
@@ -246,6 +267,8 @@ class ExportController {
       // 创建工作簿
       const workbook = XLSX.utils.book_new()
       const worksheet = XLSX.utils.json_to_sheet(excelData)
+
+      if (ordersTruncated) appendTruncationNote(worksheet)
 
       // 设置列宽 - 按三语言表头字段调整（表头较长需要更宽的列宽）
       worksheet['!cols'] = [

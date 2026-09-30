@@ -297,7 +297,7 @@ const router = useRouter()
 const route = useRoute()
 
 // 国际化
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const portalCurrency = usePortalCurrencyStore()
 
@@ -363,8 +363,10 @@ const getStatusStyle = (status) => {
 const getStatusText = (status) => {
   const statusMap = {
     pending: t('order.status.pending'),
+    paid: t('order.status.paid'),
     shipping: t('order.status.shipping'),
     shipped: t('order.status.shipped'),
+    delivered: t('order.status.delivered'),
     completed: t('order.status.completed'),
     cancelled: t('order.status.cancelled')
   }
@@ -432,7 +434,9 @@ const formatDateTime = (dateString) => {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   
-  const timeStr = date.toLocaleTimeString('zh-CN', { 
+  // 按当前 i18n 语言选择时间格式区域
+  const localeMap = { 'zh-CN': 'zh-CN', 'en-US': 'en-US', 'th-TH': 'th-TH' }
+  const timeStr = date.toLocaleTimeString(localeMap[locale.value] || 'en-US', { 
     hour: '2-digit', 
     minute: '2-digit' 
   })

@@ -2,12 +2,14 @@ import express from 'express'
 import UploadController from '../controllers/uploadController.js'
 import { authenticateToken } from '../middlewares/authMiddleware.js'
 import { authenticateAdmin, requirePermission } from '../middlewares/adminAuthMiddleware.js'
+import { writeLimiter } from '../middlewares/security.js'
 
 const router = express.Router()
 
 router.post(
   '/avatar',
   authenticateToken,
+  writeLimiter,
   UploadController.uploadUserAvatar,
   UploadController.handleUserAvatarUpload
 )
@@ -17,6 +19,7 @@ router.post(
   '/product-image',
   authenticateAdmin,
   requirePermission('products'),
+  writeLimiter,
   UploadController.uploadProductImage,
   UploadController.handleProductImageUpload
 )
@@ -24,6 +27,7 @@ router.delete(
   '/product-image/:filename',
   authenticateAdmin,
   requirePermission('products'),
+  writeLimiter,
   UploadController.deleteProductImage
 )
 
