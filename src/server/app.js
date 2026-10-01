@@ -28,6 +28,8 @@ import statisticsRoutes from './routes/statisticsRoutes.js'
 import systemConfigRoutes from './routes/systemConfigRoutes.js'
 import administrativeRegionsRoutes from './routes/administrativeRegions.js'
 import partnerRoutes from './routes/partnerRoutes.js'
+import couponRoutes from './routes/couponRoutes.js'
+import bundleRoutes from './routes/bundleRoutes.js'
 import securityRoutes from './routes/securityRoutes.js'
 import { startOrderTimeoutSweeper } from './services/orderTimeoutService.js'
 
@@ -50,6 +52,12 @@ import './models/Partner.js'
 import './models/PartnerOrder.js'
 import './models/PartnerOrderItem.js'
 import './models/PartnerAddress.js'
+import './models/Promotion.js'
+import './models/OrderPromotion.js'
+import './models/CouponTemplate.js'
+import './models/UserCoupon.js'
+import './models/Bundle.js'
+import './models/BundleItem.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -262,6 +270,42 @@ async function ensureOrderItemPointsLineCostColumn () {
   }
 }
 
+/** 订单促销补列：discount_amount（订单级减免合计）/ order_items.discount_allocated（行分摊优惠），IF NOT EXISTS 幂等 */
+async function ensurePromotionColumns () {
+  await sequelize.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0')
+  await sequelize.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS discount_allocated DECIMAL(10,2) NOT NULL DEFAULT 0')
+}
+
+/** P3 买多赠一补列：order_items.is_gift（赠品行标识），IF NOT EXISTS 幂等 */
+async function ensureOrderItemIsGiftColumn () {
+  await sequelize.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS is_gift BOOLEAN NOT NULL DEFAULT false')
+}
+
+/**
+ * P4 组合包补列与索引（全部幂等）：
+ * - carts.bundle_id（组合包行）、carts.product_id 放开 NOT NULL（组合包行 product_id 为 NULL；
+ *   DROP NOT NULL 在 PG 下天然幂等，重复执行无副作用）；
+ * - order_items.bundle_id（组合包展开组件行的来源标记）；
+ * - carts 两个 bundle 部分唯一索引（与模型 indexes 同名，sync 已建则 IF NOT EXISTS 跳过）
+ */
+async function ensureBundleColumns () {
+  await sequelize.query('ALTER TABLE carts ADD COLUMN IF NOT EXISTS bundle_id INTEGER NULL')
+  await sequelize.query('ALTER TABLE carts ALTER COLUMN product_id DROP NOT NULL')
+  await sequelize.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS bundle_id INTEGER NULL')
+  await sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS unique_user_bundle ON carts (user_id, bundle_id) WHERE bundle_id IS NOT NULL')
+  await sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS unique_session_bundle_guest ON carts (session_id, bundle_id) WHERE user_id IS NULL AND bundle_id IS NOT NULL')
+}
+
+/**
+ * P2 抵扣券补列：order_promotions.user_coupon_id（券快照行）；
+ * promotion_id 放开 NOT NULL（券快照行 promotion_id 为 NULL；
+ * DROP NOT NULL 在 PG 下天然幂等，重复执行无副作用）
+ */
+async function ensureCouponColumns () {
+  await sequelize.query('ALTER TABLE order_promotions ADD COLUMN IF NOT EXISTS user_coupon_id INTEGER NULL')
+  await sequelize.query('ALTER TABLE order_promotions ALTER COLUMN promotion_id DROP NOT NULL')
+}
+
 /** 旧库仅执行过 029 时缺列会导致合作方订单查询报错，启动时对齐模型字段 */
 async function ensurePartnerOrderSchemaColumns () {
   const qi = sequelize.getQueryInterface()
@@ -308,6 +352,38 @@ async function ensureOrderOnlinePaidAtColumn () {
     })
     console.log('✅ 已为 orders 表添加 online_paid_at（支付幂等）')
   }
+}
+
+/**
+ * orders / partner_orders 补 client_order_key（客户端幂等键）列与部分唯一索引：
+ * - 列可空，仅非 NULL 的行参与唯一约束，历史数据与未带 key 的下单不受影响；
+ * - 部分唯一索引兜底并发双击：同用户/同合作方 + 同 key 只允许落一张订单；
+ * - partner 侧写入由合作方下单控制器负责，此处只负责两侧 DDL；
+ * - CREATE UNIQUE INDEX IF NOT EXISTS 保证重复启动幂等
+ */
+async function ensureClientOrderKeyColumns () {
+  const qi = sequelize.getQueryInterface()
+
+  const orderDesc = await qi.describeTable('orders').catch(() => null)
+  if (orderDesc && !orderDesc.client_order_key) {
+    await qi.addColumn('orders', 'client_order_key', {
+      type: DataTypes.STRING(64),
+      allowNull: true
+    })
+    console.log('✅ 已为 orders 表添加 client_order_key 字段（客户端幂等键）')
+  }
+
+  const partnerOrderDesc = await qi.describeTable('partner_orders').catch(() => null)
+  if (partnerOrderDesc && !partnerOrderDesc.client_order_key) {
+    await qi.addColumn('partner_orders', 'client_order_key', {
+      type: DataTypes.STRING(64),
+      allowNull: true
+    })
+    console.log('✅ 已为 partner_orders 表添加 client_order_key 字段（客户端幂等键）')
+  }
+
+  await sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS uniq_orders_user_client_key ON orders (user_id, client_order_key) WHERE client_order_key IS NOT NULL')
+  await sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS uniq_partner_orders_partner_client_key ON partner_orders (partner_id, client_order_key) WHERE client_order_key IS NOT NULL')
 }
 
 async function ensurePartnerAddressSchemaColumns () {
@@ -371,7 +447,12 @@ if (process.env.NODE_ENV !== 'test') {
     .then(() => ensureOrderBillingColumns())
     .then(() => ensureOrderPointsRedeemedColumn())
     .then(() => ensureOrderItemPointsLineCostColumn())
+    .then(() => ensurePromotionColumns())
+    .then(() => ensureCouponColumns())
+    .then(() => ensureOrderItemIsGiftColumn())
+    .then(() => ensureBundleColumns())
     .then(() => ensureOrderOnlinePaidAtColumn())
+    .then(() => ensureClientOrderKeyColumns())
     .then(() => ensurePartnerOrderSchemaColumns())
     .then(() => ensurePartnerAddressSchemaColumns())
     .then(() => ensureExchangeRatesConfig())
@@ -421,6 +502,8 @@ app.use('/api/admin/statistics', statisticsRoutes)
 app.use('/api/system-config', systemConfigRoutes)
 app.use('/api/auth', userRoutes)
 app.use('/api/partner', partnerRoutes)
+app.use('/api/coupons', couponRoutes)
+app.use('/api/bundles', bundleRoutes)
 app.use('/api/security', securityRoutes)
 
 console.log('✅ API路由注册完成')

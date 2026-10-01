@@ -64,7 +64,7 @@ describe('订单超时清扫 orderTimeout', () => {
     await backdate15Min(orderId)
 
     const processed = await sweepExpiredPendingOrders()
-    expect(processed).toBe(1)
+    expect(processed.orders).toBe(1)
 
     // 订单、订单项、积分流水均已清理
     expect(await Order.findByPk(orderId)).toBeNull()
@@ -84,7 +84,7 @@ describe('订单超时清扫 orderTimeout', () => {
     expect(product.stock).toBe(7)
 
     const processed = await sweepExpiredPendingOrders()
-    expect(processed).toBe(0)
+    expect(processed.orders).toBe(0)
 
     // 订单仍在、仍是 pending，库存仍扣减
     const order = await Order.findByPk(orderId)
@@ -107,7 +107,7 @@ describe('订单超时清扫 orderTimeout', () => {
     await backdate15Min(orderId)
 
     const processed = await sweepExpiredPendingOrders()
-    expect(processed).toBe(0)
+    expect(processed.orders).toBe(0)
 
     const order = await Order.findByPk(orderId)
     expect(order).not.toBeNull()

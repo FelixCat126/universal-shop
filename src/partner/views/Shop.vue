@@ -317,6 +317,15 @@ const paidOrderThb = ref(0)
 const pendingPartnerOrderId = ref(null)
 const submittingPay = ref(false)
 
+// 下单幂等键：同一次下单意图共用一个 key，后端按用户作用域去重（重复提交返回首次订单）
+function generateClientOrderKey () {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `cok_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+const clientOrderKey = ref(generateClientOrderKey())
+
 const checkout = reactive({ notes: '' })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
@@ -560,14 +569,18 @@ async function doSubmit () {
     const body = {
       partner_address_id: selectedAddressId.value,
       items: partnerStore.cart.map((c) => ({ product_id: c.product_id, quantity: c.quantity })),
-      notes: checkout.notes
+      notes: checkout.notes,
+      client_order_key: clientOrderKey.value
     }
     const res = await partnerStore.api('/orders', { method: 'POST', body: JSON.stringify(body) })
     const json = await res.json()
     if (!json.success) {
+      // 提交失败保持同一幂等键：用户重试时被后端幂等去重，避免产生重复订单（设计意图）
       toast.error(json.message || t('common.error'))
       return
     }
+    // 下单成功后更换幂等键：防止用户回退页面再次提交时撞同 key 拿到旧订单
+    clientOrderKey.value = generateClientOrderKey()
     partnerStore.cart.splice(0)
     checkout.notes = ''
     confirmOpen.value = false
@@ -584,6 +597,7 @@ async function doSubmit () {
     }
     toast.success(t('shop.orderOk'))
   } catch (err) {
+    // 网络/服务器错误同样保持幂等键不变，重试才会被后端去重
     console.error('[partner-shop] submit order failed:', err)
     toast.error(t('common.error'))
   } finally {

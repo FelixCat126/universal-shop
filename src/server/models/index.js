@@ -25,6 +25,12 @@ import Partner from './Partner.js'
 import PartnerOrder from './PartnerOrder.js'
 import PartnerOrderItem from './PartnerOrderItem.js'
 import PartnerAddress from './PartnerAddress.js'
+import Promotion from './Promotion.js'
+import OrderPromotion from './OrderPromotion.js'
+import CouponTemplate from './CouponTemplate.js'
+import UserCoupon from './UserCoupon.js'
+import Bundle from './Bundle.js'
+import BundleItem from './BundleItem.js'
 import { logger } from '../utils/logger.js'
 
 // 注意：关联关系已在各个模型文件中定义，无需重复定义
@@ -48,7 +54,13 @@ export {
   Partner,
   PartnerOrder,
   PartnerOrderItem,
-  PartnerAddress
+  PartnerAddress,
+  Promotion,
+  OrderPromotion,
+  CouponTemplate,
+  UserCoupon,
+  Bundle,
+  BundleItem
 }
 
 // 导出默认对象
@@ -69,5 +81,11 @@ export default {
   Partner,
   PartnerOrder,
   PartnerOrderItem,
-  PartnerAddress
+  PartnerAddress,
+  Promotion,
+  OrderPromotion,
+  CouponTemplate,
+  UserCoupon,
+  Bundle,
+  BundleItem
 }

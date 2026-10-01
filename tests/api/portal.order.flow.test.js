@@ -1,6 +1,6 @@
 /**
  * P1 用户面 — 在线支付确认流（3 用例）
- *   OF-1 confirmOnlinePayment happy → 200 + status=shipping + 积分按件发放
+ *   OF-1 confirmOnlinePayment happy → 200 + status=shipping + 积分按实付金额发放（200 THB × 0.01 = 2）
  *   OF-2 双击重复 confirm → 200 幂等（不重复发积分，不变状态）
  *   OF-3 跨用户访问别人订单 confirm → 404
  */

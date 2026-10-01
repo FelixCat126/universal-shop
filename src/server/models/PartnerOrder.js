@@ -59,6 +59,16 @@ const PartnerOrder = sequelize.define('PartnerOrder', {
     type: DataTypes.DATE,
     allowNull: true,
     comment: '合作方在线支付确认时间；用于支付确认接口幂等'
+  },
+  /**
+   * 客户端幂等键：下单请求超时重试时防双单。
+   * (partner_id, client_order_key) WHERE client_order_key IS NOT NULL 的部分唯一索引
+   * 由启动链 DDL 兜底（不在模型 indexes 声明，避免与手工 DDL 重名双建）。
+   */
+  client_order_key: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+    comment: '客户端幂等键（每合作方唯一，可空）'
   }
 }, {
   tableName: 'partner_orders',

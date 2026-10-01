@@ -63,6 +63,23 @@ const OrderItem = sequelize.define('OrderItem', {
     allowNull: true,
     defaultValue: null,
     comment: '该行换购所用积分快照（每件×数量；非积分单可为 0）'
+  },
+  discount_allocated: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: '该行分摊的订单级促销优惠金额（THB 域；满减按行小计占比分摊，尾差归金额最大行）'
+  },
+  is_gift: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: '是否赠品行（P3 买多赠一）：赠品行 price/original_price=0、不参与金额与分摊；取消/删除时照常回补库存'
+  },
+  bundle_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '组合包ID（P4）：组合包展开成的组件行记录来源 bundle.id；普通商品行为 NULL'
   }
 }, {
   tableName: 'order_items',

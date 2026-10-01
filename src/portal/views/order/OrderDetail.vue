@@ -160,6 +160,10 @@
             <div class="flex-1 min-w-0">
               <h4 class="text-sm sm:text-base font-medium text-gray-900 line-clamp-2">
                 {{ item.product_name || item.product?.name }}
+                <span
+                  v-if="item.is_gift"
+                  class="ml-1 px-1.5 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded whitespace-nowrap"
+                >{{ t('checkout.giftTag') }}</span>
               </h4>
               <div class="flex items-center justify-between mt-2">
                 <div class="text-xs sm:text-sm text-gray-500">

@@ -128,7 +128,7 @@ describe('Batch 2 并发安全', () => {
       expect(fresh.status).toBe('shipping')
       expect(fresh.online_paid_at).toBeTruthy()
 
-      // 关键：积分只发 1 次（合计 2 件）
+      // 关键：积分只发 1 次（按折后实付 200 THB × 0.01 = 2 分）
       const bal = await UserPointBalance.findOne({ where: { user_id: user.id } })
       expect(bal && Number(bal.balance)).toBe(2)
     }, 60000)

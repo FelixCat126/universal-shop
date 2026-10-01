@@ -37,9 +37,22 @@ export const useCartStore = defineStore('cart', () => {
     return parseFloat(discountPrice.toFixed(2))
   }
 
-  // 加载购物车数据时逐项防御：商品被删除（product 为 null）的项标记为不可用，不影响其他正常项
+  // 加载购物车数据时逐项防御：商品/套餐被删除（product 或 bundle 为 null）的项标记为不可用，不影响其他正常项
   const normalizeLoadedItem = (item) => {
-    if (!item || !item.product) {
+    if (!item) {
+      return { product: null, bundle: null, price: 0, unavailable: true }
+    }
+    // 组合包行：bundle 缺失（套餐已删除/下架）时标记失效，否则以套餐最新价格为准
+    if (item.bundle_id) {
+      if (!item.bundle) {
+        return { ...item, product: null, price: 0, unavailable: true }
+      }
+      return {
+        ...item,
+        price: Number(item.bundle.price) || 0
+      }
+    }
+    if (!item.product) {
       return { ...item, product: null, price: 0, unavailable: true }
     }
     return {
@@ -169,6 +182,82 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
+  // 添加组合套餐到购物车（addToCart 的组合包分支：本地项为 { bundle_id, quantity, price, bundle }，product 为 null）
+  const addBundleToCart = async (bundle, quantity = 1) => {
+    try {
+      isLoading.value = true
+      const userStore = useUserStore()
+      // 套餐可售套数（公开接口返回的 available_stock）；缺失时跳过前端校验，由后端兜底
+      const stock = Number(bundle?.available_stock)
+
+      // 检查是否已存在该套餐
+      const existingItem = items.value.find(item => item.bundle_id === bundle.id)
+
+      if (existingItem) {
+        const newTotalQuantity = existingItem.quantity + quantity
+        if (Number.isFinite(stock) && stock < newTotalQuantity) {
+          return {
+            success: false,
+            message: 'stockInsufficientSimple'
+          }
+        }
+        return await updateQuantity(existingItem.id, newTotalQuantity)
+      }
+
+      if (Number.isFinite(stock) && stock < quantity) {
+        return {
+          success: false,
+          message: 'stockInsufficientSimple'
+        }
+      }
+
+      if (userStore.isLoggedIn) {
+        // 已登录用户：调用API添加到服务器购物车
+        const response = await api.post('/cart', {
+          bundle_id: bundle.id,
+          quantity
+        })
+
+        if (response.data.success) {
+          items.value.push({
+            id: response.data.data.id,
+            bundle_id: bundle.id,
+            product_id: null,
+            product: null,
+            bundle,
+            quantity,
+            price: Number(bundle.price) || 0
+          })
+          return { success: true, message: 'addSuccess' }
+        } else {
+          return { success: false, message: 'addFailed' }
+        }
+      }
+
+      // 游客用户：添加到localStorage（结构与登录态服务端行同构）
+      const newItem = {
+        id: `guest_${Date.now()}_b${bundle.id}`, // 游客套餐使用临时ID（b 前缀避免与商品临时ID混淆）
+        bundle_id: bundle.id,
+        product_id: null,
+        product: null,
+        bundle,
+        quantity,
+        price: Number(bundle.price) || 0
+      }
+      items.value.push(newItem)
+      saveGuestCart()
+      return { success: true, message: 'addSuccess' }
+    } catch (error) {
+      console.error('Add bundle to cart error:', error)
+      return {
+        success: false,
+        message: 'addFailed'
+      }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   // 更新商品数量
   const updateQuantity = async (itemId, newQuantity, product = null) => {
     try {
@@ -199,13 +288,24 @@ export const useCartStore = defineStore('cart', () => {
         }
       } else {
         // 游客用户：需要验证库存后更新localStorage
-        const productToCheck = product || currentItem.product
-        
-        // 检查库存
-        if (productToCheck && productToCheck.stock < newQuantity) {
-          return { 
-            success: false, 
-            message: 'stockInsufficientSimple'
+        if (currentItem.bundle) {
+          // 组合包按可售套数校验
+          const bundleStock = Number(currentItem.bundle.available_stock)
+          if (Number.isFinite(bundleStock) && bundleStock < newQuantity) {
+            return {
+              success: false,
+              message: 'stockInsufficientSimple'
+            }
+          }
+        } else {
+          const productToCheck = product || currentItem.product
+
+          // 检查库存
+          if (productToCheck && productToCheck.stock < newQuantity) {
+            return {
+              success: false,
+              message: 'stockInsufficientSimple'
+            }
           }
         }
         
@@ -294,29 +394,61 @@ export const useCartStore = defineStore('cart', () => {
   // 检查商品库存
   const checkStock = async () => {
     try {
-      const productIds = items.value.map(item => item.product_id)
-      const response = await api.post('/products/check-stock', { productIds })
-      
-      if (response.data.success) {
-        const stockInfo = response.data.data
-        
-        // 更新购物车中商品的库存信息
-        items.value.forEach(item => {
-          if (!item.product) return // 失效项无商品数据，跳过库存更新
-          const stock = stockInfo.find(s => s.id === item.product_id)
-          if (stock) {
-            item.product.stock = stock.stock
-            // 如果库存不足，调整数量
-            if (item.quantity > stock.stock) {
-              item.quantity = stock.stock
+      const productIds = items.value.filter(item => item.product_id).map(item => item.product_id)
+      if (productIds.length) {
+        const response = await api.post('/products/check-stock', { productIds })
+
+        if (response.data.success) {
+          const stockInfo = response.data.data
+
+          // 更新购物车中商品的库存信息
+          items.value.forEach(item => {
+            if (!item.product) return // 失效项与组合包行无商品数据，跳过库存更新
+            const stock = stockInfo.find(s => s.id === item.product_id)
+            if (stock) {
+              item.product.stock = stock.stock
+              // 如果库存不足，调整数量
+              if (item.quantity > stock.stock) {
+                item.quantity = stock.stock
+              }
             }
-          }
-        })
-        
-        // 移除没有库存的商品（失效项保留展示，由用户手动移除）
-        items.value = items.value.filter(item => !item.product || item.product.stock > 0)
+          })
+        }
       }
-      
+
+      // 组合包：拉取公开套餐列表刷新可售套数（接口不可用时静默跳过，不影响商品库存检查）
+      const bundleItems = items.value.filter(item => item.bundle_id && item.bundle)
+      if (bundleItems.length) {
+        try {
+          const bundleRes = await api.get('/bundles')
+          if (bundleRes.data?.success && Array.isArray(bundleRes.data.data)) {
+            const bundleById = new Map(bundleRes.data.data.map(b => [Number(b.id), b]))
+            bundleItems.forEach(item => {
+              const latest = bundleById.get(Number(item.bundle_id))
+              if (!latest) return
+              const stock = Number(latest.available_stock)
+              item.bundle.available_stock = stock
+              // 如果可售套数不足，调整数量
+              if (Number.isFinite(stock) && item.quantity > stock) {
+                item.quantity = Math.max(stock, 0)
+              }
+            })
+          }
+        } catch (e) {
+          console.warn('刷新套餐库存失败:', e)
+        }
+      }
+
+      // 移除没有库存的商品与售罄套餐（失效项保留展示，由用户手动移除）
+      items.value = items.value.filter(item => {
+        if (item.bundle_id) {
+          if (!item.bundle) return true
+          const stock = Number(item.bundle.available_stock)
+          return !Number.isFinite(stock) || stock > 0
+        }
+        return !item.product || item.product.stock > 0
+      })
+
       return { success: true }
     } catch (error) {
       console.error('Check stock error:', error)
@@ -388,16 +520,17 @@ export const useCartStore = defineStore('cart', () => {
 
       for (const guestItem of guestItems) {
         try {
-          const response = await api.post('/cart', {
-            product_id: guestItem.product_id,
-            quantity: guestItem.quantity
-          })
+          // 组合包行与商品行分别按 bundle_id / product_id 提交
+          const payload = guestItem.bundle_id
+            ? { bundle_id: guestItem.bundle_id, quantity: guestItem.quantity }
+            : { product_id: guestItem.product_id, quantity: guestItem.quantity }
+          const response = await api.post('/cart', payload)
 
           if (!response.data.success) {
             failedItems.push(guestItem)
           }
         } catch (error) {
-          console.error(`❌ 合并商品出错: ${guestItem.product_id}`, error)
+          console.error(`❌ 合并商品出错: ${guestItem.bundle_id || guestItem.product_id}`, error)
           failedItems.push(guestItem)
           // 继续处理其他商品，不中断整个合并过程
         }
@@ -467,6 +600,7 @@ export const useCartStore = defineStore('cart', () => {
     // 方法
     loadCart,
     addToCart,
+    addBundleToCart,
     updateQuantity,
     removeFromCart,
     clearCart,

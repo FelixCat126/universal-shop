@@ -30,6 +30,106 @@
         </div>
       </div>
       
+      <!-- 组合套餐区块（无套餐时整块隐藏，不干扰商品列表） -->
+      <section v-if="bundlesLoading || bundles.length > 0" class="mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">
+          {{ t('bundle.sectionTitle') }}
+        </h2>
+
+        <!-- 套餐加载中：骨架屏 -->
+        <div
+          v-if="bundlesLoading && !bundles.length"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch"
+        >
+          <SkeletonCard v-for="i in 4" :key="`bundle-sk-${i}`" />
+        </div>
+
+        <div
+          v-else
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch"
+        >
+          <div
+            v-for="(bundle, idx) in bundles"
+            :key="bundle.id"
+            v-motion
+            :initial="{ opacity: 0, y: 20, scale: 0.96 }"
+            :enter="{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { ...appleSpring, delay: Math.min(idx * 50, 500) }
+            }"
+            :hovered="{ scale: 1.04, transition: subtleSpring }"
+            :tap="{ scale: 0.97, transition: bouncySpring }"
+            class="bg-white rounded-xl shadow-sm hover:shadow-lg flex flex-col h-full min-h-0 transition-shadow duration-300"
+          >
+            <div class="aspect-w-1 aspect-h-1 w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
+              <span class="absolute left-2 top-2 z-10 px-2 py-0.5 text-xs font-medium bg-purple-600 text-white rounded">
+                {{ t('bundle.badge') }}
+              </span>
+              <ImageFade
+                :src="bundle.image || defaultImage"
+                :alt="getCurrentLanguageValue(bundle, 'name')"
+                custom-class="w-full h-48 object-cover"
+                loading="lazy"
+                @error="handleImageError"
+                @load="handleImageLoad"
+              />
+            </div>
+
+            <div class="p-4 flex flex-col flex-1 min-h-0">
+              <h3 class="text-lg font-semibold text-gray-900 mb-1 line-clamp-2">
+                {{ getCurrentLanguageValue(bundle, 'name') }}
+              </h3>
+
+              <!-- 组件摘要：A×1 + B×2 -->
+              <p class="text-gray-500 text-xs mb-3 line-clamp-2 shrink-0">
+                {{ bundleItemsSummary(bundle) }}
+              </p>
+
+              <div class="mt-auto pt-2 border-t border-gray-100">
+                <div class="mb-3 space-y-1">
+                  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span class="text-xl font-bold text-blue-600">
+                      {{ portalCurrency.formatThb(Number(bundle.price).toFixed(2)) }}
+                    </span>
+                    <span
+                      v-if="bundleSave(bundle) > 0"
+                      class="px-1.5 py-0.5 text-xs bg-red-100 text-red-600 rounded"
+                    >
+                      {{ t('bundle.save', { amount: portalCurrency.formatThb(bundleSave(bundle).toFixed(2)) }) }}
+                    </span>
+                  </div>
+                  <div v-if="bundleSave(bundle) > 0" class="text-xs text-gray-400">
+                    {{ t('bundle.standaloneTotal') }}
+                    <span class="line-through">{{ portalCurrency.formatThb(Number(bundle.standalone_total).toFixed(2)) }}</span>
+                  </div>
+                  <div
+                    class="text-xs tabular-nums"
+                    :class="Number(bundle.available_stock) > 0 ? 'text-green-600' : 'text-red-600'"
+                  >
+                    <template v-if="Number(bundle.available_stock) > 0">
+                      {{ t('bundle.stockLeft', { count: bundle.available_stock }) }}
+                    </template>
+                    <template v-else>
+                      {{ t('bundle.soldOut') }}
+                    </template>
+                  </div>
+                </div>
+
+                <button
+                  @click.stop="addBundle(bundle)"
+                  :disabled="!(Number(bundle.available_stock) > 0)"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {{ t('product.addToCart') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- 搜索栏 -->
       <div class="mb-6">
         <div class="relative max-w-md">
@@ -268,6 +368,7 @@ import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../stores/cart.js'
 import { useUserStore } from '../stores/user.js'
 import { productAPI } from '../api/products.js'
+import { bundleAPI } from '../api/bundles.js'
 import config from '../../config/index.js'
 import { useToast } from '../composables/useToast.js'
 import { usePortalCurrencyStore } from '../stores/portalCurrency.js'
@@ -306,6 +407,10 @@ let scrollProximityRaf = null
 
 const categories = ref([])
 const selectedCategoryId = ref(null)
+
+// 组合套餐
+const bundles = ref([])
+const bundlesLoading = ref(false)
 
 const hasMore = computed(() => currentPage.value < totalPages.value)
 
@@ -403,6 +508,47 @@ const mapProductRow = (product) => ({
   category: product.category,
   points: product.points != null ? Number(product.points) : 0,
 })
+
+const loadBundles = async () => {
+  bundlesLoading.value = true
+  try {
+    const res = await bundleAPI.getBundles()
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      bundles.value = res.data.data
+    } else {
+      bundles.value = []
+    }
+  } catch (e) {
+    // 套餐为附加区块：加载失败静默降级为不展示，不影响商品列表
+    console.warn('加载组合套餐失败:', e)
+    bundles.value = []
+  } finally {
+    bundlesLoading.value = false
+  }
+}
+
+// 套餐组件行归一：购物车行为嵌套 product，公开列表为扁平 product_name/product_name_th
+const bundleComponentProduct = (it) => {
+  if (it?.product) return it.product
+  if (it && (it.product_name || it.product_name_th)) {
+    return { name: it.product_name, name_th: it.product_name_th }
+  }
+  return {}
+}
+
+// 套餐组件摘要：A×1 + B×2（组件名按当前语言取值）
+const bundleItemsSummary = (bundle) => {
+  const items = Array.isArray(bundle?.items) ? bundle.items : []
+  return items
+    .map(it => `${getCurrentLanguageValue(bundleComponentProduct(it), 'name')}×${it.quantity}`)
+    .join(' + ')
+}
+
+// 相对单独购买的节省金额（<=0 时不展示划线价与节省标签）
+const bundleSave = (bundle) => {
+  const save = Number(bundle?.standalone_total) - Number(bundle?.price)
+  return Number.isFinite(save) && save > 0 ? save : 0
+}
 
 const loadCategories = async () => {
   try {
@@ -597,6 +743,26 @@ const addToCart = async (product) => {
   }
 }
 
+// 套餐加入购物车 - 游客可用
+const addBundle = async (bundle) => {
+  if (!(Number(bundle.available_stock) > 0)) {
+    showMessageToast('outOfStock', 'error')
+    return
+  }
+
+  try {
+    const result = await cartStore.addBundleToCart(bundle, 1)
+
+    if (result.success) {
+      showMessageToast(result.message, 'success', result.messageParams || {})
+    } else {
+      showMessageToast(result.message || 'addFailed', 'error', result.messageParams || {})
+    }
+  } catch (error) {
+    showMessageToast('addFailed', 'error')
+  }
+}
+
 // 立即购买 - 游客可用
 const buyNow = async (product) => {
   if (product.stock === 0) {
@@ -670,6 +836,7 @@ watch(
 // 组件挂载时加载数据
 onMounted(async () => {
   loadSystemConfig()
+  loadBundles()
   await loadCategories()
   await loadProducts({ append: false })
   await nextTick()

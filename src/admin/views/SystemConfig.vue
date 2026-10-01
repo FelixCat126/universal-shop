@@ -214,6 +214,37 @@
           </div>
         </div>
       </el-card>
+
+      <!-- 积分获取比率（每 1 泰铢实付获得积分数） -->
+      <el-card class="config-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3>{{ t('systemConfig.pointsEarnRate') }}</h3>
+            <span class="card-subtitle">{{ t('systemConfig.pointsEarnRateSubtitle') }}</span>
+          </div>
+        </template>
+        <div class="config-content">
+          <div class="currency-unit-section">
+            <el-input-number
+              v-model="pointsEarnRate"
+              :min="0"
+              :precision="4"
+              :step="0.01"
+              style="width: 280px"
+            />
+            <el-button
+              type="primary"
+              style="margin-left: 12px"
+              @click="savePointsEarnRate"
+            >
+              {{ t('systemConfig.savePointsEarnRate') }}
+            </el-button>
+            <div class="exchange-rate-tips" style="margin-top: 12px">
+              <p>{{ t('systemConfig.pointsEarnRateTips') }}</p>
+            </div>
+          </div>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -241,6 +272,7 @@ const exchangeRatesUsd = ref(0)
 const exchangeRatesCny = ref(0)
 const exchangeRatesMyr = ref(0)
 const currencyCode = ref('THB')
+const pointsEarnRate = ref(0.01)
 
 const uploading = reactive({
   homeBanner: false,
@@ -292,6 +324,8 @@ const loadConfigs = async () => {
         }
         currencyCode.value = normalizeCurrencyCode(configs.currency_unit?.value)
         mergeCurrencyCodeIntoLocales(mergeLocaleMessage, currencyCode.value)
+        const per = parseFloat(configs.points_earn_rate?.value || '0.01')
+        pointsEarnRate.value = Number.isFinite(per) && per >= 0 ? per : 0.01
       } else {
         ElMessage.error(data.message || t('systemConfig.messages.loadConfigFailed'))
       }
@@ -565,6 +599,42 @@ const saveCurrencyUnit = async () => {
   } catch (error) {
     console.error('保存货币单位失败:', error)
     ElMessage.error(t('systemConfig.messages.currencyUnitSaveFailed'))
+  }
+}
+
+const savePointsEarnRate = async () => {
+  try {
+    const n = Number(pointsEarnRate.value)
+    if (!Number.isFinite(n) || n < 0) {
+      ElMessage.error(t('systemConfig.messages.invalidPointsEarnRate'))
+      return
+    }
+    const response = await adminStore.apiRequest('/api/system-config/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        key: 'points_earn_rate',
+        value: String(n),
+        type: 'text',
+        description: '积分获取比率（每 1 泰铢实付获得积分数）'
+      })
+    })
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success) {
+        pointsEarnRate.value = n
+        ElMessage.success(t('systemConfig.messages.pointsEarnRateSaveSuccess'))
+      } else {
+        ElMessage.error(data.message || t('systemConfig.messages.pointsEarnRateSaveFailed'))
+      }
+    } else {
+      ElMessage.error(t('systemConfig.messages.pointsEarnRateSaveFailed'))
+    }
+  } catch (error) {
+    console.error('保存积分获取比率失败:', error)
+    ElMessage.error(t('systemConfig.messages.pointsEarnRateSaveFailed'))
   }
 }
 

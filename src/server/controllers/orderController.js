@@ -1,6 +1,9 @@
 import { Op } from 'sequelize'
 import Order from '../models/Order.js'
 import OrderItem from '../models/OrderItem.js'
+import OrderPromotion from '../models/OrderPromotion.js'
+import UserCoupon from '../models/UserCoupon.js'
+import CouponTemplate from '../models/CouponTemplate.js'
 import Product from '../models/Product.js'
 import User from '../models/User.js'
 import Cart from '../models/Cart.js'
@@ -9,8 +12,9 @@ import sequelize from '../config/database.js'
 import UserController from './userController.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import { createUserAddress } from '../services/addressService.js'
-import { normalizeExchangeRates, thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
+import { thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
 import * as pointsService from '../services/pointsService.js'
+import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates } from '../services/pricingEngine.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import AuditLog from '../models/AuditLog.js'
 import PointTransaction from '../models/PointTransaction.js'
@@ -42,14 +46,24 @@ const RESTORE_ON_DELETE_STATUSES = ['pending', 'paid', 'shipping']
  * 订单取消/删除时的资源回补（必须在事务内调用，order.items 需已加载）：
  * 1) 逐订单项回补库存（paranoid:false，商品被软删也要回补，否则库存静默丢失）；
  * 2) 积分换购单退回已扣积分；
- * 3) 已确认在线支付（已发购物积分）的单收回等量积分：一单可能有多条 earn_purchase
- *    流水（补发/重复发放），findAll 汇总收回总量；余额不足按 0 截断并记 warn
+ * 3) 已发放购物积分的单收回等量积分：以 earn_purchase 流水为准（不再以 online_paid_at 为门槛——
+ *    COD 单下单事务内即发积分、无 online_paid_at，取消同样要收回）；
+ *    一单可能有多条 earn_purchase 流水（补发/重复发放），findAll 汇总收回总量；
+ *    余额不足按 0 截断并记 warn
+ * 4) 该单核销的抵扣券释放回 unused（条件 UPDATE，幂等：重复回补匹配不到行即为 0 affected）
  */
 export async function restoreOrderResources (order, transaction) {
   const items = Array.isArray(order.items) ? order.items : []
-  for (const item of items) {
+  /**
+   * 回补库存与 createOrder 扣库存采用同一全局顺序（product_id 升序）获取 Product 行锁：
+   * 所有写路径锁顺序一致，消除"扣减 vs 回补"两个事务互相等待的 AB-BA 死锁
+   */
+  const sortedItems = items
+    .filter(item => item && item.product_id)
+    .sort((a, b) => a.product_id - b.product_id)
+  for (const item of sortedItems) {
     const qty = parseInt(item.quantity, 10)
-    if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue
+    if (!Number.isInteger(qty) || qty <= 0) continue
     await Product.update(
       { stock: sequelize.literal(`stock + ${qty}`) },
       // paranoid:false —— Product 是软删模型，默认过滤会让已软删商品的库存静默丢失
@@ -67,31 +81,102 @@ export async function restoreOrderResources (order, transaction) {
     })
   }
 
-  if (order.online_paid_at) {
-    // 一单可能有多条 earn_purchase 流水，findAll 汇总后按总量收回
-    const earnTxs = await PointTransaction.findAll({
-      where: { order_id: order.id, type: 'earn_purchase' },
-      transaction
+  // 已发购物积分即收回：earn_purchase 流水是唯一事实来源（无流水则 earned=0，自然跳过）
+  const earnTxs = await PointTransaction.findAll({
+    where: { order_id: order.id, type: 'earn_purchase' },
+    transaction
+  })
+  const earned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
+  if (earned > 0) {
+    const revokeResult = await pointsService.revokePurchasePoints(transaction, {
+      userId: order.user_id,
+      orderId: order.id,
+      points: earned,
+      note: `订单取消收回购物积分 ${order.order_no}`
     })
-    const earned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
-    if (earned > 0) {
-      const revokeResult = await pointsService.revokePurchasePoints(transaction, {
-        userId: order.user_id,
+    if (revokeResult.truncated > 0) {
+      logger.warn('订单取消收回购物积分时余额不足，已按 0 截断', {
         orderId: order.id,
-        points: earned,
-        note: `订单取消收回购物积分 ${order.order_no}`
+        orderNo: order.order_no,
+        userId: order.user_id,
+        requested: revokeResult.requested,
+        revoked: revokeResult.revoked
       })
-      if (revokeResult.truncated > 0) {
-        logger.warn('订单取消收回购物积分时余额不足，已按 0 截断', {
-          orderId: order.id,
-          orderNo: order.order_no,
-          userId: order.user_id,
-          requested: revokeResult.requested,
-          revoked: revokeResult.revoked
-        })
-      }
     }
   }
+
+  // 抵扣券释放（P2）：该单核销占位的券退回未使用状态；
+  // 无券订单 where 匹配 0 行，天然无操作；券已过期也无碍——/mine 查询时惰性再置 expired
+  await UserCoupon.update(
+    { status: 'unused', used_by_order_id: null, used_at: null },
+    { where: { used_by_order_id: order.id }, transaction }
+  )
+}
+
+/**
+ * PG 唯一约束冲突判定（口径与 pointsService.lockOrCreateBalance 一致：
+ * 兼容 Sequelize 包装错误与原始 PG 错误码 23505）
+ */
+function isUniqueViolationError (err) {
+  return err?.name === 'SequelizeUniqueConstraintError' ||
+    err?.parent?.code === '23505' ||
+    err?.original?.code === '23505'
+}
+
+/**
+ * 区分 23505 的冲突来源是否客户端幂等键索引（而非订单号唯一索引）：
+ * 约束名 / PG 错误明细 / Sequelize 字段路径三重佐证，任一命中即认定
+ */
+function isClientOrderKeyConflict (err) {
+  return err?.parent?.constraint === 'uniq_orders_user_client_key' ||
+    (typeof err?.parent?.detail === 'string' && err.parent.detail.includes('client_order_key')) ||
+    (Array.isArray(err?.errors) && err.errors.some(e => e?.path === 'client_order_key'))
+}
+
+/**
+ * 组装 createOrder 成功响应体（正常创建与幂等查重两条路径共用）：
+ * 订单详情（含 items + product）；游客单附带用户信息与 token；
+ * deduplicated=true 标记本次为幂等命中、未新建订单
+ */
+async function buildCreateOrderResponseData (orderId, { userId, isGuestOrder, deduplicated = false }) {
+  const createdOrder = await Order.findByPk(orderId, {
+    include: [
+      {
+        model: OrderItem,
+        as: 'items',
+        include: [{
+          model: Product,
+          as: 'product',
+          paranoid: false
+        }]
+      }
+    ]
+  })
+
+  const responseData = {
+    order: createdOrder
+  }
+  if (deduplicated) {
+    responseData.deduplicated = true
+  }
+
+  // 如果是游客下单，返回用户信息和token
+  if (isGuestOrder) {
+    const jwt = (await import('jsonwebtoken')).default
+
+    const user = await User.findByPk(userId)
+    const token = jwt.sign(
+      { userId: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+
+    responseData.user = user.toSafeJSON()
+    responseData.token = token
+    responseData.autoRegistered = true
+  }
+
+  return responseData
 }
 
 class OrderController {
@@ -107,8 +192,28 @@ class OrderController {
         message: '请先登录后再使用积分换购'
       })
     }
+    // 积分换购单与抵扣券互斥（P2）：前置拦截，不进计价流程
+    if (paymentMethod === 'points' && req.body.user_coupon_id != null) {
+      return res.status(400).json({
+        success: false,
+        message: '积分换购订单不可使用抵扣券'
+      })
+    }
+    // 积分换购单不支持组合包（P4）：前置拦截，不进计价流程
+    if (paymentMethod === 'points' && Array.isArray(req.body.items) &&
+      req.body.items.some(it => it && it.bundle_id != null)) {
+      return res.status(400).json({
+        success: false,
+        message: '积分换购订单不支持组合包'
+      })
+    }
 
-    const transaction = await sequelize.transaction()
+    /**
+     * 事务推迟到所有预检（商品查询、汇率配置、游客用户解析、地址读取）之后、
+     * 第一个写操作之前开启：sequelize.transaction() 一创建即占住一条池连接，
+     * 若事务存活期间再做 autocommit 读需再抢第二条连接，高并发下会连接池自死锁
+     */
+    let transaction = null
 
     try {
       const {
@@ -126,15 +231,33 @@ class OrderController {
         district = '',
         detail_address = '',
         postal_code = '',
-        checkout_currency: checkoutCurrencyRaw
+        checkout_currency: checkoutCurrencyRaw,
+        client_order_key: clientOrderKey, // 客户端幂等键（可选；joi 已把 ''/null 裁成 undefined）
+        user_coupon_id: userCouponId // 抵扣券（P2，可选；joi 已把 ''/null 裁成 undefined）
       } = req.body
-      
+
+      // 轻量入参校验前置：避免为畸形请求白白创建游客账号（此时事务尚未开启，直接返回即可）
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '订单商品不能为空'
+        })
+      }
+
+      // 验证收货信息
+      if (!contact_name || !contact_phone || !delivery_address) {
+        return res.status(400).json({
+          success: false,
+          message: '收货信息不能为空'
+        })
+      }
+
       let userId = req.user?.userId
       let isGuestOrder = false
-      
+
       // 标准化处理推荐码（在所有分支之前定义）
       const normalizedReferralCode = referral_code && typeof referral_code === 'string' && referral_code.trim() ? referral_code.trim() : null
-      
+
       // 如果用户未登录，检查是否为游客下单
       if (!userId) {
         // 解析并验证手机号格式（包含国家区号）
@@ -199,28 +322,75 @@ class OrderController {
         }
       }
 
-      // 验证订单项
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '订单商品不能为空'
+      /**
+       * 幂等预检：客户端带 client_order_key 时，同用户同 key 直接返回已存在订单，
+       * 不重复扣库存、不重复发积分（覆盖"已提交但响应丢失后的重试/双击"顺序场景）；
+       * 并发同 key 由 (user_id, client_order_key) 部分唯一索引兜底（见下方 Order.create 冲突分支）。
+       * 游客单同样适用：此时 userId 已是自动注册/复用账号的 id
+       */
+      if (clientOrderKey) {
+        const existingOrder = await Order.findOne({
+          where: { user_id: userId, client_order_key: clientOrderKey }
         })
-      }
-
-      // 验证收货信息
-      if (!contact_name || !contact_phone || !delivery_address) {
-        return res.status(400).json({
-          success: false,
-          message: '收货信息不能为空'
-        })
+        if (existingOrder) {
+          const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, deduplicated: true })
+          AuditLog.logUser({
+            user: req.user || (isGuestOrder ? { id: userId } : null),
+            event: 'order.create.deduplicated',
+            resource: 'order',
+            resourceId: existingOrder.id,
+            detail: { client_order_key: clientOrderKey },
+            req
+          }).catch(() => {})
+          return res.status(201).json({
+            success: true,
+            message: '订单创建成功',
+            data: responseData
+          })
+        }
       }
 
       let totalAmountThb = 0
       let pointsPurchaseTotal = 0
       const orderItems = []
 
-      // 批量查询商品信息（避免N+1查询）
-      const productIds = items.map(item => item.product_id)
+      /**
+       * 抵扣券（P2）：查券并校验归属（此时 userId 已解析——游客单为自动注册的新用户，
+       * 注册赠券已发到该账号，天然兼容）；状态/有效期/scope 门槛由计价引擎统一判定，
+       * 核销占位在事务内用条件 UPDATE 完成（见下方 OrderPromotion 快照段）
+       */
+      let userCoupon = null
+      if (userCouponId != null && paymentMethod !== 'points') {
+        userCoupon = await UserCoupon.findOne({
+          where: { id: userCouponId, user_id: userId },
+          include: [{ model: CouponTemplate, as: 'template' }]
+        })
+        if (!userCoupon) {
+          return res.status(400).json({
+            success: false,
+            message: '抵扣券不存在或不属于当前用户'
+          })
+        }
+      }
+
+      /**
+       * 计价引擎（P1 营销体系）：行价/满减/行分摊/积分预估统一收口。
+       * 积分换购单（points）不参与任何促销，priced 为 null，下方仍走原有行价逻辑
+       */
+      const priced = paymentMethod === 'points'
+        ? null
+        : await priceOrder({ items, paymentMethod, userCoupon })
+
+      /**
+       * 订单行口径（P4）：普通支付单以引擎展开行为准（组合包项已原地展开为组件行，
+       * 行带 bundle_id 标记）；积分换购单不含组合包（顶部已前置拦截），维持入参 items 口径
+       */
+      const orderRows = priced
+        ? priced.lines.map(line => ({ product_id: line.product_id, quantity: line.quantity, engineLine: line }))
+        : items.map(item => ({ product_id: item.product_id, quantity: item.quantity, engineLine: null }))
+
+      // 批量查询商品信息（避免N+1查询；组合包单覆盖展开后的组件商品）
+      const productIds = orderRows.map(row => row.product_id)
       const products = await Product.findAll({
         where: { id: productIds }
       })
@@ -231,20 +401,26 @@ class OrderController {
         productMap.set(product.id, product)
       })
 
-      // 验证商品库存和计算总价（仅做"友好"预检；真正扣减用条件 UPDATE 防超卖）
-      for (const item of items) {
-        const product = productMap.get(item.product_id)
+      // 验证商品状态/库存和计算总价（仅做"友好"预检；真正扣减用条件 UPDATE 防超卖。此时事务未开启，校验失败直接返回即可）
+      for (const row of orderRows) {
+        const product = productMap.get(row.product_id)
         if (!product) {
-          await transaction.rollback()
           return res.status(400).json({
             success: false,
-            message: `商品ID ${item.product_id} 不存在`
+            message: `商品ID ${row.product_id} 不存在`
           })
         }
 
-        const qty = parseInt(item.quantity, 10)
+        // 下架/停用商品拦截：仅 active 可售（此前不过滤 status，下架商品仍可被下单）
+        if (product.status !== 'active') {
+          return res.status(400).json({
+            success: false,
+            message: `商品 ${product.name} 已下架，无法购买`
+          })
+        }
+
+        const qty = parseInt(row.quantity, 10)
         if (!Number.isInteger(qty) || qty < 1 || qty > 5000) {
-          await transaction.rollback()
           return res.status(400).json({
             success: false,
             message: `商品 ${product.name} 数量无效（需为 1-5000 的整数）`
@@ -252,27 +428,32 @@ class OrderController {
         }
 
         if (product.stock < qty) {
-          await transaction.rollback()
           return res.status(400).json({
             success: false,
             message: `商品 ${product.name} 库存不足，当前库存：${product.stock}`
           })
         }
 
-        // 计算实际价格（考虑折扣），行价与行小计统一舍入到分
-        let actualPrice = round2(product.price)
-        if (product.discount && product.discount > 0) {
-          actualPrice = round2(product.price * (1 - product.discount / 100))
+        // 计算实际价格（考虑折扣）：普通支付单取自计价引擎行（P4 组合包展开行 = 分摊价）；
+        // 积分换购单维持原行价逻辑（不参与满减）
+        const engineLine = row.engineLine
+        let actualPrice
+        if (engineLine) {
+          actualPrice = engineLine.unit_price
+        } else {
+          actualPrice = round2(product.price)
+          if (product.discount && product.discount > 0) {
+            actualPrice = round2(product.price * (1 - product.discount / 100))
+          }
         }
 
-        const itemTotal = round2(actualPrice * qty)
+        const itemTotal = engineLine ? engineLine.line_total : round2(actualPrice * qty)
         totalAmountThb = round2(totalAmountThb + itemTotal)
 
         const ptsUnit = Number(product.points) || 0
-        const pointsLineCost = ptsUnit > 0 ? ptsUnit * item.quantity : 0
+        const pointsLineCost = ptsUnit > 0 ? ptsUnit * qty : 0
         if (paymentMethod === 'points') {
           if (ptsUnit <= 0 || pointsLineCost <= 0) {
-            await transaction.rollback()
             return res.status(400).json({
               success: false,
               message: '积分换购订单中只能包含支持积分兑换的商品'
@@ -283,43 +464,49 @@ class OrderController {
         pointsPurchaseTotal += pointsLineCost
 
         orderItems.push({
-          product_id: item.product_id,
-          quantity: item.quantity,
+          product_id: row.product_id,
+          quantity: qty,
           price: actualPrice,
           original_price: product.price,
-          discount: product.discount,
+          discount: engineLine ? engineLine.discount : product.discount,
           product_name_zh: product.name,
           product_name_th: product.name_th || null,
-          points_line_cost: pointsLineCost
+          points_line_cost: pointsLineCost,
+          discount_allocated: engineLine ? engineLine.discount_allocated : 0,
+          bundle_id: engineLine?.bundle_id ?? null
         })
+      }
+
+      /**
+       * 买多赠一（P3）：引擎 gifts 落成赠品行，追加在正价行之后——
+       * price/original_price=0、is_gift=true、discount_allocated=0，不计金额、不参与分摊；
+       * 库存扣减在下方与正价行按 product_id 合并执行（买 3 赠 1 同品即扣 4）
+       */
+      if (priced && Array.isArray(priced.gifts)) {
+        for (const gift of priced.gifts) {
+          orderItems.push({
+            product_id: gift.product_id,
+            quantity: gift.quantity,
+            price: 0,
+            original_price: 0,
+            discount: null,
+            product_name_zh: gift.name,
+            product_name_th: null,
+            points_line_cost: 0,
+            discount_allocated: 0,
+            is_gift: true
+          })
+        }
       }
 
       const checkoutCurrency = normalizeCheckoutCurrency(checkoutCurrencyRaw)
 
       // 汇算比例：与门户计价一致（泰铢底价 × 比例 = 外币金额）
-      const SystemConfig = (await import('../models/SystemConfig.js')).default
-      let xrJson = await SystemConfig.getConfig('exchange_rates')
-      if (!xrJson || typeof xrJson !== 'object') {
-        const rateConfig = await SystemConfig.findOne({
-          where: { config_key: 'exchange_rate' }
-        })
-        let usdFallback = 0
-        if (rateConfig?.config_value) {
-          const n = parseFloat(rateConfig.config_value)
-          usdFallback = Number.isFinite(n) && n >= 0 ? n : 0
-        }
-        xrJson = {
-          USD: usdFallback.toFixed(2),
-          CNY: '0.00',
-          MYR: '0.00'
-        }
-      }
-      const normRates = normalizeExchangeRates(xrJson)
+      const normRates = await loadNormalizedExchangeRates()
 
       if (paymentMethod !== 'points' && checkoutCurrency !== 'THB') {
         const need = parseFloat(normRates[checkoutCurrency])
         if (!Number.isFinite(need) || need <= 0) {
-          await transaction.rollback()
           return res.status(400).json({
             success: false,
             message: `无法在所选币种 ${checkoutCurrency} 结账：系统未配置有效汇算比例或未启用该币种`
@@ -327,14 +514,17 @@ class OrderController {
         }
       }
 
-      totalAmountThb = round2(totalAmountThb)
+      // 普通支付单以引擎口径为准：应付 = 商品小计 - 满减合计（total_amount_thb 语义 = 折后应付 THB，统计口径不变）
+      totalAmountThb = priced ? priced.payable_thb : round2(totalAmountThb)
+
+      // 积分获取比例（points_earn_rate）：事务外读取，下方 COD 发积分用
+      const pointsEarnRate = await getPointsEarnRate()
 
       let totalBilling
       if (paymentMethod === 'points') {
         totalAmountThb = 0
         totalBilling = 0
         if (!(pointsPurchaseTotal > 0)) {
-          await transaction.rollback()
           return res.status(400).json({
             success: false,
             message: '无效的积分兑换数量'
@@ -401,20 +591,31 @@ class OrderController {
 
       const initialOrderStatus = paymentMethod === 'online' ? 'pending' : 'shipping'
 
+      // 所有预检完成：以下进入写阶段，开启事务（事务内第一个写操作是 Order.create）
+      transaction = await sequelize.transaction()
+
       /**
-       * 订单号生成 + 唯一冲突重试（最多 5 次）：
-       * 高并发下 Date.now+random 仍有概率撞 unique 约束，撞了就重生
+       * 订单号生成 + 唯一冲突重试（最多 5 次，SAVEPOINT 模式）：
+       * PG 下事务内语句报错后整事务进入 aborted 状态，不设保存点直接重插只会再撞 25P02，
+       * 因此仿 pointsService.lockOrCreateBalance：Order.create 包在保存点内，
+       * 撞 order_no 唯一约束（23505）时回滚到保存点、重生成订单号再插。
+       * 幂等键 (user_id, client_order_key) 冲突同样报 23505，必须区分错误来源：
+       * 命中幂等键索引 → 不再重试，整事务回滚后按 key 查重返回（见下方分支）
        */
       const buildOrderNo = () => `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
       let order = null
       let createTries = 0
+      let clientKeyConflicted = false
       while (createTries < 5 && !order) {
+        const sp = await sequelize.transaction({ transaction })
         try {
           order = await Order.create({
             order_no: buildOrderNo(),
             user_id: userId,
+            client_order_key: clientOrderKey || null,
             total_amount: totalBilling,
             total_amount_thb: totalAmountThb,
+            discount_amount: priced ? priced.discount_amount : 0,
             currency_code: checkoutCurrency,
             payment_method: paymentMethod,
             points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
@@ -428,9 +629,15 @@ class OrderController {
             postal_code: orderPostalCode,
             notes,
             exchange_rate: exchangeRateSnapshot
-          }, { transaction })
+          }, { transaction: sp })
+          await sp.commit()
         } catch (err) {
-          if (err && err.name === 'SequelizeUniqueConstraintError') {
+          await sp.rollback().catch(() => {})
+          if (isUniqueViolationError(err)) {
+            if (clientOrderKey && isClientOrderKeyConflict(err)) {
+              clientKeyConflicted = true
+              break
+            }
             createTries++
             continue
           }
@@ -439,6 +646,32 @@ class OrderController {
       }
       if (!order) {
         await transaction.rollback()
+        transaction = null
+        if (clientKeyConflicted) {
+          /**
+           * 幂等键冲突：并发下同 key 的负方会被唯一索引阻塞到胜方提交后才报 23505，
+           * 此刻按 (user_id, key) 必能查到胜方已提交的订单，按幂等成功原样返回
+           */
+          const existingOrder = await Order.findOne({
+            where: { user_id: userId, client_order_key: clientOrderKey }
+          })
+          if (existingOrder) {
+            const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, deduplicated: true })
+            AuditLog.logUser({
+              user: req.user || (isGuestOrder ? { id: userId } : null),
+              event: 'order.create.deduplicated',
+              resource: 'order',
+              resourceId: existingOrder.id,
+              detail: { client_order_key: clientOrderKey },
+              req
+            }).catch(() => {})
+            return res.status(201).json({
+              success: true,
+              message: '订单创建成功',
+              data: responseData
+            })
+          }
+        }
         return res.status(500).json({
           success: false,
           message: '生成订单号失败，请稍后重试'
@@ -449,33 +682,89 @@ class OrderController {
        * 防超卖核心：用条件 UPDATE 原子扣库存。
        *   UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty
        * 受影响行 0 即视为库存不足；事务回滚整单。
-       * 这一段同时承担"批量创建订单项"。
+       * 扣减清单先按 product_id 合并（买赠赠品行与正价行同品时合扣，如买 3 赠 1 扣 4），
+       * 再按 product_id 升序遍历：所有写路径（下单扣减/取消回补/超时清扫回补）
+       * 按同一全局顺序获取 Product 行锁，消除 AB-BA 死锁；
+       * OrderItem 落库仍用客户端原始顺序 + 赠品行追加在后（见下方 bulkCreate），不影响订单项展示顺序契约
        */
-      const orderItemRows = []
+      const stockDeductionMap = new Map()
       for (const orderItem of orderItems) {
+        const entry = stockDeductionMap.get(orderItem.product_id) ||
+          { product_id: orderItem.product_id, quantity: 0, name: orderItem.product_name_zh }
+        entry.quantity += parseInt(orderItem.quantity, 10)
+        stockDeductionMap.set(orderItem.product_id, entry)
+      }
+      const stockDeductionOrder = [...stockDeductionMap.values()].sort((a, b) => a.product_id - b.product_id)
+      for (const entry of stockDeductionOrder) {
         const [affected] = await Product.update(
-          { stock: sequelize.literal(`stock - ${parseInt(orderItem.quantity, 10)}`) },
+          { stock: sequelize.literal(`stock - ${entry.quantity}`) },
           {
             where: {
-              id: orderItem.product_id,
-              stock: { [Op.gte]: parseInt(orderItem.quantity, 10) }
+              id: entry.product_id,
+              stock: { [Op.gte]: entry.quantity }
             },
             transaction
           }
         )
         if (!affected) {
           await transaction.rollback()
+          transaction = null
           return res.status(400).json({
             success: false,
-            message: `商品库存不足（商品 ID ${orderItem.product_id}）`
+            message: `商品 ${entry.name} 库存不足（商品 ID ${entry.product_id}）`
           })
         }
-        orderItemRows.push({ order_id: order.id, ...orderItem })
       }
 
-      // 订单项一次性写入（避免循环 N 次插入）
+      // 订单项一次性写入（保持客户端提交顺序；避免循环 N 次插入）
+      const orderItemRows = orderItems.map(orderItem => ({ order_id: order.id, ...orderItem }))
       if (orderItemRows.length > 0) {
         await OrderItem.bulkCreate(orderItemRows, { transaction })
+      }
+
+      /**
+       * 抵扣券核销占位（同事务）：条件 UPDATE 是并发的唯一闸门——
+       * 预检/计价在事务外完成，同券双下单时负方在此受影响行=0，
+       * 整单回滚报 400；胜方提交前负方会被行锁阻塞到胜方提交后重估 WHERE，不会双双核销
+       */
+      if (userCoupon && priced && priced.applied_coupon) {
+        const [affected] = await UserCoupon.update(
+          { status: 'used', used_by_order_id: order.id, used_at: new Date() },
+          { where: { id: userCoupon.id, user_id: userId, status: 'unused' }, transaction }
+        )
+        if (!affected) {
+          await transaction.rollback()
+          transaction = null
+          return res.status(400).json({
+            success: false,
+            message: '抵扣券不可用或已被使用'
+          })
+        }
+      }
+
+      // 订单促销快照（同事务）：每个命中的满减一条；券抵扣一行（user_coupon_id + 名称/面额快照），供订单详情/对账追溯
+      const promotionRows = []
+      if (priced && priced.applied_promotions.length > 0) {
+        for (const p of priced.applied_promotions) {
+          promotionRows.push({
+            order_id: order.id,
+            promotion_id: p.promotion_id,
+            name: p.name,
+            amount: p.amount
+          })
+        }
+      }
+      if (priced && priced.applied_coupon) {
+        promotionRows.push({
+          order_id: order.id,
+          promotion_id: null,
+          user_coupon_id: priced.applied_coupon.user_coupon_id,
+          name: priced.applied_coupon.name,
+          amount: priced.applied_coupon.amount
+        })
+      }
+      if (promotionRows.length > 0) {
+        await OrderPromotion.bulkCreate(promotionRows, { transaction })
       }
 
       if (paymentMethod === 'points') {
@@ -529,50 +818,20 @@ class OrderController {
 
       // COD 单在下单事务内直接发积分（与库存/订单同生共死；发放失败整单回滚，客户端可安全重试；
       // 若在提交后独立事务发放，取消窗口内 revoke 会查不到 earn 流水，用户白得积分）
+      // 发放口径：floor(折后实付 THB × points_earn_rate)，为 0 不发
       if (paymentMethod !== 'points' && paymentMethod !== 'online' && userId) {
-        const qtySum = items.reduce((s, it) => s + Number(it.quantity || 0), 0)
-        if (qtySum > 0) {
-          await pointsService.grantPurchasePoints(userId, order.id, qtySum, { transaction })
+        const earnPoints = calcPointsEarn(totalAmountThb, pointsEarnRate)
+        if (earnPoints > 0) {
+          await pointsService.grantPurchasePoints(userId, order.id, earnPoints, { transaction })
         }
       }
 
       await transaction.commit()
+      // 提交成功后事务已结束：置空避免 catch 对已提交事务再执行 rollback 而二次抛错
+      transaction = null
 
-      // 返回创建的订单信息
-      const createdOrder = await Order.findByPk(order.id, {
-        include: [
-          {
-            model: OrderItem,
-            as: 'items',
-            include: [{
-              model: Product,
-              as: 'product',
-              paranoid: false
-            }]
-          }
-        ]
-      })
-
-      // 准备响应数据
-      const responseData = {
-        order: createdOrder
-      }
-
-      // 如果是游客下单，返回用户信息和token
-      if (isGuestOrder) {
-        const jwt = (await import('jsonwebtoken')).default
-        
-        const user = await User.findByPk(userId)
-        const token = jwt.sign(
-          { userId: user.id, username: user.username },
-          JWT_SECRET,
-          { expiresIn: '7d' }
-        )
-        
-        responseData.user = user.toSafeJSON()
-        responseData.token = token
-        responseData.autoRegistered = true
-      }
+      // 返回创建的订单信息（含订单项；游客单附带账号与 token）
+      const responseData = await buildCreateOrderResponseData(order.id, { userId, isGuestOrder })
 
       AuditLog.logUser({
         user: req.user || (isGuestOrder ? { id: userId } : null),
@@ -594,8 +853,18 @@ class OrderController {
       })
 
     } catch (error) {
-      await transaction.rollback()
+      // 事务可能未开启（预检阶段抛错）或已回滚/已提交：兜底回滚需容错，避免 catch 内二次抛错
+      if (transaction) {
+        await transaction.rollback().catch(() => {})
+      }
       logger.error('创建订单失败', { err: error?.message, stack: error?.stack })
+      // 计价引擎等业务校验抛出的 400 错误（商品不存在/已下架/数量无效）原样透传
+      if (error && error.status === 400) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        })
+      }
       if (error && error.message === 'POINTS_INSUFFICIENT') {
         return res.status(400).json({
           success: false,
@@ -611,10 +880,89 @@ class OrderController {
   }
 
   /**
+   * 订单试算（quote）：与 createOrder 共用同一套计价引擎与汇率读取，只算价不落库、不扣库存。
+   * 响应含行级明细 / 满减合计 / 券抵扣 / 应付泰铢 / 结算币种金额 / 积分预估 / 赠品清单（P3），供结算页展示。
+   * P2：body 可带 user_coupon_id——必须已登录且券属于当前用户；券不可用返回 400（券在此只试算，不核销）。
+   */
+  static async quoteOrder (req, res) {
+    try {
+      const {
+        items,
+        payment_method: paymentMethod = 'cod',
+        checkout_currency: checkoutCurrencyRaw,
+        user_coupon_id: userCouponId
+      } = req.body
+
+      // 抵扣券（P2）：查券并校验归属；状态/有效期/scope 门槛/积分互斥由计价引擎统一判定
+      let userCoupon = null
+      if (userCouponId != null) {
+        const userId = req.user?.userId
+        if (!userId) {
+          return res.status(400).json({ success: false, message: '使用抵扣券需要先登录' })
+        }
+        userCoupon = await UserCoupon.findOne({
+          where: { id: userCouponId, user_id: userId },
+          include: [{ model: CouponTemplate, as: 'template' }]
+        })
+        if (!userCoupon) {
+          return res.status(400).json({ success: false, message: '抵扣券不存在或不属于当前用户' })
+        }
+      }
+
+      const priced = await priceOrder({ items, paymentMethod, userCoupon })
+
+      const checkoutCurrency = normalizeCheckoutCurrency(checkoutCurrencyRaw)
+      const normRates = await loadNormalizedExchangeRates()
+
+      if (paymentMethod !== 'points' && checkoutCurrency !== 'THB') {
+        const need = parseFloat(normRates[checkoutCurrency])
+        if (!Number.isFinite(need) || need <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: `无法在所选币种 ${checkoutCurrency} 结账：系统未配置有效汇算比例或未启用该币种`
+          })
+        }
+      }
+
+      const rate = checkoutCurrency === 'THB' ? 1 : (parseFloat(normRates[checkoutCurrency]) || 0)
+      const billing = {
+        currency: checkoutCurrency,
+        // 积分换购单无货币应付（与 createOrder 口径一致：total 计 0）
+        amount: paymentMethod === 'points' ? 0 : thbToBillingAmount(priced.payable_thb, checkoutCurrency, normRates),
+        rate
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          lines: priced.lines,
+          items_total: priced.items_total,
+          discount_amount: priced.discount_amount,
+          payable_thb: priced.payable_thb,
+          billing,
+          points_estimate: priced.points_estimate,
+          applied_promotions: priced.applied_promotions,
+          applied_coupon: priced.applied_coupon,
+          // 买多赠一（P3）：赠品清单透传，供结算页预展示；赠品不影响金额
+          gifts: priced.gifts
+        }
+      })
+    } catch (error) {
+      // 计价引擎业务校验错误（商品不存在/已下架/数量无效）→ 400
+      if (error && error.status === 400) {
+        return res.status(400).json({ success: false, message: error.message })
+      }
+      logger.error('订单试算失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '订单试算失败' })
+    }
+  }
+
+  /**
    * 在线支付订单：用户在支付弹窗内确认后转为送货中（并发放购物积分）
    * 幂等保障：用条件 UPDATE，仅当 status='pending' 且 online_paid_at IS NULL 时才置位；
    *   - 受影响行数 = 1：本次确认成功，发积分；
-   *   - 受影响行数 = 0：已被并发请求/重复点击处理过，直接返回成功（幂等），不再发积分。
+   *   - 受影响行数 = 0：并发竞态负方，重读订单甄别——online_paid_at 已置位则幂等成功（不再发积分）；
+   *     订单不存在返回 404；订单已被取消/状态被改走返回 409（不再谎报"支付已确认"）。
    */
   static async confirmOnlinePayment (req, res) {
     try {
@@ -627,8 +975,7 @@ class OrderController {
         return res.status(400).json({ success: false, message: '无效的订单 ID' })
       }
       const order = await Order.findOne({
-        where: { id, user_id: userId },
-        include: [{ model: OrderItem, as: 'items', attributes: ['quantity'] }]
+        where: { id, user_id: userId }
       })
       if (!order) {
         return res.status(404).json({ success: false, message: '订单不存在' })
@@ -654,6 +1001,8 @@ class OrderController {
        * 取消时的 revoke 查不到 earn 流水，用户会白得积分。
        * 发积分失败则整事务回滚、接口 500；客户端重试支付确认走幂等分支，安全。
        */
+      // 积分获取比例（points_earn_rate）：事务外读取，按订单折后实付 THB 换算应发积分
+      const pointsEarnRate = await getPointsEarnRate()
       const transaction = await sequelize.transaction()
       let affected = 0
       try {
@@ -672,9 +1021,10 @@ class OrderController {
         affected = updateResult[0]
 
         if (affected === 1) {
-          const qtySum = (order.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0)
-          if (qtySum > 0) {
-            await pointsService.grantPurchasePoints(userId, order.id, qtySum, { transaction })
+          // 发放口径：floor(折后实付 THB × points_earn_rate)，为 0 不发
+          const earnPoints = calcPointsEarn(Number(order.total_amount_thb) || 0, pointsEarnRate)
+          if (earnPoints > 0) {
+            await pointsService.grantPurchasePoints(userId, order.id, earnPoints, { transaction })
           }
         }
         await transaction.commit()
@@ -692,17 +1042,31 @@ class OrderController {
           resourceId: order.id,
           req
         }).catch(() => {})
-      } else {
-        AuditLog.logUser({
-          user: { id: userId },
-          event: 'order.payment.confirm.idempotent_hit',
-          resource: 'order',
-          resourceId: order.id,
-          req
-        }).catch(() => {})
+
+        const createdOrder = await Order.findByPk(order.id, {
+          include: [
+            {
+              model: OrderItem,
+              as: 'items',
+              include: [{ model: Product, as: 'product', paranoid: false }]
+            }
+          ]
+        })
+        return res.json({
+          success: true,
+          message: '支付已确认',
+          data: createdOrder
+        })
       }
 
-      const createdOrder = await Order.findByPk(order.id, {
+      /**
+       * affected = 0（条件 UPDATE 未命中）：预读到 UPDATE 之间存在竞态窗口，
+       * 重读订单甄别真实状态，不能一律谎报"支付已确认"：
+       *   - 订单不存在（已被并发删除）→ 404
+       *   - online_paid_at 已置位（并发确认已生效）→ 幂等成功
+       *   - 其余（订单已被取消/状态被管理端改走）→ 409
+       */
+      const freshOrder = await Order.findByPk(order.id, {
         include: [
           {
             model: OrderItem,
@@ -711,10 +1075,23 @@ class OrderController {
           }
         ]
       })
+      if (!freshOrder) {
+        return res.status(404).json({ success: false, message: '订单不存在' })
+      }
+      if (!freshOrder.online_paid_at) {
+        return res.status(409).json({ success: false, message: '订单当前状态不允许支付确认' })
+      }
+      AuditLog.logUser({
+        user: { id: userId },
+        event: 'order.payment.confirm.idempotent_hit',
+        resource: 'order',
+        resourceId: order.id,
+        req
+      }).catch(() => {})
       return res.json({
         success: true,
         message: '支付已确认',
-        data: createdOrder
+        data: freshOrder
       })
     } catch (error) {
       logger.error('确认在线支付失败', { err: error?.message, stack: error?.stack })
@@ -1116,6 +1493,12 @@ class OrderController {
 
       // 先清理积分流水：order_id FK 为 ON DELETE SET NULL，直接删单会把流水 order_id 静默置 NULL、断审计链
       await PointTransaction.destroy({
+        where: { order_id: id },
+        transaction
+      })
+
+      // 清理订单促销快照：order_promotions 无 DB 级联，随单硬删在此显式处理
+      await OrderPromotion.destroy({
         where: { order_id: id },
         transaction
       })

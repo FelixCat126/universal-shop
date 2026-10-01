@@ -33,6 +33,12 @@ const Order = sequelize.define('Order', {
     allowNull: true,
     comment: '订单泰铢底价合计（供统计与核验；与 total_amount 币种不同步时以此为准还原 THB）'
   },
+  discount_amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: '订单级促销减免合计（THB 域；total_amount_thb 为扣除后的应付金额）'
+  },
   currency_code: {
     type: DataTypes.STRING(10),
     allowNull: false,
@@ -106,6 +112,11 @@ const Order = sequelize.define('Order', {
     type: DataTypes.DATE,
     allowNull: true,
     comment: '在线支付确认时间；用于支付确认接口幂等（已确认则不再发放积分/不再变更状态）'
+  },
+  client_order_key: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+    comment: '客户端幂等键：同用户重复提交同一 key 只成单一次（生产库配合 (user_id, client_order_key) 部分唯一索引兜底并发双击）'
   }
 }, {
   tableName: 'orders',

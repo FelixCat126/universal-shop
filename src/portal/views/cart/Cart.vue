@@ -71,8 +71,8 @@
                 :key="item.id"
                 class="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-200"
               >
-                <!-- 失效商品：商品已被删除，展示占位并禁选，仅允许移除 -->
-                <div v-if="item.unavailable || !item.product" class="flex items-center justify-between gap-4">
+                <!-- 失效商品/套餐：已被删除，展示占位并禁选，仅允许移除 -->
+                <div v-if="isItemUnavailable(item)" class="flex items-center justify-between gap-4">
                   <div class="flex items-center space-x-4 min-w-0">
                     <img
                       :src="defaultImage"
@@ -96,6 +96,143 @@
                     <TrashIcon class="h-4 w-4" />
                   </button>
                 </div>
+                <!-- 组合套餐行：图/名/套餐标/组件摘要/数量步进/小计 -->
+                <template v-else-if="item.bundle">
+                <div class="flex items-start gap-3 sm:items-center sm:space-x-4">
+                  <!-- 套餐图片 -->
+                  <div class="flex-shrink-0">
+                    <img
+                      :src="item.bundle.image || defaultImage"
+                      :alt="getCurrentLanguageValue(item.bundle, 'name')"
+                      class="h-16 w-16 sm:h-20 sm:w-20 rounded-md object-cover"
+                    />
+                  </div>
+
+                  <!-- 套餐信息 -->
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-base sm:text-lg font-medium text-gray-900 truncate">
+                        {{ getCurrentLanguageValue(item.bundle, 'name') }}
+                      </h3>
+                      <span class="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded shrink-0">
+                        {{ t('bundle.badge') }}
+                      </span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-gray-500 mt-1 line-clamp-2">
+                      {{ bundleItemsSummary(item.bundle) }}
+                    </p>
+                    <div class="flex items-center mt-2">
+                      <span class="text-base sm:text-lg font-bold text-blue-600">
+                        {{ portalCurrency.formatThb(item.price) }}
+                      </span>
+                      <span
+                        v-if="bundleStock(item) != null"
+                        class="ml-2 text-xs tabular-nums"
+                        :class="bundleStock(item) === 0
+                          ? 'text-red-600'
+                          : bundleStock(item) > 10
+                            ? 'text-green-600'
+                            : 'text-orange-600'"
+                      >
+                        {{ t('bundle.stockLeft', { count: bundleStock(item) }) }}
+                      </span>
+                    </div>
+
+                    <!-- 移动端：数量控制和小计 -->
+                    <div class="flex items-center justify-between mt-3 sm:hidden">
+                      <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-600">{{ t('product.quantity') }}:</span>
+                        <button
+                          @click="decreaseQuantity(item)"
+                          :disabled="item.quantity <= 1 || updating.has(item.id)"
+                          class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <MinusIcon class="h-4 w-4" />
+                        </button>
+
+                        <span class="w-10 text-center font-medium text-sm">
+                          {{ item.quantity }}
+                        </span>
+
+                        <button
+                          @click="increaseQuantity(item)"
+                          :disabled="(bundleStock(item) != null && item.quantity >= bundleStock(item)) || updating.has(item.id)"
+                          class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <PlusIcon class="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div class="text-right">
+                        <span class="text-sm text-gray-600">{{ t('cart.subtotal') }}:</span>
+                        <span class="ml-1 text-lg font-bold text-gray-900">
+                          {{ portalCurrency.formatThb(item.price * item.quantity) }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 桌面端：数量操作 -->
+                  <div class="hidden sm:flex items-center space-x-2">
+                    <button
+                      @click="decreaseQuantity(item)"
+                      :disabled="item.quantity <= 1 || updating.has(item.id)"
+                      class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <MinusIcon class="h-4 w-4" />
+                    </button>
+
+                    <span class="w-12 text-center font-medium">
+                      {{ item.quantity }}
+                    </span>
+
+                    <button
+                      @click="increaseQuantity(item)"
+                      :disabled="(bundleStock(item) != null && item.quantity >= bundleStock(item)) || updating.has(item.id)"
+                      class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <PlusIcon class="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <!-- 桌面端：小计和删除 -->
+                  <div class="hidden sm:flex flex-col items-end space-y-2">
+                    <span class="text-lg font-bold text-gray-900">
+                      {{ portalCurrency.formatThb(item.price * item.quantity) }}
+                    </span>
+                    <button
+                      @click="removeItem(item)"
+                      :disabled="updating.has(item.id)"
+                      class="text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
+                    >
+                      <TrashIcon class="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <!-- 移动端：删除按钮 -->
+                  <div class="flex-shrink-0 sm:hidden">
+                    <button
+                      @click="removeItem(item)"
+                      :disabled="updating.has(item.id)"
+                      class="p-1 text-red-600 hover:text-red-700 disabled:opacity-50"
+                    >
+                      <TrashIcon class="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 套餐库存不足提示 -->
+                <div v-if="bundleStock(item) != null && item.quantity > bundleStock(item)" class="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                  <div class="flex">
+                    <ExclamationTriangleIcon class="h-5 w-5 text-orange-400" />
+                    <div class="ml-3">
+                      <p class="text-sm text-orange-800">
+                        {{ t('bundle.stockShortage', { count: bundleStock(item) }) }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                </template>
                 <template v-else>
                 <!-- 桌面端布局 -->
                 <div class="hidden sm:flex sm:items-center sm:space-x-4">
@@ -436,13 +573,45 @@ const messageClass = computed(() => {
 })
 
 const hasStockIssues = computed(() => {
-  return cartStore.items.some(item => item.product && item.quantity > item.product.stock)
+  return cartStore.items.some(item => {
+    if (item.bundle) {
+      const stock = bundleStock(item)
+      return stock != null && item.quantity > stock
+    }
+    return item.product && item.quantity > item.product.stock
+  })
 })
 
-// 失效商品（商品已被删除）存在时禁止结算，需先移除
+// 失效商品/套餐（已被删除）存在时禁止结算，需先移除
 const hasUnavailableItems = computed(() => {
-  return cartStore.items.some(item => item.unavailable || !item.product)
+  return cartStore.items.some(item => isItemUnavailable(item))
 })
+
+// 失效判定：商品行缺 product、套餐行缺 bundle，或加载时已标记 unavailable
+const isItemUnavailable = (item) => item.unavailable || (!item.product && !item.bundle)
+
+// 套餐组件行归一：嵌套 product 或扁平 product_name/product_name_th 均兼容
+const bundleComponentProduct = (it) => {
+  if (it?.product) return it.product
+  if (it && (it.product_name || it.product_name_th)) {
+    return { name: it.product_name, name_th: it.product_name_th }
+  }
+  return {}
+}
+
+// 套餐组件摘要：A×1 + B×2（组件名按当前语言取值）
+const bundleItemsSummary = (bundle) => {
+  const items = Array.isArray(bundle?.items) ? bundle.items : []
+  return items
+    .map(it => `${getCurrentLanguageValue(bundleComponentProduct(it), 'name')}×${it.quantity}`)
+    .join(' + ')
+}
+
+// 套餐可售套数（available_stock 缺失时返回 null，不展示库存、不限制步进）
+const bundleStock = (item) => {
+  const stock = Number(item?.bundle?.available_stock)
+  return Number.isFinite(stock) ? stock : null
+}
 
 // 获取当前语言的值
 const getCurrentLanguageValue = (item, field) => {

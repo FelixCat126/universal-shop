@@ -8,6 +8,7 @@ import * as pointsService from '../services/pointsService.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
+import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 
@@ -617,6 +618,8 @@ class UserController {
    * 统一的用户创建服务方法（用于订单自动注册）
    * 安全要点：默认密码不再用"手机号后 8 位"（可被字典/撞库猜测），
    *   改为 32 字节强随机；must_reset_password=true，强制下次登录改密。
+   * 复用语义：手机号已存在且为游客自动创建账号（must_reset_password=true）时
+   *   直接复用该账号（首单失败重试/并发同手机号均安全）；正常注册账号仍拒绝。
    */
   static async createUserForOrder(fullPhoneWithCode, contactName, referralCode = null) {
     try {
@@ -668,15 +671,24 @@ class UserController {
     }
 
     // 检查手机号是否已存在
-    const existingPhone = await User.findOne({ 
-      where: { 
+    const existingPhone = await User.findOne({
+      where: {
         country_code: country_code,
-        phone: phone 
-      } 
+        phone: phone
+      }
     })
     if (existingPhone) {
       if (!existingPhone.is_active) {
         throw new Error(isAutoRegister ? '该手机号关联的账户已被禁用，无法下单' : '该手机号关联的账户已被禁用，请联系管理员')
+      }
+      /**
+       * 游客下单自动注册：该账号若是此前游客单自动创建的（must_reset_password=true，
+       * 用户从未设置过自己的密码），直接复用该账号继续下单——
+       * 修复"首单失败后手机号被烧掉、重试永远报无法自动注册"的问题；
+       * 正常注册账号（用户自己设过密码）仍拒绝复用，避免冒用他人已注册手机号下单
+       */
+      if (isAutoRegister && existingPhone.must_reset_password === true) {
+        return existingPhone
       }
       throw new Error(isAutoRegister ? '该手机号已被注册，无法自动注册' : '该手机号已被注册')
     }
@@ -714,7 +726,54 @@ class UserController {
       must_reset_password: must_reset_password === true
     }
 
-    const user = await User.create(finalUserData)
+    let user
+    try {
+      user = await User.create(finalUserData)
+    } catch (createError) {
+      /**
+       * 并发下同手机号撞 (country_code, phone) 唯一约束（PG 23505）：
+       * 预检与插入之间存在竞态窗口，负方在此捕获后重读胜方已落库的行——
+       * 命中游客自动创建账号则复用（与上面已有账号分支同语义），否则报稳定的
+       * 中文提示；不再把裸 Sequelize message（如 'Validation error'）透传给前端。
+       * 仅自动注册路径做该兜底；自助注册路径维持原错误向上抛（其入口 500 包装不变）
+       */
+      const isUniqueViolation =
+        createError?.name === 'SequelizeUniqueConstraintError' ||
+        createError?.parent?.code === '23505' ||
+        createError?.original?.code === '23505'
+      if (!isUniqueViolation || !isAutoRegister) throw createError
+
+      const racedUser = await User.findOne({
+        where: {
+          country_code: country_code,
+          phone: phone
+        }
+      })
+      if (racedUser) {
+        if (!racedUser.is_active) {
+          throw new Error('该手机号关联的账户已被禁用，无法下单')
+        }
+        if (racedUser.must_reset_password === true) {
+          return racedUser
+        }
+      }
+      throw new Error('该手机号已被注册，无法自动注册')
+    }
+
+    /**
+     * 注册赠券（P2）：仅对新建用户发放——上方"复用既有游客账号"的早退分支不会再发；
+     * await 保证调用方（注册响应/游客下单）返回前发券已落定，结果确定可测；
+     * 失败只记日志，不影响注册主流程
+     */
+    try {
+      await grantRegisterGiftCoupons(user.id)
+    } catch (giftError) {
+      logger.error('注册赠券发放失败（不影响注册）', {
+        userId: user.id,
+        err: giftError?.message,
+        stack: giftError?.stack
+      })
+    }
 
     return user
   }

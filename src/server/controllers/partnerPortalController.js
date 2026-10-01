@@ -29,6 +29,28 @@ function genPartnerOrderNo () {
   return `PW${Date.now()}${r}`
 }
 
+/** PG 唯一约束违例判定（23505；Sequelize 包装或原始错误都认） */
+function isUniqueViolation (err) {
+  return err?.name === 'SequelizeUniqueConstraintError' ||
+    err?.parent?.code === '23505' ||
+    err?.original?.code === '23505'
+}
+
+/**
+ * 区分 23505 的冲突来源是否为 order_no 列（而非 client_order_key 幂等索引）：
+ * 优先看 Sequelize 解析出的冲突字段，退化到 PG 约束名（order_no 约束名形如
+ * partner_orders_order_no_key；幂等部分索引名不含 "order_no" 子串）。
+ */
+function isOrderNoUniqueConflict (err) {
+  const fields = err?.fields
+  if (fields && typeof fields === 'object') {
+    const keys = Array.isArray(fields) ? fields : Object.keys(fields)
+    if (keys.length > 0) return keys.includes('order_no')
+  }
+  const constraint = String(err?.parent?.constraint || err?.original?.constraint || '')
+  return constraint.includes('order_no')
+}
+
 const ALLOW_PARTNER_PHONE_CC = new Set(['+86', '+66', '+60'])
 
 function normalizePartnerPhoneCc (v) {
@@ -250,6 +272,21 @@ class PartnerPortalController {
     const notes = body.notes != null ? String(body.notes) : ''
     const partner_address_id = parseInt(body.partner_address_id, 10)
 
+    /**
+     * 客户端幂等键（可选）：超时重试带同一 key，撞 (partner_id, client_order_key)
+     * 部分唯一索引时返回首个已建订单而非双单。列宽 64，超长直接 400。
+     * 注意：路由层 Joi（validate.js createPartnerOrderSchema，stripUnknown）
+     * 未声明该字段时会被裁剪，此处读不到即退化为无幂等（向后兼容）。
+     */
+    let clientOrderKey = null
+    if (body.client_order_key != null && String(body.client_order_key).trim() !== '') {
+      const k = String(body.client_order_key).trim()
+      if (k.length > 64) {
+        return res.status(400).json({ success: false, message: 'client_order_key 长度不能超过 64' })
+      }
+      clientOrderKey = k
+    }
+
     const agent = isPartnerAgent(partnerRow)
 
     /**
@@ -349,10 +386,18 @@ class PartnerPortalController {
             total = Math.round((total + lineTotal) * 100) / 100
           }
 
-          let order_no = genPartnerOrderNo()
-          let order
+          /**
+           * 订单号唯一冲突重试（SAVEPOINT 版）：
+           * PG 撞 23505 后整个事务进入 aborted 状态，直接在同事务重插只会再吃 25P02
+           * （旧实现因此在 PG 下是死代码）。仿 pointsService.lockOrCreateBalance：
+           * 每次插入包一层保存点，冲突只回滚到保存点、不污染外层事务，重生成单号再插。
+           * 保存点内吞掉的 23505 不会外溢，withDeadlockRetry 只见 40P01/40001。
+           */
+          let order = null
           let tries = 0
-          while (tries < 5) {
+          while (tries < 5 && !order) {
+            const order_no = genPartnerOrderNo()
+            const sp = await sequelize.transaction({ transaction })
             try {
               order = await PartnerOrder.create({
                 partner_id: partnerRow.id,
@@ -364,16 +409,28 @@ class PartnerPortalController {
                 notes,
                 contact_name,
                 contact_phone,
-                delivery_address
-              }, { transaction })
-              break
+                delivery_address,
+                client_order_key: clientOrderKey
+              }, { transaction: sp })
+              await sp.commit()
             } catch (err) {
-              // 只吞订单号唯一冲突重生单号；死锁等错误上抛给 withDeadlockRetry 重建事务
-              if (err && err.name === 'SequelizeUniqueConstraintError') {
-                tries++
-                order_no = genPartnerOrderNo()
-                continue
+              await sp.rollback().catch(() => {})
+              if (isUniqueViolation(err)) {
+                if (isOrderNoUniqueConflict(err)) {
+                  // 订单号撞库：重生成再插（最多 5 次）
+                  tries++
+                  continue
+                }
+                if (clientOrderKey) {
+                  /**
+                   * 幂等键冲突：同 (partner_id, client_order_key) 的订单已由先前请求建成。
+                   * 整单回滚（含已扣库存），事务外按键查出已存在订单返回去重响应。
+                   */
+                  await transaction.rollback()
+                  return { ok: true, deduplicated: true }
+                }
               }
+              // 死锁等其余错误上抛给 withDeadlockRetry 重建事务
               throw err
             }
           }
@@ -385,8 +442,13 @@ class PartnerPortalController {
           /**
            * 防超卖：用条件 UPDATE 原子扣减 Product.stock，且仅在 stock>=qty 时生效
            * 之前的实现完全未扣库存（可永远超卖），本次一并修复。
+           *
+           * 锁顺序：扣减按 product_id 升序逐行加锁，与零售下单、取消/超时回补的
+           * 加锁顺序保持一致，消除跨事务相反顺序拿锁导致的 AB-BA 死锁。
+           * lines 本身保持请求行顺序用于落库/展示，这里用排序副本扣减。
            */
-          for (const line of lines) {
+          const linesByProductId = [...lines].sort((a, b) => a.product_id - b.product_id)
+          for (const line of linesByProductId) {
             const [affected] = await Product.update(
               { stock: sequelize.literal(`stock - ${line.quantity}`) },
               {
@@ -429,6 +491,35 @@ class PartnerPortalController {
       return res.status(result.status).json({ success: false, message: result.message })
     }
 
+    // 幂等键命中：先前请求已建成同 key 订单，直接查出返回（不重复扣库存/建行）
+    if (result.deduplicated) {
+      const existing = await PartnerOrder.findOne({
+        where: { partner_id: partnerRow.id, client_order_key: clientOrderKey },
+        include: [{ model: PartnerOrderItem, as: 'items' }]
+      })
+      if (!existing) {
+        // 极端场景：唯一索引冲突来自尚未提交/已回滚的并发插入，行不可见——让客户端重试
+        logger.error('PartnerPortalController.createOrder 幂等键冲突但未查到已存在订单', {
+          partnerId: partnerRow.id
+        })
+        return res.status(409).json({ success: false, message: '重复提交检测异常，请重试' })
+      }
+      AuditLog.logPartner({
+        partner: req.partnerFull || { id: req.partner?.partnerId },
+        event: 'partner_order.create.idempotent_hit',
+        resource: 'partner_order',
+        resourceId: existing.id,
+        detail: { client_order_key: clientOrderKey },
+        req
+      }).catch(() => {})
+      return res.status(200).json({
+        success: true,
+        message: '提交成功',
+        data: existing,
+        deduplicated: true
+      })
+    }
+
     const { order, lines } = result
 
     const full = await PartnerOrder.findByPk(order.id, {
@@ -459,7 +550,8 @@ class PartnerPortalController {
    * 合作方支付确认幂等：条件 UPDATE 只在 status='pending_payment' 且 online_paid_at IS NULL 时生效；
    *   - online_paid_at 已置位（已确认过的并发/重放请求）：幂等返回最新数据，不重复变更状态；
    *   - 状态已被改走（如已取消）但从未支付：409 冲突，不允许再确认；
-   *   - 其余走条件 UPDATE，受影响行数 0 即幂等命中。
+   *   - 条件 UPDATE 受影响 0 行时重读订单区分：已支付→幂等成功；订单不存在→404；其余→409，
+   *     避免竞争失败方（如超时清扫已删单）被误报"支付已确认"。
    */
   static async confirmPartnerOrderPayment (req, res) {
     try {
@@ -491,6 +583,25 @@ class PartnerPortalController {
           }
         }
       )
+
+      /**
+       * 竞争失败方（affected=0）不能一律报"支付已确认"：
+       * 条件 UPDATE 命中 0 行有三种真实原因，重读订单区分——
+       *   - online_paid_at 已置位：并发确认先提交，幂等成功，走下方统一返回；
+       *   - 订单已不存在（如超时清扫删单）：404；
+       *   - 其余（状态已被改走且从未支付，如已取消）：409。
+       */
+      if (affected === 0) {
+        const fresh = await PartnerOrder.findOne({
+          where: { id: order.id, partner_id: req.partner.id }
+        })
+        if (!fresh) {
+          return res.status(404).json({ success: false, message: '订单不存在' })
+        }
+        if (!fresh.online_paid_at) {
+          return res.status(409).json({ success: false, message: '订单当前状态不允许支付确认' })
+        }
+      }
 
       AuditLog.logPartner({
         partner: req.partnerFull || { id: req.partner?.partnerId || req.partner?.id },
@@ -618,25 +729,34 @@ class PartnerPortalController {
       const label = body.label != null ? String(body.label).trim() : ''
       const phone_country_code = normalizePartnerPhoneCc(body.phone_country_code)
 
-      const existing = await PartnerAddress.count({ where: { partner_id } })
-      const wantDefault = body.is_default === true || body.is_default === 'true' || existing === 0
+      /**
+       * count→清默认→create 多步写包进同一事务；
+       * 先对合作方父行加 FOR UPDATE 锁：仅事务（READ COMMITTED）挡不住并发首建
+       * 双双 count=0 都设默认，父行锁把同一合作方的地址写串行化。
+       */
+      const row = await sequelize.transaction(async (transaction) => {
+        await Partner.findByPk(partner_id, { transaction, lock: transaction.LOCK.UPDATE })
 
-      if (wantDefault) {
-        await PartnerAddress.update({ is_default: false }, { where: { partner_id } })
-      }
+        const existing = await PartnerAddress.count({ where: { partner_id }, transaction })
+        const wantDefault = body.is_default === true || body.is_default === 'true' || existing === 0
 
-      const row = await PartnerAddress.create({
-        partner_id,
-        recipient_name,
-        phone,
-        phone_country_code,
-        province: province || null,
-        city: city || null,
-        district: district || null,
-        postal_code: postal_code || null,
-        detail,
-        label: label || null,
-        is_default: wantDefault
+        if (wantDefault) {
+          await PartnerAddress.update({ is_default: false }, { where: { partner_id }, transaction })
+        }
+
+        return PartnerAddress.create({
+          partner_id,
+          recipient_name,
+          phone,
+          phone_country_code,
+          province: province || null,
+          city: city || null,
+          district: district || null,
+          postal_code: postal_code || null,
+          detail,
+          label: label || null,
+          is_default: wantDefault
+        }, { transaction })
       })
       return res.status(201).json({ success: true, data: row })
     } catch (e) {
@@ -649,35 +769,54 @@ class PartnerPortalController {
     try {
       const id = parseInt(req.params.id, 10)
       const partner_id = req.partner.id
-      const row = await PartnerAddress.findOne({ where: { id, partner_id } })
-      if (!row) return res.status(404).json({ success: false, message: '地址不存在' })
 
-      const body = req.body || {}
-      if (body.recipient_name != null) row.recipient_name = String(body.recipient_name).trim()
-      if (body.phone != null) row.phone = String(body.phone).trim()
-      if (body.phone_country_code !== undefined) {
-        row.phone_country_code = normalizePartnerPhoneCc(body.phone_country_code)
-      }
-      if (body.detail != null) row.detail = String(body.detail).trim()
-      if (body.province !== undefined) row.province = body.province != null ? String(body.province).trim() : null
-      if (body.city !== undefined) row.city = body.city != null ? String(body.city).trim() : null
-      if (body.district !== undefined) row.district = body.district != null ? String(body.district).trim() : null
-      if (body.postal_code !== undefined) {
-        row.postal_code = body.postal_code != null ? String(body.postal_code).trim().slice(0, 10) : null
-      }
-      if (body.label !== undefined) row.label = body.label != null ? String(body.label).trim() : null
+      /**
+       * 清默认→设新默认的多步写包进同一事务；
+       * 先锁合作方父行串行化同一合作方的并发地址写（防双默认）。
+       * 校验失败返回 { ok:false } 由事务外统一响应。
+       */
+      const result = await sequelize.transaction(async (transaction) => {
+        await Partner.findByPk(partner_id, { transaction, lock: transaction.LOCK.UPDATE })
 
-      if (!row.recipient_name || !row.phone || !row.detail) {
-        return res.status(400).json({ success: false, message: '收货人、电话与详细地址不能为空' })
-      }
+        const row = await PartnerAddress.findOne({
+          where: { id, partner_id },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        })
+        if (!row) return { ok: false, status: 404, message: '地址不存在' }
 
-      if (body.is_default === true || body.is_default === 'true') {
-        await PartnerAddress.update({ is_default: false }, { where: { partner_id } })
-        row.is_default = true
-      }
+        const body = req.body || {}
+        if (body.recipient_name != null) row.recipient_name = String(body.recipient_name).trim()
+        if (body.phone != null) row.phone = String(body.phone).trim()
+        if (body.phone_country_code !== undefined) {
+          row.phone_country_code = normalizePartnerPhoneCc(body.phone_country_code)
+        }
+        if (body.detail != null) row.detail = String(body.detail).trim()
+        if (body.province !== undefined) row.province = body.province != null ? String(body.province).trim() : null
+        if (body.city !== undefined) row.city = body.city != null ? String(body.city).trim() : null
+        if (body.district !== undefined) row.district = body.district != null ? String(body.district).trim() : null
+        if (body.postal_code !== undefined) {
+          row.postal_code = body.postal_code != null ? String(body.postal_code).trim().slice(0, 10) : null
+        }
+        if (body.label !== undefined) row.label = body.label != null ? String(body.label).trim() : null
 
-      await row.save()
-      return res.json({ success: true, data: row })
+        if (!row.recipient_name || !row.phone || !row.detail) {
+          return { ok: false, status: 400, message: '收货人、电话与详细地址不能为空' }
+        }
+
+        if (body.is_default === true || body.is_default === 'true') {
+          await PartnerAddress.update({ is_default: false }, { where: { partner_id }, transaction })
+          row.is_default = true
+        }
+
+        await row.save({ transaction })
+        return { ok: true, row }
+      })
+
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message })
+      }
+      return res.json({ success: true, data: result.row })
     } catch (e) {
       logger.error('PartnerPortalController.updateAddress', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '更新地址失败' })
@@ -688,22 +827,40 @@ class PartnerPortalController {
     try {
       const id = parseInt(req.params.id, 10)
       const partner_id = req.partner.id
-      const row = await PartnerAddress.findOne({ where: { id, partner_id } })
-      if (!row) return res.status(404).json({ success: false, message: '地址不存在' })
-      const wasDefault = row.is_default
-      await row.destroy()
 
-      if (wasDefault) {
-        const nextDef = await PartnerAddress.findOne({
-          where: { partner_id },
-          order: [['updated_at', 'DESC']]
+      /**
+       * 删除→默认地址递补的多步写包进同一事务（防并发下"无默认"或双默认）；
+       * 先锁合作方父行串行化同一合作方的地址写。
+       */
+      const result = await sequelize.transaction(async (transaction) => {
+        await Partner.findByPk(partner_id, { transaction, lock: transaction.LOCK.UPDATE })
+
+        const row = await PartnerAddress.findOne({
+          where: { id, partner_id },
+          transaction,
+          lock: transaction.LOCK.UPDATE
         })
-        if (nextDef) {
-          nextDef.is_default = true
-          await nextDef.save()
-        }
-      }
+        if (!row) return { ok: false, status: 404, message: '地址不存在' }
+        const wasDefault = row.is_default
+        await row.destroy({ transaction })
 
+        if (wasDefault) {
+          const nextDef = await PartnerAddress.findOne({
+            where: { partner_id },
+            order: [['updated_at', 'DESC']],
+            transaction
+          })
+          if (nextDef) {
+            nextDef.is_default = true
+            await nextDef.save({ transaction })
+          }
+        }
+        return { ok: true }
+      })
+
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message })
+      }
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
       logger.error('PartnerPortalController.deleteAddress', { err: e?.message, stack: e?.stack })

@@ -9,6 +9,10 @@ import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
 
 import ProductCategoryController from '../controllers/productCategoryController.js'
 import PartnerAdminController from '../controllers/partnerAdminController.js'
+import PromotionController from '../controllers/promotionController.js'
+import CouponAdminController from '../controllers/couponAdminController.js'
+import BundleAdminController from '../controllers/bundleAdminController.js'
+import { validate, promotionPayloadSchema, promotionStatusSchema, couponTemplatePayloadSchema, couponTemplateStatusSchema, bundlePayloadSchema, bundleStatusSchema } from '../middlewares/validate.js'
 
 const router = express.Router()
 
@@ -69,6 +73,28 @@ router.get('/product-categories', requirePermission('products'), ProductCategory
 router.post('/product-categories', requirePermission('products'), logOperation('create_product_category', 'product_category'), ProductCategoryController.create)
 router.put('/product-categories/:id', requirePermission('products'), logOperation('update_product_category', 'product_category'), ProductCategoryController.update)
 router.delete('/product-categories/:id', requirePermission('products'), logOperation('delete_product_category', 'product_category'), ProductCategoryController.remove)
+
+// 促销活动（与产品共用 products 权限；P1 仅 threshold 满减）
+router.get('/promotions', requirePermission('products'), PromotionController.list)
+router.post('/promotions', requirePermission('products'), logOperation('create_promotion', 'promotion'), validate({ body: promotionPayloadSchema }), PromotionController.create)
+router.put('/promotions/:id', requirePermission('products'), logOperation('update_promotion', 'promotion'), validate({ body: promotionPayloadSchema }), PromotionController.update)
+router.put('/promotions/:id/status', requirePermission('products'), logOperation('update_promotion_status', 'promotion'), validate({ body: promotionStatusSchema }), PromotionController.updateStatus)
+router.delete('/promotions/:id', requirePermission('products'), logOperation('delete_promotion', 'promotion'), PromotionController.remove)
+
+// 抵扣券模板（P2 营销体系；与产品共用 products 权限）
+router.get('/coupon-templates', requirePermission('products'), CouponAdminController.list)
+router.post('/coupon-templates', requirePermission('products'), logOperation('create_coupon_template', 'coupon_template'), validate({ body: couponTemplatePayloadSchema }), CouponAdminController.create)
+router.put('/coupon-templates/:id', requirePermission('products'), logOperation('update_coupon_template', 'coupon_template'), validate({ body: couponTemplatePayloadSchema }), CouponAdminController.update)
+router.put('/coupon-templates/:id/status', requirePermission('products'), logOperation('update_coupon_template_status', 'coupon_template'), validate({ body: couponTemplateStatusSchema }), CouponAdminController.updateStatus)
+router.get('/coupon-templates/:id/instances', requirePermission('products'), CouponAdminController.instances)
+router.delete('/coupon-templates/:id', requirePermission('products'), logOperation('delete_coupon_template', 'coupon_template'), CouponAdminController.remove)
+
+// 固定组合包（P4；与产品共用 products 权限）
+router.get('/bundles', requirePermission('products'), BundleAdminController.list)
+router.post('/bundles', requirePermission('products'), logOperation('create_bundle', 'bundle'), validate({ body: bundlePayloadSchema }), BundleAdminController.create)
+router.put('/bundles/:id', requirePermission('products'), logOperation('update_bundle', 'bundle'), validate({ body: bundlePayloadSchema }), BundleAdminController.update)
+router.put('/bundles/:id/status', requirePermission('products'), logOperation('update_bundle_status', 'bundle'), validate({ body: bundleStatusSchema }), BundleAdminController.updateStatus)
+router.delete('/bundles/:id', requirePermission('products'), logOperation('delete_bundle', 'bundle'), BundleAdminController.remove)
 
 // 操作日志路由（仅超级管理员）
 router.get('/operation-logs', requireSuperAdmin, AdministratorController.getOperationLogs)

@@ -74,6 +74,15 @@
             <el-icon><Document /></el-icon>
             <span>{{ t('menu.orders') }}</span>
           </el-menu-item>
+          <el-sub-menu index="/marketing" v-if="adminStore.hasPermission('products')">
+            <template #title>
+              <el-icon><PriceTag /></el-icon>
+              <span>{{ t('menu.marketing') }}</span>
+            </template>
+            <el-menu-item index="/promotions">{{ t('menu.promotions') }}</el-menu-item>
+            <el-menu-item index="/bundles">{{ t('menu.bundles') }}</el-menu-item>
+            <el-menu-item index="/coupon-templates">{{ t('menu.coupons') }}</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/users">
             <el-icon><User /></el-icon>
             <span>{{ t('menu.users') }}</span>
@@ -110,7 +119,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding } from '@element-plus/icons-vue'
+import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAdminStore } from '../stores/admin.js'
 
@@ -125,7 +134,7 @@ const adminStore = useAdminStore()
 const activeMenuPath = computed(() => route.path)
 
 /** el-sub-menu 仅用于展开的占位 index，不能做 router.push（否则跳转到不存在的路由） */
-const submenuGroupIndices = new Set(['/products-menu', '/partner-wholesale', '/system'])
+const submenuGroupIndices = new Set(['/products-menu', '/marketing', '/partner-wholesale', '/system'])
 
 function onMenuSelect (index) {
   const path = typeof index === 'string' ? index.trim() : ''

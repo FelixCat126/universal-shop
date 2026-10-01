@@ -336,6 +336,7 @@ export default {
     pointsPaySummary: 'ชำระด้วยแต้มครบ หัก {need} แต้ม',
     pointsMixedCartHint:
       'ถ้ามีสินค้าที่ไม่ใช้แต้มแลกร่วมอยู่ จะชำระเต็มจำนวนด้วยแต้มทั้งบิลไม่ได้ — ให้แยกรายการหรือลบสินค้าที่ไม่ร่วมแลกแต้ออก',
+    pointsBundleHint: 'ตะกร้ามีชุดคอมโบ ไม่สามารถใช้แต้มชำระได้',
     pointsSubmitBlocked: 'ยังใช้แลกด้วยคะแนนไม่ได้ กรุณาเลือกวิธีอื่น',
     pointsRedeemedShort: 'ชำระแล้ว {points} แต้ม'
   },
@@ -512,5 +513,56 @@ export default {
     china: 'จีน',
     thailand: 'ไทย',
     malaysia: 'มาเลเซีย'
+  },
+
+  // 结算页
+  checkout: {
+    promotionDiscount: 'ส่วนลดโปรโมชัน',
+    gift: 'ของแถม',
+    giftTag: 'ของแถม'
+  },
+
+  // 组合套餐（固定组合包）
+  bundle: {
+    sectionTitle: 'ชุดคอมโบ',
+    badge: 'ชุดคอมโบ',
+    standaloneTotal: 'ซื้อแยกรวม',
+    save: 'ประหยัด {amount}',
+    stockLeft: 'เหลือ {count} ชุด',
+    soldOut: 'หมดแล้ว',
+    stockShortage: 'สต็อกชุดไม่เพียงพอ เหลือ {count} ชุด'
+  },
+
+  // 优惠券
+  coupon: {
+    tab: 'คูปอง',
+    claimCenter: 'ศูนย์รับคูปอง',
+    myCoupons: 'คูปองของฉัน',
+    claim: 'รับเลย',
+    claiming: 'กำลังรับ…',
+    claimed: 'รับแล้ว',
+    soldOut: 'หมดแล้ว',
+    claimSuccess: 'รับคูปองสำเร็จ',
+    claimFailed: 'รับคูปองไม่สำเร็จ',
+    remaining: 'เหลือ {n} ใบ',
+    unlimited: 'ไม่จำกัดจำนวน',
+    minSpend: 'ใช้ได้เมื่อซื้อครบ {amount}',
+    noMinSpend: 'ไม่มีขั้นต่ำ',
+    validTo: 'ใช้ได้ถึง {date}',
+    scopeAll: 'ใช้ได้ทั้งร้าน',
+    scopeCategory: 'เฉพาะหมวดหมู่ที่กำหนด',
+    scopeProduct: 'เฉพาะสินค้าที่กำหนด',
+    statusUnused: 'ยังไม่ได้ใช้',
+    statusUsed: 'ใช้แล้ว',
+    statusExpired: 'หมดอายุ',
+    noAvailable: 'ยังไม่มีคูปองให้รับ',
+    noMine: 'ยังไม่มีคูปอง',
+    loadFailed: 'โหลดคูปองไม่สำเร็จ โปรดลองอีกครั้ง',
+    usedByOrder: 'ใช้กับคำสั่งซื้อ',
+    select: 'เลือกคูปอง',
+    none: 'ไม่ใช้คูปอง',
+    noUsable: 'ยังไม่มีคูปองที่ใช้ได้',
+    discountLine: 'ส่วนลดคูปอง',
+    notEnough: 'ยอดซื้อยังไม่ถึงขั้นต่ำ'
   }
 }

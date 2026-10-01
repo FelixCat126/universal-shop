@@ -48,20 +48,32 @@
                 :key="item.id"
                 class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg"
               >
-                <!-- 商品图片 -->
+                <!-- 商品/套餐图片 -->
                 <div class="flex-shrink-0">
                   <img
-                    :src="item.product.image_url || defaultImage"
-                    :alt="item.product.name"
+                    :src="itemImage(item)"
+                    :alt="itemName(item)"
                     class="h-16 w-16 sm:h-20 sm:w-20 rounded-md object-cover"
                   />
                 </div>
 
-                <!-- 商品信息 -->
+                <!-- 商品/套餐信息 -->
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-sm sm:text-base font-medium text-gray-900 line-clamp-2">
-                    {{ item.product.name }}
-                  </h3>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-sm sm:text-base font-medium text-gray-900 line-clamp-2">
+                      {{ itemName(item) }}
+                    </h3>
+                    <span
+                      v-if="item.bundle"
+                      class="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded shrink-0"
+                    >
+                      {{ t('bundle.badge') }}
+                    </span>
+                  </div>
+                  <!-- 套餐组件行：组件名 × 数量 -->
+                  <div v-if="item.bundle" class="text-xs text-gray-400 mt-0.5">
+                    {{ bundleComponentsText(item.bundle) }}
+                  </div>
                   <div class="text-xs sm:text-sm text-gray-500 mt-1">
                     {{ t('cart.price') }}: {{ portalCurrency.formatThb(item.price) }} × {{ item.quantity }}
                   </div>
@@ -368,6 +380,9 @@
                   <p v-if="pointsMixedCartBlocked" class="text-xs text-amber-800 mt-1">
                     {{ t('payment.pointsMixedCartHint') }}
                   </p>
+                  <p v-if="cartHasBundle" class="text-xs text-amber-800 mt-1">
+                    {{ t('payment.pointsBundleHint') }}
+                  </p>
                   <p v-if="pointsInsufficientNotice" class="text-xs text-red-500 mt-1">
                     {{ pointsInsufficientNotice }}
                   </p>
@@ -396,11 +411,104 @@
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 sticky top-4">
             <h3 class="text-lg font-semibold mb-4">{{ t('order.summary') }}</h3>
 
+            <!-- 优惠券选择（积分换购与券互斥；仅登录用户可见） -->
+            <div v-if="showCouponSelector" class="mb-4">
+              <button
+                type="button"
+                class="w-full flex items-center justify-between gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm hover:border-orange-400"
+                @click="couponPickerOpen = !couponPickerOpen"
+              >
+                <span class="text-gray-600 shrink-0">🎟️ {{ t('coupon.select') }}</span>
+                <span v-if="selectedCoupon" class="truncate font-medium text-orange-600">
+                  {{ selectedCoupon.name }} -{{ portalCurrency.formatThb(Number(selectedCoupon.amount).toFixed(2)) }}
+                </span>
+                <span v-else class="text-gray-400">{{ t('coupon.none') }}</span>
+              </button>
+
+              <div v-if="couponPickerOpen" class="mt-2 max-h-64 overflow-y-auto rounded-md border border-gray-200">
+                <div
+                  class="flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
+                  :class="{ 'bg-gray-50 font-medium': !selectedCouponId }"
+                  @click="selectCoupon(null)"
+                >
+                  <span>{{ t('coupon.none') }}</span>
+                </div>
+                <div v-if="loadingCoupons" class="border-t border-gray-100 px-3 py-3 text-sm text-gray-400">
+                  {{ t('common.loading') }}
+                </div>
+                <div v-else-if="myUnusedCoupons.length === 0" class="border-t border-gray-100 px-3 py-3 text-sm text-gray-400">
+                  {{ t('coupon.noUsable') }}
+                </div>
+                <div
+                  v-for="c in myUnusedCoupons"
+                  :key="c.id"
+                  class="flex items-center justify-between gap-2 border-t border-gray-100 px-3 py-2 text-sm"
+                  :class="[
+                    couponDisabledForCurrentQuote(c) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-orange-50',
+                    selectedCouponId === c.id ? 'bg-orange-50' : ''
+                  ]"
+                  @click="selectCoupon(c)"
+                >
+                  <div class="min-w-0">
+                    <div class="truncate font-medium text-gray-900">{{ c.name }}</div>
+                    <div class="mt-0.5 text-xs text-gray-500">
+                      {{ couponMinSpendText(c) }} · {{ t('coupon.validTo', { date: formatCouponDate(c.expire_at) }) }}
+                    </div>
+                    <div v-if="couponDisabledForCurrentQuote(c)" class="mt-0.5 text-xs text-red-500">
+                      {{ t('coupon.notEnough') }}
+                    </div>
+                  </div>
+                  <span class="shrink-0 font-bold text-orange-600 tabular-nums">
+                    -{{ portalCurrency.formatThb(Number(c.amount).toFixed(2)) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <div class="space-y-3">
               <!-- 商品小计 -->
               <div class="flex justify-between">
                 <span class="text-sm text-gray-600">{{ t('cart.subtotal') }}</span>
-                <span class="text-sm font-medium">{{ portalCurrency.formatThb(cartStore.totalAmount.toFixed(2)) }}</span>
+                <span class="text-sm font-medium">{{ portalCurrency.formatThb(summaryItemsTotal.toFixed(2)) }}</span>
+              </div>
+
+              <!-- 满减优惠（服务端报价；无报价/报价失败时不展示，摘要回退本地计算） -->
+              <div v-if="orderForm.payment_method !== 'points' && quoteDiscount > 0" class="flex justify-between">
+                <span class="text-sm text-gray-600 flex items-center flex-wrap gap-1">
+                  <span>{{ t('checkout.promotionDiscount') }}</span>
+                  <span
+                    v-for="promo in appliedPromotions"
+                    :key="promo.promotion_id"
+                    class="px-1.5 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded"
+                  >{{ promo.name }}</span>
+                </span>
+                <span class="text-sm font-medium text-green-600 whitespace-nowrap tabular-nums">-{{ portalCurrency.formatThb(quoteDiscount.toFixed(2)) }}</span>
+              </div>
+
+              <!-- 优惠券优惠（服务端报价 applied_coupon；券不可用报价时 400 已自动取消选中） -->
+              <div v-if="orderForm.payment_method !== 'points' && appliedCoupon" class="flex justify-between">
+                <span class="text-sm text-gray-600 flex items-center flex-wrap gap-1">
+                  <span>{{ t('coupon.discountLine') }}</span>
+                  <span class="px-1.5 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded">{{ appliedCoupon.name }}</span>
+                </span>
+                <span class="text-sm font-medium text-green-600 whitespace-nowrap tabular-nums">-{{ portalCurrency.formatThb(Number(appliedCoupon.amount).toFixed(2)) }}</span>
+              </div>
+
+              <!-- 赠品（买多赠一，服务端报价 gifts；0 元不计入金额） -->
+              <div
+                v-for="(gift, index) in quoteGifts"
+                :key="`${gift.product_id}-${index}`"
+                class="flex justify-between"
+              >
+                <span class="text-sm text-gray-600 flex items-center flex-wrap gap-1 min-w-0">
+                  <span>🎁</span>
+                  <span class="truncate">{{ t('checkout.gift') }}: {{ gift.name }} × {{ gift.quantity }}</span>
+                  <span
+                    v-if="gift.promotion_name"
+                    class="px-1.5 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded"
+                  >{{ gift.promotion_name }}</span>
+                </span>
+                <span class="text-sm font-medium text-green-600 whitespace-nowrap">{{ t('common.free') }}</span>
               </div>
 
               <!-- 运费 -->
@@ -428,7 +536,7 @@
                 </template>
                 <div v-else class="flex flex-nowrap justify-between gap-3 items-center">
                   <span class="text-lg font-semibold text-gray-900 shrink-0 whitespace-nowrap">{{ t('order.total') }}</span>
-                  <span class="text-xl font-bold text-blue-600 whitespace-nowrap tabular-nums shrink-0">{{ portalCurrency.formatThb(totalAmount.toFixed(2)) }}</span>
+                  <span class="text-xl font-bold text-blue-600 whitespace-nowrap tabular-nums shrink-0">{{ portalCurrency.formatThb(summaryPayable.toFixed(2)) }}</span>
                 </div>
               </div>
             </div>
@@ -559,6 +667,7 @@ import { useCartStore } from '../../stores/cart.js'
 import { useUserStore } from '../../stores/user.js'
 import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import { createOrder, confirmOnlinePayment as confirmOnlinePaymentApi } from '../../api/orders.js'
+import { getMyCoupons } from '../../api/coupons.js'
 import { getAddresses } from '../../api/addresses.js'
 import api from '../../api/index.js'
 import config from '../../../config/index.js'
@@ -624,12 +733,36 @@ const pendingOnlinePaymentOrderId = ref(null)
 const pendingOnlinePaymentThb = ref(null)
 const confirmingOnlinePayment = ref(false)
 
+// 下单幂等键：同一次下单意图共用一个 key，后端按用户作用域去重（重复提交返回首次订单）
+const generateClientOrderKey = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `cok_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+const clientOrderKey = ref(generateClientOrderKey())
+
 // 地址数据
 const addresses = ref([])
 const selectedAddress = ref(null)
 
 // 默认图片
 const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik02MCA2MEgxNDBWMTQwSDYwVjYwWiIgc3Ryb2tlPSIjOUI5QkEwIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPGNpcmNsZSBjeD0iODAiIGN5PSI4MCIgcj0iMTAiIGZpbGw9IiM5QjlCQTAiLz4KPHBhdGggZD0iTTkwIDEwMEwxMjAgNzBMMTMwIDgwTDEyMCAxMDBMOTAgMTAwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K'
+
+// 订单行展示：商品行取 product，套餐行取 bundle
+const itemImage = (item) => (item.bundle ? item.bundle.image : item.product?.image_url) || defaultImage
+const itemName = (item) => item.bundle ? getCurrentLanguageValue(item.bundle, 'name') : (item.product?.name || '')
+
+// 套餐组件行文本：组件名 × 数量（组件名按当前语言取值；嵌套 product 与扁平 product_name 行均兼容）
+const bundleComponentsText = (bundle) => {
+  const items = Array.isArray(bundle?.items) ? bundle.items : []
+  return items
+    .map(it => {
+      const p = it.product || { name: it.product_name, name_th: it.product_name_th }
+      return `${getCurrentLanguageValue(p, 'name')} × ${it.quantity}`
+    })
+    .join(' + ')
+}
 
 // 订单表单
 const orderForm = reactive({
@@ -659,17 +792,23 @@ const checkoutAddressRegion = ref({
 // 超过2件禁用货到付款
 const codDisabled = computed(() => cartStore.itemCount > 2)
 
-// 失效商品（商品已被删除）不可下单，渲染与提交时均过滤掉
+// 失效商品/套餐（已被删除）不可下单，渲染与提交时均过滤掉
 const availableCartItems = computed(() =>
-  cartStore.items.filter(item => item.product && !item.unavailable)
+  cartStore.items.filter(item => (item.product || item.bundle) && !item.unavailable)
 )
 
 const availableItemCount = computed(() =>
   availableCartItems.value.reduce((total, item) => total + item.quantity, 0)
 )
 
+// 购物车是否含组合套餐（套餐与积分换购互斥）
+const cartHasBundle = computed(() =>
+  cartStore.items.some(it => !!it.bundle_id)
+)
+
 const cartSupportsPointsPayment = computed(() =>
   userStore.isLoggedIn &&
+  !cartHasBundle.value &&
   cartStore.items.length > 0 &&
   cartStore.items.every(it => Number(it.product?.points || 0) > 0)
 )
@@ -679,9 +818,9 @@ const cartHasPointsProduct = computed(() =>
   cartStore.items.some(it => Number(it.product?.points || 0) > 0)
 )
 
-/** 登录且车里有可积分商品时展示积分换购车；全部为现金商品则不展示 */
+/** 登录且车里有可积分商品或组合套餐时展示积分换购卡（含套餐时禁用并提示互斥）；全部为现金商品则不展示 */
 const showPointsRedeemCard = computed(() =>
-  userStore.isLoggedIn && cartStore.items.length > 0 && cartHasPointsProduct.value
+  userStore.isLoggedIn && cartStore.items.length > 0 && (cartHasPointsProduct.value || cartHasBundle.value)
 )
 
 /** 混入非积分商品时不可选，仅展示说明 */
@@ -742,6 +881,164 @@ const message = reactive({
 const totalAmount = computed(() => {
   return cartStore.totalAmount
 })
+
+// 服务端报价（满减等促销由后端计算；失败静默回退本地计算，不影响下单）
+const quote = ref(null)
+let quoteTimer = null
+let quoteSeq = 0
+
+// 优惠券：进入结算拉取一次我的未使用券；选中后带 user_coupon_id 重新报价
+const myUnusedCoupons = ref([])
+const loadingCoupons = ref(false)
+const couponPickerOpen = ref(false)
+const selectedCouponId = ref(null)
+
+const showCouponSelector = computed(() =>
+  userStore.isLoggedIn && orderForm.payment_method !== 'points'
+)
+
+const selectedCoupon = computed(() =>
+  myUnusedCoupons.value.find(c => c.id === selectedCouponId.value) || null
+)
+
+const appliedCoupon = computed(() => {
+  const ac = quote.value?.applied_coupon
+  return ac && ac.amount != null ? ac : null
+})
+
+const formatCouponDate = (s) => (s ? new Date(s).toLocaleDateString() : '-')
+
+const couponMinSpendText = (c) => {
+  const min = Number(c?.min_spend)
+  if (Number.isFinite(min) && min > 0) {
+    return t('coupon.minSpend', { amount: portalCurrency.formatThb(min.toFixed(2)) })
+  }
+  return t('coupon.noMinSpend')
+}
+
+// 客户端预判：门槛未达则灰显（最终仍以服务端 quote 为准）
+const couponDisabledForCurrentQuote = (c) => {
+  const min = Number(c?.min_spend) || 0
+  return min > 0 && summaryItemsTotal.value < min
+}
+
+const selectCoupon = (c) => {
+  if (c && couponDisabledForCurrentQuote(c)) return
+  selectedCouponId.value = c ? c.id : null
+  couponPickerOpen.value = false
+}
+
+const clearSelectedCoupon = () => {
+  selectedCouponId.value = null
+}
+
+const loadMyCoupons = async () => {
+  if (!userStore.isLoggedIn) return
+  loadingCoupons.value = true
+  try {
+    const res = await getMyCoupons({ status: 'unused' })
+    myUnusedCoupons.value = res.data?.success && Array.isArray(res.data.data) ? res.data.data : []
+  } catch (_e) {
+    myUnusedCoupons.value = []
+  } finally {
+    loadingCoupons.value = false
+  }
+}
+
+const quoteDiscount = computed(() => {
+  const d = Number(quote.value?.discount_amount)
+  return Number.isFinite(d) && d > 0 ? d : 0
+})
+
+const appliedPromotions = computed(() =>
+  Array.isArray(quote.value?.applied_promotions) ? quote.value.applied_promotions : []
+)
+
+// 服务端报价返回的赠品行（买多赠一；价格 0 不计入金额，报价失败回退本地时为空不展示）
+const quoteGifts = computed(() =>
+  Array.isArray(quote.value?.gifts) ? quote.value.gifts : []
+)
+
+const summaryItemsTotal = computed(() => {
+  const v = Number(quote.value?.items_total)
+  return Number.isFinite(v) ? v : cartStore.totalAmount
+})
+
+const summaryPayable = computed(() => {
+  const thb = Number(quote.value?.payable_thb)
+  if (Number.isFinite(thb)) return thb
+  const billing = quote.value?.billing
+  const amount = Number(billing?.amount)
+  if (billing?.currency === 'THB' && Number.isFinite(amount)) return amount
+  return totalAmount.value
+})
+
+const fetchQuote = async () => {
+  const seq = ++quoteSeq
+  // 积分支付全额积分抵扣，不参与满减报价
+  if (orderForm.payment_method === 'points') {
+    quote.value = null
+    return
+  }
+  // 套餐行按 bundle_id 提交，商品行按 product_id 提交
+  const items = availableCartItems.value.map(item =>
+    item.bundle_id
+      ? { bundle_id: item.bundle_id, quantity: item.quantity }
+      : { product_id: item.product_id, quantity: item.quantity }
+  )
+  if (items.length === 0) {
+    quote.value = null
+    return
+  }
+  const body = {
+    items,
+    payment_method: orderForm.payment_method,
+    checkout_currency: portalCurrency.selectedCode
+  }
+  // 已选券且非积分支付时带券报价
+  if (selectedCouponId.value) body.user_coupon_id = selectedCouponId.value
+  try {
+    const res = await api.post('/orders/quote', body)
+    if (seq !== quoteSeq) return // 已有更新的报价请求，丢弃过期响应
+    quote.value = res.data?.success ? res.data.data : null
+  } catch (error) {
+    if (seq !== quoteSeq) return
+    quote.value = null
+    // 券不可用（400）：toast 服务端消息并自动取消选中，watch 会以无券重新报价
+    if (body.user_coupon_id) {
+      const msg = error.response?.data?.message
+      clearSelectedCoupon()
+      if (msg) showMessage(msg, 'error')
+    }
+  }
+}
+
+// 购物车有效项/币种/支付方式/已选券变化时重新报价（300ms 防抖）
+const loadQuote = () => {
+  clearTimeout(quoteTimer)
+  quoteTimer = setTimeout(fetchQuote, 300)
+}
+
+watch(
+  () => [
+    availableCartItems.value.map(item => `${item.bundle_id ? `b${item.bundle_id}` : item.product_id}:${item.quantity}`).join(','),
+    orderForm.payment_method,
+    portalCurrency.selectedCode,
+    selectedCouponId.value
+  ],
+  loadQuote
+)
+
+// 积分换购与优惠券互斥：切换到积分支付时清空已选券
+watch(
+  () => orderForm.payment_method,
+  (m) => {
+    if (m === 'points') {
+      clearSelectedCoupon()
+      couponPickerOpen.value = false
+    }
+  }
+)
 
 const paymentModalThb = computed(() => {
   const p = pendingOnlinePaymentThb.value
@@ -1014,12 +1311,13 @@ const submitOrder = async () => {
   submitting.value = true
 
   try {
-    // 准备订单数据（过滤失效商品）
+    // 准备订单数据（过滤失效商品；套餐行按 bundle_id 提交）
     const orderData = {
-      items: availableCartItems.value.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity
-      })),
+      items: availableCartItems.value.map(item =>
+        item.bundle_id
+          ? { bundle_id: item.bundle_id, quantity: item.quantity }
+          : { product_id: item.product_id, quantity: item.quantity }
+      ),
       contact_name: orderForm.contact_name.trim(),
       contact_phone: `${orderForm.contact_country_code}${orderForm.contact_phone.trim()}`,
       delivery_address: userStore.isLoggedIn 
@@ -1028,6 +1326,7 @@ const submitOrder = async () => {
       payment_method: orderForm.payment_method,
       notes: orderForm.notes.trim(),
       clear_cart: true, // 提交订单后清空购物车
+      client_order_key: clientOrderKey.value, // 幂等键：失败重试保持同 key 才能被后端去重
       // 登录用户传递地址ID，游客用户传递省市区信息
       ...(userStore.isLoggedIn ? {
         address_id: selectedAddress.value?.id // 传递选中的地址ID
@@ -1040,7 +1339,11 @@ const submitOrder = async () => {
       }),
       // 传递推荐码
       referral_code: orderForm.referral_code && orderForm.referral_code.trim() ? orderForm.referral_code.trim() : null,
-      checkout_currency: portalCurrency.selectedCode
+      checkout_currency: portalCurrency.selectedCode,
+      // 已选抵扣券（积分支付互斥，未选不传）
+      ...(selectedCouponId.value && orderForm.payment_method !== 'points'
+        ? { user_coupon_id: selectedCouponId.value }
+        : {})
     }
 
 
@@ -1048,6 +1351,10 @@ const submitOrder = async () => {
     const response = await createOrder(orderData)
 
     if (response.data.success) {
+      // 下单成功后更换幂等键：防止用户回退页面再次提交时撞同 key 拿到旧订单
+      clientOrderKey.value = generateClientOrderKey()
+      // 下单成功后清空已选券（券已被核销，留在本地状态会导致重复报价）
+      clearSelectedCoupon()
       await cartStore.loadCart()
       const payload = response.data.data || {}
 
@@ -1058,6 +1365,9 @@ const submitOrder = async () => {
           return
         }
         if (payload.autoRegistered && payload.user && payload.token) {
+          // 先清空游客购物车（此刻仍是游客态，clearCart 走 localStorage 分支、不碰服务器购物车），
+          // 否则 setAuth 触发 App.vue 的登录合并会把已下单商品重新合并进新账号（幽灵购物车）
+          await cartStore.clearCart()
           userStore.setAuth(payload.user, payload.token)
           const phone = payload.user.phone
           const password = phone.slice(-8)
@@ -1074,6 +1384,8 @@ const submitOrder = async () => {
 
       showMessage(t('order.submitSuccess'), 'success')
       if (payload.autoRegistered && payload.user && payload.token) {
+        // 同在线支付分支：setAuth 前清空游客购物车，避免登录合并把已下单商品塞回新账号
+        await cartStore.clearCart()
         userStore.setAuth(payload.user, payload.token)
         const phone = payload.user.phone
         const password = phone.slice(-8)
@@ -1092,10 +1404,12 @@ const submitOrder = async () => {
         await router.push({ path: '/profile', query: { tab: 'orders' } })
       }
     } else {
+      // 提交失败保持同一幂等键：用户点重试时被后端幂等去重，避免产生重复订单（设计意图）
       showMessage(response.data.message || t('order.submitFailed'), 'error')
     }
 
   } catch (error) {
+    // 网络/服务器错误同样保持幂等键不变，重试才会被后端去重
     console.error('提交订单失败:', error)
     const errorMessage = error.response?.data?.message || t('order.submitFailedRetry')
     showMessage(errorMessage, 'error')
@@ -1160,11 +1474,15 @@ onMounted(async () => {
       cartStore.loadCart(),
       loadAddresses(),
       loadSystemConfig(),
-      loadPointsBalance()
+      loadPointsBalance(),
+      loadMyCoupons()
     ])
     if (codDisabled.value && orderForm.payment_method === 'cod') {
       orderForm.payment_method = 'online'
     }
+
+    // 初次报价（满减摘要）
+    loadQuote()
     
     // 如果购物车为空，跳转到购物车页面
     if (cartStore.isEmpty) {

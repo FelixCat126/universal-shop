@@ -36,6 +36,24 @@ const router = createRouter({
           meta: { title: '类别管理', requiresAuth: true, permission: 'products' }
         },
         {
+          path: '/promotions',
+          name: 'Promotions',
+          component: () => import('../views/Promotions.vue'),
+          meta: { title: '促销管理', requiresAuth: true, permission: 'products' }
+        },
+        {
+          path: '/bundles',
+          name: 'Bundles',
+          component: () => import('../views/Bundles.vue'),
+          meta: { title: '组合套餐', requiresAuth: true, permission: 'products' }
+        },
+        {
+          path: '/coupon-templates',
+          name: 'CouponTemplates',
+          component: () => import('../views/CouponTemplates.vue'),
+          meta: { title: '抵扣券管理', requiresAuth: true, permission: 'products' }
+        },
+        {
           path: '/orders',
           name: 'Orders',
           component: () => import('../views/Orders.vue'),

@@ -124,7 +124,7 @@
               <span class="inline-block w-5 h-5 mr-2 text-center">📍</span>
               {{ t('profile.shippingAddresses') }}
             </button>
-            <button 
+            <button
               @click="activeTab = 'points'"
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
@@ -135,6 +135,18 @@
             >
               <span class="inline-block w-5 h-5 mr-2 text-center">⭐</span>
               {{ t('profile.pointsLedgerTab') }}
+            </button>
+            <button
+              @click="activeTab = 'coupons'"
+              :class="[
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                activeTab === 'coupons'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ]"
+            >
+              <span class="inline-block w-5 h-5 mr-2 text-center">🎟️</span>
+              {{ t('coupon.tab') }}
             </button>
             <button 
               @click="activeTab = 'profile'" 
@@ -342,6 +354,127 @@
 
             <div v-else class="py-12 text-center">
               <p class="text-sm text-gray-500">{{ t('profile.noPointTransactions') }}</p>
+            </div>
+          </div>
+
+          <div v-else-if="activeTab === 'coupons'">
+            <!-- 领券中心 -->
+            <div class="mb-8">
+              <h3 class="text-lg font-medium text-gray-900 mb-3">{{ t('coupon.claimCenter') }}</h3>
+
+              <div v-if="loadingAvailableCoupons" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p class="mt-2 text-sm text-gray-500">{{ t('common.loading') }}</p>
+              </div>
+
+              <div v-else-if="availableCoupons.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  v-for="tpl in availableCoupons"
+                  :key="tpl.id"
+                  class="flex rounded-lg border border-orange-200 bg-gradient-to-r from-orange-50 to-white overflow-hidden"
+                >
+                  <div class="flex w-24 shrink-0 flex-col items-center justify-center border-r border-dashed border-orange-200 bg-orange-500/10 px-2 py-3">
+                    <span class="text-xl font-bold text-orange-600 tabular-nums">{{ t('product.currencyThbSymbol') }}{{ formatMoneyThb(tpl.amount) }}</span>
+                    <span class="mt-1 text-xs text-orange-700 text-center">{{ couponMinSpendText(tpl) }}</span>
+                  </div>
+                  <div class="flex-1 min-w-0 p-3">
+                    <div class="text-sm font-medium text-gray-900 truncate">{{ tpl.name }}</div>
+                    <div class="mt-1 text-xs text-gray-500">{{ couponScopeText(tpl.scope) }}</div>
+                    <div class="mt-1 text-xs text-gray-500">{{ t('coupon.validTo', { date: formatDate(tpl.valid_to) }) }}</div>
+                    <div class="mt-1 text-xs text-gray-400">{{ couponRemainingText(tpl) }}</div>
+                  </div>
+                  <div class="flex items-center pr-3">
+                    <button
+                      type="button"
+                      class="rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      :class="couponClaimState(tpl) === 'claim' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400'"
+                      :disabled="couponClaimState(tpl) !== 'claim' || claimingCouponId === tpl.id"
+                      @click="handleClaimCoupon(tpl)"
+                    >
+                      <span v-if="claimingCouponId === tpl.id">{{ t('coupon.claiming') }}</span>
+                      <span v-else-if="couponClaimState(tpl) === 'claimed'">{{ t('coupon.claimed') }}</span>
+                      <span v-else-if="couponClaimState(tpl) === 'soldOut'">{{ t('coupon.soldOut') }}</span>
+                      <span v-else>{{ t('coupon.claim') }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="py-8 text-center">
+                <div class="mx-auto flex h-12 w-12 items-center justify-center text-3xl text-gray-400">🎟️</div>
+                <p class="mt-2 text-sm text-gray-500">{{ t('coupon.noAvailable') }}</p>
+              </div>
+            </div>
+
+            <!-- 我的券 -->
+            <div>
+              <h3 class="text-lg font-medium text-gray-900 mb-3">{{ t('coupon.myCoupons') }}</h3>
+              <div class="flex space-x-2 mb-4">
+                <button
+                  v-for="s in ['unused', 'used', 'expired']"
+                  :key="s"
+                  type="button"
+                  class="rounded-full px-3 py-1 text-sm border"
+                  :class="couponStatusTab === s
+                    ? 'border-blue-500 bg-blue-50 text-blue-600 font-medium'
+                    : 'border-gray-300 text-gray-600 hover:border-gray-400'"
+                  @click="couponStatusTab = s"
+                >
+                  {{ couponStatusLabel(s) }}
+                </button>
+              </div>
+
+              <div v-if="loadingMyCoupons" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p class="mt-2 text-sm text-gray-500">{{ t('common.loading') }}</p>
+              </div>
+
+              <div v-else-if="myCoupons.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  v-for="c in myCoupons"
+                  :key="c.id"
+                  class="flex rounded-lg border overflow-hidden"
+                  :class="c.status === 'unused'
+                    ? 'border-orange-200 bg-gradient-to-r from-orange-50 to-white'
+                    : 'border-gray-200 bg-gray-50 opacity-70'"
+                >
+                  <div
+                    class="flex w-24 shrink-0 flex-col items-center justify-center border-r border-dashed px-2 py-3"
+                    :class="c.status === 'unused' ? 'border-orange-200 bg-orange-500/10' : 'border-gray-200 bg-gray-100'"
+                  >
+                    <span
+                      class="text-xl font-bold tabular-nums"
+                      :class="c.status === 'unused' ? 'text-orange-600' : 'text-gray-500'"
+                    >{{ t('product.currencyThbSymbol') }}{{ formatMoneyThb(c.amount) }}</span>
+                    <span class="mt-1 text-xs text-center" :class="c.status === 'unused' ? 'text-orange-700' : 'text-gray-500'">
+                      {{ couponMinSpendText(c) }}
+                    </span>
+                  </div>
+                  <div class="flex-1 min-w-0 p-3">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-gray-900 truncate">{{ c.name }}</span>
+                      <span
+                        class="shrink-0 rounded px-1.5 py-0.5 text-xs"
+                        :class="{
+                          'bg-green-100 text-green-700': c.status === 'unused',
+                          'bg-gray-200 text-gray-500': c.status === 'used',
+                          'bg-gray-200 text-gray-400': c.status === 'expired'
+                        }"
+                      >{{ couponStatusLabel(c.status) }}</span>
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500">{{ couponScopeText(c.scope) }}</div>
+                    <div class="mt-1 text-xs text-gray-500">{{ t('coupon.validTo', { date: formatDate(c.expire_at) }) }}</div>
+                    <div v-if="c.status === 'used' && c.used_by_order_id" class="mt-1 text-xs text-gray-400">
+                      {{ t('coupon.usedByOrder') }} #{{ c.used_by_order_id }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="py-12 text-center">
+                <div class="mx-auto flex h-12 w-12 items-center justify-center text-3xl text-gray-400">🎟️</div>
+                <p class="mt-2 text-sm text-gray-500">{{ t('coupon.noMine') }}</p>
+              </div>
             </div>
           </div>
 
@@ -725,6 +858,7 @@ import { useUserStore } from '../stores/user.js'
 import { usePortalCurrencyStore } from '../stores/portalCurrency.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
 import { getUserOrders, confirmOnlinePayment as confirmOnlinePaymentApi } from '../api/orders.js'
+import { getAvailableCoupons, claimCoupon, getMyCoupons } from '../api/coupons.js'
 import { userAPI } from '../api/users.js'
 import api from '../api/index.js'
 import config from '../../config/index.js'
@@ -779,7 +913,7 @@ const activeTab = ref('orders')
 watch(
   () => route.query.tab,
   (tabParam) => {
-    if (tabParam && ['orders', 'addresses', 'points', 'profile'].includes(String(tabParam))) {
+    if (tabParam && ['orders', 'addresses', 'points', 'coupons', 'profile'].includes(String(tabParam))) {
       activeTab.value = String(tabParam)
     }
   },
@@ -864,6 +998,15 @@ const pointsHasMore = computed(() => pointTransactions.value.length < pointsTxTo
 
 let ordersIo = null
 let pointsIo = null
+
+// 优惠券：领券中心 + 我的券
+const availableCoupons = ref([])
+const loadingAvailableCoupons = ref(false)
+const claimingCouponId = ref(null)
+const myCoupons = ref([])
+const loadingMyCoupons = ref(false)
+const couponStatusTab = ref('unused')
+const couponsLoaded = ref(false)
 
 // 地址数据
 const addresses = ref([])
@@ -1345,6 +1488,121 @@ const pointTxTitle = (tx) => {
   return tx.type || '—'
 }
 
+// scope 在服务端可能是对象或 JSON 字符串，统一归一后取文案
+const parseCouponScope = (scope) => {
+  if (scope == null) return { type: 'all', ids: [] }
+  if (typeof scope === 'object') return scope
+  try {
+    return JSON.parse(scope)
+  } catch (_) {
+    return { type: 'all', ids: [] }
+  }
+}
+
+const couponScopeText = (scope) => {
+  const s = parseCouponScope(scope)
+  if (s.type === 'category') return t('coupon.scopeCategory')
+  if (s.type === 'product') return t('coupon.scopeProduct')
+  return t('coupon.scopeAll')
+}
+
+const couponMinSpendText = (coupon) => {
+  const min = Number(coupon?.min_spend)
+  if (Number.isFinite(min) && min > 0) {
+    return t('coupon.minSpend', { amount: `${t('product.currencyThbSymbol')}${formatMoneyThb(min)}` })
+  }
+  return t('coupon.noMinSpend')
+}
+
+const couponRemainingText = (tpl) => {
+  if (tpl?.remaining == null) return t('coupon.unlimited')
+  return t('coupon.remaining', { n: Number(tpl.remaining) || 0 })
+}
+
+const couponStatusLabel = (status) => {
+  if (status === 'used') return t('coupon.statusUsed')
+  if (status === 'expired') return t('coupon.statusExpired')
+  return t('coupon.statusUnused')
+}
+
+// 领取按钮态：已领（达到每人限领）> 已领完 > 可领取
+const couponClaimState = (tpl) => {
+  const perUser = Number(tpl?.per_user) || 1
+  const claimed = Number(tpl?.claimed_by_me) || 0
+  if (claimed >= perUser) return 'claimed'
+  if (tpl?.remaining != null && Number(tpl.remaining) <= 0) return 'soldOut'
+  return 'claim'
+}
+
+const loadAvailableCoupons = async () => {
+  loadingAvailableCoupons.value = true
+  try {
+    const res = await getAvailableCoupons()
+    if (res.data?.success) {
+      availableCoupons.value = Array.isArray(res.data.data) ? res.data.data : []
+    } else {
+      availableCoupons.value = []
+      showError(res.data?.message || t('coupon.loadFailed'))
+    }
+  } catch (e) {
+    console.error('加载可领取优惠券失败:', e)
+    availableCoupons.value = []
+    showError(t('coupon.loadFailed'))
+  } finally {
+    loadingAvailableCoupons.value = false
+  }
+}
+
+const loadMyCoupons = async () => {
+  loadingMyCoupons.value = true
+  try {
+    const res = await getMyCoupons({ status: couponStatusTab.value })
+    if (res.data?.success) {
+      myCoupons.value = Array.isArray(res.data.data) ? res.data.data : []
+    } else {
+      myCoupons.value = []
+      showError(res.data?.message || t('coupon.loadFailed'))
+    }
+  } catch (e) {
+    console.error('加载我的优惠券失败:', e)
+    myCoupons.value = []
+    showError(t('coupon.loadFailed'))
+  } finally {
+    loadingMyCoupons.value = false
+  }
+}
+
+const loadCouponsTab = async () => {
+  await Promise.all([loadAvailableCoupons(), loadMyCoupons()])
+  couponsLoaded.value = true
+}
+
+const handleClaimCoupon = async (tpl) => {
+  if (!tpl?.id || claimingCouponId.value === tpl.id) return
+  if (couponClaimState(tpl) !== 'claim') return
+  claimingCouponId.value = tpl.id
+  try {
+    const res = await claimCoupon(tpl.id)
+    if (res.data?.success) {
+      success(res.data.message || t('coupon.claimSuccess'))
+      // 同步本地计数，无需整表刷新即可反映「已领/剩余」变化
+      tpl.claimed_by_me = (Number(tpl.claimed_by_me) || 0) + 1
+      if (tpl.remaining != null) tpl.remaining = Math.max(0, Number(tpl.remaining) - 1)
+      if (couponStatusTab.value === 'unused') await loadMyCoupons()
+    } else {
+      showError(res.data?.message || t('coupon.claimFailed'))
+    }
+  } catch (e) {
+    showError(e.response?.data?.message || t('coupon.claimFailed'))
+  } finally {
+    claimingCouponId.value = null
+  }
+}
+
+watch(couponStatusTab, () => {
+  if (activeTab.value === 'coupons') loadMyCoupons()
+})
+
 // 加载地址列表
 const loadAddresses = async () => {
   try {
@@ -1739,6 +1997,8 @@ onMounted(async () => {
   await nextTick()
   if (activeTab.value === 'points') {
     await loadPointTransactions({ reset: true })
+  } else if (activeTab.value === 'coupons') {
+    await loadCouponsTab()
   } else if (activeTab.value === 'orders') {
     setupOrdersIntersection()
   }
@@ -1755,6 +2015,12 @@ watch(activeTab, async (tab) => {
       await loadPointTransactions({ reset: true })
     } else {
       setupPointsIntersection()
+    }
+  } else if (tab === 'coupons') {
+    teardownOrdersIo()
+    teardownPointsIo()
+    if (!couponsLoaded.value) {
+      await loadCouponsTab()
     }
   } else {
     teardownOrdersIo()

@@ -368,6 +368,7 @@ export default {
     pointsPaySummary: 'Full points payment: {need} pts will be deducted',
     pointsMixedCartHint:
       'If the cart includes non-points items, the full order cannot be paid with points. Remove non-points items or place a separate order.',
+    pointsBundleHint: 'The cart contains a bundle, which cannot be paid with points.',
     pointsSubmitBlocked: 'Points checkout is not available. Please choose another payment method.',
     pointsRedeemedShort: 'Paid {points} pts'
   },
@@ -559,5 +560,56 @@ export default {
     china: 'China',
     thailand: 'Thailand',
     malaysia: 'Malaysia'
+  },
+
+  // Checkout page
+  checkout: {
+    promotionDiscount: 'Promotion discount',
+    gift: 'Gift',
+    giftTag: 'Gift'
+  },
+
+  // Fixed bundle deals
+  bundle: {
+    sectionTitle: 'Bundle Deals',
+    badge: 'Bundle',
+    standaloneTotal: 'Bought separately',
+    save: 'Save {amount}',
+    stockLeft: '{count} left',
+    soldOut: 'Sold out',
+    stockShortage: 'Bundle stock insufficient, only {count} left'
+  },
+
+  // Coupons
+  coupon: {
+    tab: 'Coupons',
+    claimCenter: 'Coupon Center',
+    myCoupons: 'My Coupons',
+    claim: 'Claim',
+    claiming: 'Claiming…',
+    claimed: 'Claimed',
+    soldOut: 'Sold out',
+    claimSuccess: 'Coupon claimed',
+    claimFailed: 'Failed to claim coupon',
+    remaining: '{n} left',
+    unlimited: 'Unlimited',
+    minSpend: 'Min. spend {amount}',
+    noMinSpend: 'No minimum spend',
+    validTo: 'Valid until {date}',
+    scopeAll: 'Storewide',
+    scopeCategory: 'Selected categories only',
+    scopeProduct: 'Selected products only',
+    statusUnused: 'Unused',
+    statusUsed: 'Used',
+    statusExpired: 'Expired',
+    noAvailable: 'No coupons available to claim',
+    noMine: 'No coupons here yet',
+    loadFailed: 'Failed to load coupons. Please try again later',
+    usedByOrder: 'Used on order',
+    select: 'Select coupon',
+    none: 'No coupon',
+    noUsable: 'No coupons available',
+    discountLine: 'Coupon discount',
+    notEnough: 'Minimum spend not reached'
   }
 }

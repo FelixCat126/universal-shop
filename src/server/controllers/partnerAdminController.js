@@ -263,6 +263,8 @@ class PartnerAdminController {
           where: { partner_order_id: order.id },
           transaction
         })
+        // 按 product_id 升序回补：与下单扣减/超时清扫的加锁顺序一致，消除 AB-BA 死锁
+        items.sort((a, b) => a.product_id - b.product_id)
         for (const item of items) {
           const qty = parseInt(item.quantity, 10)
           if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue

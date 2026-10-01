@@ -248,6 +248,43 @@ class SystemConfigController {
         })
       }
 
+      // 积分获取比例：每实付 1 泰铢获得的积分（发积分口径 floor(实付THB × rate)）
+      // 只接受 string/number 标量；有限数且 0 ≤ rate ≤ 1，字符串存储
+      if (key === 'points_earn_rate') {
+        if (typeof value !== 'string' && typeof value !== 'number') {
+          return res.status(400).json({
+            success: false,
+            message: '积分获取比例必须是有效的数字'
+          })
+        }
+        const text = typeof value === 'string' ? value.trim() : String(value)
+        // Number('') / Number('   ') 会被强转为 0，空串按无效数字拒绝
+        const numValue = text === '' ? NaN : Number(text)
+        if (!Number.isFinite(numValue)) {
+          return res.status(400).json({
+            success: false,
+            message: '积分获取比例必须是有效的数字'
+          })
+        }
+        if (numValue < 0 || numValue > 1) {
+          return res.status(400).json({
+            success: false,
+            message: '积分获取比例必须在 0 ~ 1 之间'
+          })
+        }
+        const config = await SystemConfig.setConfig(
+          key,
+          String(numValue),
+          'text',
+          description || '积分获取比例：每实付 1 泰铢获得的积分（默认 0.01，即每 100 泰铢 1 积分）'
+        )
+        return res.json({
+          success: true,
+          message: '积分获取比例已保存',
+          data: config
+        })
+      }
+
       // 兼容：单笔 exchange_rate 视为美元/USDT 比例，并写回 exchange_rates.USD
       if (key === 'exchange_rate') {
         // 只接受 string/number 标量；数组/对象/boolean 直接 400，防止 parseFloat 强转出脏值

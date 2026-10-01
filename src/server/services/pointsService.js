@@ -78,12 +78,14 @@ export async function redeemPointsForOrder (transaction, {
 }
 
 /**
- * 真实支付订单成交后：按件发放积分（每笔订单内件数之和）
+ * 真实支付订单成交后发放购物积分
+ * 发放口径（P1 起）：按订单折后实付泰铢金额换算 —— floor(实付THB × points_earn_rate)，
+ * 由调用方（orderController / pricingEngine.calcPointsEarn）算好后传入；
  * options.transaction 传入时复用调用方事务（不再自建事务，失败随调用方一起回滚）；
  * 不传则自建独立事务（订单事务已提交后的场景），失败仅向上抛、由调用方决定如何处理。
  */
-export async function grantPurchasePoints (userId, orderId, quantityTotal, options = {}) {
-  const n = Number(quantityTotal)
+export async function grantPurchasePoints (userId, orderId, points, options = {}) {
+  const n = Number(points)
   if (!userId || !Number.isFinite(n) || n <= 0) return
   const run = async (t) => {
     const row = await lockOrCreateBalance(userId, t)
@@ -95,7 +97,7 @@ export async function grantPurchasePoints (userId, orderId, quantityTotal, optio
       type: 'earn_purchase',
       delta: n,
       balance_after: row.balance,
-      note: `购物获得 ${n} 积分（按件计）`
+      note: `购物获得 ${n} 积分（按实付金额计）`
     }, { transaction: t })
   }
   if (options.transaction) {

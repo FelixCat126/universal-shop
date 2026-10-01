@@ -336,6 +336,7 @@ export default {
     pointsPaySummary: '积分全额支付，共扣 {need} 积分',
     pointsMixedCartHint:
       '购物车中有非积分换购商品时，本订单无法用积分全额支付；请移除非积分换购商品或拆分下单。',
+    pointsBundleHint: '购物车包含组合套餐，不可使用积分换购',
     pointsSubmitBlocked: '当前无法使用积分换购，请选择其他支付方式',
     pointsRedeemedShort: '已付 {points} 积分'
   },
@@ -512,5 +513,56 @@ export default {
     china: '中国',
     thailand: '泰国',
     malaysia: '马来西亚'
+  },
+
+  // 结算页
+  checkout: {
+    promotionDiscount: '满减优惠',
+    gift: '赠品',
+    giftTag: '赠品'
+  },
+
+  // 组合套餐（固定组合包）
+  bundle: {
+    sectionTitle: '组合套餐',
+    badge: '组合套餐',
+    standaloneTotal: '单买合计',
+    save: '省 {amount}',
+    stockLeft: '剩 {count} 套',
+    soldOut: '已抢完',
+    stockShortage: '套餐库存不足，仅剩 {count} 套'
+  },
+
+  // 优惠券
+  coupon: {
+    tab: '优惠券',
+    claimCenter: '领券中心',
+    myCoupons: '我的券',
+    claim: '立即领取',
+    claiming: '领取中…',
+    claimed: '已领取',
+    soldOut: '已领完',
+    claimSuccess: '领取成功',
+    claimFailed: '领取失败',
+    remaining: '剩余 {n} 张',
+    unlimited: '不限量',
+    minSpend: '满 {amount} 可用',
+    noMinSpend: '无门槛',
+    validTo: '有效期至 {date}',
+    scopeAll: '全场通用',
+    scopeCategory: '指定分类可用',
+    scopeProduct: '指定商品可用',
+    statusUnused: '未使用',
+    statusUsed: '已使用',
+    statusExpired: '已过期',
+    noAvailable: '暂无可领取的优惠券',
+    noMine: '暂无相关优惠券',
+    loadFailed: '优惠券加载失败，请稍后重试',
+    usedByOrder: '已用于订单',
+    select: '选择优惠券',
+    none: '不使用优惠券',
+    noUsable: '暂无可用优惠券',
+    discountLine: '优惠券优惠',
+    notEnough: '未满使用门槛'
   }
 }
