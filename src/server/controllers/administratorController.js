@@ -5,6 +5,7 @@ import OperationLog from '../models/OperationLog.js'
 import AuditLog from '../models/AuditLog.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
+import { invalidateAdminAuthCache } from '../middlewares/adminAuthMiddleware.js'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 
@@ -295,6 +296,9 @@ class AdministratorController {
 
       await admin.save()
 
+      // 角色/启用状态可能已变更：立即失效鉴权链 5s 短缓存，不等 TTL 自然过期
+      invalidateAdminAuthCache(admin.id)
+
       // 操作日志由路由层 logOperation 中间件统一记录；
       // 中间件固定以响应 data 作为 newData，故把变更前快照挂到 data.old_data 传递，避免审计信息丢失
       res.json({
@@ -344,6 +348,8 @@ class AdministratorController {
 
       const oldData = admin.toSafeJSON()
       await admin.destroy()
+      // 删号后立即失效鉴权缓存，旧 token 下一请求即 401
+      invalidateAdminAuthCache(admin.id)
 
       // 操作日志由路由层 logOperation 中间件统一记录；
       // 中间件固定以响应 data 作为 newData，故把已删除管理员的快照经响应体传递给中间件存档
@@ -394,6 +400,8 @@ class AdministratorController {
 
       admin.password = password
       await admin.save()
+      // 改密后立即失效鉴权缓存（约定：凭据类变更即刻收敛，虽然缓存本身不含密码）
+      invalidateAdminAuthCache(admin.id)
 
       // 操作日志由路由层 logOperation 中间件统一记录；
       // 经响应体把操作对象（不含密码）传给中间件，保证 resourceId/用户名不丢失

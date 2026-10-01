@@ -295,7 +295,7 @@ import {
 import getCurrentLanguageValue from '../../utils/language.js'
 import config from '../../../config/index.js'
 import { formatRecordedOrderAmount, formatLineRecordedFromThb } from '../../utils/orderBillingDisplay.js'
-import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
+import { usePortalCurrencyStore, loadPublicConfig } from '../../stores/portalCurrency.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -378,16 +378,11 @@ const getStatusText = (status) => {
 }
 
 async function loadOnlinePayCfg () {
-  try {
-    const response = await fetch(config.buildApiUrl('/api/system-config/public'))
-    if (!response.ok) return
-    const data = await response.json()
-    if (data.success && data.data) {
-      onlinePayQr.value = data.data.payment_qrcode
-      onlinePayRate.value = parseFloat(data.data.exchange_rate || '0.00')
-    }
-  } catch {
-    /* silent */
+  // 共享缓存：30s 内重复打开支付弹窗不再请求
+  const data = await loadPublicConfig()
+  if (data) {
+    onlinePayQr.value = data.payment_qrcode
+    onlinePayRate.value = parseFloat(data.exchange_rate || '0.00')
   }
 }
 

@@ -306,6 +306,14 @@ async function ensureCouponColumns () {
   await sequelize.query('ALTER TABLE order_promotions ALTER COLUMN promotion_id DROP NOT NULL')
 }
 
+/**
+ * user_coupons.used_by_order_id 索引（与模型 indexes 同名，sync 已建则 IF NOT EXISTS 跳过）：
+ * 订单取消/删除/超时清扫时 restoreOrderResources 按 used_by_order_id 条件 UPDATE 释放券，无索引会全表扫
+ */
+async function ensureUserCouponUsedByOrderIndex () {
+  await sequelize.query('CREATE INDEX IF NOT EXISTS idx_user_coupons_used_by_order ON user_coupons (used_by_order_id)')
+}
+
 /** 旧库仅执行过 029 时缺列会导致合作方订单查询报错，启动时对齐模型字段 */
 async function ensurePartnerOrderSchemaColumns () {
   const qi = sequelize.getQueryInterface()
@@ -449,6 +457,7 @@ if (process.env.NODE_ENV !== 'test') {
     .then(() => ensureOrderItemPointsLineCostColumn())
     .then(() => ensurePromotionColumns())
     .then(() => ensureCouponColumns())
+    .then(() => ensureUserCouponUsedByOrderIndex())
     .then(() => ensureOrderItemIsGiftColumn())
     .then(() => ensureBundleColumns())
     .then(() => ensureOrderOnlinePaidAtColumn())

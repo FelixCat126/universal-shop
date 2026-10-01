@@ -22,9 +22,12 @@ const {
   mergeCurrencyCodeIntoLocales,
   fetchAndApplyCurrencyUnit
 } = await import('@/utils/currencyI18n.js')
+const { resetPublicConfigCache } = await import('@/utils/publicConfig.js')
 
 beforeEach(() => {
   vi.unstubAllGlobals()
+  // fetchAndApplyCurrencyUnit 走 publicConfig 模块级缓存，用例间需重置避免串数据
+  resetPublicConfigCache()
 })
 
 describe('VU.utils.currencyI18n', () => {

@@ -287,6 +287,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import config from '../../config/index.js'
+import { loadPublicConfig } from '../../utils/publicConfig.js'
 import { formatPhoneDisplay } from '../../portal/utils/phoneValidation.js'
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
@@ -511,16 +512,11 @@ function openConfirm () {
 }
 
 async function loadPublicPaymentConfig () {
-  try {
-    const response = await fetch(config.buildApiUrl('/api/system-config/public'))
-    if (!response.ok) return
-    const data = await response.json()
-    if (data.success && data.data) {
-      paymentQRCode.value = data.data.payment_qrcode
-      exchangeRateUsd.value = parseFloat(data.data.exchange_rate ?? data.data.exchange_rates?.USD ?? '0') || 0
-    }
-  } catch {
-    /* silent */
+  // 共享缓存：30s 内重复打开支付弹窗不再请求
+  const data = await loadPublicConfig()
+  if (data) {
+    paymentQRCode.value = data.payment_qrcode
+    exchangeRateUsd.value = parseFloat(data.exchange_rate ?? data.exchange_rates?.USD ?? '0') || 0
   }
 }
 

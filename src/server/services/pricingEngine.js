@@ -276,6 +276,32 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
   const itemsTotal = round2(lines.reduce((s, l) => s + l.line_total, 0))
 
   /**
+   * 促销一次性加载（第 1.5 层买赠 + 第 2 层满减共用）：
+   * 原来两层各自查询 promotions 表，现合并为一次 type IN 查询后按 type 内存分派；
+   * 统一按 id ASC 排序——买赠原查询即为 id ASC；满减原查询未指定排序，
+   * 合并后 priority 与减免额完全相同的平级场景取 id 较小者，结果更确定
+   */
+  let buyGetPromotions = []
+  let thresholdPromotions = []
+  if (paymentMethod !== 'points') {
+    const activePromotions = await Promotion.findAll({
+      where: {
+        status: 'active',
+        type: { [Op.in]: ['buy_x_get_y', 'threshold'] },
+        [Op.and]: [
+          { [Op.or]: [{ start_at: null }, { start_at: { [Op.lte]: now } }] },
+          { [Op.or]: [{ end_at: null }, { end_at: { [Op.gte]: now } }] }
+        ]
+      },
+      order: [['id', 'ASC']]
+    })
+    for (const promo of activePromotions) {
+      if (promo.type === 'buy_x_get_y') buyGetPromotions.push(promo)
+      else if (promo.type === 'threshold') thresholdPromotions.push(promo)
+    }
+  }
+
+  /**
    * 第 1.5 层：买多赠一（buy_x_get_y，P3）——只产出赠品清单，不动任何金额与行分摊：
    * scope 内行购买数量合计 eligibleQty，times = floor(eligibleQty / buy)，赠品数 = times × get；
    * 赠品商品 = rules.gift_product_id（未指定时仅当 scope 恰为单商品默认赠同品——admin 校验已拦截
@@ -286,18 +312,7 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
    */
   const gifts = []
   if (paymentMethod !== 'points') {
-    const buyGetPromotions = await Promotion.findAll({
-      where: {
-        status: 'active',
-        type: 'buy_x_get_y',
-        [Op.and]: [
-          { [Op.or]: [{ start_at: null }, { start_at: { [Op.lte]: now } }] },
-          { [Op.or]: [{ end_at: null }, { end_at: { [Op.gte]: now } }] }
-        ]
-      },
-      order: [['id', 'ASC']]
-    })
-
+    // 买赠清单来自上方合并查询的 type 分派结果，不再单独查库
     // 先解析每条规则的赠品商品与数量，再一次性加载订单行之外的赠品商品（避免 N+1）
     const candidates = []
     const giftIdsToLoad = new Set()
@@ -367,20 +382,10 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
   let discountAmount = 0
   const appliedPromotions = []
   if (paymentMethod !== 'points' && itemsTotal > 0) {
-    const promotions = await Promotion.findAll({
-      where: {
-        status: 'active',
-        type: 'threshold',
-        [Op.and]: [
-          { [Op.or]: [{ start_at: null }, { start_at: { [Op.lte]: now } }] },
-          { [Op.or]: [{ end_at: null }, { end_at: { [Op.gte]: now } }] }
-        ]
-      }
-    })
-
+    // 满减清单来自上方合并查询的 type 分派结果，不再单独查库
     // 每条候选独立计算 eligible 与命中档；最终只应用一条（priority 最高，平级 off 最大）
     let best = null
-    for (const promo of promotions) {
+    for (const promo of thresholdPromotions) {
       const tiers = Array.isArray(promo.rules?.tiers) ? promo.rules.tiers : []
       if (tiers.length === 0) continue
       const scope = promo.scope && typeof promo.scope === 'object' ? promo.scope : { type: 'all' }

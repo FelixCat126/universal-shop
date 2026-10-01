@@ -34,6 +34,11 @@ export function validate (schemas) {
 export const phoneSchema = Joi.string().pattern(/^[1-9]\d{7,14}$/).required()
 export const countryCodeSchema = Joi.string().valid('+86', '+66', '+60').default('+66')
 
+// 批量库存查询（POST /api/products/check-stock）：公开端点，数组上限 1-200 个正整数防枚举风暴拖库
+export const checkStockSchema = Joi.object({
+  productIds: Joi.array().items(Joi.number().integer().min(1)).min(1).max(200).required()
+})
+
 export const orderItemSchema = Joi.object({
   product_id: Joi.number().integer().min(1).required(),
   quantity: Joi.number().integer().min(1).max(5000).required()

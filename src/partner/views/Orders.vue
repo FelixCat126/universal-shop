@@ -154,6 +154,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDownIcon } from '@heroicons/vue/24/outline'
 import config from '../../config/index.js'
+import { loadPublicConfig } from '../../utils/publicConfig.js'
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
 import PartnerOnlinePayModal from '../components/PartnerOnlinePayModal.vue'
@@ -247,17 +248,12 @@ function statusLabel (status) {
 }
 
 async function loadPublicPaymentConfigPay () {
-  try {
-    const response = await fetch(config.buildApiUrl('/api/system-config/public'))
-    if (!response.ok) return
-    const data = await response.json()
-    if (data.success && data.data) {
-      payQRPath.value = data.data.payment_qrcode
-      payExchangeUsd.value =
-        parseFloat(data.data.exchange_rate ?? data.data.exchange_rates?.USD ?? '0') || 0
-    }
-  } catch {
-    /* ignore */
+  // 共享缓存：30s 内重复打开支付弹窗不再请求
+  const data = await loadPublicConfig()
+  if (data) {
+    payQRPath.value = data.payment_qrcode
+    payExchangeUsd.value =
+      parseFloat(data.exchange_rate ?? data.exchange_rates?.USD ?? '0') || 0
   }
 }
 

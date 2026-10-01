@@ -261,9 +261,11 @@ onMounted(async () => {
   locale.value = currentLanguage.value
   
   try {
-    await fetchAndApplyCurrencyUnit(i18n, '')
-
-    await portalCurrency.loadRates()
+    // 两者共用同一份 public 配置（in-flight 去重后实际只发一次请求），并行等待
+    await Promise.all([
+      fetchAndApplyCurrencyUnit(i18n, ''),
+      portalCurrency.loadRates()
+    ])
     portalCurrency.initFromStorage(locale.value)
 
     // 检查用户认证状态

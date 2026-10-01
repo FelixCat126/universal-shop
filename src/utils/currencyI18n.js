@@ -1,3 +1,5 @@
+import { loadPublicConfig } from './publicConfig.js'
+
 /** 与 admin / portal i18n 的 locale 键一致 */
 export const CURRENCY_I18N_LOCALES = ['zh-CN', 'en-US', 'th-TH']
 
@@ -97,19 +99,25 @@ export function applyCurrencyUnitToI18n (i18n, symbolOrCode) {
 
 /**
  * @param {import('vue-i18n').I18n} i18n
- * @param {string} [apiBase] 如 '' 表示同源 /api
+ * @param {string} [apiBase] 如 '' 表示同源 /api；空值时走 publicConfig 共享缓存
  */
 export async function fetchAndApplyCurrencyUnit (i18n, apiBase = '') {
   try {
-    const base = apiBase.replace(/\/$/, '')
-    const url = `${base}/api/system-config/public`
-    const res = await fetch(url)
-    const json = await res.json()
-    if (json.success && json.data) {
+    let data = null
+    if (apiBase) {
+      // 兼容显式指定 apiBase 的旧用法：直连该地址，不走共享缓存
+      const base = apiBase.replace(/\/$/, '')
+      const res = await fetch(`${base}/api/system-config/public`)
+      const json = await res.json()
+      data = json?.success ? json.data : null
+    } else {
+      data = await loadPublicConfig()
+    }
+    if (data) {
       const code =
-        json.data.currency_code != null && String(json.data.currency_code).trim() !== ''
-          ? json.data.currency_code
-          : json.data.currency_unit
+        data.currency_code != null && String(data.currency_code).trim() !== ''
+          ? data.currency_code
+          : data.currency_unit
       applyCurrencyCodeToI18n(i18n, code)
     } else {
       applyCurrencyCodeToI18n(i18n, 'THB')

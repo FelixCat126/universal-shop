@@ -20,6 +20,7 @@ import AuditLog from '../models/AuditLog.js'
 import PointTransaction from '../models/PointTransaction.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
+import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
 
 /** 金额统一舍入到分：消除浮点误差，保证 Σ(行价×数量) 与订单总额严格一致 */
@@ -211,10 +212,10 @@ class OrderController {
     /**
      * 事务推迟到所有预检（商品查询、汇率配置、游客用户解析、地址读取）之后、
      * 第一个写操作之前开启：sequelize.transaction() 一创建即占住一条池连接，
-     * 若事务存活期间再做 autocommit 读需再抢第二条连接，高并发下会连接池自死锁
+     * 若事务存活期间再做 autocommit 读需再抢第二条连接，高并发下会连接池自死锁。
+     * 写阶段整体包 withDeadlockRetry：事务在 fn 内创建，PG 40P01/40001 时重建事务整体重跑；
+     * 游客用户创建在事务外，不受重试影响
      */
-    let transaction = null
-
     try {
       const {
         items,
@@ -591,257 +592,271 @@ class OrderController {
 
       const initialOrderStatus = paymentMethod === 'online' ? 'pending' : 'shipping'
 
-      // 所有预检完成：以下进入写阶段，开启事务（事务内第一个写操作是 Order.create）
-      transaction = await sequelize.transaction()
-
-      /**
-       * 订单号生成 + 唯一冲突重试（最多 5 次，SAVEPOINT 模式）：
-       * PG 下事务内语句报错后整事务进入 aborted 状态，不设保存点直接重插只会再撞 25P02，
-       * 因此仿 pointsService.lockOrCreateBalance：Order.create 包在保存点内，
-       * 撞 order_no 唯一约束（23505）时回滚到保存点、重生成订单号再插。
-       * 幂等键 (user_id, client_order_key) 冲突同样报 23505，必须区分错误来源：
-       * 命中幂等键索引 → 不再重试，整事务回滚后按 key 查重返回（见下方分支）
-       */
-      const buildOrderNo = () => `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-      let order = null
-      let createTries = 0
-      let clientKeyConflicted = false
-      while (createTries < 5 && !order) {
-        const sp = await sequelize.transaction({ transaction })
+      // 所有预检完成：进入写阶段。事务在 fn 内创建，40P01/40001 时 withDeadlockRetry 重建事务整体重跑；
+      // 业务校验失败以 { ok:false, status, message } 返回、不触发重试；res 响应副作用一律在事务外执行
+      const result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
         try {
-          order = await Order.create({
-            order_no: buildOrderNo(),
-            user_id: userId,
-            client_order_key: clientOrderKey || null,
-            total_amount: totalBilling,
-            total_amount_thb: totalAmountThb,
-            discount_amount: priced ? priced.discount_amount : 0,
-            currency_code: checkoutCurrency,
-            payment_method: paymentMethod,
-            points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
-            status: initialOrderStatus,
-            contact_name: orderContactName,
-            contact_phone: orderContactPhone,
-            delivery_address: orderDeliveryAddress,
-            province: orderProvince,
-            city: orderCity,
-            district: orderDistrict,
-            postal_code: orderPostalCode,
-            notes,
-            exchange_rate: exchangeRateSnapshot
-          }, { transaction: sp })
-          await sp.commit()
-        } catch (err) {
-          await sp.rollback().catch(() => {})
-          if (isUniqueViolationError(err)) {
-            if (clientOrderKey && isClientOrderKeyConflict(err)) {
-              clientKeyConflicted = true
-              break
-            }
-            createTries++
-            continue
-          }
-          throw err
-        }
-      }
-      if (!order) {
-        await transaction.rollback()
-        transaction = null
-        if (clientKeyConflicted) {
           /**
-           * 幂等键冲突：并发下同 key 的负方会被唯一索引阻塞到胜方提交后才报 23505，
-           * 此刻按 (user_id, key) 必能查到胜方已提交的订单，按幂等成功原样返回
+           * 订单号生成 + 唯一冲突重试（最多 5 次，SAVEPOINT 模式）：
+           * PG 下事务内语句报错后整事务进入 aborted 状态，不设保存点直接重插只会再撞 25P02，
+           * 因此仿 pointsService.lockOrCreateBalance：Order.create 包在保存点内，
+           * 撞 order_no 唯一约束（23505）时回滚到保存点、重生成订单号再插。
+           * 幂等键 (user_id, client_order_key) 冲突同样报 23505，必须区分错误来源：
+           * 命中幂等键索引 → 不再重试，整事务回滚后按 key 查重返回（见 withDeadlockRetry 后的 deduplicated 分支）。
+           * 保存点内吞掉的 23505 不会外溢，withDeadlockRetry 只见 40P01/40001
            */
-          const existingOrder = await Order.findOne({
-            where: { user_id: userId, client_order_key: clientOrderKey }
-          })
-          if (existingOrder) {
-            const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, deduplicated: true })
-            AuditLog.logUser({
-              user: req.user || (isGuestOrder ? { id: userId } : null),
-              event: 'order.create.deduplicated',
-              resource: 'order',
-              resourceId: existingOrder.id,
-              detail: { client_order_key: clientOrderKey },
-              req
-            }).catch(() => {})
-            return res.status(201).json({
-              success: true,
-              message: '订单创建成功',
-              data: responseData
+          const buildOrderNo = () => `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+          let order = null
+          let createTries = 0
+          let clientKeyConflicted = false
+          while (createTries < 5 && !order) {
+            const sp = await sequelize.transaction({ transaction })
+            try {
+              order = await Order.create({
+                order_no: buildOrderNo(),
+                user_id: userId,
+                client_order_key: clientOrderKey || null,
+                total_amount: totalBilling,
+                total_amount_thb: totalAmountThb,
+                discount_amount: priced ? priced.discount_amount : 0,
+                currency_code: checkoutCurrency,
+                payment_method: paymentMethod,
+                points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
+                status: initialOrderStatus,
+                contact_name: orderContactName,
+                contact_phone: orderContactPhone,
+                delivery_address: orderDeliveryAddress,
+                province: orderProvince,
+                city: orderCity,
+                district: orderDistrict,
+                postal_code: orderPostalCode,
+                notes,
+                exchange_rate: exchangeRateSnapshot
+              }, { transaction: sp })
+              await sp.commit()
+            } catch (err) {
+              await sp.rollback().catch(() => {})
+              if (isUniqueViolationError(err)) {
+                if (clientOrderKey && isClientOrderKeyConflict(err)) {
+                  clientKeyConflicted = true
+                  break
+                }
+                createTries++
+                continue
+              }
+              throw err
+            }
+          }
+          if (!order) {
+            await transaction.rollback()
+            if (clientKeyConflicted) {
+              // 幂等键冲突：整单回滚，由事务外按 (user_id, key) 查重返回
+              return { ok: true, deduplicated: true }
+            }
+            return { ok: false, status: 500, message: '生成订单号失败，请稍后重试' }
+          }
+
+          /**
+           * 防超卖核心：用条件 UPDATE 原子扣库存。
+           *   UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty
+           * 受影响行 0 即视为库存不足；事务回滚整单。
+           * 扣减清单先按 product_id 合并（买赠赠品行与正价行同品时合扣，如买 3 赠 1 扣 4），
+           * 再按 product_id 升序遍历：所有写路径（下单扣减/取消回补/超时清扫回补）
+           * 按同一全局顺序获取 Product 行锁，消除 AB-BA 死锁；
+           * OrderItem 落库仍用客户端原始顺序 + 赠品行追加在后（见下方 bulkCreate），不影响订单项展示顺序契约
+           */
+          const stockDeductionMap = new Map()
+          for (const orderItem of orderItems) {
+            const entry = stockDeductionMap.get(orderItem.product_id) ||
+              { product_id: orderItem.product_id, quantity: 0, name: orderItem.product_name_zh }
+            entry.quantity += parseInt(orderItem.quantity, 10)
+            stockDeductionMap.set(orderItem.product_id, entry)
+          }
+          const stockDeductionOrder = [...stockDeductionMap.values()].sort((a, b) => a.product_id - b.product_id)
+          for (const entry of stockDeductionOrder) {
+            const [affected] = await Product.update(
+              { stock: sequelize.literal(`stock - ${entry.quantity}`) },
+              {
+                where: {
+                  id: entry.product_id,
+                  stock: { [Op.gte]: entry.quantity }
+                },
+                transaction
+              }
+            )
+            if (!affected) {
+              await transaction.rollback()
+              return {
+                ok: false,
+                status: 400,
+                message: `商品 ${entry.name} 库存不足（商品 ID ${entry.product_id}）`
+              }
+            }
+          }
+
+          // 订单项一次性写入（保持客户端提交顺序；避免循环 N 次插入）
+          const orderItemRows = orderItems.map(orderItem => ({ order_id: order.id, ...orderItem }))
+          if (orderItemRows.length > 0) {
+            await OrderItem.bulkCreate(orderItemRows, { transaction })
+          }
+
+          /**
+           * 抵扣券核销占位（同事务）：条件 UPDATE 是并发的唯一闸门——
+           * 预检/计价在事务外完成，同券双下单时负方在此受影响行=0，
+           * 整单回滚报 400；胜方提交前负方会被行锁阻塞到胜方提交后重估 WHERE，不会双双核销
+           */
+          if (userCoupon && priced && priced.applied_coupon) {
+            const [affected] = await UserCoupon.update(
+              { status: 'used', used_by_order_id: order.id, used_at: new Date() },
+              { where: { id: userCoupon.id, user_id: userId, status: 'unused' }, transaction }
+            )
+            if (!affected) {
+              await transaction.rollback()
+              return { ok: false, status: 400, message: '抵扣券不可用或已被使用' }
+            }
+          }
+
+          // 订单促销快照（同事务）：每个命中的满减一条；券抵扣一行（user_coupon_id + 名称/面额快照），供订单详情/对账追溯
+          const promotionRows = []
+          if (priced && priced.applied_promotions.length > 0) {
+            for (const p of priced.applied_promotions) {
+              promotionRows.push({
+                order_id: order.id,
+                promotion_id: p.promotion_id,
+                name: p.name,
+                amount: p.amount
+              })
+            }
+          }
+          if (priced && priced.applied_coupon) {
+            promotionRows.push({
+              order_id: order.id,
+              promotion_id: null,
+              user_coupon_id: priced.applied_coupon.user_coupon_id,
+              name: priced.applied_coupon.name,
+              amount: priced.applied_coupon.amount
             })
           }
+          if (promotionRows.length > 0) {
+            await OrderPromotion.bulkCreate(promotionRows, { transaction })
+          }
+
+          if (paymentMethod === 'points') {
+            await pointsService.redeemPointsForOrder(transaction, {
+              userId,
+              orderId: order.id,
+              points: pointsPurchaseTotal,
+              note: `积分换购 ${order.order_no}`
+            })
+          }
+
+          // 清空用户购物车（如果订单来自购物车）
+          if (req.body.clear_cart) {
+            await Cart.destroy({
+              where: { user_id: userId },
+              transaction
+            })
+          }
+
+          // 为游客用户创建默认地址（复用统一逻辑）
+          if (isGuestOrder) {
+            // 将完整手机号切分为国家区号与本地号
+            let contact_country_code = '+66'
+            let phoneNumber = contact_phone
+            const supportedCodes = ['+86', '+66', '+60']
+            for (const code of supportedCodes) {
+              if (contact_phone.startsWith(code)) {
+                contact_country_code = code
+                phoneNumber = contact_phone.substring(code.length)
+                break
+              }
+            }
+
+            await createUserAddress(
+              {
+                userId,
+                contact_name,
+                contact_country_code,
+                contact_phone: phoneNumber,
+                province,
+                city,
+                district,
+                detail_address,
+                postal_code,
+                is_default: true,
+                address_type: 'home'
+              },
+              transaction
+            )
+          }
+
+          // COD 单在下单事务内直接发积分（与库存/订单同生共死；发放失败整单回滚，客户端可安全重试；
+          // 若在提交后独立事务发放，取消窗口内 revoke 会查不到 earn 流水，用户白得积分）
+          // 发放口径：floor(折后实付 THB × points_earn_rate)，为 0 不发
+          if (paymentMethod !== 'points' && paymentMethod !== 'online' && userId) {
+            const earnPoints = calcPointsEarn(totalAmountThb, pointsEarnRate)
+            if (earnPoints > 0) {
+              await pointsService.grantPurchasePoints(userId, order.id, earnPoints, { transaction })
+            }
+          }
+
+          await transaction.commit()
+          return { ok: true, orderId: order.id, totalAmount: order.total_amount }
+        } catch (e) {
+          // 死锁等其余错误回滚后上抛：40P01/40001 由 withDeadlockRetry 重建事务重跑，其余原样透出
+          await transaction.rollback().catch(() => {})
+          throw e
         }
+      })
+
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message })
+      }
+
+      if (result.deduplicated) {
+        /**
+         * 幂等键冲突：并发下同 key 的负方会被唯一索引阻塞到胜方提交后才报 23505，
+         * 此刻按 (user_id, key) 必能查到胜方已提交的订单，按幂等成功原样返回
+         */
+        const existingOrder = await Order.findOne({
+          where: { user_id: userId, client_order_key: clientOrderKey }
+        })
+        if (existingOrder) {
+          const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, deduplicated: true })
+          AuditLog.logUser({
+            user: req.user || (isGuestOrder ? { id: userId } : null),
+            event: 'order.create.deduplicated',
+            resource: 'order',
+            resourceId: existingOrder.id,
+            detail: { client_order_key: clientOrderKey },
+            req
+          }).catch(() => {})
+          return res.status(201).json({
+            success: true,
+            message: '订单创建成功',
+            data: responseData
+          })
+        }
+        // 极端场景：冲突来源行尚未提交/已回滚导致查不到，沿用原 500 口径让客户端重试
         return res.status(500).json({
           success: false,
           message: '生成订单号失败，请稍后重试'
         })
       }
 
-      /**
-       * 防超卖核心：用条件 UPDATE 原子扣库存。
-       *   UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty
-       * 受影响行 0 即视为库存不足；事务回滚整单。
-       * 扣减清单先按 product_id 合并（买赠赠品行与正价行同品时合扣，如买 3 赠 1 扣 4），
-       * 再按 product_id 升序遍历：所有写路径（下单扣减/取消回补/超时清扫回补）
-       * 按同一全局顺序获取 Product 行锁，消除 AB-BA 死锁；
-       * OrderItem 落库仍用客户端原始顺序 + 赠品行追加在后（见下方 bulkCreate），不影响订单项展示顺序契约
-       */
-      const stockDeductionMap = new Map()
-      for (const orderItem of orderItems) {
-        const entry = stockDeductionMap.get(orderItem.product_id) ||
-          { product_id: orderItem.product_id, quantity: 0, name: orderItem.product_name_zh }
-        entry.quantity += parseInt(orderItem.quantity, 10)
-        stockDeductionMap.set(orderItem.product_id, entry)
-      }
-      const stockDeductionOrder = [...stockDeductionMap.values()].sort((a, b) => a.product_id - b.product_id)
-      for (const entry of stockDeductionOrder) {
-        const [affected] = await Product.update(
-          { stock: sequelize.literal(`stock - ${entry.quantity}`) },
-          {
-            where: {
-              id: entry.product_id,
-              stock: { [Op.gte]: entry.quantity }
-            },
-            transaction
-          }
-        )
-        if (!affected) {
-          await transaction.rollback()
-          transaction = null
-          return res.status(400).json({
-            success: false,
-            message: `商品 ${entry.name} 库存不足（商品 ID ${entry.product_id}）`
-          })
-        }
-      }
-
-      // 订单项一次性写入（保持客户端提交顺序；避免循环 N 次插入）
-      const orderItemRows = orderItems.map(orderItem => ({ order_id: order.id, ...orderItem }))
-      if (orderItemRows.length > 0) {
-        await OrderItem.bulkCreate(orderItemRows, { transaction })
-      }
-
-      /**
-       * 抵扣券核销占位（同事务）：条件 UPDATE 是并发的唯一闸门——
-       * 预检/计价在事务外完成，同券双下单时负方在此受影响行=0，
-       * 整单回滚报 400；胜方提交前负方会被行锁阻塞到胜方提交后重估 WHERE，不会双双核销
-       */
-      if (userCoupon && priced && priced.applied_coupon) {
-        const [affected] = await UserCoupon.update(
-          { status: 'used', used_by_order_id: order.id, used_at: new Date() },
-          { where: { id: userCoupon.id, user_id: userId, status: 'unused' }, transaction }
-        )
-        if (!affected) {
-          await transaction.rollback()
-          transaction = null
-          return res.status(400).json({
-            success: false,
-            message: '抵扣券不可用或已被使用'
-          })
-        }
-      }
-
-      // 订单促销快照（同事务）：每个命中的满减一条；券抵扣一行（user_coupon_id + 名称/面额快照），供订单详情/对账追溯
-      const promotionRows = []
-      if (priced && priced.applied_promotions.length > 0) {
-        for (const p of priced.applied_promotions) {
-          promotionRows.push({
-            order_id: order.id,
-            promotion_id: p.promotion_id,
-            name: p.name,
-            amount: p.amount
-          })
-        }
-      }
-      if (priced && priced.applied_coupon) {
-        promotionRows.push({
-          order_id: order.id,
-          promotion_id: null,
-          user_coupon_id: priced.applied_coupon.user_coupon_id,
-          name: priced.applied_coupon.name,
-          amount: priced.applied_coupon.amount
-        })
-      }
-      if (promotionRows.length > 0) {
-        await OrderPromotion.bulkCreate(promotionRows, { transaction })
-      }
-
-      if (paymentMethod === 'points') {
-        await pointsService.redeemPointsForOrder(transaction, {
-          userId,
-          orderId: order.id,
-          points: pointsPurchaseTotal,
-          note: `积分换购 ${order.order_no}`
-        })
-      }
-
-      // 清空用户购物车（如果订单来自购物车）
-      if (req.body.clear_cart) {
-        await Cart.destroy({
-          where: { user_id: userId },
-          transaction
-        })
-      }
-
-      // 为游客用户创建默认地址（复用统一逻辑）
-      if (isGuestOrder) {
-        // 将完整手机号切分为国家区号与本地号
-        let contact_country_code = '+66'
-        let phoneNumber = contact_phone
-        const supportedCodes = ['+86', '+66', '+60']
-        for (const code of supportedCodes) {
-          if (contact_phone.startsWith(code)) {
-            contact_country_code = code
-            phoneNumber = contact_phone.substring(code.length)
-            break
-          }
-        }
-
-        await createUserAddress(
-          {
-            userId,
-            contact_name,
-            contact_country_code,
-            contact_phone: phoneNumber,
-            province,
-            city,
-            district,
-            detail_address,
-            postal_code,
-            is_default: true,
-            address_type: 'home'
-          },
-          transaction
-        )
-      }
-
-      // COD 单在下单事务内直接发积分（与库存/订单同生共死；发放失败整单回滚，客户端可安全重试；
-      // 若在提交后独立事务发放，取消窗口内 revoke 会查不到 earn 流水，用户白得积分）
-      // 发放口径：floor(折后实付 THB × points_earn_rate)，为 0 不发
-      if (paymentMethod !== 'points' && paymentMethod !== 'online' && userId) {
-        const earnPoints = calcPointsEarn(totalAmountThb, pointsEarnRate)
-        if (earnPoints > 0) {
-          await pointsService.grantPurchasePoints(userId, order.id, earnPoints, { transaction })
-        }
-      }
-
-      await transaction.commit()
-      // 提交成功后事务已结束：置空避免 catch 对已提交事务再执行 rollback 而二次抛错
-      transaction = null
-
       // 返回创建的订单信息（含订单项；游客单附带账号与 token）
-      const responseData = await buildCreateOrderResponseData(order.id, { userId, isGuestOrder })
+      const responseData = await buildCreateOrderResponseData(result.orderId, { userId, isGuestOrder })
 
       AuditLog.logUser({
         user: req.user || (isGuestOrder ? { id: userId } : null),
         event: isGuestOrder ? 'order.create.guest' : 'order.create',
         resource: 'order',
-        resourceId: order.id,
+        resourceId: result.orderId,
         detail: {
           payment_method: paymentMethod,
           item_count: items.length,
-          total_amount: order.total_amount
+          total_amount: result.totalAmount
         },
         req
       }).catch(() => {})
@@ -853,10 +868,6 @@ class OrderController {
       })
 
     } catch (error) {
-      // 事务可能未开启（预检阶段抛错）或已回滚/已提交：兜底回滚需容错，避免 catch 内二次抛错
-      if (transaction) {
-        await transaction.rollback().catch(() => {})
-      }
       logger.error('创建订单失败', { err: error?.message, stack: error?.stack })
       // 计价引擎等业务校验抛出的 400 错误（商品不存在/已下架/数量无效）原样透传
       if (error && error.status === 400) {
@@ -1325,30 +1336,40 @@ class OrderController {
       }
 
       // 服务端统计：基于当前筛选条件（不含分页），供管理端订单页统计卡片使用
-      // todayAmount 取"今日 0 点起"与筛选条件中 created_at 范围的交集
+      // 三条聚合合并为单次查询（PG FILTER 语法），语义与原三条独立查询严格一致：
+      //   completed   —— 原实现 {...where, status:'completed'} 会覆盖用户的 status 筛选，
+      //                  故统计基准 where 剔除 status，completed 用 FILTER 独立计；
+      //   totalAmount —— 尊重用户 status 筛选（有筛选时 FILTER 叠加 status 条件）；
+      //   todayAmount —— "今日 0 点起"与筛选条件中 created_at 范围的交集，FILTER 追加 created_at 下限
+      // status/todayStart 均经 sequelize.escape 转义后才进 literal，防注入
       const toFiniteNumber = (v) => {
         const n = Number(v)
         return Number.isFinite(n) ? n : 0
       }
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
-      const todayWhere = {
-        ...where,
-        created_at: {
-          ...(where.created_at && typeof where.created_at === 'object' ? where.created_at : {}),
-          [Op.gte]: todayStart
-        }
-      }
-      const [completedCount, totalAmountRaw, todayAmountRaw] = await Promise.all([
-        Order.count({ where: { ...where, status: 'completed' } }),
-        Order.sum('total_amount_thb', { where }),
-        Order.sum('total_amount_thb', { where: todayWhere })
-      ])
+      const statsWhere = { ...where }
+      delete statsWhere.status
+      const statusLit = status ? sequelize.escape(String(status)) : null
+      const todayLit = sequelize.escape(todayStart)
+      const totalAmountFilter = statusLit ? ` FILTER (WHERE status = ${statusLit})` : ''
+      const todayAmountFilter = statusLit
+        ? ` FILTER (WHERE created_at >= ${todayLit} AND status = ${statusLit})`
+        : ` FILTER (WHERE created_at >= ${todayLit})`
+      const [statsRow] = await Order.findAll({
+        attributes: [
+          [sequelize.literal(`COUNT(*) FILTER (WHERE status = 'completed')`), 'completed'],
+          [sequelize.literal(`COALESCE(SUM(total_amount_thb)${totalAmountFilter}, 0)`), 'totalAmount'],
+          [sequelize.literal(`COALESCE(SUM(total_amount_thb)${todayAmountFilter}, 0)`), 'todayAmount']
+        ],
+        where: statsWhere,
+        raw: true
+      })
       const stats = {
         total: toFiniteNumber(count),
-        completed: toFiniteNumber(completedCount),
-        totalAmount: toFiniteNumber(totalAmountRaw),
-        todayAmount: toFiniteNumber(todayAmountRaw)
+        completed: toFiniteNumber(statsRow?.completed),
+        totalAmount: toFiniteNumber(statsRow?.totalAmount),
+        todayAmount: toFiniteNumber(statsRow?.todayAmount)
       }
 
       res.json({
@@ -1372,55 +1393,68 @@ class OrderController {
   }
 
   // 管理员更新订单状态（状态白名单 + 状态机校验 + 取消回补，全部在同一事务内）
+  // 事务整体包 withDeadlockRetry：40P01/40001 时重建事务重跑；业务校验失败返回
+  // { ok:false, status, message } 不触发重试，res 响应一律在事务外发出
   static async updateOrderStatus(req, res) {
-    const transaction = await sequelize.transaction()
+    const { id } = req.params
+    const { status } = req.body
 
     try {
-      const { id } = req.params
-      const { status } = req.body
+      const result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          if (!ORDER_STATUS_VALUES.includes(status)) {
+            await transaction.rollback()
+            return {
+              ok: false,
+              status: 400,
+              message: `无效的订单状态：${status}（合法值：${ORDER_STATUS_VALUES.join('/')}）`
+            }
+          }
 
-      if (!ORDER_STATUS_VALUES.includes(status)) {
-        await transaction.rollback()
-        return res.status(400).json({
-          success: false,
-          message: `无效的订单状态：${status}（合法值：${ORDER_STATUS_VALUES.join('/')}）`
-        })
-      }
+          // 行锁防并发双转移
+          const order = await Order.findByPk(id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          })
+          if (!order) {
+            await transaction.rollback()
+            return { ok: false, status: 404, message: '订单不存在' }
+          }
 
-      // 行锁防并发双转移
-      const order = await Order.findByPk(id, {
-        transaction,
-        lock: transaction.LOCK.UPDATE
+          const fromStatus = order.status
+          const allowedTargets = ORDER_STATUS_TRANSITIONS[fromStatus] || []
+          if (!allowedTargets.includes(status)) {
+            await transaction.rollback()
+            return {
+              ok: false,
+              status: 400,
+              message: `订单状态不允许从「${fromStatus}」变更为「${status}」`
+            }
+          }
+
+          // 进入 cancelled 时回补库存与积分（原状态在此不可能是 cancelled，状态机已拦截）
+          if (status === 'cancelled') {
+            order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
+            await restoreOrderResources(order, transaction)
+          }
+
+          await order.update({ status }, { transaction })
+          await transaction.commit()
+          return { ok: true, orderId: order.id }
+        } catch (e) {
+          // 死锁等其余错误回滚后上抛给 withDeadlockRetry 判定（40P01/40001 重建事务，其余透出）
+          await transaction.rollback().catch(() => {})
+          throw e
+        }
       })
-      if (!order) {
-        await transaction.rollback()
-        return res.status(404).json({
-          success: false,
-          message: '订单不存在'
-        })
-      }
 
-      const fromStatus = order.status
-      const allowedTargets = ORDER_STATUS_TRANSITIONS[fromStatus] || []
-      if (!allowedTargets.includes(status)) {
-        await transaction.rollback()
-        return res.status(400).json({
-          success: false,
-          message: `订单状态不允许从「${fromStatus}」变更为「${status}」`
-        })
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message })
       }
-
-      // 进入 cancelled 时回补库存与积分（原状态在此不可能是 cancelled，状态机已拦截）
-      if (status === 'cancelled') {
-        order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
-        await restoreOrderResources(order, transaction)
-      }
-
-      await order.update({ status }, { transaction })
-      await transaction.commit()
 
       // 返回更新后的订单（含 items）
-      const updatedOrder = await Order.findByPk(order.id, {
+      const updatedOrder = await Order.findByPk(result.orderId, {
         include: [
           {
             model: OrderItem,
@@ -1441,7 +1475,6 @@ class OrderController {
       })
 
     } catch (error) {
-      await transaction.rollback()
       logger.error('更新订单状态失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
@@ -1451,72 +1484,84 @@ class OrderController {
   }
 
   // 管理员删除订单
+  // 事务整体包 withDeadlockRetry：40P01/40001 时重建事务重跑；订单不存在返回
+  // { ok:false, 404 } 不触发重试，res 响应一律在事务外发出
   static async deleteOrder(req, res) {
-    const transaction = await sequelize.transaction()
-    
+    const { id } = req.params
+
     try {
-      const { id } = req.params
+      const result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          const order = await Order.findByPk(id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          })
 
-      const order = await Order.findByPk(id, {
-        transaction,
-        lock: transaction.LOCK.UPDATE
+          if (!order) {
+            await transaction.rollback()
+            return { ok: false, status: 404, message: '订单不存在' }
+          }
+
+          order.items = await OrderItem.findAll({ where: { order_id: id }, transaction })
+
+          // 保存订单信息用于日志记录
+          const orderInfo = {
+            id: order.id,
+            order_no: order.order_no,
+            user_id: order.user_id,
+            total_amount: order.total_amount,
+            status: order.status,
+            items_count: order.items ? order.items.length : 0
+          }
+
+          /**
+           * 仅未履约状态（pending/paid/shipping）删除才回补库存与积分；
+           * shipped/delivered/completed 已发货或已履约，直接删除不回补（避免库存/积分虚增）；
+           * cancelled 在状态变更为取消时已回补过，不在此重复回补
+           */
+          if (RESTORE_ON_DELETE_STATUSES.includes(order.status)) {
+            await restoreOrderResources(order, transaction)
+          }
+
+          // 先清理积分流水：order_id FK 为 ON DELETE SET NULL，直接删单会把流水 order_id 静默置 NULL、断审计链
+          await PointTransaction.destroy({
+            where: { order_id: id },
+            transaction
+          })
+
+          // 清理订单促销快照：order_promotions 无 DB 级联，随单硬删在此显式处理
+          await OrderPromotion.destroy({
+            where: { order_id: id },
+            transaction
+          })
+
+          // 先删除订单项
+          if (order.items && order.items.length > 0) {
+            await OrderItem.destroy({
+              where: { order_id: id },
+              transaction
+            })
+          }
+
+          // 再删除订单
+          await order.destroy({ transaction })
+
+          // 提交事务
+          await transaction.commit()
+          return { ok: true, orderInfo }
+        } catch (e) {
+          // 死锁等其余错误回滚后上抛给 withDeadlockRetry 判定（40P01/40001 重建事务，其余透出）
+          await transaction.rollback().catch(() => {})
+          throw e
+        }
       })
 
-      if (!order) {
-        await transaction.rollback()
-        return res.status(404).json({
-          success: false,
-          message: '订单不存在'
-        })
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message })
       }
 
-      order.items = await OrderItem.findAll({ where: { order_id: id }, transaction })
-
-      // 保存订单信息用于日志记录
-      const orderInfo = {
-        id: order.id,
-        order_no: order.order_no,
-        user_id: order.user_id,
-        total_amount: order.total_amount,
-        status: order.status,
-        items_count: order.items ? order.items.length : 0
-      }
-
-      /**
-       * 仅未履约状态（pending/paid/shipping）删除才回补库存与积分；
-       * shipped/delivered/completed 已发货或已履约，直接删除不回补（避免库存/积分虚增）；
-       * cancelled 在状态变更为取消时已回补过，不在此重复回补
-       */
-      if (RESTORE_ON_DELETE_STATUSES.includes(order.status)) {
-        await restoreOrderResources(order, transaction)
-      }
-
-      // 先清理积分流水：order_id FK 为 ON DELETE SET NULL，直接删单会把流水 order_id 静默置 NULL、断审计链
-      await PointTransaction.destroy({
-        where: { order_id: id },
-        transaction
-      })
-
-      // 清理订单促销快照：order_promotions 无 DB 级联，随单硬删在此显式处理
-      await OrderPromotion.destroy({
-        where: { order_id: id },
-        transaction
-      })
-
-      // 先删除订单项
-      if (order.items && order.items.length > 0) {
-        await OrderItem.destroy({
-          where: { order_id: id },
-          transaction
-        })
-      }
-
-      // 再删除订单
-      await order.destroy({ transaction })
-
-      // 提交事务
-      await transaction.commit()
-
+      const { orderInfo } = result
       res.json({
         success: true,
         message: '订单删除成功',
@@ -1528,7 +1573,6 @@ class OrderController {
       })
 
     } catch (error) {
-      await transaction.rollback()
       logger.error('删除订单失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,

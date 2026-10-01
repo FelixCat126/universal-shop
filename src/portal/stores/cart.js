@@ -394,6 +394,8 @@ export const useCartStore = defineStore('cart', () => {
   // 检查商品库存
   const checkStock = async () => {
     try {
+      // 游客购物车有实际调整时需要落盘，否则刷新后调整失效
+      let changed = false
       const productIds = items.value.filter(item => item.product_id).map(item => item.product_id)
       if (productIds.length) {
         const response = await api.post('/products/check-stock', { productIds })
@@ -410,6 +412,7 @@ export const useCartStore = defineStore('cart', () => {
               // 如果库存不足，调整数量
               if (item.quantity > stock.stock) {
                 item.quantity = stock.stock
+                changed = true
               }
             }
           })
@@ -431,6 +434,7 @@ export const useCartStore = defineStore('cart', () => {
               // 如果可售套数不足，调整数量
               if (Number.isFinite(stock) && item.quantity > stock) {
                 item.quantity = Math.max(stock, 0)
+                changed = true
               }
             })
           }
@@ -440,6 +444,7 @@ export const useCartStore = defineStore('cart', () => {
       }
 
       // 移除没有库存的商品与售罄套餐（失效项保留展示，由用户手动移除）
+      const beforeCount = items.value.length
       items.value = items.value.filter(item => {
         if (item.bundle_id) {
           if (!item.bundle) return true
@@ -448,6 +453,13 @@ export const useCartStore = defineStore('cart', () => {
         }
         return !item.product || item.product.stock > 0
       })
+      if (items.value.length !== beforeCount) changed = true
+
+      // 登录态购物车由服务端保存，无需本地落盘
+      const userStore = useUserStore()
+      if (changed && !userStore.isLoggedIn) {
+        saveGuestCart()
+      }
 
       return { success: true }
     } catch (error) {

@@ -16,7 +16,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, waitForCondition } from '../helpers/test-helpers.js'
 import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
 import { clearResponseCache } from '@server/utils/responseCache.js'
 import { _resetLoginGuardForTests } from '@server/middlewares/loginGuard.js'
@@ -118,8 +118,11 @@ describe('P4.crossSurface', () => {
     expect(list.status).toBe(200)
     expect(list.body.data.orders.find((o) => o.partner_id === partner.id)).toBeTruthy()
 
-    await new Promise((r) => setTimeout(r, 200))
-    const after = await AuditLog.count({ where: { event: 'partner_order.create' } })
+    // AuditLog 为 fire-and-forget 异步写库，轮询等待计数增长（替代固定 sleep）
+    const after = await waitForCondition(async () => {
+      const n = await AuditLog.count({ where: { event: 'partner_order.create' } })
+      return n > before ? n : false
+    })
     expect(after).toBeGreaterThan(before)
   })
 
@@ -188,8 +191,11 @@ describe('P4.crossSurface', () => {
       contact_name: 'X', contact_phone: '1', delivery_address: 'A', exchange_rate: 1
     })
     await request(app).delete(`/api/admin/orders/${o.id}`).set('Authorization', `Bearer ${aToken}`)
-    await new Promise((r) => setTimeout(r, 250))
-    const cnt = await OperationLog.count({ where: { action: 'delete_order' } })
+    // logOperation 是 setImmediate 异步写库，轮询等待落库（替代固定 sleep）
+    const cnt = await waitForCondition(async () => {
+      const n = await OperationLog.count({ where: { action: 'delete_order' } })
+      return n >= 1 ? n : false
+    })
     expect(cnt).toBeGreaterThanOrEqual(1)
   })
 
@@ -201,10 +207,13 @@ describe('P4.crossSurface', () => {
       .set('Authorization', `Bearer ${aToken}`)
       .send({ password: 'NewOpPwd#5678' })
 
-    await new Promise((r) => setTimeout(r, 250))
+    // logOperation 是 setImmediate 异步写库，轮询等待落库（替代固定 sleep）
     const sequelize = TestDatabase.getSequelize()
     const { OperationLog } = sequelize.models
-    const cnt = await OperationLog.count({ where: { action: 'reset_password' } })
+    const cnt = await waitForCondition(async () => {
+      const n = await OperationLog.count({ where: { action: 'reset_password' } })
+      return n >= 1 ? n : false
+    })
     expect(cnt).toBeGreaterThanOrEqual(1)
   })
 
@@ -214,10 +223,13 @@ describe('P4.crossSurface', () => {
       .send({ key: 'currency_unit', value: 'CNY' })
     await request(app).delete('/api/system-config/currency_unit').set('Authorization', `Bearer ${aToken}`)
 
-    await new Promise((r) => setTimeout(r, 250))
+    // logOperation 是 setImmediate 异步写库，轮询等待落库（替代固定 sleep）
     const sequelize = TestDatabase.getSequelize()
     const { OperationLog } = sequelize.models
-    const cnt = await OperationLog.count({ where: { action: 'delete', resource: 'system_config' } })
+    const cnt = await waitForCondition(async () => {
+      const n = await OperationLog.count({ where: { action: 'delete', resource: 'system_config' } })
+      return n >= 1 ? n : false
+    })
     expect(cnt).toBeGreaterThanOrEqual(1)
   })
 

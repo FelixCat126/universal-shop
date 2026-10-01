@@ -300,7 +300,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showTemplateDialog = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" @click="saveTemplate">
+          <el-button type="primary" :loading="saving" @click="saveTemplate">
             {{ isEditing ? t('coupons.updateTemplate') : t('coupons.addTemplate') }}
           </el-button>
         </span>
@@ -373,6 +373,7 @@ import { productAPI } from '../api/products.js'
 const { t } = useI18n()
 
 const loading = ref(false)
+const saving = ref(false)
 const showTemplateDialog = ref(false)
 const isEditing = ref(false)
 const currentPage = ref(1)
@@ -530,9 +531,19 @@ const buildPayload = () => {
   }
 }
 
+// 弹窗选项（分类 + 商品）懒加载：首次打开对话框时才拉取，只拉一次
+let dialogOptionsPromise = null
+const ensureDialogOptions = () => {
+  if (!dialogOptionsPromise) {
+    dialogOptionsPromise = Promise.all([loadCategoryOptions(), loadProductOptions()])
+  }
+  return dialogOptionsPromise
+}
+
 const showAddDialog = () => {
   isEditing.value = false
   resetTemplateForm()
+  ensureDialogOptions()
   setTimeout(() => {
     showTemplateDialog.value = true
   }, 10)
@@ -540,6 +551,7 @@ const showAddDialog = () => {
 
 const editTemplate = (row) => {
   isEditing.value = true
+  ensureDialogOptions()
   const scope = parseMaybeJson(row.scope, {})
   Object.assign(templateForm, {
     id: row.id,
@@ -581,7 +593,7 @@ const resetTemplateForm = () => {
 }
 
 const saveTemplate = async () => {
-  if (!templateFormRef.value) return
+  if (!templateFormRef.value || saving.value) return
 
   try {
     await templateFormRef.value.validate()
@@ -601,6 +613,8 @@ const saveTemplate = async () => {
       }
     )
 
+    // 确认后禁用保存按钮，防止请求期间重复提交
+    saving.value = true
     const payload = buildPayload()
     const response = isEditing.value
       ? await couponAPI.update(templateForm.id, payload)
@@ -620,6 +634,8 @@ const saveTemplate = async () => {
     if (error === 'cancel') return
     console.error('保存券模板失败:', error)
     ElMessage.error(t('coupons.messages.saveFailed') + ': ' + (error.response?.data?.message || error.message))
+  } finally {
+    saving.value = false
   }
 }
 
@@ -782,7 +798,7 @@ const loadProductOptions = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadCategoryOptions(), loadProductOptions()])
+  // 弹窗选项（分类/商品）改为首次打开对话框时懒加载，见 ensureDialogOptions
   await loadTemplates()
 })
 </script>

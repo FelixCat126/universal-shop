@@ -19,11 +19,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 const { usePortalCurrencyStore } = await import('@portal/stores/portalCurrency.js')
+const { resetPublicConfigCache } = await import('@/utils/publicConfig.js')
 
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
   vi.unstubAllGlobals()
+  // loadRates 走 publicConfig 模块级缓存，用例间需重置避免串数据
+  resetPublicConfigCache()
 })
 
 describe('VS.store.portalCurrency', () => {
@@ -35,7 +38,7 @@ describe('VS.store.portalCurrency', () => {
   it('PC-2 loadRates 成功 → rates 更新', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ data: { exchange_rates: { USD: '0.03', CNY: '0.20', MYR: '0.13' } } })
+      json: async () => ({ success: true, data: { exchange_rates: { USD: '0.03', CNY: '0.20', MYR: '0.13' } } })
     }))
     const c = usePortalCurrencyStore()
     await c.loadRates()

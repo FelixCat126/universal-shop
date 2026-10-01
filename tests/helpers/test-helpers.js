@@ -242,3 +242,47 @@ export class TestHelpers {
     return `test${timestamp}${random}@example.com`
   }
 }
+
+// 轮询等待条件成立：每 interval 调一次 fn()，返回 truthy 即返回该值；超时抛出带上下文的错误。
+// 用于替代固定 sleep 等待 fire-and-forget 异步写库（AuditLog/OperationLog），消除 CI 高负载下的偶发红。
+export async function waitForCondition(fn, { timeout = 3000, interval = 100 } = {}) {
+  const deadline = Date.now() + timeout
+  let lastValue
+  let lastError
+  while (true) {
+    try {
+      lastValue = await fn()
+      lastError = undefined
+      if (lastValue) return lastValue
+    } catch (err) {
+      lastError = err
+    }
+    if (Date.now() >= deadline) {
+      const detail = lastError
+        ? `最后一次调用抛错: ${lastError.message}`
+        : `最后一次返回: ${JSON.stringify(lastValue)}`
+      throw new Error(`waitForCondition 超时（${timeout}ms 内条件未满足），${detail}`)
+    }
+    await new Promise((r) => setTimeout(r, interval))
+  }
+}
+
+/**
+ * 单实例 HTTP server 包装：洪峰/并发测试专用。
+ * supertest 的 request(app) 每个请求都新建/销毁一个 ephemeral server，
+ * 几十到几百次快速调用在高负载下会偶发 ECONNRESET / 串端口 404；
+ * 这里手动 listen 一次、请求走固定端口，结束后关闭。
+ */
+export async function withHttpServer (app, fn) {
+  const server = app.listen(0)
+  await new Promise((resolve, reject) => {
+    server.once('listening', resolve)
+    server.once('error', reject)
+  })
+  const baseUrl = `http://127.0.0.1:${server.address().port}`
+  try {
+    return await fn(baseUrl)
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+}

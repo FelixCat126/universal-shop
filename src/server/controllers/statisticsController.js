@@ -1,9 +1,21 @@
 import { Op } from 'sequelize'
+import { LRUCache } from 'lru-cache'
 import sequelize from '../config/database.js'
 import User from '../models/User.js'
 import Order from '../models/Order.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
+
+/**
+ * 综合统计进程内短缓存（TTL 15s）：
+ * dashboard 高频刷新摊薄全表聚合（含活跃用户 last_login_at 无索引扫描——保留原逻辑，
+ * 靠本缓存摊薄，不为此加索引）。
+ * 失效取舍：订单/用户写入后不主动清，最长 15s 读到旧值，dashboard 场景可接受；
+ * 键含查询参数（当前端点无参数，保留扩展位）。
+ * 测试环境旁路：测试库 beforeEach 清库，缓存会跨用例泄漏计数。
+ */
+const comprehensiveCache = new LRUCache({ max: 50, ttl: 15_000 })
+const isTestEnv = process.env.NODE_ENV === 'test'
 
 /**
  * 趋势统计按"服务器本地时区"的自然日分桶，SQL 与 JS 两侧口径必须一致：
@@ -36,32 +48,33 @@ class StatisticsController {
   // 获取统计总览数据
   static async getOverviewStats(req, res) {
     try {
-      // 获取总订单数
-      const totalOrders = await Order.count()
-      
-      // 获取总金额数
-      const totalAmountResult = await Order.findOne({
-        attributes: [
-          [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
-        ]
-      })
-      const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
-      
-      // 获取总用户数
-      const totalUsers = await User.count()
-      
       // 获取近七天活跃用户数（近七天内有登录记录的）
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      
-      const activeUsers = await User.count({
-        where: {
-          last_login_at: {
-            [Op.gte]: sevenDaysAgo,
-            [Op.ne]: null
+
+      // 四条聚合相互独立：并行执行，总耗时从串行求和降为单条最大
+      const [totalOrders, totalAmountResult, totalUsers, activeUsers] = await Promise.all([
+        // 总订单数
+        Order.count(),
+        // 总金额数
+        Order.findOne({
+          attributes: [
+            [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
+          ]
+        }),
+        // 总用户数
+        User.count(),
+        // 近七天活跃用户数
+        User.count({
+          where: {
+            last_login_at: {
+              [Op.gte]: sevenDaysAgo,
+              [Op.ne]: null
+            }
           }
-        }
-      })
+        })
+      ])
+      const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
 
       res.json({
         success: true,
@@ -191,6 +204,20 @@ class StatisticsController {
   // 获取综合统计数据（包含总览和趋势）
   static async getComprehensiveStats(req, res) {
     try {
+      // 键含全部查询参数（排序后序列化，与参数顺序无关）；命中直接返回
+      const cacheKey = JSON.stringify(
+        Object.keys(req.query || {}).sort().map(k => [k, req.query[k]])
+      )
+      if (!isTestEnv) {
+        const cached = comprehensiveCache.get(cacheKey)
+        if (cached) {
+          return res.json({
+            success: true,
+            data: cached
+          })
+        }
+      }
+
       // 并行获取所有统计数据
       const [overviewStats, orderTrend, userTrend] = await Promise.all([
         StatisticsController.getOverviewStatsData(),
@@ -198,13 +225,16 @@ class StatisticsController {
         StatisticsController.getUserRegistrationTrendData()
       ])
 
+      const data = {
+        overview: overviewStats,
+        orderTrend,
+        userTrend
+      }
+      if (!isTestEnv) comprehensiveCache.set(cacheKey, data)
+
       res.json({
         success: true,
-        data: {
-          overview: overviewStats,
-          orderTrend,
-          userTrend
-        }
+        data
       })
     } catch (error) {
       logger.error('获取综合统计失败', { err: error?.message, stack: error?.stack })

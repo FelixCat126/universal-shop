@@ -210,11 +210,10 @@ describe('P1-Supplement.productEdge', () => {
     expect(res.status).toBe(400)
   })
 
-  it('P1-13 checkStock productIds=[] → 200 数组', async () => {
+  it('P1-13 checkStock productIds=[] → 400（数组下限 1，防空查询）', async () => {
     const res = await request(app).post('/api/products/check-stock')
       .send({ productIds: [] })
-    expect(res.status).toBe(200)
-    expect(Array.isArray(res.body.data)).toBe(true)
+    expect(res.status).toBe(400)
   })
 
   it('P1-14 restoreProduct 未下架 → 400', async () => {

@@ -13,6 +13,8 @@ import { Sequelize } from 'sequelize'
  *   PG_POOL_ACQUIRE_MS    取连接超时（默认 30000）
  *   PG_POOL_IDLE_MS       空闲回收（默认 10000）
  *   PG_SSL                'true' 启用 SSL（云数据库一般需要）
+ *   PG_STATEMENT_TIMEOUT          单条 SQL 超时毫秒（默认 15000）
+ *   PG_IDLE_IN_TX_TIMEOUT         事务空闲超时毫秒（默认 10000）
  *
  * 本地开发：可执行 `docker compose up -d postgres` 启动随仓库附带的 PG 实例，
  * 见 docker-compose.yml。.env.example 已附默认连接串。
@@ -47,9 +49,14 @@ const sequelize = new Sequelize(url, {
     freezeTableName: true,
     underscored: true
   },
-  dialectOptions: useSsl
-    ? { ssl: { require: true, rejectUnauthorized: false } }
-    : {}
+  // 语句级保护：pg 驱动把这两个 GUC 作为连接启动参数下发（毫秒整数）——
+  // 慢 SQL 超 15s、事务空闲超 10s 由 PG 侧中断，防止悬挂查询/事务占满连接池；
+  // 生产可用 PG_STATEMENT_TIMEOUT / PG_IDLE_IN_TX_TIMEOUT 覆盖；测试环境同值（现有最长用例远低于此）
+  dialectOptions: {
+    statement_timeout: parseInt(process.env.PG_STATEMENT_TIMEOUT || '15000', 10),
+    idle_in_transaction_session_timeout: parseInt(process.env.PG_IDLE_IN_TX_TIMEOUT || '10000', 10),
+    ...(useSsl ? { ssl: { require: true, rejectUnauthorized: false } } : {})
+  }
 })
 
 export default sequelize

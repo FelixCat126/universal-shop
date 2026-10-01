@@ -13,6 +13,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import AuditLog from '@server/models/AuditLog.js'
 import { TestDatabase } from '../setup/test-database.js'
+import { waitForCondition } from '../helpers/test-helpers.js'
 import { issueCaptcha, verifyCaptcha } from '@server/utils/captcha.js'
 import {
   FAIL_THRESHOLD_VALUE,
@@ -215,9 +216,11 @@ describe('T-S5 AuditLog 写入', () => {
     await request(app)
       .post('/api/users/login')
       .send({ country_code: '+86', phone, password: 'definitely-wrong-pwd' })
-    // 给一点时间让异步 catch().then 完成
-    await new Promise(r => setTimeout(r, 200))
-    const after = await AuditLog.count({ where: { event: 'user.login.fail' } })
+    // AuditLog 为 fire-and-forget 异步写库，轮询等待计数增长（替代固定 sleep）
+    const after = await waitForCondition(async () => {
+      const n = await AuditLog.count({ where: { event: 'user.login.fail' } })
+      return n > before ? n : false
+    })
     expect(after).toBeGreaterThan(before)
   })
 
@@ -233,8 +236,11 @@ describe('T-S5 AuditLog 写入', () => {
         password: 'StrongPass#1234'
       })
     expect([200, 201]).toContain(res.status)
-    await new Promise(r => setTimeout(r, 200))
-    const after = await AuditLog.count({ where: { event: 'user.register.success' } })
+    // AuditLog 为 fire-and-forget 异步写库，轮询等待计数增长（替代固定 sleep）
+    const after = await waitForCondition(async () => {
+      const n = await AuditLog.count({ where: { event: 'user.register.success' } })
+      return n > before ? n : false
+    })
     expect(after).toBeGreaterThan(before)
   })
 })

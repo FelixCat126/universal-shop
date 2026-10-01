@@ -4,6 +4,7 @@ import BundleItem from '../models/BundleItem.js'
 import Product from '../models/Product.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { logger } from '../utils/logger.js'
+import { clearResponseCache } from '../utils/responseCache.js'
 
 /** 列表/详情统一的组件 include（含组件商品名/价/库存，供后台展示） */
 const ITEMS_INCLUDE = [{
@@ -94,6 +95,8 @@ class BundleAdminController {
         { transaction }
       )
       await transaction.commit()
+      // 组合包变更后清 GET 响应缓存，公开列表/详情（15s 缓存）立即读到新数据
+      clearResponseCache()
 
       const created = await Bundle.findByPk(bundle.id, { include: ITEMS_INCLUDE })
       return res.status(201).json({ success: true, data: created })
@@ -140,6 +143,8 @@ class BundleAdminController {
         { transaction }
       )
       await transaction.commit()
+      // 组合包变更后清 GET 响应缓存
+      clearResponseCache()
 
       const updated = await Bundle.findByPk(bundle.id, { include: ITEMS_INCLUDE })
       return res.json({ success: true, data: updated })
@@ -161,6 +166,8 @@ class BundleAdminController {
         return res.status(404).json({ success: false, message: '组合包不存在' })
       }
       await bundle.update({ status: req.body.status })
+      // 上下架后清 GET 响应缓存，公开列表/详情立即反映状态
+      clearResponseCache()
       return res.json({ success: true, data: bundle })
     } catch (e) {
       logger.error('update bundle status', { err: e?.message, stack: e?.stack })
@@ -185,6 +192,8 @@ class BundleAdminController {
       await BundleItem.destroy({ where: { bundle_id: bundle.id }, transaction })
       await bundle.destroy({ transaction })
       await transaction.commit()
+      // 删除后清 GET 响应缓存
+      clearResponseCache()
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
       await transaction.rollback().catch(() => {})

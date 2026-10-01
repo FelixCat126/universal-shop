@@ -10,7 +10,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, waitForCondition } from '../helpers/test-helpers.js'
 
 beforeEach(async () => { await TestDatabase.clearAllData() })
 
@@ -66,12 +66,13 @@ describe('P3.admin.export', () => {
     await makeUserAndOrder()
     await request(app).get('/api/admin/export/users')
       .set('Authorization', `Bearer ${token}`).buffer(true)
-    // logOperation 是 setImmediate 异步，等一下
-    await new Promise((r) => setTimeout(r, 250))
-
+    // logOperation 是 setImmediate 异步写库，轮询等待落库（替代固定 sleep）
     const sequelize = TestDatabase.getSequelize()
     const { OperationLog } = sequelize.models
-    const cnt = await OperationLog.count({ where: { action: 'export' } })
+    const cnt = await waitForCondition(async () => {
+      const n = await OperationLog.count({ where: { action: 'export' } })
+      return n >= 1 ? n : false
+    })
     expect(cnt).toBeGreaterThanOrEqual(1)
   })
 })

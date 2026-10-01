@@ -9,7 +9,6 @@
               :placeholder="t('products.searchName')"
               clearable
               style="width: 200px"
-              @input="handleSearch"
             />
           </el-form-item>
           <el-form-item :label="t('products.category')">
@@ -18,7 +17,6 @@
               :placeholder="t('products.selectCategory')"
               clearable
               style="width: 180px"
-              @change="handleSearch"
             >
               <el-option
                 v-for="opt in categoryOptions"
@@ -34,7 +32,6 @@
               :placeholder="t('products.stockStatus')"
               clearable
               style="width: 140px"
-              @change="handleSearch"
             >
               <el-option :label="t('products.stockOptions.normal')" value="normal" />
               <el-option :label="t('products.stockOptions.low')" value="low" />
@@ -47,7 +44,6 @@
               :placeholder="t('products.listingFilter')"
               clearable
               style="width: 150px"
-              @change="handleSearch"
             >
               <el-option :label="t('products.listingFilterAll')" value="" />
               <el-option :label="t('products.listingFilterOnShelf')" value="on_shelf" />
@@ -395,7 +391,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showProductDialog = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" @click="saveProduct">
+          <el-button type="primary" :loading="saving" @click="saveProduct">
             {{ isEditing ? t('products.updateProduct') : t('products.addProduct') }}
           </el-button>
         </span>
@@ -462,6 +458,7 @@ export default {
 
     // 响应式数据
     const loading = ref(false)
+    const saving = ref(false)
     const showProductDialog = ref(false)
     const showStockAdjustDialog = ref(false)
     const isEditing = ref(false)
@@ -632,16 +629,16 @@ export default {
     }
 
     const saveProduct = async () => {
-      if (!productFormRef.value) return
-      
+      if (!productFormRef.value || saving.value) return
+
       try {
         await productFormRef.value.validate()
-        
+
         // 添加确认对话框
-        const confirmMessage = isEditing.value 
+        const confirmMessage = isEditing.value
           ? t('products.messages.confirmUpdate')
           : t('products.messages.confirmAdd')
-        
+
         await ElMessageBox.confirm(
           confirmMessage,
           t('common.confirm'),
@@ -651,7 +648,9 @@ export default {
             type: 'warning',
           }
         )
-        
+
+        // 确认后禁用保存按钮，防止请求期间重复提交
+        saving.value = true
         if (isEditing.value) {
           // 更新产品
           const response = await productAPI.updateProduct(productForm.id, productForm)
@@ -667,7 +666,7 @@ export default {
             loadProducts() // 重新加载产品列表
           }
         }
-        
+
         showProductDialog.value = false
         resetProductForm()
       } catch (error) {
@@ -676,6 +675,8 @@ export default {
         }
         console.error('保存产品失败:', error)
         ElMessage.error(t('products.messages.saveFailed') + ': ' + (error.response?.data?.message || error.message))
+      } finally {
+        saving.value = false
       }
     }
 
@@ -779,11 +780,14 @@ export default {
     }
 
     const handleSearch = () => {
+      // 清掉待执行的防抖，避免立即搜索后又被防抖重复触发
+      clearTimeout(searchTimeout.value)
       currentPage.value = 1
       loadProducts()
     }
 
     const resetSearch = () => {
+      clearTimeout(searchTimeout.value)
       Object.assign(searchForm, {
         name: '',
         category_id: '',
@@ -842,8 +846,12 @@ export default {
       return true
     }
 
+    // 请求序号：连续触发时仅最新一次响应生效，避免过期响应覆盖列表
+    let loadSeq = 0
+
     // 加载产品数据
     const loadProducts = async () => {
+      const seq = ++loadSeq
       try {
         loading.value = true
         const params = {
@@ -854,8 +862,9 @@ export default {
           stockStatus: searchForm.stockStatus,
           listingStatus: searchForm.listingStatus || undefined
         }
-        
+
         const response = await productAPI.getProducts(params)
+        if (seq !== loadSeq) return // 已有更新的请求在途，丢弃过期响应
         if (response.data.success) {
           products.value = response.data.data.products
           totalProducts.value = response.data.data.total
@@ -869,29 +878,28 @@ export default {
           }
         }
       } catch (error) {
+        if (seq !== loadSeq) return
         console.error('加载产品数据失败:', error)
         ElMessage.error('加载产品数据失败: ' + (error.response?.data?.message || error.message))
       } finally {
-        loading.value = false
+        if (seq === loadSeq) loading.value = false
       }
     }
+
+    // 搜索输入与下拉筛选统一走 500ms 防抖单通道（watch 触发），避免 @input/@change + watch 双发
+    const searchTimeout = ref(null)
 
     // 监听搜索条件变化
     watch(
       () => [searchForm.name, searchForm.category_id, searchForm.stockStatus, searchForm.listingStatus],
       () => {
-        // 防抖处理
         clearTimeout(searchTimeout.value)
-        if (searchForm.name) {
-          searchTimeout.value = setTimeout(() => {
-            handleSearch()
-          }, 500)
-        }
+        searchTimeout.value = setTimeout(() => {
+          handleSearch()
+        }, 500)
       },
       { deep: true }
     )
-
-    const searchTimeout = ref(null)
 
     onMounted(async () => {
       await loadCategoryOptions()
@@ -904,6 +912,7 @@ export default {
       // 数据
       defaultImage,
       loading,
+      saving,
       showProductDialog,
       showStockAdjustDialog,
       isEditing,

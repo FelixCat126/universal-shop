@@ -346,7 +346,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showPromotionDialog = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" @click="savePromotion">
+          <el-button type="primary" :loading="saving" @click="savePromotion">
             {{ isEditing ? t('promotions.updatePromotion') : t('promotions.addPromotion') }}
           </el-button>
         </span>
@@ -366,6 +366,7 @@ import { productAPI } from '../api/products.js'
 const { t } = useI18n()
 
 const loading = ref(false)
+const saving = ref(false)
 const showPromotionDialog = ref(false)
 const isEditing = ref(false)
 const currentPage = ref(1)
@@ -587,9 +588,19 @@ const buildPayload = () => {
   }
 }
 
+// 弹窗选项（分类 + 商品）懒加载：首次打开对话框时才拉取，只拉一次
+let dialogOptionsPromise = null
+const ensureDialogOptions = () => {
+  if (!dialogOptionsPromise) {
+    dialogOptionsPromise = Promise.all([loadCategoryOptions(), loadProductOptions()])
+  }
+  return dialogOptionsPromise
+}
+
 const showAddDialog = () => {
   isEditing.value = false
   resetPromotionForm()
+  ensureDialogOptions()
   setTimeout(() => {
     showPromotionDialog.value = true
   }, 10)
@@ -597,6 +608,7 @@ const showAddDialog = () => {
 
 const editPromotion = (row) => {
   isEditing.value = true
+  ensureDialogOptions()
   const rules = parseMaybeJson(row.rules, {})
   const scope = parseMaybeJson(row.scope, {})
   const scopeType = ['all', 'category', 'product'].includes(scope.type) ? scope.type : 'all'
@@ -650,7 +662,7 @@ const resetPromotionForm = () => {
 }
 
 const savePromotion = async () => {
-  if (!promotionFormRef.value) return
+  if (!promotionFormRef.value || saving.value) return
 
   try {
     await promotionFormRef.value.validate()
@@ -670,6 +682,8 @@ const savePromotion = async () => {
       }
     )
 
+    // 确认后禁用保存按钮，防止请求期间重复提交
+    saving.value = true
     const payload = buildPayload()
     const response = isEditing.value
       ? await promotionAPI.update(promotionForm.id, payload)
@@ -689,6 +703,8 @@ const savePromotion = async () => {
     if (error === 'cancel') return
     console.error('保存促销失败:', error)
     ElMessage.error(t('promotions.messages.saveFailed') + ': ' + (error.response?.data?.message || error.message))
+  } finally {
+    saving.value = false
   }
 }
 
@@ -814,7 +830,7 @@ const loadProductOptions = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadCategoryOptions(), loadProductOptions()])
+  // 弹窗选项（分类/商品）改为首次打开对话框时懒加载，见 ensureDialogOptions
   await loadPromotions()
 })
 </script>

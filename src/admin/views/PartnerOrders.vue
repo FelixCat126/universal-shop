@@ -109,7 +109,7 @@
           :total="pagination.total"
           layout="total, prev, pager, next, jumper"
           @current-change="loadOrders"
-          @size-change="loadOrders"
+          @size-change="onSizeChange"
         />
       </div>
     </el-card>
@@ -199,6 +199,12 @@ async function loadOrders () {
 }
 
 function search () {
+  pagination.page = 1
+  loadOrders()
+}
+
+// 每页条数变更：回到第 1 页再加载，避免高页码超界
+function onSizeChange () {
   pagination.page = 1
   loadOrders()
 }

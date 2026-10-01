@@ -68,7 +68,9 @@ const UserCoupon = sequelize.define('UserCoupon', {
   comment: '用户抵扣券实例表',
   indexes: [
     { fields: ['user_id', 'status'], name: 'idx_user_coupon_user_status' },
-    { fields: ['template_id'], name: 'idx_user_coupon_template_id' }
+    { fields: ['template_id'], name: 'idx_user_coupon_template_id' },
+    // 订单取消/删除/超时清扫按 used_by_order_id 释放券（restoreOrderResources 的条件 UPDATE）
+    { fields: ['used_by_order_id'], name: 'idx_user_coupons_used_by_order' }
   ]
 })
 

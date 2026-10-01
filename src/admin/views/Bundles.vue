@@ -261,7 +261,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showBundleDialog = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" @click="saveBundle">
+          <el-button type="primary" :loading="saving" @click="saveBundle">
             {{ isEditing ? t('bundles.updateBundle') : t('bundles.addBundle') }}
           </el-button>
         </span>
@@ -281,6 +281,7 @@ import { productAPI } from '../api/products.js'
 const { t } = useI18n()
 
 const loading = ref(false)
+const saving = ref(false)
 const showBundleDialog = ref(false)
 const isEditing = ref(false)
 const currentPage = ref(1)
@@ -438,9 +439,19 @@ const buildPayload = () => {
   }
 }
 
+// 弹窗商品选项懒加载：首次打开对话框时才拉取，只拉一次
+let dialogOptionsPromise = null
+const ensureDialogOptions = () => {
+  if (!dialogOptionsPromise) {
+    dialogOptionsPromise = loadProductOptions()
+  }
+  return dialogOptionsPromise
+}
+
 const showAddDialog = () => {
   isEditing.value = false
   resetBundleForm()
+  ensureDialogOptions()
   setTimeout(() => {
     showBundleDialog.value = true
   }, 10)
@@ -448,6 +459,7 @@ const showAddDialog = () => {
 
 const editBundle = (row) => {
   isEditing.value = true
+  ensureDialogOptions()
   const items = itemsOf(row)
   Object.assign(bundleForm, {
     id: row.id,
@@ -487,7 +499,7 @@ const resetBundleForm = () => {
 }
 
 const saveBundle = async () => {
-  if (!bundleFormRef.value) return
+  if (!bundleFormRef.value || saving.value) return
 
   try {
     await bundleFormRef.value.validate()
@@ -507,6 +519,8 @@ const saveBundle = async () => {
       }
     )
 
+    // 确认后禁用保存按钮，防止请求期间重复提交
+    saving.value = true
     const payload = buildPayload()
     const response = isEditing.value
       ? await bundleAPI.update(bundleForm.id, payload)
@@ -526,6 +540,8 @@ const saveBundle = async () => {
     if (error === 'cancel') return
     console.error('保存套餐失败:', error)
     ElMessage.error(t('bundles.messages.saveFailed') + ': ' + (error.response?.data?.message || error.message))
+  } finally {
+    saving.value = false
   }
 }
 
@@ -676,7 +692,7 @@ const loadProductOptions = async () => {
 }
 
 onMounted(async () => {
-  await loadProductOptions()
+  // 弹窗商品选项改为首次打开对话框时懒加载，见 ensureDialogOptions
   await loadBundles()
 })
 </script>

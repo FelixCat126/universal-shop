@@ -54,6 +54,7 @@
                     :src="itemImage(item)"
                     :alt="itemName(item)"
                     class="h-16 w-16 sm:h-20 sm:w-20 rounded-md object-cover"
+                    loading="lazy"
                   />
                 </div>
 
@@ -665,7 +666,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
 import { useUserStore } from '../../stores/user.js'
-import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
+import { usePortalCurrencyStore, loadPublicConfig } from '../../stores/portalCurrency.js'
 import { createOrder, confirmOnlinePayment as confirmOnlinePaymentApi } from '../../api/orders.js'
 import { getMyCoupons } from '../../api/coupons.js'
 import { getAddresses } from '../../api/addresses.js'
@@ -1072,20 +1073,12 @@ const getImageUrl = (imagePath) => {
   return config.buildStaticUrl(imagePath)
 }
 
-// 加载系统配置
+// 加载系统配置（共享缓存，避免与各页面重复请求）
 const loadSystemConfig = async () => {
-  try {
-    const response = await fetch(config.buildApiUrl('/api/system-config/public'))
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success) {
-        paymentQRCode.value = data.data.payment_qrcode
-        exchangeRate.value = parseFloat(data.data.exchange_rate || '0.00')
-      }
-    }
-  } catch (error) {
-    console.warn('加载系统配置失败:', error)
-    // 静默失败，不影响主要功能
+  const data = await loadPublicConfig()
+  if (data) {
+    paymentQRCode.value = data.payment_qrcode
+    exchangeRate.value = parseFloat(data.exchange_rate || '0.00')
   }
 }
 

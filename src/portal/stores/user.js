@@ -35,31 +35,38 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('user')
   }
 
-  // 检查认证状态
-  const checkAuth = async () => {
-    const savedToken = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('user')
-    
-    if (savedToken && savedUser) {
-      try {
-        token.value = savedToken
-        const parsedUser = JSON.parse(savedUser)
-        user.value = parsedUser
-        
-        // 验证token是否仍然有效
-        const response = await api.get('/auth/verify')
-        
-        // 如果验证成功，更新用户信息（确保数据一致性）
-        if (response.data.success && response.data.data.user) {
-          const verifiedUser = response.data.data.user
-          user.value = verifiedUser
-          localStorage.setItem('user', JSON.stringify(verifiedUser))
+  // 检查认证状态（并发调用共享同一进行中的 Promise，避免直开页面时与 App.vue 初始化重复验证）
+  let checkAuthPromise = null
+  const checkAuth = () => {
+    if (checkAuthPromise) return checkAuthPromise
+    checkAuthPromise = (async () => {
+      const savedToken = localStorage.getItem('token')
+      const savedUser = localStorage.getItem('user')
+
+      if (savedToken && savedUser) {
+        try {
+          token.value = savedToken
+          const parsedUser = JSON.parse(savedUser)
+          user.value = parsedUser
+
+          // 验证token是否仍然有效
+          const response = await api.get('/auth/verify')
+
+          // 如果验证成功，更新用户信息（确保数据一致性）
+          if (response.data.success && response.data.data.user) {
+            const verifiedUser = response.data.data.user
+            user.value = verifiedUser
+            localStorage.setItem('user', JSON.stringify(verifiedUser))
+          }
+        } catch (error) {
+          console.error('Token verification failed:', error)
+          clearAuth()
         }
-      } catch (error) {
-        console.error('Token verification failed:', error)
-        clearAuth()
       }
-    }
+    })().finally(() => {
+      checkAuthPromise = null
+    })
+    return checkAuthPromise
   }
 
   // 用户登录

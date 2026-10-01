@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import config from '../../config/index.js'
 import { PORTAL_CURRENCIES, formatConvertedMoney, convertThbToCurrency } from '../../utils/exchangeRatesDisplay.js'
+import { loadPublicConfig } from '../../utils/publicConfig.js'
+
+// 全站共享的 /api/system-config/public 拉取（30s 缓存 + in-flight 去重），各页面统一从这里取公开配置
+export { loadPublicConfig }
 
 const STORAGE_KEY = 'portal_currency'
 
@@ -25,10 +28,8 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
 
   async function loadRates () {
     try {
-      const response = await fetch(config.buildApiUrl('/api/system-config/public'))
-      if (!response.ok) return
-      const data = await response.json()
-      const er = data.data?.exchange_rates
+      const data = await loadPublicConfig()
+      const er = data?.exchange_rates
       if (er && typeof er === 'object') {
         rates.value = {
           USD: er.USD ?? '0.00',
@@ -36,8 +37,6 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
           MYR: er.MYR ?? '0.00'
         }
       }
-    } catch (e) {
-      console.warn('portalCurrency: load rates failed', e)
     } finally {
       loaded.value = true
     }

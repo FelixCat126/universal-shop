@@ -9,7 +9,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, withHttpServer } from '../helpers/test-helpers.js'
 import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
 import { _clearAuthCacheForTests } from '@server/middlewares/authMiddleware.js'
 import { _resetLoginGuardForTests } from '@server/middlewares/loginGuard.js'
@@ -119,20 +119,23 @@ describe('P2concurrency.orderNoUnique', () => {
     const product = await activeProduct({ stock: 1000, price: 10 })
 
     const N = 30
-    const promises = []
-    for (let i = 0; i < N; i++) {
-      promises.push(
-        request(app).post('/api/orders')
-          .set('Authorization', `Bearer ${token}`)
-          .send({
-            contact_name: 'X',
-            contact_phone: '13800000001',
-            delivery_address: 'A',
-            items: [{ product_id: product.id, quantity: 1 }]
-          })
-      )
-    }
-    const results = await Promise.all(promises)
+    // 单实例 server 跑 30 并发：避免 30 个 ephemeral server 并发监听/销毁的传输层抖动
+    const results = await withHttpServer(app, async (base) => {
+      const promises = []
+      for (let i = 0; i < N; i++) {
+        promises.push(
+          request(base).post('/api/orders')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+              contact_name: 'X',
+              contact_phone: '13800000001',
+              delivery_address: 'A',
+              items: [{ product_id: product.id, quantity: 1 }]
+            })
+        )
+      }
+      return Promise.all(promises)
+    })
     const ok = results.filter((r) => r.status === 201).length
     expect(ok).toBe(N) // 库存 1000 够 30 笔
 

@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
+import { withHttpServer } from '../helpers/test-helpers.js'
 
 async function loadProdSecurity () {
   const old = process.env.NODE_ENV
@@ -98,27 +99,31 @@ describe('P5.security.limiters.e2e — 真实 limiter 挂在路由上', () => {
 
   it('LME-3 writeLimiter 60/min：跑到 60 后第 61 次 429', async () => {
     const app = buildApp(prod)
-    let lastOk = 0
-    for (let i = 0; i < 60; i++) {
-      const r = await request(app).post('/write').set('X-Forwarded-For', '10.0.2.1').send({})
-      if (r.status === 200) lastOk++
-    }
-    expect(lastOk).toBe(60)
-    const blocked = await request(app).post('/write').set('X-Forwarded-For', '10.0.2.1').send({})
-    expect(blocked.status).toBe(429)
+    // 单实例 server 打满 60 次：避免逐请求新建 ephemeral server 的传输层抖动
+    await withHttpServer(app, async (base) => {
+      let lastOk = 0
+      for (let i = 0; i < 60; i++) {
+        const r = await request(base).post('/write').set('X-Forwarded-For', '10.0.2.1').send({})
+        if (r.status === 200) lastOk++
+      }
+      expect(lastOk).toBe(60)
+      const blocked = await request(base).post('/write').set('X-Forwarded-For', '10.0.2.1').send({})
+      expect(blocked.status).toBe(429)
+    })
   })
 
   it('LME-4 globalLimiter 600/min：单 IP 600 次正常，第 601 次 429', async () => {
     const app = buildApp(prod)
-    // 完整跑 600 次成本较高（约几百 ms），但不打 DB，可承受
-    let okCount = 0
-    for (let i = 0; i < 600; i++) {
-      const r = await request(app).get('/any').set('X-Forwarded-For', '10.0.3.1')
-      if (r.status === 200) okCount++
-    }
-    expect(okCount).toBe(600)
-    const blocked = await request(app).get('/any').set('X-Forwarded-For', '10.0.3.1')
-    expect(blocked.status).toBe(429)
-    expect(blocked.body.code).toBe('RATE_LIMITED')
+    await withHttpServer(app, async (base) => {
+      let okCount = 0
+      for (let i = 0; i < 600; i++) {
+        const r = await request(base).get('/any').set('X-Forwarded-For', '10.0.3.1')
+        if (r.status === 200) okCount++
+      }
+      expect(okCount).toBe(600)
+      const blocked = await request(base).get('/any').set('X-Forwarded-For', '10.0.3.1')
+      expect(blocked.status).toBe(429)
+      expect(blocked.body.code).toBe('RATE_LIMITED')
+    })
   })
 })

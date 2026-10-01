@@ -1,7 +1,53 @@
 import jwt from 'jsonwebtoken'
+import { LRUCache } from 'lru-cache'
 import Administrator from '../models/Administrator.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import { logger } from '../utils/logger.js'
+
+/**
+ * 管理员状态/权限短缓存（key: adminId，TTL 5s，仿 authMiddleware 用户态缓存）：
+ * authenticateAdmin 与 requirePermission 原来每请求各查一次 DB，现共用同一份缓存，
+ * 命中时整条鉴权链零查询。
+ * permissions 直接缓存绑定到模型实例的 hasPermission 判定函数——完整保留
+ * super_admin 的 '*' 通配语义（退化为静态权限数组会丢失通配与未来资源扩展）。
+ * 失效矩阵：
+ *   - 管理端改角色/禁用/删号/改密 → administratorController 调 invalidateAdminAuthCache 立即失效
+ *   - 绕过控制器直改库 → 最长 5s 生效（与 authMiddleware 用户态同一约定，业务可接受）
+ * 测试环境旁路：测试库 beforeEach TRUNCATE 复用 id，缓存会跨用例泄漏。
+ */
+const adminStatusCache = new LRUCache({ max: 1000, ttl: 5_000 })
+const isTestEnv = process.env.NODE_ENV === 'test'
+
+/** 管理端变更管理员（角色/禁用/删号/改密）后调一次，使缓存中的状态立即失效 */
+export function invalidateAdminAuthCache (adminId) {
+  adminStatusCache.delete(adminId)
+}
+
+export function _clearAdminAuthCacheForTests () {
+  adminStatusCache.clear()
+}
+
+async function loadAdminStatus (adminId) {
+  if (!isTestEnv) {
+    const cached = adminStatusCache.get(adminId)
+    if (cached) return cached
+  }
+  const admin = await Administrator.findByPk(adminId, {
+    attributes: ['id', 'username', 'email', 'role', 'is_active']
+  })
+  const status = admin
+    ? {
+        exists: true,
+        isActive: admin.is_active !== false,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        permissions: admin.hasPermission.bind(admin)
+      }
+    : { exists: false, isActive: false, username: null, email: null, role: null, permissions: () => false }
+  if (!isTestEnv) adminStatusCache.set(adminId, status)
+  return status
+}
 
 /**
  * 可选：请求中带合法管理员 Bearer 时设置 req.admin，否则 req.admin 为 null（不返回 401）
@@ -21,21 +67,16 @@ export const optionalAuthenticateAdmin = async (req, res, next) => {
       return next()
     }
 
-    const admin = await Administrator.findOne({
-      where: {
-        id: decoded.adminId,
-        is_active: true
-      }
-    })
-    if (!admin) {
+    const status = await loadAdminStatus(decoded.adminId)
+    if (!status.exists || !status.isActive) {
       return next()
     }
 
     req.admin = {
-      id: admin.id,
-      username: admin.username,
-      role: admin.role,
-      email: admin.email
+      id: decoded.adminId,
+      username: status.username,
+      role: status.role,
+      email: status.email
     }
   } catch (_) {
     // 无效或过期的 token：按未登录管理员处理
@@ -66,15 +107,10 @@ export const authenticateAdmin = async (req, res, next) => {
       })
     }
     
-    // 验证管理员是否存在且启用
-    const admin = await Administrator.findOne({
-      where: {
-        id: decoded.adminId,
-        is_active: true
-      }
-    })
-    
-    if (!admin) {
+    // 验证管理员是否存在且启用（5s 短缓存，见文件头注释）
+    const status = await loadAdminStatus(decoded.adminId)
+
+    if (!status.exists || !status.isActive) {
       return res.status(401).json({
         success: false,
         message: '管理员账户不存在或已被禁用'
@@ -83,10 +119,10 @@ export const authenticateAdmin = async (req, res, next) => {
 
     // 将管理员信息附加到请求对象
     req.admin = {
-      id: admin.id,
-      username: admin.username,
-      role: admin.role,
-      email: admin.email
+      id: decoded.adminId,
+      username: status.username,
+      role: status.role,
+      email: status.email
     }
     
     next()
@@ -103,9 +139,11 @@ export const authenticateAdmin = async (req, res, next) => {
 export const requirePermission = (resource) => {
   return async (req, res, next) => {
     try {
-      const admin = await Administrator.findByPk(req.admin.id)
-      
-      if (!admin || !admin.hasPermission(resource)) {
+      // 与 authenticateAdmin 共用 5s 短缓存，命中时零 DB 查询；
+      // permissions 即模型 hasPermission（super_admin '*' 通配语义原样保留）
+      const status = await loadAdminStatus(req.admin.id)
+
+      if (!status.exists || !status.permissions(resource)) {
         return res.status(403).json({
           success: false,
           message: '权限不足'

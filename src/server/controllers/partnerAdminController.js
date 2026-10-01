@@ -7,6 +7,20 @@ import Product from '../models/Product.js'
 import { parsePartnerAccountKind } from '../constants/partnerAccountKind.js'
 import XLSX from 'xlsx'
 import { logger } from '../utils/logger.js'
+import { sanitizeCell } from '../utils/sanitizeCell.js'
+
+// 单次导出行数安全上限（与 exportController 口径一致）；超出截断并在文件末尾追加说明行
+const EXPORT_ROW_LIMIT = 50000
+
+// 截断时在表格末尾追加一行说明（origin:-1 追加到最后一行之后）
+const appendTruncationNote = (worksheet) => {
+  XLSX.utils.sheet_add_aoa(
+    worksheet,
+    [[`数据量超过上限，仅导出前 ${EXPORT_ROW_LIMIT} 行（按创建时间倒序）`]],
+    { origin: -1 }
+  )
+}
+
 const PARTNER_ORDER_STATUS_ZH = {
   pending_payment: '待支付',
   submitted: '已提交',
@@ -193,7 +207,8 @@ class PartnerAdminController {
         order: [['created_at', 'DESC']],
         limit: pageSize,
         offset: (page - 1) * pageSize,
-        subQuery: false,
+        // 默认子查询模式：hasMany items 会让 JOIN 行膨胀，subQuery:false 时 LIMIT 作用在
+        // 膨胀后的行上导致一页订单数少于 pageSize（分页错位）；子查询模式先对订单主表分页再回填关联
         distinct: true,
         include: [
           {
@@ -311,9 +326,11 @@ class PartnerAdminController {
             }
           : undefined
 
-      const orders = await PartnerOrder.findAll({
+      // 多取 1 行用于判断是否截断（limit + hasMany items 默认走子查询，LIMIT 作用于订单主表）
+      let orders = await PartnerOrder.findAll({
         where,
         order: [['created_at', 'DESC']],
+        limit: EXPORT_ROW_LIMIT + 1,
         include: [
           {
             model: Partner,
@@ -325,31 +342,34 @@ class PartnerAdminController {
           { model: PartnerOrderItem, as: 'items' }
         ]
       })
+      const ordersTruncated = orders.length > EXPORT_ROW_LIMIT
+      if (ordersTruncated) orders = orders.slice(0, EXPORT_ROW_LIMIT)
 
+      // 用户可控字符串字段统一过 sanitizeCell，防 Excel 公式注入
       const flat = []
       for (const o of orders) {
         const oj = o.toJSON()
-        const partnerLogin = oj.partner?.login ?? ''
-        const partnerName = oj.partner?.display_name ?? ''
+        const partnerLogin = sanitizeCell(oj.partner?.login ?? '')
+        const partnerName = sanitizeCell(oj.partner?.display_name ?? '')
         for (const it of oj.items || []) {
           flat.push({
             订单号: oj.order_no,
             合作方登录名: partnerLogin,
             合作方名称: partnerName,
             状态: PARTNER_ORDER_STATUS_ZH[oj.status] || oj.status,
-            收货人: oj.contact_name ?? '',
-            收货电话: partnerOrderPhoneWithoutDuplicateName(oj.contact_name, oj.contact_phone),
-            送货地址: (oj.delivery_address ?? '').replace(/\n/g, ' '),
+            收货人: sanitizeCell(oj.contact_name ?? ''),
+            收货电话: sanitizeCell(partnerOrderPhoneWithoutDuplicateName(oj.contact_name, oj.contact_phone)),
+            送货地址: sanitizeCell((oj.delivery_address ?? '').replace(/\n/g, ' ')),
             订单总额THB: parseFloat(oj.total_amount_thb),
             商品ID: it.product_id,
-            商品快照名: it.product_name_snapshot ?? '',
-            商品图片: it.product_image_snapshot ?? '',
+            商品快照名: sanitizeCell(it.product_name_snapshot ?? ''),
+            商品图片: sanitizeCell(it.product_image_snapshot ?? ''),
             数量: it.quantity,
             合作方折扣快照: parseFloat(it.partner_discount_percent_snapshot),
             零售价等价THB: parseFloat(it.base_unit_thb),
             单价THB: parseFloat(it.unit_price_thb),
             行小计THB: parseFloat(it.line_total_thb),
-            备注: oj.notes ?? '',
+            备注: sanitizeCell(oj.notes ?? ''),
             下单时间: formatDatetimeLocalDigits(oj.created_at)
           })
         }
@@ -357,6 +377,7 @@ class PartnerAdminController {
 
       const workbook = XLSX.utils.book_new()
       const sheet = XLSX.utils.json_to_sheet(flat.length ? flat : [{}])
+      if (ordersTruncated) appendTruncationNote(sheet)
       XLSX.utils.book_append_sheet(workbook, sheet, 'partner_orders')
 
       const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })

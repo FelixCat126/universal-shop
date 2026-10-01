@@ -11,7 +11,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, waitForCondition } from '../helpers/test-helpers.js'
 import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
 import { _resetLoginGuardForTests } from '@server/middlewares/loginGuard.js'
 
@@ -30,8 +30,11 @@ describe('P5.security.audit', () => {
       .post('/api/admin/login')
       .send({ username: 'no_such_admin', password: 'WrongPass#1234' })
 
-    await new Promise((r) => setTimeout(r, 200))
-    const after = await AuditLog.count({ where: { event: 'admin.login.fail' } })
+    // AuditLog 为 fire-and-forget 异步写库，轮询等待计数增长（替代固定 sleep）
+    const after = await waitForCondition(async () => {
+      const n = await AuditLog.count({ where: { event: 'admin.login.fail' } })
+      return n > before ? n : false
+    })
     expect(after).toBeGreaterThan(before)
   })
 
@@ -44,8 +47,11 @@ describe('P5.security.audit', () => {
       .post('/api/partner/login')
       .send({ login: 'no_such_partner', password: 'WrongPass#1234' })
 
-    await new Promise((r) => setTimeout(r, 200))
-    const after = await AuditLog.count({ where: { event: 'partner.login.fail' } })
+    // AuditLog 为 fire-and-forget 异步写库，轮询等待计数增长（替代固定 sleep）
+    const after = await waitForCondition(async () => {
+      const n = await AuditLog.count({ where: { event: 'partner.login.fail' } })
+      return n > before ? n : false
+    })
     expect(after).toBeGreaterThan(before)
   })
 
@@ -67,9 +73,12 @@ describe('P5.security.audit', () => {
       .send({ items: [{ product_id: product.id, quantity: 50 }], partner_address_id: address.id })
     expect(r.status).toBe(201)
 
-    await new Promise((r) => setTimeout(r, 250))
-    const after = await AuditLog.count({
-      where: { event: 'partner_order.create', actor_type: 'partner', actor_id: String(partner.id) }
+    // AuditLog 为 fire-and-forget 异步写库，轮询等待计数增长（替代固定 sleep）
+    const after = await waitForCondition(async () => {
+      const n = await AuditLog.count({
+        where: { event: 'partner_order.create', actor_type: 'partner', actor_id: String(partner.id) }
+      })
+      return n > before ? n : false
     })
     expect(after).toBeGreaterThan(before)
   })

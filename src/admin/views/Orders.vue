@@ -10,7 +10,7 @@
               :placeholder="t('orders.selectStatus')"
               clearable
               style="width: 150px"
-              @change="loadOrders"
+              @change="applyFilters"
             >
               <el-option :label="t('orders.statusOptions.completed')" value="completed" />
               <el-option :label="t('orders.statusOptions.pending')" value="pending" />
@@ -38,7 +38,7 @@
               type="date"
               :placeholder="t('orders.selectStartDate')"
               style="width: 150px"
-              @change="loadOrders"
+              @change="applyFilters"
             />
           </el-form-item>
           
@@ -48,12 +48,12 @@
               type="date"
               :placeholder="t('orders.selectEndDate')"
               style="width: 150px"
-              @change="loadOrders"
+              @change="applyFilters"
             />
           </el-form-item>
           
           <el-form-item>
-            <el-button type="primary" @click="loadOrders" :loading="loading">
+            <el-button type="primary" @click="applyFilters" :loading="loading">
               <el-icon><Search /></el-icon>
               {{ t('orders.search') }}
             </el-button>
@@ -527,12 +527,19 @@ const stats = computed(() => {
   }
 })
 
+// 筛选变更统一入口：先回到第 1 页再加载，避免高页码改筛选触发超界回退的二次请求
+const applyFilters = () => {
+  currentPage.value = 1
+  pagination.page = 1
+  loadOrders()
+}
+
 // 搜索防抖
 let searchTimeout = null
 const debounceSearch = () => {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    loadOrders()
+    applyFilters()
   }, 500)
 }
 

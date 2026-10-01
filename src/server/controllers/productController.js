@@ -5,6 +5,7 @@ import sequelize from '../config/database.js'
 import { Op } from 'sequelize'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
+import { clearResponseCache } from '../utils/responseCache.js'
 
 class ProductController {
   // 获取所有产品（分页和搜索）
@@ -300,6 +301,9 @@ class ProductController {
       }
       delete created.productCategory
 
+      // 商品写后清 GET 响应缓存（公开列表/详情/组合包 available_stock 立即失效）
+      clearResponseCache()
+
       res.status(201).json({
         success: true,
         message: '产品创建成功',
@@ -452,6 +456,9 @@ class ProductController {
       }
       delete out.productCategory
 
+      // 商品写后清 GET 响应缓存（价格/库存/折扣变更影响公开读与组合包 available_stock）
+      clearResponseCache()
+
       res.json({
         success: true,
         message: '产品更新成功',
@@ -499,6 +506,9 @@ class ProductController {
         await Cart.destroy({ where: { product_id: productId }, transaction: t })
         await product.destroy({ transaction: t })
       })
+
+      // 下架后清 GET 响应缓存（公开列表/详情/组合包 available_stock 立即失效）
+      clearResponseCache()
 
       res.json({
         success: true,
@@ -548,6 +558,8 @@ class ProductController {
       }
 
       await product.restore()
+      // 重新上架后清 GET 响应缓存
+      clearResponseCache()
 
       res.json({
         success: true,
@@ -610,6 +622,9 @@ class ProductController {
       }
 
       const fresh = await Product.findByPk(id, { paranoid: !req.admin })
+      // 库存变更影响公开读与组合包 available_stock：清 GET 响应缓存
+      // （注：前台下单扣库存不经过此方法，公开读库存最多滞后到缓存 TTL 结束——已确认的取舍）
+      clearResponseCache()
       res.json({
         success: true,
         message: '库存调整成功',

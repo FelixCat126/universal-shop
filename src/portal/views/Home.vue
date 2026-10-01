@@ -371,7 +371,7 @@ import { productAPI } from '../api/products.js'
 import { bundleAPI } from '../api/bundles.js'
 import config from '../../config/index.js'
 import { useToast } from '../composables/useToast.js'
-import { usePortalCurrencyStore } from '../stores/portalCurrency.js'
+import { usePortalCurrencyStore, loadPublicConfig } from '../stores/portalCurrency.js'
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import ImageFade from '../components/ui/ImageFade.vue'
 import { appleSpring, subtleSpring, bouncySpring } from '../composables/useSpring.js'
@@ -478,19 +478,11 @@ const messageClass = computed(() => {
     : 'bg-red-500 text-white'
 })
 
-// 加载系统配置
+// 加载系统配置（共享缓存，避免与各页面重复请求）
 const loadSystemConfig = async () => {
-  try {
-    const response = await fetch(config.buildApiUrl('/api/system-config/public'))
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success) {
-        homeBanner.value = data.data.home_banner
-      }
-    }
-  } catch (error) {
-    console.warn('加载系统配置失败:', error)
-    // 静默失败，不影响主要功能
+  const data = await loadPublicConfig()
+  if (data) {
+    homeBanner.value = data.home_banner
   }
 }
 
@@ -603,6 +595,9 @@ const onProductAreaTouchEnd = (e) => {
   }
 }
 
+// 无限滚动列表上限：最多保留 200 条，超出截断最早的记录并停止继续加载（触底提示复用 product.noMoreProducts）
+const MAX_HOME_PRODUCTS = 200
+
 const loadProducts = async ({ append = false } = {}) => {
   if (append) {
     loadingMore.value = true
@@ -633,6 +628,11 @@ const loadProducts = async ({ append = false } = {}) => {
             seen.add(p.id)
             products.value.push(p)
           }
+        }
+        if (products.value.length > MAX_HOME_PRODUCTS) {
+          products.value.splice(0, products.value.length - MAX_HOME_PRODUCTS)
+          // 使 hasMore=false，停止后续加载并展示「已加载全部商品」
+          totalPages.value = currentPage.value
         }
       } else {
         products.value = list

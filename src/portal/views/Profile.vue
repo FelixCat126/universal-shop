@@ -855,7 +855,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatRecordedOrderAmount } from '../utils/orderBillingDisplay.js'
 import { useUserStore } from '../stores/user.js'
-import { usePortalCurrencyStore } from '../stores/portalCurrency.js'
+import { usePortalCurrencyStore, loadPublicConfig } from '../stores/portalCurrency.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
 import { getUserOrders, confirmOnlinePayment as confirmOnlinePaymentApi } from '../api/orders.js'
 import { getAvailableCoupons, claimCoupon, getMyCoupons } from '../api/coupons.js'
@@ -1260,16 +1260,11 @@ const getStatusText = (status) => {
 }
 
 async function loadOnlinePayConfig () {
-  try {
-    const response = await fetch(config.buildApiUrl('/api/system-config/public'))
-    if (!response.ok) return
-    const data = await response.json()
-    if (data.success && data.data) {
-      onlinePayQr.value = data.data.payment_qrcode
-      onlinePayExchangeRate.value = parseFloat(data.data.exchange_rate || '0.00')
-    }
-  } catch {
-    /* silent */
+  // 共享缓存：30s 内重复打开支付弹窗不再请求
+  const data = await loadPublicConfig()
+  if (data) {
+    onlinePayQr.value = data.payment_qrcode
+    onlinePayExchangeRate.value = parseFloat(data.exchange_rate || '0.00')
   }
 }
 
