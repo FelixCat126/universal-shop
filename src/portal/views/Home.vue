@@ -132,7 +132,7 @@
 
       <!-- 搜索栏 -->
       <div class="mb-6">
-        <div class="relative max-w-md">
+        <div class="relative w-full sm:max-w-md">
           <input
             v-model="searchQuery"
             type="text"
@@ -157,7 +157,7 @@
             v-for="c in categories"
             :key="c.id"
             type="button"
-            class="shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors whitespace-nowrap"
+            class="shrink-0 px-3 py-2.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors whitespace-nowrap min-h-[40px] sm:min-h-0"
             :class="selectedCategoryId === c.id
               ? 'bg-blue-600 text-white border-blue-600 shadow'
               : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
@@ -170,7 +170,7 @@
 
       <!-- 商品列表区：左右滑动切换分类（Tab 条自身仅横向滚动，不绑此手势） -->
       <section
-        class="product-swipe-zone min-h-[8rem]"
+        class="product-swipe-zone min-h-[8rem] touch-pan-y"
         @touchstart.passive="onProductAreaTouchStart"
         @touchend.passive="onProductAreaTouchEnd"
       >
@@ -182,25 +182,28 @@
         <SkeletonCard v-for="i in 8" :key="`sk-${i}`" />
       </div>
 
-      <!-- 产品网格（卡片等高，按钮贴底；spring 弹簧入场） -->
+      <!-- 产品网格（卡片等高，按钮贴底；spring 弹簧入场仅第一页前 8 张，其余 CSS 简单 fade-in） -->
       <div
         v-else-if="products.length > 0"
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch"
+        class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch"
       >
         <div
           v-for="(product, idx) in products"
           :key="product.id"
           v-motion
-          :initial="{ opacity: 0, y: 20, scale: 0.96 }"
-          :enter="{
+          :initial="shouldAnimateCard(idx) ? { opacity: 0, y: 20, scale: 0.96 } : undefined"
+          :enter="shouldAnimateCard(idx) ? {
             opacity: 1,
             y: 0,
             scale: 1,
-            transition: { ...appleSpring, delay: Math.min(idx * 50, 500) }
-          }"
-          :hovered="{ scale: 1.04, transition: subtleSpring }"
+            transition: { ...appleSpring, delay: Math.min(idx * 50, 400) }
+          } : undefined"
+          :hovered="isDesktop ? { scale: 1.04, transition: subtleSpring } : undefined"
           :tap="{ scale: 0.97, transition: bouncySpring }"
-          class="bg-white rounded-xl shadow-sm hover:shadow-lg cursor-pointer flex flex-col h-full min-h-0 transition-shadow duration-300"
+          :class="[
+            'bg-white rounded-xl shadow-sm hover:shadow-lg cursor-pointer flex flex-col h-full min-h-0 transition-shadow duration-300',
+            shouldAnimateCard(idx) ? '' : 'css-card-fade-in'
+          ]"
           @click="goToProductDetail(product.id)"
         >
           <div class="aspect-w-1 aspect-h-1 w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
@@ -291,14 +294,14 @@
                 <button
                   @click.stop="addToCart(product)"
                   :disabled="product.stock === 0"
-                  class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="flex-1 px-3 py-2.5 sm:py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
                 >
                   {{ t('product.addToCart') }}
                 </button>
                 <button
                   @click.stop="buyNow(product)"
                   :disabled="product.stock === 0"
-                  class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  class="flex-1 px-3 py-2.5 sm:py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
                 >
                   {{ t('product.buyNow') }}
                 </button>
@@ -404,6 +407,18 @@ let loadMoreObserver = null
 let searchDebounceTimer = null
 /** 移动端等环境下 IO 不可靠时：用 passive 滚动检测距文档底部距离 */
 let scrollProximityRaf = null
+
+/**
+ * 卡片入场动画只应用到第一页的前 8 张（首屏可见），避免长列表 200 个 v-motion 状态机导致 GC 压力。
+ * 后续卡片用 CSS 简单 fade-in（.css-card-fade-in）。
+ */
+const shouldAnimateCard = (idx) => currentPage.value === 1 && idx < 8
+
+/** 桌面端 hover 存在；移动端 hover 不存在（触摸），不浪费 motion 状态 */
+const isDesktop = computed(() => {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia?.('(hover: hover) and (pointer: fine)').matches ?? true
+})
 
 const categories = ref([])
 const selectedCategoryId = ref(null)

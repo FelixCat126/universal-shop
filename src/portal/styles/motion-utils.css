@@ -152,16 +152,26 @@
   font-feature-settings: 'tnum';
 }
 
-/* ===== 图片 fade-in ===== */
+/* ===== 图片 fade-in（GPU 友好：用 transform 替代 filter blur） ===== */
 .ui-img-fade {
   opacity: 0;
-  filter: blur(8px);
+  transform: scale(1.05);
   transition: opacity var(--dur-slower) var(--ease-standard),
-    filter var(--dur-slower) var(--ease-standard);
+    transform var(--dur-slower) var(--ease-out-soft);
+  will-change: opacity, transform;
 }
 .ui-img-fade.is-loaded {
   opacity: 1;
-  filter: blur(0);
+  transform: scale(1);
+}
+
+/* ===== 卡片简单 fade-in（不占 motion 状态机的轻量版） ===== */
+@keyframes ui-card-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.css-card-fade-in {
+  animation: ui-card-fade-in var(--dur-slow) var(--ease-standard) backwards;
 }
 
 /* ===== 骨架屏 ===== */

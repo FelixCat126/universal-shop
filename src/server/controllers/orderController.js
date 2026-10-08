@@ -18,6 +18,7 @@ import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRa
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import AuditLog from '../models/AuditLog.js'
 import PointTransaction from '../models/PointTransaction.js'
+import UserPointBalance from '../models/UserPointBalance.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
@@ -904,6 +905,14 @@ class OrderController {
         user_coupon_id: userCouponId
       } = req.body
 
+      // 积分换购单与抵扣券互斥（P2）：前置拦截，与 createOrder 错误路径一致
+      if (paymentMethod === 'points' && userCouponId != null) {
+        return res.status(400).json({
+          success: false,
+          message: '积分换购订单不可使用抵扣券'
+        })
+      }
+
       // 抵扣券（P2）：查券并校验归属；状态/有效期/scope 门槛/积分互斥由计价引擎统一判定
       let userCoupon = null
       if (userCouponId != null) {
@@ -1435,6 +1444,34 @@ class OrderController {
 
           // 进入 cancelled 时回补库存与积分（原状态在此不可能是 cancelled，状态机已拦截）
           if (status === 'cancelled') {
+            /**
+             * 防"刷积分"漏洞：本订单 earn_purchase 是否已超用户当前余额？
+             * 余额 >= earn 时 revoke 全额成功，截断为 0；
+             * 余额 <  earn 时 revoke 截断，相当于部分积分被"免费花掉"。
+             * 直接拦截：余额不足时不允许取消，提示用户先归还部分积分兑换订单。
+             */
+            const earnTxs = await PointTransaction.findAll({
+              where: { order_id: order.id, type: 'earn_purchase' },
+              transaction
+            })
+            const totalEarned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
+            if (totalEarned > 0) {
+              const balanceRow = await UserPointBalance.findOne({
+                where: { user_id: order.user_id },
+                transaction,
+                lock: transaction.LOCK.UPDATE
+              })
+              const currentBalance = Number(balanceRow?.balance) || 0
+              if (currentBalance < totalEarned) {
+                await transaction.rollback()
+                return {
+                  ok: false,
+                  status: 400,
+                  message: `该订单获得的 ${totalEarned} 积分已被使用（当前余额 ${currentBalance}），请先归还部分积分兑换订单后再取消`
+                }
+              }
+            }
+
             order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
             await restoreOrderResources(order, transaction)
           }
