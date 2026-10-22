@@ -23,6 +23,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      # Redis：sharedState 有内存/Redis 双后端，类型契约必须两后端一致
+      # （曾因不一致导致生产 500：内存版原样存取字符串，Redis 版 get 时 JSON.parse
+      #   成对象 → res.end(对象) 抛 ERR_INVALID_ARG_TYPE）
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - name: 📥 检出代码
@@ -45,6 +57,7 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          TEST_REDIS_URL: redis://127.0.0.1:6379/9
           JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
           JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
           JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
@@ -55,6 +68,7 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          TEST_REDIS_URL: redis://127.0.0.1:6379/9
           JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
           JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
           JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
@@ -133,6 +147,7 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          TEST_REDIS_URL: redis://127.0.0.1:6379/9
           JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
           JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
           JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars

@@ -21,7 +21,9 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
       if (hit) {
         res.setHeader('X-Cache', 'HIT')
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
-        return res.status(200).end(hit)
+        // 存储层实现差异：内存版原样返回字符串，Redis 版会 JSON.parse 成对象。
+        // res.end() 只接受 string/Buffer，因此这里统一序列化为字符串。
+        return res.status(200).end(typeof hit === 'string' ? hit : JSON.stringify(hit))
       }
 
       const orig = res.json.bind(res)

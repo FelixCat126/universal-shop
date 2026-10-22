@@ -39,12 +39,17 @@ class MemoryStore {
       this.map.delete(k)
       return null
     }
-    return row.value
+    // 与 RedisStore 保持同一契约：值按 JSON 序列化存放，get 时还原
+    try { return JSON.parse(row.value) } catch { return row.value }
   }
 
   async set (key, value, ttlMs) {
+    if (value === undefined) {
+      this.map.delete(this.key(key))
+      return
+    }
     this.map.set(this.key(key), {
-      value,
+      value: JSON.stringify(value),
       expiresAt: ttlMs > 0 ? Date.now() + ttlMs : null
     })
   }
@@ -58,7 +63,7 @@ class MemoryStore {
     // increment 不重置 TTL（与 express-rate-limit 语义一致）
     const existing = this.map.get(this.key(key))
     this.map.set(this.key(key), {
-      value: current,
+      value: JSON.stringify(current),
       expiresAt: existing?.expiresAt || (ttlMs > 0 ? Date.now() + ttlMs : null)
     })
     return current
@@ -86,8 +91,24 @@ class RedisStore {
     try { return JSON.parse(value) } catch { return value }
   }
 
+  /**
+   * 统一以 JSON 序列化写入（字符串也序列化）。
+   *
+   * 这样 get 的 JSON.parse 能把值还原成「写进去时的类型」：
+   *   set(key, '{"a":1}') → 存 '"{\\"a\\":1}"' → get 得到字符串 '{"a":1}'
+   *   set(key, { a: 1 })  → 存 '{"a":1}'        → get 得到对象 { a: 1 }
+   *   set(key, 5)         → 存 '5'              → get 得到数字 5
+   *
+   * 若字符串不序列化（早期实现），get 会把它 JSON.parse 成对象，
+   * 导致 res.end(对象) 抛 ERR_INVALID_ARG_TYPE（生产 500）。
+   * 内存版同样按此契约存取，两种后端行为一致。
+   */
   async set (key, value, ttlMs) {
-    const serialized = typeof value === 'string' ? value : JSON.stringify(value)
+    if (value === undefined) {
+      await this.client.del(this.key(key))
+      return
+    }
+    const serialized = JSON.stringify(value)
     if (ttlMs > 0) {
       await this.client.set(this.key(key), serialized, 'PX', ttlMs)
     } else {
@@ -99,11 +120,23 @@ class RedisStore {
     await this.client.del(this.key(key))
   }
 
+  /**
+   * 计数自增。
+   *
+   * 用 GET+SET 而非 Redis INCR：INCR 要求键值是裸数字，
+   * 而 set 写入的是 JSON 形式（"5"），同一 key 上 INCR 会报
+   * "value is not an integer"。用 GET+SET 可与 set 保持同一存储格式。
+   */
   async increment (key, ttlMs) {
     const k = this.key(key)
-    const value = await this.client.incr(k)
-    if (value === 1 && ttlMs > 0) await this.client.pexpire(k, ttlMs)
-    return value
+    const current = Number(await this.get(key) || 0) + 1
+    const ttl = ttlMs > 0 ? ttlMs : null
+    if (ttl != null) {
+      await this.client.set(k, JSON.stringify(current), 'PX', ttl)
+    } else {
+      await this.client.set(k, JSON.stringify(current))
+    }
+    return current
   }
 
   async clear () {
