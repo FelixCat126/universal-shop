@@ -220,7 +220,14 @@ fi
 # 7. PG sync + SQL 补丁（幂等）
 # --------------------------------------------------------------------------
 echo "🌱 PostgreSQL 模型同步 + SQL 补丁（幂等；不重置管理员密码）..."
-NODE_ENV=production node scripts/production-deploy-setup.mjs
+# setup 失败时不能让服务停着：rsync 已替换了新代码，此时服务若不重启会停在旧/坏状态。
+# 因此这里捕获失败 → 记录错误 → 仍然尝试拉起 PM2 → 最后再以非零码退出让 CI/人工感知。
+SETUP_OK=1
+if ! NODE_ENV=production node scripts/production-deploy-setup.mjs; then
+  SETUP_OK=0
+  echo "❌ 数据库准备/种子步骤失败（详见上方错误）" >&2
+  echo "   仍将尝试启动服务以保持可用性；请修复后重新执行部署" >&2
+fi
 
 # --------------------------------------------------------------------------
 # 8. PM2 启动/重启
@@ -266,3 +273,9 @@ if command -v curl >/dev/null 2>&1; then
 fi
 
 echo "✅ deploy-on-server.sh 执行完毕"
+
+# setup 失败时以非零码退出（服务已尽力拉起，但数据库准备未完成，必须让人/CI 感知）
+if [[ "${SETUP_OK:-1}" != "1" ]]; then
+  echo "❌ 部署过程中数据库准备步骤失败，部署标记为失败" >&2
+  exit 1
+fi
