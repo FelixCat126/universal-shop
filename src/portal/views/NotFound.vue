@@ -16,18 +16,18 @@
           {{ $t('error.notFoundDesc') }}
         </p>
 
-        <!-- 操作按钮 -->
-        <div class="space-y-3">
+        <!-- 操作按钮：主按钮 + 次按钮，桌面横排、移动端纵排 -->
+        <div class="flex flex-col sm:flex-row gap-3">
           <button
             @click="$router.push({ name: 'Home' })"
-            class="ui-btn-ripple w-full btn btn-primary"
+            class="ui-btn-ripple flex-1 btn btn-primary"
           >
             {{ $t('common.home') }}
           </button>
 
           <button
             @click="$router.back()"
-            class="w-full btn btn-secondary transition-all hover:bg-gray-100"
+            class="flex-1 btn btn-outline"
           >
             {{ $t('common.back') }}
           </button>

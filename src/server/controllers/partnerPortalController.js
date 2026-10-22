@@ -6,7 +6,7 @@ import Product from '../models/Product.js'
 import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import PartnerAddress from '../models/PartnerAddress.js'
-import { JWT_SECRET } from '../config/jwtSecret.js'
+import { JWT_PARTNER_SECRET } from '../config/jwtSecret.js'
 import {
   partnerUnitPriceAfterDiscount,
   retailBaseUnitThb,
@@ -115,7 +115,7 @@ class PartnerPortalController {
 
       const partner = await Partner.findOne({ where: { login } })
       if (!partner || !partner.is_active) {
-        recordLoginFailure(req, login)
+        await recordLoginFailure(req, login)
         AuditLog.logPartner({
           partner: partner || { id: null, code: login },
           event: 'partner.login.fail',
@@ -127,7 +127,7 @@ class PartnerPortalController {
       }
       const ok = await partner.validatePassword(password)
       if (!ok) {
-        recordLoginFailure(req, login)
+        await recordLoginFailure(req, login)
         AuditLog.logPartner({
           partner,
           event: 'partner.login.fail',
@@ -140,11 +140,11 @@ class PartnerPortalController {
 
       partner.last_login_at = new Date()
       await partner.save()
-      clearLoginFailures(req, login)
+      await clearLoginFailures(req, login)
 
       const token = jwt.sign(
-        { type: 'partner', partnerId: partner.id, login: partner.login },
-        JWT_SECRET,
+        { type: 'partner', partnerId: partner.id, login: partner.login, tv: Number(partner.token_version) || 0 },
+        JWT_PARTNER_SECRET,
         { expiresIn: '14d' }
       )
 
@@ -484,7 +484,7 @@ class PartnerPortalController {
       })
     } catch (e) {
       logger.error('PartnerPortalController.createOrder', { err: e?.message, stack: e?.stack })
-      return res.status(500).json({ success: false, message: '提交订单失败', error: e.message })
+      return res.status(500).json({ success: false, message: '提交订单失败', code: 'INTERNAL_SERVER_ERROR' })
     }
 
     if (!result.ok) {

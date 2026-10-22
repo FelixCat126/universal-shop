@@ -11,6 +11,7 @@ export default {
 
   // 通用
   common: {
+    backToHome: 'Back to Home',
     confirm: 'Confirm',
     cancel: 'Cancel',
     save: 'Save',
@@ -96,6 +97,22 @@ export default {
     confirmPasswordPlaceholder: 'Please enter password again',
     rememberMe: 'Remember me',
     forgotPassword: 'Forgot password?',
+    forgotPasswordHint: 'Enter your registered phone number and we will send you a verification code',
+    sendOtp: 'Send code',
+    otpCode: 'Verification code',
+    otpPlaceholder: 'Enter the code from SMS',
+    otpRequired: 'Please enter the verification code',
+    otpSent: 'Verification code sent, please check your messages',
+    otpInvalid: 'Invalid or expired code, please request a new one',
+    otpResendHint: 'Slide the captcha again to get a new verification code',
+    resendOtp: 'Resend',
+    newPassword: 'New password',
+    newPasswordPlaceholder: 'Enter a new password',
+    resetPassword: 'Reset password',
+    passwordResetOk: 'Password reset, please sign in with your new password',
+    togglePassword: 'Toggle password visibility',
+    captchaInvalid: 'Please complete the slider captcha',
+    smsNotConfigured: 'Password reset is not available yet. Please contact support for assistance.',
     noAccount: 'Don\'t have an account?',
     alreadyHaveAccount: 'Already have an account?',
     goToRegister: 'Sign up',
@@ -155,6 +172,7 @@ export default {
     quantity: 'Quantity',
     total: 'Total',
     productList: 'Product List',
+    listSubtitle: 'Browse all products on sale',
     productDetail: 'Product Details',
     noProducts: 'No Products',
     loadMore: 'Load More',
@@ -611,5 +629,13 @@ export default {
     noUsable: 'No coupons available',
     discountLine: 'Coupon discount',
     notEnough: 'Minimum spend not reached'
+  },
+  legal: {
+    termsLink: 'Terms of Use',
+    privacyLink: 'Privacy Policy',
+    termsTitle: 'Terms of Use',
+    termsBody: 'Welcome to Universal Shop. By using this store, you agree to these terms.\n\n1. Accounts and orders\nPlease provide accurate contact and delivery information. Guest checkout creates an account automatically, and you can reset its password with an SMS verification code.\n\n2. Orders and payment\nOrder records are authoritative. Do not submit duplicate orders. We may cancel orders caused by stock errors, pricing errors, or abuse prevention.\n\n3. After-sales\nRefunds, returns, points, and coupons are handled according to order and after-sales records. Fraud, payment abuse, coupon farming, or system abuse may result in restrictions.\n\n4. Responsibility\nKeep your credentials secure. You are responsible for losses caused by compromised credentials, false information, or illegal activity.',
+    privacyTitle: 'Privacy Policy',
+    privacyBody: 'We only collect information needed for registration, ordering, delivery, payment, and after-sales, such as phone number, nickname, delivery address, orders, and security audit records.\n\nWe do not sell your personal information. Limited processing may occur for fulfillment, payment, SMS notifications, security, and troubleshooting.\n\nOrders and audit logs are retained as required by business and legal obligations and periodically cleaned according to policy. You may anonymize your profile through account deletion, while order records remain as required.\n\nWe use access control, password hashing, token versioning, rate limiting, CAPTCHA, and audit logs to protect data. Contact the administrator to request access, correction, or deletion of your information.'
   }
 }

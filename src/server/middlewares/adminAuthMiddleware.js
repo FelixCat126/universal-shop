@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken'
 import { LRUCache } from 'lru-cache'
 import Administrator from '../models/Administrator.js'
-import { JWT_SECRET } from '../config/jwtSecret.js'
+import { JWT_ADMIN_SECRET } from '../config/jwtSecret.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -33,7 +33,7 @@ async function loadAdminStatus (adminId) {
     if (cached) return cached
   }
   const admin = await Administrator.findByPk(adminId, {
-    attributes: ['id', 'username', 'email', 'role', 'is_active']
+    attributes: ['id', 'username', 'email', 'role', 'is_active', 'token_version']
   })
   const status = admin
     ? {
@@ -42,9 +42,10 @@ async function loadAdminStatus (adminId) {
         username: admin.username,
         email: admin.email,
         role: admin.role,
+        tokenVersion: Number(admin.token_version) || 0,
         permissions: admin.hasPermission.bind(admin)
       }
-    : { exists: false, isActive: false, username: null, email: null, role: null, permissions: () => false }
+    : { exists: false, isActive: false, username: null, email: null, role: null, tokenVersion: 0, permissions: () => false }
   if (!isTestEnv) adminStatusCache.set(adminId, status)
   return status
 }
@@ -62,13 +63,16 @@ export const optionalAuthenticateAdmin = async (req, res, next) => {
       return next()
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, JWT_ADMIN_SECRET)
     if (decoded.type !== 'admin') {
       return next()
     }
 
     const status = await loadAdminStatus(decoded.adminId)
     if (!status.exists || !status.isActive) {
+      return next()
+    }
+    if (Number(decoded.tv ?? 0) !== status.tokenVersion) {
       return next()
     }
 
@@ -97,7 +101,7 @@ export const authenticateAdmin = async (req, res, next) => {
       })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, JWT_ADMIN_SECRET)
     
     // 验证是否为管理员token
     if (decoded.type !== 'admin') {
@@ -116,6 +120,9 @@ export const authenticateAdmin = async (req, res, next) => {
         message: '管理员账户不存在或已被禁用'
       })
     }
+    if (Number(decoded.tv ?? 0) !== status.tokenVersion) {
+      return res.status(401).json({ success: false, message: '登录状态已失效，请重新登录' })
+    }
 
     // 将管理员信息附加到请求对象
     req.admin = {
@@ -128,7 +135,7 @@ export const authenticateAdmin = async (req, res, next) => {
     next()
   } catch (error) {
     logger.error('管理员Token验证失败', { err: error?.message, stack: error?.stack })
-    return res.status(403).json({
+    return res.status(401).json({
       success: false,
       message: '无效的认证令牌'
     })

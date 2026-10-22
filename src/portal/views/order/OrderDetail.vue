@@ -1,23 +1,21 @@
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- 导航栏 -->
-    <header class="bg-white shadow-sm border-b">
+    <!-- 二级页 slim 页头：仅保留返回与标题，导航由全局 sticky 顶栏承担 -->
+    <div class="border-b border-gray-200 bg-gray-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <button 
+        <div class="flex items-center h-11">
+          <button
             @click="goBack"
-            class="flex items-center text-gray-600 hover:text-gray-900"
+            class="flex items-center text-sm text-gray-600 hover:text-gray-900"
           >
-            <ArrowLeftIcon class="h-5 w-5 mr-2" />
+            <ArrowLeftIcon class="h-4 w-4 mr-1.5" />
             {{ t('common.back') }}
           </button>
-          
-          <h1 class="text-base sm:text-lg font-semibold">{{ t('order.orderDetail') }}</h1>
-          
-          <div class="w-16"></div>
+
+          <h1 class="ml-4 text-sm font-medium text-gray-500">{{ t('order.orderDetail') }}</h1>
         </div>
       </div>
-    </header>
+    </div>
 
     <!-- 加载状态：骨架屏 -->
     <div v-if="loading" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">

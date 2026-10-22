@@ -153,7 +153,11 @@ export default {
     loadFailed: 'โหลดไม่สำเร็จ',
     createOk: 'สร้างแล้ว',
     updateOk: 'อัปเดตแล้ว',
-    resetOk: 'รีเซ็ตรหัสแล้ว'
+    resetOk: 'รีเซ็ตรหัสแล้ว',
+    delete: 'ลบ',
+    confirmDelete: 'ยืนยันลบบัญชีคู่ค้านี้? บัญชีจะไม่สามารถเข้าระบบได้อีก',
+    deleteOk: 'ลบแล้ว',
+    deleteFailed: 'ลบไม่สำเร็จ'
   },
 
   partnerOrdersMgmt: {

@@ -16,6 +16,10 @@ async function prepareTestEnvironment () {
   process.env.NODE_ENV = 'test'
   process.env.JWT_SECRET = process.env.JWT_SECRET ||
     'test-jwt-secret-key-for-testing-only-32-chars-long'
+  process.env.JWT_ADMIN_SECRET = process.env.JWT_ADMIN_SECRET ||
+    'test-admin-jwt-secret-key-for-testing-only'
+  process.env.JWT_PARTNER_SECRET = process.env.JWT_PARTNER_SECRET ||
+    'test-partner-jwt-secret-key-for-testing-only'
   if (!process.env.DATABASE_URL_TEST) {
     process.env.DATABASE_URL_TEST = 'postgres://shop:shop@127.0.0.1:5432/shop_test'
   }

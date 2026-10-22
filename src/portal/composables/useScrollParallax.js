@@ -27,6 +27,10 @@ function mapRange (t, a, b, x, y) {
 export function registerMotionParallax (app) {
   app.directive('motion-parallax', {
     mounted (el, binding) {
+      // 遵循系统减少动画偏好：不注册滚动监听、不改变 transform
+      if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        return
+      }
       const opts = binding.value || {}
       const from = opts.from ?? 0
       const to = opts.to ?? 1

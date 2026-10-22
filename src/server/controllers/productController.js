@@ -129,7 +129,7 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: '获取产品列表失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -183,7 +183,7 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: '获取产品详情失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -302,7 +302,7 @@ class ProductController {
       delete created.productCategory
 
       // 商品写后清 GET 响应缓存（公开列表/详情/组合包 available_stock 立即失效）
-      clearResponseCache()
+      await clearResponseCache()
 
       res.status(201).json({
         success: true,
@@ -314,7 +314,7 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: '创建产品失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -457,7 +457,7 @@ class ProductController {
       delete out.productCategory
 
       // 商品写后清 GET 响应缓存（价格/库存/折扣变更影响公开读与组合包 available_stock）
-      clearResponseCache()
+      await clearResponseCache()
 
       res.json({
         success: true,
@@ -469,7 +469,7 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: '更新产品失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -508,7 +508,7 @@ class ProductController {
       })
 
       // 下架后清 GET 响应缓存（公开列表/详情/组合包 available_stock 立即失效）
-      clearResponseCache()
+      await clearResponseCache()
 
       res.json({
         success: true,
@@ -519,7 +519,7 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: '下架产品失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -559,7 +559,7 @@ class ProductController {
 
       await product.restore()
       // 重新上架后清 GET 响应缓存
-      clearResponseCache()
+      await clearResponseCache()
 
       res.json({
         success: true,
@@ -571,7 +571,7 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: '重新上架失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -624,7 +624,7 @@ class ProductController {
       const fresh = await Product.findByPk(id, { paranoid: !req.admin })
       // 库存变更影响公开读与组合包 available_stock：清 GET 响应缓存
       // （注：前台下单扣库存不经过此方法，公开读库存最多滞后到缓存 TTL 结束——已确认的取舍）
-      clearResponseCache()
+      await clearResponseCache()
       res.json({
         success: true,
         message: '库存调整成功',
@@ -668,7 +668,7 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: '检查库存失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

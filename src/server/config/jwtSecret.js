@@ -22,4 +22,16 @@ function resolveJwtSecret () {
   return DEV_FALLBACK
 }
 
+function resolveScopedSecret (rawValue, fallback, envName) {
+  const raw = rawValue == null ? '' : String(rawValue).trim()
+  if (raw && raw !== 'your-secret-key-here' && raw.length >= 32) return raw
+  if (process.env.NODE_ENV !== 'production') {
+    return `${fallback}-${envName.toLowerCase().replace(/_/g, '-')}`
+  }
+  console.warn(`⚠️ ${envName} 未配置，暂时回退到 JWT_SECRET；公测/生产建议独立配置以隔离密钥用途`)
+  return fallback
+}
+
 export const JWT_SECRET = resolveJwtSecret()
+export const JWT_ADMIN_SECRET = resolveScopedSecret(process.env.JWT_ADMIN_SECRET, JWT_SECRET, 'JWT_ADMIN_SECRET')
+export const JWT_PARTNER_SECRET = resolveScopedSecret(process.env.JWT_PARTNER_SECRET, JWT_SECRET, 'JWT_PARTNER_SECRET')

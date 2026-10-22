@@ -1,35 +1,20 @@
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- 导航栏 -->
-    <header class="bg-white shadow-sm border-b">
+    <!-- 二级页 slim 页头：全局 sticky 顶栏已含购物车入口，此处仅保留返回与标题 -->
+    <div class="border-b border-gray-200 bg-gray-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <button 
+        <div class="flex items-center h-11">
+          <button
             @click="goBack"
-            class="flex items-center text-gray-600 hover:text-gray-900"
+            class="flex items-center text-sm text-gray-600 hover:text-gray-900"
           >
-            <ArrowLeftIcon class="h-5 w-5 mr-2" />
+            <ArrowLeftIcon class="h-4 w-4 mr-1.5" />
             {{ t('product.back') }}
           </button>
-          
-          <h1 class="text-lg font-semibold">{{ t('product.productDetail') }}</h1>
-          
-          <!-- 购物车图标 -->
-          <router-link 
-            to="/cart"
-            class="relative p-2 text-gray-400 hover:text-gray-500"
-          >
-            <ShoppingCartIcon class="h-6 w-6" />
-            <span 
-              v-if="cartStore.itemCount > 0" 
-              class="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center"
-            >
-              {{ cartStore.itemCount }}
-            </span>
-          </router-link>
+          <h1 class="ml-4 text-sm font-medium text-gray-500">{{ t('product.productDetail') }}</h1>
         </div>
       </div>
-    </header>
+    </div>
 
     <!-- 加载状态：骨架屏替代 spinner -->
     <div v-if="isLoading" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -40,8 +25,8 @@
     <div
       v-else-if="product"
       v-motion
-      :initial="{ opacity: 0, y: 12 }"
-      :enter="{ opacity: 1, y: 0, transition: softSpring }"
+      :initial="reducedMotion ? undefined : { opacity: 0, y: 12 }"
+      :enter="reducedMotion ? undefined : { opacity: 1, y: 0, transition: softSpring }"
       class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
     >
       <div class="lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
@@ -58,7 +43,9 @@
               :src="product.image_url || defaultImage"
               :alt="getCurrentLanguageValue(product, 'name')"
               custom-class="w-full h-96 object-cover rounded-lg"
+              sizes="(max-width: 1024px) 100vw, 50vw"
               loading="eager"
+              fetchpriority="high"
               @error="handleImageError"
               @load="handleImageLoad"
             />
@@ -68,7 +55,7 @@
         <!-- 产品信息区域 -->
         <div class="mt-10 px-4 sm:px-0 sm:mt-16 lg:mt-0">
           <!-- 产品名称 -->
-          <h1 class="text-3xl font-bold tracking-tight text-gray-900">
+          <h1 class="text-xl sm:text-3xl font-bold tracking-tight text-gray-900">
             {{ getCurrentLanguageValue(product, 'name') }}
           </h1>
 
@@ -79,7 +66,7 @@
               <div class="flex items-center space-x-3">
                 <!-- 有折扣时显示折扣价 -->
                 <div v-if="product.discount && product.discount > 0" class="flex items-center space-x-3">
-                  <p class="text-3xl font-bold text-red-600">{{ portalCurrency.formatThb(getDiscountPrice(product)) }}</p>
+                  <p class="text-2xl sm:text-3xl font-bold text-red-600">{{ portalCurrency.formatThb(getDiscountPrice(product)) }}</p>
                   <p class="text-xl text-gray-400 line-through">{{ portalCurrency.formatThb(product.price) }}</p>
                   <span class="px-2 py-1 text-sm bg-red-100 text-red-600 rounded-md font-medium">
                     {{ product.discount }}%
@@ -87,7 +74,7 @@
                 </div>
                 <!-- 无折扣时显示正常价格 -->
                 <div v-else>
-                  <p class="text-3xl font-bold text-blue-600">{{ portalCurrency.formatThb(product.price) }}</p>
+                  <p class="text-2xl sm:text-3xl font-bold text-blue-600">{{ portalCurrency.formatThb(product.price) }}</p>
                 </div>
               </div>
               <p v-if="product.points > 0" class="text-sm text-amber-800">
@@ -249,8 +236,10 @@ import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import SkeletonDetail from '../../components/ui/SkeletonDetail.vue'
 import ImageFade from '../../components/ui/ImageFade.vue'
 import { softSpring, subtleSpring } from '../../composables/useSpring.js'
+import { useReducedMotion } from '../../composables/useReducedMotion.js'
 
 const portalCurrency = usePortalCurrencyStore()
+const reducedMotion = useReducedMotion()
 
 // 路由和状态
 const route = useRoute()

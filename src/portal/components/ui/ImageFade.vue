@@ -1,9 +1,13 @@
 <template>
   <img
     :src="src"
+    :srcset="srcset"
+    :sizes="sizes"
     :alt="alt"
     :class="['ui-img-fade', { 'is-loaded': loaded }, customClass]"
     :loading="loading"
+    :fetchpriority="fetchpriority"
+    decoding="async"
     @load="onLoad"
     @error="onError"
   >
@@ -13,19 +17,17 @@
 import { ref } from 'vue'
 
 /**
- * 图片 fade-in 组件
- *
- * 用法：
- *   <ImageFade :src="url" alt="..." />
- *   <ImageFade :src="url" custom-class="rounded-lg" />
+ * 图片 fade-in 组件：支持 srcset/sizes/decoding/fetchpriority，降低移动端流量与解码抖动
  */
 
 const props = defineProps({
   src: { type: String, required: true },
+  srcset: { type: String, default: undefined },
+  sizes: { type: String, default: undefined },
   alt: { type: String, default: '' },
   customClass: { type: String, default: '' },
   loading: { type: String, default: 'lazy' },
-  eager: { type: Boolean, default: false }
+  fetchpriority: { type: String, default: 'auto' }
 })
 
 const emit = defineEmits(['load', 'error'])

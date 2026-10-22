@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-lg mx-auto px-3 sm:px-4 py-4 sm:py-6">
+  <div class="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
     <header class="mb-4">
       <h1 class="text-lg font-semibold text-gray-900">{{ t('addresses.title') }}</h1>
       <p class="text-xs text-gray-500 mt-1">{{ t('addresses.subtitle') }}</p>

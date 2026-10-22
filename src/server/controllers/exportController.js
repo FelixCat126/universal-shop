@@ -1,4 +1,4 @@
-import XLSX from 'xlsx'
+import XLSX from '../utils/excelWorkbook.js'
 import User from '../models/User.js'
 import Order from '../models/Order.js'
 import OrderItem from '../models/OrderItem.js'
@@ -66,7 +66,7 @@ class ExportController {
       XLSX.utils.book_append_sheet(workbook, worksheet, '用户列表')
 
       // 生成Excel文件
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+      const buffer = await XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
 
       // 设置响应头
       const filename = `用户数据_${new Date().toISOString().split('T')[0]}.xlsx`
@@ -81,7 +81,7 @@ class ExportController {
       res.status(500).json({
         success: false,
         message: '导出失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -323,7 +323,7 @@ class ExportController {
       XLSX.utils.book_append_sheet(workbook, worksheet, '订单列表')
 
       // 生成Excel文件
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+      const buffer = await XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
 
       // 设置响应头
       const filename = `订单数据_${new Date().toISOString().split('T')[0]}.xlsx`
@@ -338,7 +338,7 @@ class ExportController {
       res.status(500).json({
         success: false,
         message: '导出失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

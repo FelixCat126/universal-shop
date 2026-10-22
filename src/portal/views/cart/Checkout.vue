@@ -1,23 +1,21 @@
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- 导航栏 -->
-    <header class="bg-white shadow-sm border-b">
+    <!-- 二级页 slim 页头：仅保留返回与标题，导航由全局 sticky 顶栏承担 -->
+    <div class="border-b border-gray-200 bg-gray-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <button 
+        <div class="flex items-center h-11">
+          <button
             @click="goBack"
-            class="flex items-center text-gray-600 hover:text-gray-900"
+            class="flex items-center text-sm text-gray-600 hover:text-gray-900"
           >
-            <ArrowLeftIcon class="h-5 w-5 mr-2" />
+            <ArrowLeftIcon class="h-4 w-4 mr-1.5" />
             {{ t('common.back') }}
           </button>
-          
-          <h1 class="text-base sm:text-lg font-semibold">{{ t('order.confirmOrder') }}</h1>
-          
-          <div class="w-16"></div>
+
+          <h1 class="ml-4 text-sm font-medium text-gray-500">{{ t('order.confirmOrder') }}</h1>
         </div>
       </div>
-    </header>
+    </div>
 
     <!-- 加载状态：骨架屏 -->
     <div v-if="loading" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">
@@ -416,14 +414,24 @@
             <div v-if="showCouponSelector" class="mb-4">
               <button
                 type="button"
-                class="w-full flex items-center justify-between gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm hover:border-orange-400"
+                class="w-full rounded-md border border-dashed border-gray-300 px-3 py-2 text-left text-sm hover:border-orange-400"
                 @click="couponPickerOpen = !couponPickerOpen"
               >
-                <span class="text-gray-600 shrink-0">🎟️ {{ t('coupon.select') }}</span>
-                <span v-if="selectedCoupon" class="truncate font-medium text-orange-600">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-gray-600 shrink-0">🎟️ {{ t('coupon.select') }}</span>
+                  <svg
+                    class="h-4 w-4 shrink-0 text-gray-400 transition-transform"
+                    :class="{ 'rotate-180': couponPickerOpen }"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                <!-- 选中券独占一行：避免窄栏下与标签同行重叠 -->
+                <div v-if="selectedCoupon" class="mt-1 truncate font-medium text-orange-600">
                   {{ selectedCoupon.name }} -{{ portalCurrency.formatThb(Number(selectedCoupon.amount).toFixed(2)) }}
-                </span>
-                <span v-else class="text-gray-400">{{ t('coupon.none') }}</span>
+                </div>
+                <div v-else class="mt-1 text-gray-400">{{ t('coupon.none') }}</div>
               </button>
 
               <div v-if="couponPickerOpen" class="mt-2 max-h-64 overflow-y-auto rounded-md border border-gray-200">

@@ -9,6 +9,7 @@
 process.env.NODE_ENV = 'test'
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only-32-chars-long'
 process.env.JWT_ADMIN_SECRET = 'test-admin-jwt-secret-key-for-testing-only'
+process.env.JWT_PARTNER_SECRET = 'test-partner-jwt-secret-key-for-testing-only'
 process.env.CAPTCHA_SECRET = 'test-captcha-secret-key-for-testing-only'
 
 // 默认测试库
@@ -42,5 +43,9 @@ beforeEach(async () => {
   try {
     const { _clearAuthCacheForTests } = await import('../../src/server/middlewares/authMiddleware.js')
     _clearAuthCacheForTests()
+  } catch (_) { /* 早于 module 加载时忽略 */ }
+  try {
+    const { _resetGuestOrderProtectionForTests } = await import('../../src/server/middlewares/guestOrderGuard.js')
+    await _resetGuestOrderProtectionForTests()
   } catch (_) { /* 早于 module 加载时忽略 */ }
 })

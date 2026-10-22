@@ -6,6 +6,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 bg-white rounded-xl border border-gray-100 shadow-soft p-3 sm:p-4">
           <h2 class="text-base sm:text-lg font-semibold text-gray-900 shrink-0">
             {{ t('shop.title') }}
+            <span class="block sm:inline text-[11px] sm:text-xs font-normal text-gray-400 sm:ml-2">{{ t('shop.priceNoteThb') }}</span>
           </h2>
           <div class="flex-1 flex flex-col xs:flex-row gap-2 min-w-0">
             <input

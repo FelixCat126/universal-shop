@@ -24,7 +24,7 @@ import { _clearAuthCacheForTests } from '@server/middlewares/authMiddleware.js'
 
 beforeEach(async () => {
   await TestDatabase.clearAllData()
-  clearResponseCache()
+  await clearResponseCache()
   _resetLoginGuardForTests()
   _clearAuthCacheForTests()
 })

@@ -118,7 +118,7 @@ class CartController {
       res.status(500).json({
         success: false,
         message: '获取购物车失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -256,7 +256,7 @@ class CartController {
       res.status(500).json({
         success: false,
         message: '添加到购物车失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -486,7 +486,7 @@ class CartController {
       res.status(500).json({
         success: false,
         message: '更新购物车失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -532,7 +532,7 @@ class CartController {
       res.status(500).json({
         success: false,
         message: '删除购物车项目失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -568,7 +568,7 @@ class CartController {
       res.status(500).json({
         success: false,
         message: '清空购物车失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

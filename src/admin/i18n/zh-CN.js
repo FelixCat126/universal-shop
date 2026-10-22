@@ -153,7 +153,11 @@ export default {
     loadFailed: '加载失败',
     createOk: '已创建',
     updateOk: '已更新',
-    resetOk: '密码已重置'
+    resetOk: '密码已重置',
+    delete: '删除',
+    confirmDelete: '确认删除该合作方账号？删除后其将无法登录。',
+    deleteOk: '已删除',
+    deleteFailed: '删除失败'
   },
 
   partnerOrdersMgmt: {

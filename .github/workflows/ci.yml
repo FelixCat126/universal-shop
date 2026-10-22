@@ -9,194 +9,139 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        node-version: [20.x]
-    
-    # 未使用 services（SQLite 为文件库）；若需 Postgres 等再在此添加映射，勿留空 services:
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+          POSTGRES_DB: shop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
     steps:
-    - name: 📥 检出代码
-      uses: actions/checkout@v4
-    
-    - name: 🔧 设置 Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    
-    - name: 📦 安装依赖
-      run: npm ci
-    
-    - name: 🔍 代码风格检查
-      run: npm run lint
-      continue-on-error: true
-    
-    - name: 🏗️ 构建项目
-      run: |
-        npm run build:portal
-        npm run build:admin
-    
-    - name: 🧪 运行单元测试
-      run: npm run test:unit
-    
-    - name: 🔗 运行集成测试
-      run: npm run test:integration
-    
-    - name: 🌐 运行API测试
-      run: npm run test:api
-    
-    - name: 🎭 运行E2E测试
-      run: npm run test:e2e
-      env:
-        NODE_ENV: test
-    
-    - name: 📊 生成测试覆盖率报告
-      run: npm run test:coverage
-    
-    - name: 📈 上传覆盖率报告到 Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
-        flags: unittests
-        name: codecov-umbrella
-      continue-on-error: true
-    
-    - name: 💾 保存测试报告
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: test-reports
-        path: |
-          coverage/
-          test-reports/
-        retention-days: 30
-    
-    - name: 📋 生成测试报告摘要
-      if: always()
-      run: |
-        echo "## 🧪 测试结果摘要" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 覆盖率统计" >> $GITHUB_STEP_SUMMARY
-        if [ -f "coverage/coverage-summary.json" ]; then
-          node -e "
-            const fs = require('fs');
-            const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
-            const total = coverage.total;
-            console.log('| 指标 | 覆盖率 | 状态 |');
-            console.log('|------|--------|------|');
-            console.log(\`| 语句 | \${total.statements.pct}% | \${total.statements.pct >= 80 ? '✅' : '❌'} |\`);
-            console.log(\`| 分支 | \${total.branches.pct}% | \${total.branches.pct >= 70 ? '✅' : '❌'} |\`);
-            console.log(\`| 函数 | \${total.functions.pct}% | \${total.functions.pct >= 75 ? '✅' : '❌'} |\`);
-            console.log(\`| 行数 | \${total.lines.pct}% | \${total.lines.pct >= 80 ? '✅' : '❌'} |\`);
-          " >> $GITHUB_STEP_SUMMARY
-        else
-          echo "覆盖率报告生成失败" >> $GITHUB_STEP_SUMMARY
-        fi
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: 🔧 设置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 安装依赖
+        run: npm ci
+
+      - name: 🏗️ 构建三端
+        run: npm run build:all
+
+      - name: 🧪 全量测试（API + 集成 + Vue）
+        run: npm run test:all
+        env:
+          NODE_ENV: test
+          DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
+          JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
+          JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
+          CAPTCHA_SECRET: ci-test-captcha-secret-key-at-least-32-chars
+
+      - name: 📊 覆盖率门禁
+        run: npm run test:coverage
+        env:
+          NODE_ENV: test
+          DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
+          JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
+          JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
+          CAPTCHA_SECRET: ci-test-captcha-secret-key-at-least-32-chars
+
+      - name: 💾 保存覆盖率
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
 
   security-scan:
     runs-on: ubuntu-latest
-    needs: test
-    
     steps:
-    - name: 📥 检出代码
-      uses: actions/checkout@v4
-    
-    - name: 🔧 设置 Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: 📦 安装依赖
-      run: npm ci
-    
-    - name: 🔐 运行安全扫描
-      run: npm audit --audit-level=moderate
-      continue-on-error: true
-    
-    - name: 🛡️ 检查依赖漏洞
-      run: |
-        npx audit-ci --moderate
-      continue-on-error: true
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
 
-  performance-test:
+      - name: 🔧 设置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 安装依赖
+        run: npm ci
+
+      # 只审计生产依赖（--omit=dev）：dev 工具链（vitest/vite/tailwind 等）的上游告警
+      # 不进产物运行时，不应阻塞发布；生产依赖当前 0 high / 0 critical
+      - name: 🔐 生产依赖漏洞门禁（High/Critical 失败）
+        run: npm audit --omit=dev --registry=https://registry.npmjs.org --audit-level=high
+
+      - name: 🧾 dev 工具链漏洞快照（仅告警，不阻塞）
+        run: npm audit --registry=https://registry.npmjs.org --audit-level=high || true
+
+  browser-e2e:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'pull_request'
-    
-    steps:
-    - name: 📥 检出代码
-      uses: actions/checkout@v4
-    
-    - name: 🔧 设置 Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: 📦 安装依赖
-      run: npm ci
-    
-    - name: ⚡ 运行性能基准测试
-      run: |
-        npm run test:performance
-      continue-on-error: true
-    
-    - name: 📊 性能报告
-      if: always()
-      run: |
-        echo "## ⚡ 性能测试结果" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        if [ -f "performance-results.json" ]; then
-          echo "性能测试已完成，详细结果请查看artifacts" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "性能测试未完成或失败" >> $GITHUB_STEP_SUMMARY
-        fi
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+          POSTGRES_DB: shop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
-  deploy-preview:
-    runs-on: ubuntu-latest
-    needs: [test, security-scan]
-    if: github.event_name == 'pull_request'
-    
     steps:
-    - name: 📥 检出代码
-      uses: actions/checkout@v4
-    
-    - name: 🔧 设置 Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: 📦 安装依赖
-      run: npm ci
-    
-    - name: 🏗️ 构建生产版本
-      run: |
-        npm run build:both
-      env:
-        NODE_ENV: production
-    
-    - name: 📋 构建摘要
-      run: |
-        echo "## 🏗️ 构建结果" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ 生产构建完成" >> $GITHUB_STEP_SUMMARY
-        echo "📦 构建产物大小:" >> $GITHUB_STEP_SUMMARY
-        du -sh dist/ >> $GITHUB_STEP_SUMMARY || echo "构建目录不存在" >> $GITHUB_STEP_SUMMARY
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
 
-  notify:
-    runs-on: ubuntu-latest
-    needs: [test, security-scan]
-    if: always()
-    
-    steps:
-    - name: 📬 通知结果
-      run: |
-        if [ "${{ needs.test.result }}" == "success" ] && [ "${{ needs.security-scan.result }}" == "success" ]; then
-          echo "✅ 所有检查通过"
-        else
-          echo "❌ 部分检查失败"
-          exit 1
-        fi
+      - name: 🔧 设置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 安装依赖
+        run: npm ci
+
+      - name: 🌐 安装 Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: 🏗️ 构建三端
+        run: npm run build:all
+
+      - name: 🎭 真实浏览器 E2E
+        run: npm run test:e2e
+        env:
+          NODE_ENV: test
+          DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
+          JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
+          JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
+          CAPTCHA_SECRET: ci-test-captcha-secret-key-at-least-32-chars
+
+      - name: 💾 保存 E2E 报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

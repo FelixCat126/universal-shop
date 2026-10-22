@@ -36,7 +36,7 @@ const decodeTargetX = (token) =>
 const decodeSvg = (dataUrl) =>
   decodeURIComponent(dataUrl.slice('data:image/svg+xml;utf8,'.length))
 
-describe('T-S1 GET /api/security/captcha', () => {
+describe('T-S1 GET /api/security/captcha', async () => {
   it('应返回滑块拼图契约字段', async () => {
     const res = await request(app).get('/api/security/captcha')
     expect(res.status).toBe(200)
@@ -80,64 +80,64 @@ describe('T-S1 GET /api/security/captcha', () => {
   })
 })
 
-describe('T-S2 滑块验证码自包含验证', () => {
-  it('提交 targetX 应通过，容差 ±6 内也应通过', () => {
+describe('T-S2 滑块验证码自包含验证', async () => {
+  it('提交 targetX 应通过，容差 ±6 内也应通过', async () => {
     const c1 = issueCaptcha()
-    expect(verifyCaptcha(c1.token, decodeTargetX(c1.token))).toBe(true)
+    expect(await verifyCaptcha(c1.token, decodeTargetX(c1.token))).toBe(true)
     const c2 = issueCaptcha()
-    expect(verifyCaptcha(c2.token, decodeTargetX(c2.token) + 6)).toBe(true)
+    expect(await verifyCaptcha(c2.token, decodeTargetX(c2.token) + 6)).toBe(true)
     const c3 = issueCaptcha()
-    expect(verifyCaptcha(c3.token, decodeTargetX(c3.token) - 6)).toBe(true)
+    expect(await verifyCaptcha(c3.token, decodeTargetX(c3.token) - 6)).toBe(true)
   })
 
-  it('偏差超过容差（targetX + 20）应失败', () => {
+  it('偏差超过容差（targetX + 20）应失败', async () => {
     const { token } = issueCaptcha()
-    expect(verifyCaptcha(token, decodeTargetX(token) + 20)).toBe(false)
+    expect(await verifyCaptcha(token, decodeTargetX(token) + 20)).toBe(false)
   })
 
-  it('非数字答案应失败', () => {
+  it('非数字答案应失败', async () => {
     const { token } = issueCaptcha()
-    expect(verifyCaptcha(token, 'abc')).toBe(false)
+    expect(await verifyCaptcha(token, 'abc')).toBe(false)
   })
 
-  it('伪造 token 应失败', () => {
-    expect(verifyCaptcha('forged.invalid.token', 5)).toBe(false)
+  it('伪造 token 应失败', async () => {
+    expect(await verifyCaptcha('forged.invalid.token', 5)).toBe(false)
   })
 
-  it('同一 token 二次消费应失败（防重放）', () => {
+  it('同一 token 二次消费应失败（防重放）', async () => {
     const { token } = issueCaptcha()
     const x = decodeTargetX(token)
-    expect(verifyCaptcha(token, x)).toBe(true)
-    expect(verifyCaptcha(token, x)).toBe(false)
+    expect(await verifyCaptcha(token, x)).toBe(true)
+    expect(await verifyCaptcha(token, x)).toBe(false)
   })
 
-  it('答错也会消费 token（一次性，防穷举）', () => {
+  it('答错也会消费 token（一次性，防穷举）', async () => {
     const { token } = issueCaptcha()
     const x = decodeTargetX(token)
     // 答错：nonce 已被核销
-    expect(verifyCaptcha(token, x + 20)).toBe(false)
+    expect(await verifyCaptcha(token, x + 20)).toBe(false)
     // 同一 token 再提交正确位置也拒收
-    expect(verifyCaptcha(token, x)).toBe(false)
+    expect(await verifyCaptcha(token, x)).toBe(false)
   })
 
-  it('过期 token 应失败', () => {
+  it('过期 token 应失败', async () => {
     // 用测试密钥自签一个 6 分钟前的 token（TTL 5 分钟）
     const ts = Date.now() - 6 * 60 * 1000
     const payload = `${ts}|120|expirednonce01`
     const sig = crypto.createHmac('sha256', process.env.CAPTCHA_SECRET).update(payload).digest('base64url')
     const token = Buffer.from(`${payload}|${sig}`, 'utf8').toString('base64url')
-    expect(verifyCaptcha(token, 120)).toBe(false)
+    expect(await verifyCaptcha(token, 120)).toBe(false)
   })
 
-  it('篡改签名的 token 应失败', () => {
+  it('篡改签名的 token 应失败', async () => {
     // 签名内容与 payload 不一致（签的是 targetX=999，payload 写 120）
     const ts = Date.now()
     const badSig = crypto.createHmac('sha256', process.env.CAPTCHA_SECRET).update(`${ts}|999|tampernonce001`).digest('base64url')
     const token = Buffer.from(`${ts}|120|tampernonce001|${badSig}`, 'utf8').toString('base64url')
-    expect(verifyCaptcha(token, 120)).toBe(false)
+    expect(await verifyCaptcha(token, 120)).toBe(false)
   })
 
-  it('targetX 应落在 [60, 220]，y 应落在 [20, 86]', () => {
+  it('targetX 应落在 [60, 220]，y 应落在 [20, 86]', async () => {
     for (let i = 0; i < 50; i++) {
       const d = issueCaptcha()
       const x = decodeTargetX(d.token)
@@ -149,7 +149,7 @@ describe('T-S2 滑块验证码自包含验证', () => {
   })
 })
 
-describe('T-S3 登录连败后强制验证码', () => {
+describe('T-S3 登录连败后强制验证码', async () => {
   it(`同 IP+phone 失败 ${FAIL_THRESHOLD_VALUE} 次后再登录返回 428`, async () => {
     const phone = '13900900' + Math.floor(Math.random() * 900 + 100)
     // 先制造 N 次失败
@@ -185,21 +185,21 @@ describe('T-S3 登录连败后强制验证码', () => {
   })
 })
 
-describe('T-S3b 登录成功不再清零 IP 共享计数', () => {
-  it('clearLoginFailures 只清精确键，松散键按 TTL 保留（防跨身份重置）', () => {
+describe('T-S3b 登录成功不再清零 IP 共享计数', async () => {
+  it('clearLoginFailures 只清精确键，松散键按 TTL 保留（防跨身份重置）', async () => {
     const req = { ip: '203.0.113.10' }
-    recordLoginFailure(req, 'victim')
-    recordLoginFailure(req, 'attacker')
+    await recordLoginFailure(req, 'victim')
+    await recordLoginFailure(req, 'attacker')
     // 攻击者用自己账号登录成功：只清自己的精确键
-    clearLoginFailures(req, 'attacker')
+    await clearLoginFailures(req, 'attacker')
     // 松散键 ip::* 仍累计 2 次：受害者身份的失败计数不会被他人登录成功清零
-    expect(getFailCount(req, 'victim')).toBe(2)
+    expect(await getFailCount(req, 'victim')).toBe(2)
     // 攻击者自身也仍受 IP 级计数约束（精确键已清，松散键还在）
-    expect(getFailCount(req, 'attacker')).toBe(2)
+    expect(await getFailCount(req, 'attacker')).toBe(2)
   })
 })
 
-describe('T-S4 helmet 与 Permissions-Policy 响应头', () => {
+describe('T-S4 helmet 与 Permissions-Policy 响应头', async () => {
   it('应包含 Permissions-Policy / Referrer-Policy / X-Content-Type-Options', async () => {
     const res = await request(app).get('/api/security/captcha')
     expect(res.headers['x-content-type-options']).toBe('nosniff')
@@ -209,7 +209,7 @@ describe('T-S4 helmet 与 Permissions-Policy 响应头', () => {
   })
 })
 
-describe('T-S5 AuditLog 写入', () => {
+describe('T-S5 AuditLog 写入', async () => {
   it('错密码登录应在 audit_logs 中产生 user.login.fail 记录', async () => {
     const phone = '13700700' + Math.floor(Math.random() * 900 + 100)
     const before = await AuditLog.count({ where: { event: 'user.login.fail' } })

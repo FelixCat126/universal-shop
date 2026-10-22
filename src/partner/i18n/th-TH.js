@@ -42,6 +42,7 @@ export default {
   },
   shop: {
     title: 'รายการสินค้า',
+    priceNoteThb: 'ราคาทั้งหมดเป็นราคาขายส่งสกุลบาท (THB)',
     search: 'ค้นหาชื่อสินค้า',
     searchBtn: 'ค้นหา',
     loading: 'กำลังโหลด…',
@@ -99,6 +100,7 @@ export default {
     loading: 'กำลังโหลด…',
     loadingMore: 'กำลังโหลดเพิ่ม…',
     empty: 'ยังไม่มีคำสั่งซื้อ',
+    emptyGoShop: 'ไปสั่งสินค้า',
     delivery: 'ที่อยู่จัดส่ง',
     placedAt: 'เวลาสั่ง',
     dateRangeLabel: 'กรองตามวันที่สั่ง',

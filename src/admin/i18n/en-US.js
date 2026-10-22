@@ -151,7 +151,11 @@ export default {
     loadFailed: 'Load failed',
     createOk: 'Created',
     updateOk: 'Updated',
-    resetOk: 'Password reset'
+    resetOk: 'Password reset',
+    delete: 'Delete',
+    confirmDelete: 'Delete this partner account? They will no longer be able to log in.',
+    deleteOk: 'Deleted',
+    deleteFailed: 'Delete failed'
   },
 
   partnerOrdersMgmt: {

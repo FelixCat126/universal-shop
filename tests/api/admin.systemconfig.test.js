@@ -36,7 +36,7 @@ import { clearResponseCache } from '@server/utils/responseCache.js'
 
 beforeEach(async () => {
   await TestDatabase.clearAllData()
-  clearResponseCache()
+  await clearResponseCache()
 })
 
 async function superCtx () {
@@ -205,5 +205,32 @@ describe('P3.admin.systemconfig — 上传/删除 + 权限', () => {
     const res = await request(app).get('/api/system-config')
       .set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(403)
+  })
+})
+
+describe('SC-Extra.公开配置 sms_configured', () => {
+  it('SC-19 /public 返回 sms_configured 布尔值（短信未配置时为 false）', async () => {
+    const res = await request(app).get('/api/system-config/public')
+    expect(res.status).toBe(200)
+    expect(res.body.data).toHaveProperty('sms_configured')
+    expect(typeof res.body.data.sms_configured).toBe('boolean')
+  })
+
+  it('SC-20 配置 SMS_WEBHOOK_URL 后 sms_configured 变 true', async () => {
+    const original = process.env.SMS_WEBHOOK_URL
+    process.env.SMS_WEBHOOK_URL = 'https://sms.example.com/send'
+    try {
+      // /public 有 30s 服务端缓存，改 env 前必须失效，否则读到旧值
+      const { clearResponseCache } = await import('../../src/server/utils/responseCache.js')
+      await clearResponseCache()
+      const res = await request(app).get('/api/system-config/public')
+      expect(res.status).toBe(200)
+      expect(res.body.data.sms_configured).toBe(true)
+    } finally {
+      if (original === undefined) delete process.env.SMS_WEBHOOK_URL
+      else process.env.SMS_WEBHOOK_URL = original
+      const { clearResponseCache } = await import('../../src/server/utils/responseCache.js')
+      await clearResponseCache()
+    }
   })
 })

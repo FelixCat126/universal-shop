@@ -229,7 +229,7 @@ echo "🚀 PM2 启动/重启..."
 export NODE_ENV=production
 if command -v pm2 >/dev/null 2>&1; then
   if pm2 describe universal-shop >/dev/null 2>&1; then
-    pm2 restart universal-shop --update-env
+    pm2 reload universal-shop --update-env
   elif [[ -f ecosystem.config.js ]]; then
     pm2 start ecosystem.config.js
   else

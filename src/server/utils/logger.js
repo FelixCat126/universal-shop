@@ -65,7 +65,8 @@ export function requestLogger () {
         path: req.originalUrl,
         status: res.statusCode,
         ms: dur,
-        ip: req.ip
+        ip: req.ip,
+        requestId: req.requestId || null
       })
     })
     next()

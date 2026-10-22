@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { createSharedStore } from './sharedState.js'
 import { logger } from './logger.js'
 
 /**
@@ -39,14 +40,7 @@ const Y_MIN = 20
 const Y_MAX = HEIGHT - PIECE_W - 20
 const TOLERANCE = 6 // 滑块 x 与缺口 targetX 的判定容差（像素）
 
-const usedNonces = new Map() // nonce -> exp
-
-const sweepUsed = () => {
-  const now = Date.now()
-  for (const [n, exp] of usedNonces) {
-    if (exp <= now) usedNonces.delete(n)
-  }
-}
+const usedNonces = createSharedStore('captcha-used')
 
 const sign = (payload) =>
   crypto.createHmac('sha256', SECRET).update(payload).digest('base64url')
@@ -165,7 +159,7 @@ export function issueCaptcha () {
  * @param {string} token
  * @param {string|number} userAnswer 客户端提交的滑块 x 坐标（像素）
  */
-export function verifyCaptcha (token, userAnswer) {
+export async function verifyCaptcha (token, userAnswer) {
   if (!token || userAnswer === undefined || userAnswer === null) return false
   let raw
   try {
@@ -189,9 +183,8 @@ export function verifyCaptcha (token, userAnswer) {
   }
 
   // 一次性消费：无论答案对错都先核销 nonce，防同一 token 在 TTL 内穷举答案
-  sweepUsed()
-  if (usedNonces.has(nonce)) return false
-  usedNonces.set(nonce, ts + TTL_MS)
+  if (await usedNonces.get(nonce)) return false
+  await usedNonces.set(nonce, true, Math.max(1, ts + TTL_MS - Date.now()))
 
   const answerNum = Number(userAnswer)
   if (!Number.isFinite(answerNum)) return false

@@ -67,7 +67,7 @@ class ProductCategoryController {
         sort_order: Number.isFinite(sort_order) ? sort_order : 0
       })
       // 分类变更后清 GET 响应缓存，避免前台读到旧分类列表
-      clearResponseCache()
+      await clearResponseCache()
       return res.status(201).json({ success: true, data: row })
     } catch (e) {
       logger.error('create category', { err: e?.message, stack: e?.stack })
@@ -99,7 +99,7 @@ class ProductCategoryController {
       }
       await row.update(patch)
       // 分类变更后清 GET 响应缓存，避免前台读到旧分类列表
-      clearResponseCache()
+      await clearResponseCache()
       return res.json({ success: true, data: row })
     } catch (e) {
       logger.error('update category', { err: e?.message, stack: e?.stack })
@@ -126,7 +126,7 @@ class ProductCategoryController {
       }
       await row.destroy()
       // 分类变更后清 GET 响应缓存，避免前台读到旧分类列表
-      clearResponseCache()
+      await clearResponseCache()
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
       logger.error('remove category', { err: e?.message, stack: e?.stack })

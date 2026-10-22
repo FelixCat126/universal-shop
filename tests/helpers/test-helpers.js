@@ -6,7 +6,7 @@ export class TestHelpers {
   // 生成JWT Token
   static generateToken(user, expiresIn = '1h') {
     return jwt.sign(
-      { userId: user.id, username: user.username },
+      { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
       process.env.JWT_SECRET,
       { expiresIn }
     )
@@ -19,9 +19,10 @@ export class TestHelpers {
         adminId: admin.id, 
         username: admin.username, 
         role: admin.role,
-        type: 'admin'
+        type: 'admin',
+        tv: Number(admin.token_version) || 0
       },
-      process.env.JWT_SECRET,
+      process.env.JWT_ADMIN_SECRET || process.env.JWT_SECRET,
       { expiresIn }
     )
   }
@@ -32,9 +33,10 @@ export class TestHelpers {
       {
         partnerId: partner.id,
         login: partner.login,
-        type: 'partner'
+        type: 'partner',
+        tv: Number(partner.token_version) || 0
       },
-      process.env.JWT_SECRET,
+      process.env.JWT_PARTNER_SECRET || process.env.JWT_SECRET,
       { expiresIn }
     )
   }

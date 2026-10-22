@@ -51,6 +51,12 @@ const Partner = sequelize.define('Partner', {
   last_login_at: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  token_version: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '令牌版本：重置密码时递增，旧 JWT 立即失效'
   }
 }, {
   tableName: 'partners',

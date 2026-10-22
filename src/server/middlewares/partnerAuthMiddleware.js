@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 import Partner from '../models/Partner.js'
-import { JWT_SECRET } from '../config/jwtSecret.js'
+import { JWT_PARTNER_SECRET } from '../config/jwtSecret.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -16,7 +16,7 @@ export async function authenticatePartner (req, res, next) {
 
     let decoded
     try {
-      decoded = jwt.verify(token, JWT_SECRET)
+      decoded = jwt.verify(token, JWT_PARTNER_SECRET)
     } catch {
       return res.status(403).json({ success: false, message: '无效的认证令牌' })
     }
@@ -28,6 +28,9 @@ export async function authenticatePartner (req, res, next) {
     const partner = await Partner.findByPk(decoded.partnerId)
     if (!partner?.is_active) {
       return res.status(403).json({ success: false, message: '合作方账号不可用' })
+    }
+    if (Number(decoded.tv ?? 0) !== (Number(partner.token_version) || 0)) {
+      return res.status(401).json({ success: false, message: '登录状态已失效，请重新登录' })
     }
 
     req.partner = {

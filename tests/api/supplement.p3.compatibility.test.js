@@ -19,7 +19,7 @@ beforeEach(async () => {
   await TestDatabase.clearAllData()
   _clearAuthCacheForTests()
   _resetLoginGuardForTests()
-  clearResponseCache()
+  await clearResponseCache()
 })
 
 // 本文件业务测试套件最后一个执行（compatibility 命名 a- 前缀最小）。

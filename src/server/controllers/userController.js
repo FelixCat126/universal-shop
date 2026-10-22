@@ -1,4 +1,7 @@
 import User from '../models/User.js'
+import Address from '../models/Address.js'
+import Cart from '../models/Cart.js'
+import sequelize from '../config/database.js'
 import jwt from 'jsonwebtoken'
 import { Op } from 'sequelize'
 import crypto from 'crypto'
@@ -102,7 +105,7 @@ class UserController {
 
       // 生成JWT token
       const token = jwt.sign(
-        { userId: user.id, username: user.username, type: 'user' },
+        { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
         JWT_SECRET,
         { expiresIn: '7d' }
       )
@@ -127,7 +130,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '注册失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -200,7 +203,7 @@ class UserController {
       return res.json({ success: true, message: '资料更新成功', data: user.toSafeJSON() })
     } catch (error) {
       logger.error('更新用户资料失败', { err: error?.message, stack: error?.stack })
-      return res.status(500).json({ success: false, message: '更新失败', error: error.message })
+      return res.status(500).json({ success: false, message: '更新失败', code: 'INTERNAL_SERVER_ERROR' })
     }
   }
 
@@ -245,7 +248,11 @@ class UserController {
       }
 
       user.password = next
+      user.token_version = (Number(user.token_version) || 0) + 1
+      user.must_reset_password = false
       await user.save()
+      const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
+      await invalidateAuthCache(user.id)
 
       return res.json({
         success: true,
@@ -256,7 +263,7 @@ class UserController {
       return res.status(500).json({
         success: false,
         message: '修改密码失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -320,7 +327,7 @@ class UserController {
       }
 
       if (!user) {
-        recordLoginFailure(req, phone || email)
+        await recordLoginFailure(req, phone || email)
         AuditLog.logUser({
           event: 'user.login.fail',
           success: false,
@@ -351,7 +358,7 @@ class UserController {
       // 验证密码
       const isValidPassword = await user.validatePassword(password)
       if (!isValidPassword) {
-        recordLoginFailure(req, phone || email)
+        await recordLoginFailure(req, phone || email)
         AuditLog.logUser({
           user,
           event: 'user.login.fail',
@@ -368,12 +375,12 @@ class UserController {
       // 更新最后登录时间
       user.last_login_at = new Date()
       await user.save()
-      clearLoginFailures(req, phone || email)
+      await clearLoginFailures(req, phone || email)
       AuditLog.logUser({ user, event: 'user.login.success', req }).catch(() => {})
 
       // 生成JWT token
       const token = jwt.sign(
-        { userId: user.id, username: user.username, type: 'user' },
+        { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
         JWT_SECRET,
         { expiresIn: '7d' }
       )
@@ -391,7 +398,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '登录失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -494,7 +501,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '获取用户列表失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -528,7 +535,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '验证推荐码失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -561,7 +568,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: 'Token验证失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -590,16 +597,77 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '获取用户信息失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
 
-  // 用户登出
+  // 注销当前账号：匿名化资料并禁用，保留订单用于审计，旧 token 立即失效
+  static async deleteAccount (req, res) {
+    const transaction = await sequelize.transaction()
+    try {
+      const userId = req.user?.userId
+      if (!userId) {
+        await transaction.rollback()
+        return res.status(401).json({ success: false, message: '未登录' })
+      }
+      const { password } = req.body || {}
+      if (!password) {
+        await transaction.rollback()
+        return res.status(400).json({ success: false, message: '请输入当前密码以确认注销' })
+      }
+      const user = await User.findByPk(userId, { transaction, lock: transaction.LOCK.UPDATE })
+      if (!user) {
+        await transaction.rollback()
+        return res.status(404).json({ success: false, message: '用户不存在' })
+      }
+      const ok = await user.validatePassword(String(password))
+      if (!ok) {
+        await transaction.rollback()
+        return res.status(400).json({ success: false, message: '当前密码不正确' })
+      }
+
+      await Address.destroy({ where: { user_id: userId }, transaction })
+      await Cart.destroy({ where: { user_id: userId }, transaction })
+
+      user.is_active = false
+      user.country_code = '+86'
+      user.phone = `139${String(user.id).padStart(8, '0')}`
+      user.username = `deleted_${user.id}`
+      user.email = null
+      user.nickname = '已注销用户'
+      user.avatar_url = null
+      user.referral_code = null
+      user.referred_by_code = null
+      user.must_reset_password = false
+      user.token_version = (Number(user.token_version) || 0) + 1
+      await user.save({ transaction })
+      await transaction.commit()
+
+      const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
+      await invalidateAuthCache(userId)
+      AuditLog.logUser({ user, event: 'user.delete_account.success', req }).catch(() => {})
+      return res.json({ success: true, message: '账号已注销，个人资料已匿名化' })
+    } catch (error) {
+      await transaction.rollback().catch(() => {})
+      logger.error('注销账号失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '注销账号失败', code: 'INTERNAL_SERVER_ERROR' })
+    }
+  }
+
+  // 用户登出：递增 token_version，旧 JWT 立即失效（含其他设备会话）
   static async logout(req, res) {
     try {
-      // JWT是无状态的，前端删除token即可
-      // 这里可以添加黑名单逻辑或其他清理操作
+      const userId = req.user?.userId
+      if (userId) {
+        const user = await User.findByPk(userId)
+        if (user) {
+          user.token_version = (Number(user.token_version) || 0) + 1
+          await user.save()
+          const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
+          await invalidateAuthCache(user.id)
+        }
+      }
       res.json({
         success: true,
         message: '登出成功'
@@ -609,7 +677,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '登出失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -804,7 +872,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '检查手机号失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -833,7 +901,7 @@ class UserController {
       await user.update({ is_active })
       // 立即失效 authMiddleware 5s 缓存，确保该 token 下次请求即被拒绝
       const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
-      invalidateAuthCache(user.id)
+      await invalidateAuthCache(user.id)
 
       res.json({
         success: true,
@@ -850,7 +918,7 @@ class UserController {
       res.status(500).json({
         success: false,
         message: '更新用户状态失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

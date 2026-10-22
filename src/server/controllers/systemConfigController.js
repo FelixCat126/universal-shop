@@ -135,7 +135,7 @@ class SystemConfigController {
       res.status(500).json({
         success: false,
         message: '获取系统配置失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -158,7 +158,7 @@ class SystemConfigController {
       res.status(500).json({
         success: false,
         message: '获取配置失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -347,7 +347,7 @@ class SystemConfigController {
       res.status(500).json({
         success: false,
         message: '设置配置失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -389,7 +389,7 @@ class SystemConfigController {
       res.status(500).json({
         success: false,
         message: '删除配置失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -450,7 +450,7 @@ class SystemConfigController {
         res.status(500).json({
           success: false,
           message: '上传失败',
-          error: error.message
+          code: 'INTERNAL_SERVER_ERROR'
         })
       }
     }
@@ -512,7 +512,7 @@ class SystemConfigController {
         res.status(500).json({
           success: false,
           message: '上传失败',
-          error: error.message
+          code: 'INTERNAL_SERVER_ERROR'
         })
       }
     }
@@ -618,7 +618,12 @@ class SystemConfigController {
         exchange_rate: rates.USD,
         currency_code: code,
         /** @deprecated 与 currency_code 相同，兼容旧前端 */
-        currency_unit: code
+        currency_unit: code,
+        /**
+         * 短信通道是否已配置：未配置时前端不展示「忘记密码」入口，
+         * 避免把用户引到必然 503 的死链
+         */
+        sms_configured: Boolean(process.env.SMS_WEBHOOK_URL)
       }
       
       res.json({
@@ -630,7 +635,7 @@ class SystemConfigController {
       res.status(500).json({
         success: false,
         message: '获取配置失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

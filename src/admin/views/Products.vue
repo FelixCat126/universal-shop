@@ -82,7 +82,7 @@
         <div class="table-wrapper">
       <el-table 
         :data="filteredProducts" 
-        style="width: 100%; min-width: 1200px" 
+        style="width: 100%"
         v-loading="loading"
         row-key="id"
         border
@@ -91,9 +91,9 @@
         class="product-table"
         :row-class-name="tableRowClassName"
       >
-        <el-table-column prop="id" label="ID" width="80" />
-        
-        <el-table-column :label="t('products.image.productImage')" width="120" align="center">
+        <el-table-column prop="id" label="ID" width="60" />
+
+        <el-table-column :label="t('products.image.productImage')" width="90" align="center">
           <template #default="scope">
             <el-image
               :src="scope.row.image || defaultImage"
@@ -118,7 +118,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.name')" width="280" min-width="250">
+        <el-table-column :label="t('products.name')" width="200" min-width="180">
           <template #default="scope">
             <div class="product-name-container">
               <div class="product-name" :title="scope.row.name">{{ scope.row.name }}</div>
@@ -126,13 +126,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="category" :label="t('products.category')" width="140" min-width="120">
+        <el-table-column prop="category" :label="t('products.category')" width="110" min-width="100">
           <template #default="scope">
             <el-tag>{{ getCategoryLabel(scope.row) }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.shelfStatus')" width="130" min-width="120">
+        <el-table-column :label="t('products.shelfStatus')" width="110" min-width="100">
           <template #default="scope">
             <div class="shelf-status-cell">
               <el-tag v-if="isDelisted(scope.row)" type="info" size="small">{{ t('products.shelfDelisted') }}</el-tag>
@@ -150,7 +150,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="price" :label="t('products.price')" width="180" min-width="160" align="right">
+        <el-table-column prop="price" :label="t('products.price')" width="130" min-width="120" align="right">
           <template #default="scope">
             <div class="price-container">
               <!-- 有折扣时显示折扣价 -->
@@ -167,9 +167,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="points" :label="t('products.points')" width="120" align="right" />
+        <el-table-column prop="points" :label="t('products.points')" width="90" align="right" />
 
-        <el-table-column prop="stock" :label="t('products.stock')" width="160" min-width="140">
+        <el-table-column prop="stock" :label="t('products.stock')" width="110" min-width="100">
           <template #default="scope">
             <div class="stock-info-inline">
               <span :class="{
@@ -199,45 +199,31 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('common.createTime')" width="160" min-width="140">
+        <el-table-column :label="t('common.createTime')" width="130" min-width="120">
           <template #default="scope">
             <span class="create-time">{{ formatDate(scope.row.created_at) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.actions')" width="300" min-width="280" fixed="right">
+        <el-table-column :label="t('products.actions')" width="110" align="center" fixed="right">
           <template #default="scope">
-            <div class="action-buttons">
-              <el-button
-                size="small"
-                @click="editProduct(scope.row)"
-              >
-                {{ t('products.edit') }}
+            <el-dropdown trigger="click" @command="(cmd) => handleProductAction(cmd, scope.row)">
+              <el-button size="small">
+                {{ t('products.actions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </el-button>
-              <el-button
-                size="small"
-                type="warning"
-                @click="showStockDialog(scope.row)"
-              >
-                {{ t('products.adjustStock') }}
-              </el-button>
-              <el-button
-                v-if="!isDelisted(scope.row)"
-                size="small"
-                type="danger"
-                @click="deleteProduct(scope.row)"
-              >
-                {{ t('products.delete') }}
-              </el-button>
-              <el-button
-                v-else
-                size="small"
-                type="success"
-                @click="restoreProduct(scope.row)"
-              >
-                {{ t('products.restore') }}
-              </el-button>
-            </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="edit">{{ t('products.edit') }}</el-dropdown-item>
+                  <el-dropdown-item command="stock">{{ t('products.adjustStock') }}</el-dropdown-item>
+                  <el-dropdown-item v-if="!isDelisted(scope.row)" command="delete" divided>
+                    {{ t('products.delete') }}
+                  </el-dropdown-item>
+                  <el-dropdown-item v-else command="restore" divided>
+                    {{ t('products.restore') }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
@@ -572,6 +558,14 @@ export default {
 
     const tableRowClassName = ({ row }) => {
       return isDelisted(row) ? 'product-row-delisted' : ''
+    }
+
+    // 操作列下拉菜单统一分发：窄列 + fixed 共存，避免宽操作列遮挡业务列
+    const handleProductAction = (command, row) => {
+      if (command === 'edit') return editProduct(row)
+      if (command === 'stock') return showStockDialog(row)
+      if (command === 'delete') return deleteProduct(row)
+      if (command === 'restore') return restoreProduct(row)
     }
 
     const showAddDialog = () => {
@@ -933,6 +927,7 @@ export default {
       formatDate,
       isDelisted,
       tableRowClassName,
+      handleProductAction,
       showAddDialog,
       editProduct,
       resetProductForm,

@@ -19,7 +19,7 @@ router.get('/', logOperation('view', 'system_config'), SystemConfigController.ge
 router.post(
   '/',
   logOperation('update', 'system_config'),
-  (req, res, next) => { clearResponseCache(); next() },
+  async (req, res, next) => { await clearResponseCache(); next() },
   SystemConfigController.setConfig
 )
 
@@ -27,7 +27,7 @@ router.post(
 router.post(
   '/upload/home-banner',
   logOperation('upload', 'home_banner'),
-  (req, res, next) => { clearResponseCache(); next() },
+  async (req, res, next) => { await clearResponseCache(); next() },
   SystemConfigController.uploadHomeBanner
 )
 
@@ -35,7 +35,7 @@ router.post(
 router.post(
   '/upload/payment-qr',
   logOperation('upload', 'payment_qrcode'),
-  (req, res, next) => { clearResponseCache(); next() },
+  async (req, res, next) => { await clearResponseCache(); next() },
   SystemConfigController.uploadPaymentQR
 )
 
@@ -43,7 +43,7 @@ router.post(
 router.delete(
   '/home-banner',
   logOperation('delete', 'home_banner'),
-  (req, res, next) => { clearResponseCache(); next() },
+  async (req, res, next) => { await clearResponseCache(); next() },
   SystemConfigController.deleteHomeBanner
 )
 
@@ -51,7 +51,7 @@ router.delete(
 router.delete(
   '/payment-qr',
   logOperation('delete', 'payment_qrcode'),
-  (req, res, next) => { clearResponseCache(); next() },
+  async (req, res, next) => { await clearResponseCache(); next() },
   SystemConfigController.deletePaymentQR
 )
 

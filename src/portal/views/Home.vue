@@ -10,7 +10,7 @@
           {{ t('product.productList') }}
         </h2>
         <p class="text-gray-600">
-          {{ t('product.searchPlaceholder') }}
+          {{ t('product.listSubtitle') }}
         </p>
       </div>
 
@@ -71,6 +71,7 @@
                 :src="bundle.image || defaultImage"
                 :alt="getCurrentLanguageValue(bundle, 'name')"
                 custom-class="w-full h-48 object-cover"
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
                 loading="lazy"
                 @error="handleImageError"
                 @load="handleImageLoad"
@@ -130,9 +131,9 @@
         </div>
       </section>
 
-      <!-- 搜索栏 -->
+      <!-- 搜索栏：移动端全宽，桌面加宽与容器更协调 -->
       <div class="mb-6">
-        <div class="relative w-full sm:max-w-md">
+        <div class="relative w-full sm:max-w-xl">
           <input
             v-model="searchQuery"
             type="text"
@@ -151,7 +152,10 @@
         class="sticky top-0 z-30 -mx-4 mb-5 px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 bg-gray-50/95 backdrop-blur-md border-b border-gray-200/90 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
       >
         <div
-          class="flex gap-2 overflow-x-auto overflow-y-hidden pb-1 -mx-1 px-1 touch-pan-x [scrollbar-width:thin]"
+          ref="categoryTabScroller"
+          class="flex gap-2 overflow-x-auto overflow-y-hidden pb-1 -mx-1 px-1 touch-pan-x [scrollbar-width:thin] category-tab-scroll"
+          :class="{ 'cat-fade-right': categoryTabFadeRight, 'cat-fade-left': categoryTabFadeLeft }"
+          @scroll.passive="updateCategoryTabFade"
         >
           <button
             v-for="c in categories"
@@ -231,6 +235,7 @@
               :src="product.image_url || defaultImage"
               :alt="getCurrentLanguageValue(product, 'name')"
               custom-class="w-full h-48 object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
               loading="lazy"
               @error="handleImageError"
               @load="handleImageLoad"
@@ -238,11 +243,11 @@
           </div>
           
           <div class="p-4 flex flex-col flex-1 min-h-0">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3rem] sm:min-h-[3.5rem]">
               {{ getCurrentLanguageValue(product, 'name') }}
             </h3>
-            
-            <p class="text-gray-600 text-sm mb-3 line-clamp-2 shrink-0">
+
+            <p class="text-gray-600 text-sm mb-3 line-clamp-2 shrink-0 min-h-[2.5rem]">
               {{ getCurrentLanguageValue(product, 'description') }}
             </p>
             
@@ -378,6 +383,7 @@ import { usePortalCurrencyStore, loadPublicConfig } from '../stores/portalCurren
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import ImageFade from '../components/ui/ImageFade.vue'
 import { appleSpring, subtleSpring, bouncySpring } from '../composables/useSpring.js'
+import { useReducedMotion } from '../composables/useReducedMotion.js'
 
 const portalCurrency = usePortalCurrencyStore()
 
@@ -412,16 +418,37 @@ let scrollProximityRaf = null
  * 卡片入场动画只应用到第一页的前 8 张（首屏可见），避免长列表 200 个 v-motion 状态机导致 GC 压力。
  * 后续卡片用 CSS 简单 fade-in（.css-card-fade-in）。
  */
-const shouldAnimateCard = (idx) => currentPage.value === 1 && idx < 8
+const shouldAnimateCard = (idx) => currentPage.value === 1 && idx < 8 && !reducedMotion.value
 
 /** 桌面端 hover 存在；移动端 hover 不存在（触摸），不浪费 motion 状态 */
 const isDesktop = computed(() => {
   if (typeof window === 'undefined') return false
   return window.matchMedia?.('(hover: hover) and (pointer: fine)').matches ?? true
 })
+const reducedMotion = useReducedMotion()
 
 const categories = ref([])
 const selectedCategoryId = ref(null)
+
+// 分类 Tab 横滑边界渐隐：提示右侧/左侧还有内容可滑
+const categoryTabScroller = ref(null)
+const categoryTabFadeRight = ref(false)
+const categoryTabFadeLeft = ref(false)
+const updateCategoryTabFade = () => {
+  const el = categoryTabScroller.value
+  if (!el) {
+    categoryTabFadeRight.value = false
+    categoryTabFadeLeft.value = false
+    return
+  }
+  const remaining = el.scrollWidth - el.clientWidth - el.scrollLeft
+  categoryTabFadeRight.value = remaining > 8
+  categoryTabFadeLeft.value = el.scrollLeft > 8
+}
+watch(categories, async () => {
+  await nextTick()
+  updateCategoryTabFade()
+})
 
 // 组合套餐
 const bundles = ref([])
@@ -856,7 +883,9 @@ onMounted(async () => {
   await loadProducts({ append: false })
   await nextTick()
   attachInfiniteScroll()
+  updateCategoryTabFade()
   window.addEventListener('scroll', onWindowScrollProximity, { passive: true })
+  window.addEventListener('resize', updateCategoryTabFade, { passive: true })
   window.visualViewport?.addEventListener?.('resize', onWindowScrollProximity)
 })
 
@@ -864,6 +893,7 @@ onUnmounted(() => {
   loadMoreObserver?.disconnect()
   loadMoreObserver = null
   window.removeEventListener('scroll', onWindowScrollProximity, { passive: true })
+  window.removeEventListener('resize', updateCategoryTabFade, { passive: true })
   window.visualViewport?.removeEventListener?.('resize', onWindowScrollProximity)
   if (scrollProximityRaf != null) {
     cancelAnimationFrame(scrollProximityRaf)
@@ -881,5 +911,21 @@ onUnmounted(() => {
 
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* 分类 Tab 横滑边界渐隐（按滚动位置动态挂载，提示还有内容可滑） */
+.category-tab-scroll.cat-fade-right {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 2.5rem), transparent);
+}
+
+.category-tab-scroll.cat-fade-left {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 2.5rem);
+  mask-image: linear-gradient(to right, transparent, black 2.5rem);
+}
+
+.category-tab-scroll.cat-fade-left.cat-fade-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 2.5rem, black calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(to right, transparent, black 2.5rem, black calc(100% - 2.5rem), transparent);
 }
 </style>

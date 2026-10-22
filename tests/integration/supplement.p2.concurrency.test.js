@@ -19,7 +19,7 @@ beforeEach(async () => {
   await TestDatabase.clearAllData()
   _clearAuthCacheForTests()
   _resetLoginGuardForTests()
-  clearResponseCache()
+  await clearResponseCache()
 })
 
 async function makeUser (overrides = {}) {

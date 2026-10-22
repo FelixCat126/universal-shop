@@ -14,7 +14,9 @@ import {
   globalLimiter,
   loginLimiter
 } from './middlewares/security.js'
+import { authenticateAdmin, requireSuperAdmin } from './middlewares/adminAuthMiddleware.js'
 import { logger, requestLogger } from './utils/logger.js'
+import { observabilityMiddleware, getRuntimeMetrics } from './middlewares/observability.js'
 import productRoutes from './routes/productRoutes.js'
 import productCategoryRoutes from './routes/productCategoryRoutes.js'
 import uploadRoutes from './routes/uploadRoutes.js'
@@ -32,6 +34,8 @@ import couponRoutes from './routes/couponRoutes.js'
 import bundleRoutes from './routes/bundleRoutes.js'
 import securityRoutes from './routes/securityRoutes.js'
 import { startOrderTimeoutSweeper } from './services/orderTimeoutService.js'
+import { startGuestAccountCleanup } from './services/guestAccountCleanup.js'
+import { startRetentionCleanup } from './services/retentionService.js'
 
 // 导入模型以确保数据库同步
 import './models/User.js'
@@ -58,6 +62,7 @@ import './models/CouponTemplate.js'
 import './models/UserCoupon.js'
 import './models/Bundle.js'
 import './models/BundleItem.js'
+import './models/AfterSale.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -170,6 +175,7 @@ app.use('/api', globalLimiter)
 app.use(['/api/admin/login', '/api/users/login', '/api/auth/login', '/api/partner/login'], loginLimiter)
 
 // 请求日志中间件（生产用 winston 落盘；开发/测试用控制台）
+app.use(observabilityMiddleware)
 app.use(requestLogger())
 
 // Content-Type修复中间件
@@ -183,6 +189,20 @@ app.use((req, res, next) => {
   }
   next()
 })
+
+async function ensureTokenVersionColumns () {
+  const qi = sequelize.getQueryInterface()
+  for (const table of ['users', 'administrators', 'partners']) {
+    const desc = await qi.describeTable(table).catch(() => null)
+    if (!desc || desc.token_version) continue
+    await qi.addColumn(table, 'token_version', {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    })
+    console.log(`✅ 已为 ${table} 添加 token_version 字段（旧 JWT 失效机制）`)
+  }
+}
 
 async function ensureUserAvatarUrlColumn () {
   const qi = sequelize.getQueryInterface()
@@ -446,10 +466,13 @@ let dbReadyState
 if (process.env.NODE_ENV !== 'test') {
   dbReadyState = 'pending'
   dbReady = sequelize.authenticate()
-    .then(() => {
+    .then(async () => {
       console.log('✅ 数据库连接成功')
+      // 与 production-deploy-setup.mjs 共用同一把锁，防止多实例/部署并发迁移
+      await sequelize.query('SELECT pg_advisory_lock(862427113)')
       return sequelize.sync({ alter: false })
     })
+    .then(() => ensureTokenVersionColumns())
     .then(() => ensureUserAvatarUrlColumn())
     .then(() => ensureProductPointsColumn())
     .then(() => ensureOrderBillingColumns())
@@ -466,9 +489,10 @@ if (process.env.NODE_ENV !== 'test') {
     .then(() => ensurePartnerAddressSchemaColumns())
     .then(() => ensureExchangeRatesConfig())
     .then(() => ensureProductCategoriesMigrate())
-    .then(() => {
+    .then(async () => {
       dbReadyState = 'ready'
       console.log('✅ 数据库模型同步成功')
+      await sequelize.query('SELECT pg_advisory_unlock(862427113)').catch(() => {})
     })
     .then(() => {
       // 启动 pending 在线支付订单超时清扫（默认 10 分钟未支付自动删单回补库存）
@@ -476,12 +500,15 @@ if (process.env.NODE_ENV !== 'test') {
       // try/catch 兜底：清扫器启动失败不影响 dbReadyState='ready'，避免 /api/health 误报 503
       try {
         startOrderTimeoutSweeper()
+        startGuestAccountCleanup()
+        startRetentionCleanup()
       } catch (err) {
         console.error('⚠️ 订单超时清扫器启动失败（不影响主服务）:', err.message)
       }
     })
-    .catch(err => {
+    .catch(async err => {
       dbReadyState = 'failed'
+      await sequelize.query('SELECT pg_advisory_unlock(862427113)').catch(() => {})
       console.error('❌ 数据库连接或同步失败:', err.message)
       console.error('📋 详细错误信息:', err)
       if (err.sql) {
@@ -539,7 +566,7 @@ app.get('/api/health', (req, res) => {
 })
 
 /** 排查部署：返回 package 版本与 dist/portal/index.html 修改时间（确认是否已同步新前端；不暴露服务器绝对路径） */
-app.get('/api/portal-build', (req, res) => {
+app.get('/api/portal-build', authenticateAdmin, requireSuperAdmin, (req, res) => {
   try {
     const pkgPath = path.join(projectRoot, 'package.json')
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
@@ -552,7 +579,8 @@ app.get('/api/portal-build', (req, res) => {
       hint: '若公网仍为旧界面：对比 portalIndexModified 是否为本次部署时间；过旧则多为 Nginx/OSS 未指向本机 dist，或 CDN 缓存未刷新'
     })
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message })
+    logger.error('portal-build 读取失败', { err: e?.message, stack: e?.stack })
+    res.status(500).json({ success: false, message: '读取构建信息失败', code: 'INTERNAL_SERVER_ERROR' })
   }
 })
 

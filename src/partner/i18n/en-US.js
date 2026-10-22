@@ -42,6 +42,7 @@ export default {
   },
   shop: {
     title: 'Catalog',
+    priceNoteThb: 'All prices are wholesale base prices in THB',
     search: 'Search product name',
     searchBtn: 'Search',
     loading: 'Loading…',
@@ -99,6 +100,7 @@ export default {
     loading: 'Loading…',
     loadingMore: 'Loading more…',
     empty: 'No orders yet',
+    emptyGoShop: 'Browse products',
     delivery: 'Shipping address',
     placedAt: 'Placed at',
     dateRangeLabel: 'Filter by order date',

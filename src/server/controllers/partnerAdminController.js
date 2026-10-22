@@ -5,7 +5,7 @@ import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import Product from '../models/Product.js'
 import { parsePartnerAccountKind } from '../constants/partnerAccountKind.js'
-import XLSX from 'xlsx'
+import XLSX from '../utils/excelWorkbook.js'
 import { logger } from '../utils/logger.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 
@@ -105,7 +105,7 @@ class PartnerAdminController {
       return res.status(201).json({ success: true, data: row.toSafeJSON() })
     } catch (e) {
       logger.error('PartnerAdminController.createPartner', { err: e?.message, stack: e?.stack })
-      return res.status(500).json({ success: false, message: '创建失败', error: e.message })
+      return res.status(500).json({ success: false, message: '创建失败', code: 'INTERNAL_SERVER_ERROR' })
     }
   }
 
@@ -152,6 +152,7 @@ class PartnerAdminController {
       if (!row) return res.status(404).json({ success: false, message: '不存在' })
 
       row.password = pwd
+      row.token_version = (Number(row.token_version) || 0) + 1
       await row.save()
       return res.json({ success: true, message: '密码已重置' })
     } catch (e) {
@@ -380,7 +381,7 @@ class PartnerAdminController {
       if (ordersTruncated) appendTruncationNote(sheet)
       XLSX.utils.book_append_sheet(workbook, sheet, 'partner_orders')
 
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+      const buffer = await XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
       const fn = `合作方订货_${new Date().toISOString().split('T')[0]}.xlsx`
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -388,7 +389,7 @@ class PartnerAdminController {
       res.send(buffer)
     } catch (e) {
       logger.error('PartnerAdminController.exportPartnerOrders', { err: e?.message, stack: e?.stack })
-      res.status(500).json({ success: false, message: '导出失败', error: e.message })
+      res.status(500).json({ success: false, message: '导出失败', code: 'INTERNAL_SERVER_ERROR' })
     }
   }
 }

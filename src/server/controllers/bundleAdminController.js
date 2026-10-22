@@ -96,7 +96,7 @@ class BundleAdminController {
       )
       await transaction.commit()
       // 组合包变更后清 GET 响应缓存，公开列表/详情（15s 缓存）立即读到新数据
-      clearResponseCache()
+      await clearResponseCache()
 
       const created = await Bundle.findByPk(bundle.id, { include: ITEMS_INCLUDE })
       return res.status(201).json({ success: true, data: created })
@@ -144,7 +144,7 @@ class BundleAdminController {
       )
       await transaction.commit()
       // 组合包变更后清 GET 响应缓存
-      clearResponseCache()
+      await clearResponseCache()
 
       const updated = await Bundle.findByPk(bundle.id, { include: ITEMS_INCLUDE })
       return res.json({ success: true, data: updated })
@@ -167,7 +167,7 @@ class BundleAdminController {
       }
       await bundle.update({ status: req.body.status })
       // 上下架后清 GET 响应缓存，公开列表/详情立即反映状态
-      clearResponseCache()
+      await clearResponseCache()
       return res.json({ success: true, data: bundle })
     } catch (e) {
       logger.error('update bundle status', { err: e?.message, stack: e?.stack })
@@ -193,7 +193,7 @@ class BundleAdminController {
       await bundle.destroy({ transaction })
       await transaction.commit()
       // 删除后清 GET 响应缓存
-      clearResponseCache()
+      await clearResponseCache()
       return res.json({ success: true, message: '已删除' })
     } catch (e) {
       await transaction.rollback().catch(() => {})

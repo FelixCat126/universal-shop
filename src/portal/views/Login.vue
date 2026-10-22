@@ -100,9 +100,14 @@
             </div>
 
             <div class="text-sm">
-              <a href="#" class="font-medium text-blue-600 hover:text-blue-500">
+              <!-- 短信通道未配置时不展示入口：后端必然返回 503，展示即死链 -->
+              <router-link
+                v-if="smsConfigured"
+                to="/forgot-password"
+                class="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+              >
                 {{ t('user.forgotPassword') }}
-              </a>
+              </router-link>
             </div>
           </div>
 
@@ -180,13 +185,14 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../stores/user.js'
 import CountrySelector from '../components/CountrySelector.vue'
 import SliderCaptcha from '../components/SliderCaptcha.vue'
 import { validatePhone, getCountryInfo, getPhoneLengthRange, getPhoneLengthText } from '../utils/phoneValidation.js'
+import { loadPublicConfig } from '../../utils/publicConfig.js'
 import { 
   UserIcon, 
   EyeIcon, 
@@ -223,6 +229,9 @@ const errors = ref({})
 // 滑块验证码（428 CAPTCHA_REQUIRED 时展示）
 const captchaVisible = ref(false)
 const captchaRef = ref(null)
+
+// 短信通道是否可用：未配置时隐藏「忘记密码」入口（后端必然 503）
+const smsConfigured = ref(false)
 
 // 计算属性
 const messageClass = computed(() => {
@@ -381,11 +390,21 @@ const showMessageToast = (msg, type = 'success') => {
   message.value = msg
   messageType.value = type
   showMessage.value = true
-  
+
   setTimeout(() => {
     showMessage.value = false
   }, 3000)
 }
+
+// 公开配置里带 sms_configured：短信通道未部署时不展示「忘记密码」入口
+onMounted(async () => {
+  try {
+    const cfg = await loadPublicConfig()
+    smsConfigured.value = Boolean(cfg?.sms_configured)
+  } catch {
+    smsConfigured.value = false
+  }
+})
 </script>
 
 <style scoped>

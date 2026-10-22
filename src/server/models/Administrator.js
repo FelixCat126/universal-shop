@@ -63,6 +63,12 @@ const Administrator = sequelize.define('Administrator', {
     allowNull: true,
     comment: '最后登录时间'
   },
+  token_version: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '令牌版本：改密/重置时递增，旧 JWT 立即失效'
+  },
   created_by: {
     type: DataTypes.INTEGER,
     allowNull: true,

@@ -18,7 +18,7 @@
         <div class="flex items-center space-x-4">
           <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-2xl shrink-0 overflow-hidden ring-2 ring-gray-100">
             <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" alt="" class="w-full h-full object-cover" />
-            <span v-else>👤</span>
+            <UserIcon v-else class="h-8 w-8 text-blue-400" />
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -59,7 +59,7 @@
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="flex items-center">
-            <div class="h-8 w-8 text-green-600 flex items-center justify-center text-2xl">✅</div>
+            <div class="h-8 w-8 text-green-600 flex items-center justify-center"><CheckCircleIcon class="h-8 w-8" /></div>
             <div class="ml-4">
               <p class="text-2xl font-semibold text-gray-900">{{ profileMetrics.order_count }}</p>
               <p class="text-sm text-gray-600">{{ t('profile.completedOrders') }}</p>
@@ -68,7 +68,7 @@
         </div>
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="flex items-center">
-            <div class="h-8 w-8 text-blue-600 flex items-center justify-center text-2xl">📍</div>
+            <div class="h-8 w-8 text-blue-600 flex items-center justify-center"><MapPinIcon class="h-8 w-8" /></div>
             <div class="ml-4">
               <p class="text-2xl font-semibold text-gray-900">{{ addresses.length }}</p>
               <p class="text-sm text-gray-600">{{ t('profile.shippingAddresses') }}</p>
@@ -77,7 +77,7 @@
         </div>
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="flex items-center">
-            <div class="h-8 w-8 text-purple-600 flex items-center justify-center text-2xl">💰</div>
+            <div class="h-8 w-8 text-purple-600 flex items-center justify-center"><CurrencyDollarIcon class="h-8 w-8" /></div>
             <div class="ml-4 min-w-0">
               <p class="text-2xl font-semibold text-gray-900">{{ t('product.currencyThbSymbol') }}{{ formatMoneyThb(profileMetrics.spent_thb) }}</p>
               <p class="text-sm text-gray-600">{{ t('profile.totalSpent') }}</p>
@@ -87,7 +87,7 @@
         </div>
         <div class="bg-white p-6 rounded-lg shadow">
           <div class="flex items-center">
-            <div class="h-8 w-8 text-amber-600 flex items-center justify-center text-2xl">⭐</div>
+            <div class="h-8 w-8 text-amber-600 flex items-center justify-center"><StarIcon class="h-8 w-8" /></div>
             <div class="ml-4">
               <p class="text-2xl font-semibold text-amber-900 tabular-nums">{{ profileMetrics.points_balance }}</p>
               <p class="text-sm text-gray-600">{{ t('profile.pointsBalanceTitle') }}</p>
@@ -109,7 +109,7 @@
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
-              <span class="inline-block w-5 h-5 mr-2 text-center">🛍️</span>
+              <ShoppingBagIcon class="w-5 h-5 mr-2" />
               {{ t('profile.myOrders') }}
             </button>
             <button 
@@ -121,7 +121,7 @@
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
-              <span class="inline-block w-5 h-5 mr-2 text-center">📍</span>
+              <MapPinIcon class="w-5 h-5 mr-2" />
               {{ t('profile.shippingAddresses') }}
             </button>
             <button
@@ -133,7 +133,7 @@
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
-              <span class="inline-block w-5 h-5 mr-2 text-center">⭐</span>
+              <StarIcon class="w-5 h-5 mr-2" />
               {{ t('profile.pointsLedgerTab') }}
             </button>
             <button
@@ -145,7 +145,7 @@
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
-              <span class="inline-block w-5 h-5 mr-2 text-center">🎟️</span>
+              <TicketIcon class="w-5 h-5 mr-2" />
               {{ t('coupon.tab') }}
             </button>
             <button 
@@ -157,7 +157,7 @@
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
-              <span class="inline-block w-5 h-5 mr-2 text-center">👤</span>
+              <UserIcon class="w-5 h-5 mr-2" />
               {{ t('user.profile') }}
             </button>
           </nav>
@@ -272,7 +272,7 @@
             </template>
 
             <div v-else class="py-12 text-center">
-              <div class="mx-auto flex h-12 w-12 items-center justify-center text-3xl text-gray-400">🛍️</div>
+              <div class="mx-auto flex h-12 w-12 items-center justify-center text-gray-400"><ShoppingBagIcon class="h-12 w-12" /></div>
               <h3 class="mt-2 text-sm font-medium text-gray-900">{{ t('order.noOrders') }}</h3>
               <p class="mt-1 text-sm text-gray-500">{{ t('profile.noOrdersDesc') }}</p>
             </div>
@@ -543,7 +543,7 @@
             </div>
 
             <div v-else class="text-center py-12">
-              <div class="mx-auto h-12 w-12 text-gray-400 flex items-center justify-center text-3xl">📍</div>
+              <div class="mx-auto h-12 w-12 text-gray-400 flex items-center justify-center"><MapPinIcon class="h-12 w-12" /></div>
               <h3 class="mt-2 text-sm font-medium text-gray-900">{{ t('address.noAddresses') }}</h3>
               <p class="mt-1 text-sm text-gray-500">{{ t('profile.addAddressHint') }}</p>
               <div class="mt-6">
@@ -867,6 +867,15 @@ import ThailandAddressSelector from '../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n, formatPhoneDisplay } from '../utils/phoneValidation.js'
 import { useToast } from '../composables/useToast.js'
 import { describePasswordPolicyFailure } from '../utils/passwordPolicy.js'
+import {
+  CheckCircleIcon,
+  MapPinIcon,
+  CurrencyDollarIcon,
+  StarIcon,
+  ShoppingBagIcon,
+  TicketIcon,
+  UserIcon
+} from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const route = useRoute()

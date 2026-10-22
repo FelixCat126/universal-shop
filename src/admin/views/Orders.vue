@@ -139,18 +139,18 @@
             v-loading="loading"
             stripe
             border
-            style="width: 100%; min-width: 1400px"
+            style="width: 100%"
             :default-sort="{ prop: 'created_at', order: 'descending' }"
             table-layout="fixed"
             class="order-table"
           >
-        <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="240" align="center">
+        <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="190" align="center">
           <template #default="scope">
             <div class="order-no">{{ scope.row.order_no }}</div>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.user')" width="180" min-width="160">
+        <el-table-column :label="t('orders.user')" width="140" min-width="130">
           <template #default="scope">
             <div class="user-info">
               <div class="user-nickname">{{ scope.row.user?.nickname || t('common.unknown') }}</div>
@@ -159,7 +159,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.amount')" width="200" align="center">
+        <el-table-column :label="t('orders.amount')" width="170" align="center">
           <template #default="scope">
             <div class="amount">
               <template v-if="scope.row.payment_method === 'points'">
@@ -179,7 +179,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('common.paymentMethod')" width="150" align="center">
+        <el-table-column :label="t('common.paymentMethod')" width="120" align="center">
           <template #default="scope">
             <el-tag
               :type="scope.row.payment_method === 'cod' ? 'warning' : scope.row.payment_method === 'online' ? 'success' : 'info'"
@@ -190,7 +190,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.status')" width="140" align="center">
+        <el-table-column :label="t('orders.status')" width="110" align="center">
           <template #default="scope">
             <el-tag :type="getStatusTagType(scope.row.status)" size="small">
               {{ getStatusText(scope.row.status) }}
@@ -199,7 +199,7 @@
         </el-table-column>
 
 
-        <el-table-column :label="t('orders.recipientInfo')" width="200" min-width="180">
+        <el-table-column :label="t('orders.recipientInfo')" width="160" min-width="150">
           <template #default="scope">
             <div class="contact-info">
               <div class="contact-name">{{ scope.row.contact_name }}</div>
@@ -208,30 +208,25 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.orderDate')" width="180" align="center">
+        <el-table-column :label="t('orders.orderDate')" width="140" align="center">
           <template #default="scope">
             <div class="created-time">{{ formatDate(scope.row.created_at) }}</div>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.actions')" width="200" align="center" fixed="right">
+        <el-table-column :label="t('orders.actions')" width="110" align="center" fixed="right">
           <template #default="scope">
-            <div class="action-buttons">
-              <el-button
-                type="primary"
-                size="small"
-                @click="viewOrderDetail(scope.row)"
-              >
-                {{ t('orders.viewDetails') }}
+            <el-dropdown trigger="click" @command="(cmd) => handleOrderAction(cmd, scope.row)">
+              <el-button size="small">
+                {{ t('orders.actions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </el-button>
-              <el-button
-                type="danger"
-                size="small"
-                @click="deleteOrder(scope.row.id)"
-              >
-                {{ t('common.delete') }}
-              </el-button>
-            </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="detail">{{ t('orders.viewDetails') }}</el-dropdown-item>
+                  <el-dropdown-item command="delete" divided>{{ t('common.delete') }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
         </el-table-column>
           </el-table>
@@ -589,6 +584,12 @@ const loadOrders = async () => {
 }
 
 
+
+// 操作列下拉菜单统一分发：窄列 + fixed 共存，避免宽操作列遮挡业务列
+const handleOrderAction = (command, row) => {
+  if (command === 'detail') return viewOrderDetail(row)
+  if (command === 'delete') return deleteOrder(row.id)
+}
 
 // 删除订单
 const deleteOrder = async (orderId) => {

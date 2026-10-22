@@ -2,7 +2,8 @@ import express from 'express'
 import UserController from '../controllers/userController.js'
 import PointsController from '../controllers/pointsController.js'
 import { authenticateToken } from '../middlewares/authMiddleware.js'
-import { loginLimiter, enumerationLimiter, writeLimiter } from '../middlewares/security.js'
+import { loginLimiter, enumerationLimiter, writeLimiter, passwordResetLimiter } from '../middlewares/security.js'
+import PasswordResetController from '../controllers/passwordResetController.js'
 import { validate, registerSchema, loginSchema } from '../middlewares/validate.js'
 import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
 
@@ -22,6 +23,8 @@ router.post(
 )
 router.get('/verify-referral/:code', enumerationLimiter, UserController.verifyReferralCode)
 router.get('/check-phone/:phone', enumerationLimiter, UserController.checkPhoneExists)
+router.post('/forgot-password', passwordResetLimiter, PasswordResetController.forgotPassword)
+router.post('/reset-password', passwordResetLimiter, PasswordResetController.resetPassword)
 
 // 需要认证的路由
 router.get('/verify', authenticateToken, UserController.verifyToken)
@@ -31,6 +34,7 @@ router.put('/profile', authenticateToken, UserController.updateProfile)
 // 改密挂 writeLimiter：防会话被盗后在线爆破旧密码（限流在控制器前；测试环境 no-op）
 router.put('/profile/password', writeLimiter, authenticateToken, UserController.changePassword)
 router.post('/logout', authenticateToken, UserController.logout)
+router.post('/me/delete', writeLimiter, authenticateToken, UserController.deleteAccount)
 router.get('/points/balance', authenticateToken, PointsController.getBalance)
 router.get('/points/transactions', authenticateToken, PointsController.listTransactions)
 

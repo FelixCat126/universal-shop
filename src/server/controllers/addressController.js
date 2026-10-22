@@ -31,7 +31,7 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '获取地址列表失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -147,7 +147,7 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '创建地址失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -331,7 +331,7 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '更新地址失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -397,7 +397,7 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '设置默认地址失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -464,7 +464,7 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '删除地址失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -507,7 +507,7 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '获取地址详情失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -552,7 +552,7 @@ class AddressController {
       res.status(500).json({
         success: false,
         message: '获取用户地址列表失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

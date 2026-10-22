@@ -53,8 +53,15 @@
     </div>
 
     <ul v-else class="space-y-3 pb-8">
-      <li v-if="!rows.length" class="text-center py-14 text-gray-500 text-sm">
-        {{ t('orders.empty') }}
+      <li v-if="!rows.length" class="flex flex-col items-center py-14 text-center">
+        <ClipboardDocumentListIcon class="h-12 w-12 text-gray-300" aria-hidden="true" />
+        <p class="mt-3 text-sm text-gray-500">{{ t('orders.empty') }}</p>
+        <router-link
+          to="/"
+          class="mt-4 inline-flex min-h-[44px] items-center rounded-xl bg-primary-600 px-5 text-sm font-semibold text-white hover:bg-primary-700 touch-manipulation"
+        >
+          {{ t('orders.emptyGoShop') }}
+        </router-link>
       </li>
       <li
         v-for="order in rows"
@@ -152,7 +159,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { ChevronDownIcon, ClipboardDocumentListIcon } from '@heroicons/vue/24/outline'
 import config from '../../config/index.js'
 import { loadPublicConfig } from '../../utils/publicConfig.js'
 import { usePartnerStore } from '../stores/partner.js'

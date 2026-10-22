@@ -55,6 +55,8 @@ export const useToast = () => {
   const error = (message, duration) => showToast(message, 'error', duration)
   const warning = (message, duration) => showToast(message, 'warning', duration)
   const info = (message, duration) => showToast(message, 'info', duration)
+  // 兼容旧调用方：showError 等价于 error
+  const showError = (message, duration) => showToast(message, 'error', duration)
 
   return {
     toasts,
@@ -63,6 +65,7 @@ export const useToast = () => {
     clearToasts,
     success,
     error,
+    showError,
     warning,
     info
   }

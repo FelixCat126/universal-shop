@@ -168,7 +168,7 @@ async function buildCreateOrderResponseData (orderId, { userId, isGuestOrder, de
 
     const user = await User.findByPk(userId)
     const token = jwt.sign(
-      { userId: user.id, username: user.username },
+      { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
       JWT_SECRET,
       { expiresIn: '7d' }
     )
@@ -886,7 +886,7 @@ class OrderController {
       res.status(500).json({
         success: false,
         message: '创建订单失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -1173,7 +1173,7 @@ class OrderController {
       res.status(500).json({
         success: false,
         message: '获取订单列表失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -1262,7 +1262,7 @@ class OrderController {
       res.status(500).json({
         success: false,
         message: '获取订单详情失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

@@ -25,12 +25,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="last_login_at" :label="t('partnersMgmt.lastLogin')" min-width="170">
-          <template #default="{ row }">{{ row.last_login_at || '—' }}</template>
+          <template #default="{ row }">{{ formatDateTime(row.last_login_at) }}</template>
         </el-table-column>
         <el-table-column :label="t('common.actions')" width="220" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="openEdit(row)">{{ t('partnersMgmt.edit') }}</el-button>
             <el-button type="warning" link @click="openPwd(row)">{{ t('partnersMgmt.resetPwd') }}</el-button>
+            <el-button type="danger" link @click="confirmDelete(row)">{{ t('partnersMgmt.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -106,7 +107,7 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAdminStore } from '../stores/admin.js'
 
 const { t } = useI18n()
@@ -150,6 +151,44 @@ function formatNum (v) {
 
 function accountKindLabel (kind) {
   return kind === 'agent' ? t('partnersMgmt.kindAgent') : t('partnersMgmt.kindDealer')
+}
+
+function formatDateTime (v) {
+  if (!v) return '—'
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 删除合作方：确认后调用 DELETE /api/admin/partners/:id（后端校验无未完成订单）
+async function confirmDelete (row) {
+  try {
+    await ElMessageBox.confirm(
+      t('partnersMgmt.confirmDelete'),
+      t('partnersMgmt.delete'),
+      { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') }
+    )
+  } catch {
+    return
+  }
+  try {
+    const res = await adminStore.apiRequest(`/api/admin/partners/${row.id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (json.success) {
+      ElMessage.success(t('partnersMgmt.deleteOk'))
+      await load()
+    } else {
+      ElMessage.error(json.message || t('partnersMgmt.deleteFailed'))
+    }
+  } catch {
+    ElMessage.error(t('partnersMgmt.deleteFailed'))
+  }
 }
 
 async function load () {

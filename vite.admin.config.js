@@ -25,7 +25,23 @@ export default defineConfig({
   },
   build: {
     outDir: '../../dist/admin',
-    emptyOutDir: false
+    emptyOutDir: false,
+    rollupOptions: {
+      output: {
+        // 将 ECharts / Element Plus / Vue 生态拆成独立 vendor，减少首屏主包并提高缓存命中
+        manualChunks (id) {
+          if (id.includes('node_modules/echarts') || id.includes('node_modules/vue-echarts') || id.includes('node_modules/zrender')) {
+            return 'vendor-echarts'
+          }
+          if (id.includes('node_modules/element-plus') || id.includes('node_modules/@element-plus')) {
+            return 'vendor-element-plus'
+          }
+          if (id.includes('node_modules/vue') || id.includes('node_modules/pinia') || id.includes('node_modules/vue-i18n') || id.includes('node_modules/vue-router') || id.includes('node_modules/axios')) {
+            return 'vendor-vue'
+          }
+        }
+      }
+    }
   },
   server: {
     port: 3002,

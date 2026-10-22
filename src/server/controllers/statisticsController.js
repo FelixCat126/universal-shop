@@ -90,7 +90,7 @@ class StatisticsController {
       res.status(500).json({
         success: false,
         message: '获取统计总览失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -144,7 +144,7 @@ class StatisticsController {
       res.status(500).json({
         success: false,
         message: '获取订单趋势失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -196,7 +196,7 @@ class StatisticsController {
       res.status(500).json({
         success: false,
         message: '获取用户注册趋势失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -241,7 +241,7 @@ class StatisticsController {
       res.status(500).json({
         success: false,
         message: '获取综合统计失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

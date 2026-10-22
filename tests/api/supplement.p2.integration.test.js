@@ -19,7 +19,7 @@ beforeEach(async () => {
   await TestDatabase.clearAllData()
   _clearAuthCacheForTests()
   _resetLoginGuardForTests()
-  clearResponseCache()
+  await clearResponseCache()
 })
 
 async function makeUser (overrides = {}) {
@@ -195,22 +195,19 @@ describe('P2-Supplement.adjustStockAtomic', () => {
 })
 
 describe('P2-Supplement.crossSurface', () => {
-  it('P2-9 admin 删合作方 → 合作方旧 token 失效（实测路由未注册，合作方仍可访问）', async () => {
-    // 真实情况：DELETE /api/admin/partners/:id 路由未注册
-    // 由此合作方 token 仍可用。暴露 dead route 风险。
+  it('P2-9 admin 删合作方 → 合作方旧 token 立即失效', async () => {
     const sequelize = TestDatabase.getSequelize()
     const { Partner } = sequelize.models
     const p = await Partner.create(TestDataFactory.createPartner({}))
     const partnerToken = TestHelpers.generatePartnerToken(p)
-    // 模拟 admin 删合作方（实际 404）
     const { token: adminToken } = await adminCtx()
     const del = await request(app).delete(`/api/admin/partners/${p.id}`)
       .set('Authorization', `Bearer ${adminToken}`)
-    expect(del.status).toBe(404)
-    // 但合作方 token 仍可用
+    expect(del.status).toBe(200)
+    // 合作方已删除，旧 token 必须失效（账号不存在 → 403 账号不可用）
     const me = await request(app).get('/api/partner/me')
       .set('Authorization', `Bearer ${partnerToken}`)
-    expect(me.status).toBe(200)
+    expect(me.status).toBe(403)
   })
 
   it('P2-10 admin 改订单状态 → AuditLog 写入', async () => {

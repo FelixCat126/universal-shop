@@ -62,7 +62,7 @@ export function applyCreatedBetween (whereBase, reqQuery, options = {}) {
     const c = parseDayEnd(tm)
     if (c) range[Op.lte] = c
   }
-  if (Object.keys(range).length === 0) return whereBase
+  if (Reflect.ownKeys(range).length === 0) return whereBase
   return {
     ...whereBase,
     [columnAttr]: range

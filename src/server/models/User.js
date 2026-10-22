@@ -131,6 +131,12 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: false,
     comment: '强制下次登录修改密码（如游客自动注册随机密码）'
+  },
+  token_version: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '令牌版本：改密/重置/登出时递增，旧 JWT 立即失效'
   }
 }, {
   tableName: 'users',

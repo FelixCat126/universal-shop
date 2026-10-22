@@ -12,6 +12,7 @@ export default {
   // 通用
   common: {
     loading: '加载中...',
+    backToHome: '返回首页',
     error: '出错了',
     success: '成功',
     cancel: '取消',
@@ -76,6 +77,7 @@ export default {
     quantity: '数量',
     total: '总计',
     productList: '商品列表',
+    listSubtitle: '浏览全部在售商品',
     productDetail: '商品详情',
     noProducts: '暂无商品',
     loadMore: '加载更多',
@@ -169,6 +171,22 @@ export default {
     newPassword: '新密码',
     rememberMe: '记住我',
     forgotPassword: '忘记密码？',
+    forgotPasswordHint: '输入注册手机号，我们会把验证码发到你的手机上',
+    sendOtp: '发送验证码',
+    otpCode: '短信验证码',
+    otpPlaceholder: '请输入短信验证码',
+    otpRequired: '请输入验证码',
+    otpSent: '验证码已发送，请查收',
+    otpInvalid: '验证码错误或已过期，请重新获取',
+    otpResendHint: '请重新拖动滑块以获取新的验证码',
+    resendOtp: '重新获取',
+    newPassword: '新密码',
+    newPasswordPlaceholder: '请输入新密码',
+    resetPassword: '重置密码',
+    passwordResetOk: '密码已重置，请用新密码登录',
+    togglePassword: '显示或隐藏密码',
+    captchaInvalid: '请完成滑块验证',
+    smsNotConfigured: '找回密码功能暂未开通，请联系客服协助重置',
     alreadyHaveAccount: '已有账号？',
     noAccount: '还没有账号？',
     goToLogin: '去登录',
@@ -564,5 +582,13 @@ export default {
     noUsable: '暂无可用优惠券',
     discountLine: '优惠券优惠',
     notEnough: '未满使用门槛'
+  },
+  legal: {
+    termsLink: '用户协议',
+    privacyLink: '隐私政策',
+    termsTitle: '用户协议',
+    termsBody: '欢迎使用 Universal Shop。使用本商城前，请确认您已阅读并同意本协议。\n\n一、账号与交易\n请提供真实、准确的联系和收货信息。游客下单会自动创建账号，您可以通过手机号验证码重置密码。\n\n二、订单与支付\n订单状态以系统记录为准。请勿重复提交订单；发生库存不足、价格异常或风控拦截时，商城有权取消或拒绝订单。\n\n三、售后\n退款、退货和积分/优惠券处理以订单与售后记录为准。恶意刷单、虚假支付、滥用优惠或攻击系统的账号可能被限制使用。\n\n四、责任\n您应妥善保管账号与设备。因您泄露凭据、提供虚假信息或违反法律法规造成的后果，由您自行承担。',
+    privacyTitle: '隐私政策',
+    privacyBody: '我们仅收集完成注册、下单、配送、支付与售后所需的信息，包括手机号、昵称、收货地址、订单和必要的安全审计记录。\n\n我们不会向无关第三方出售您的个人信息。为完成订单履约、支付、短信通知、系统安全和故障排查，必要信息可能在有限范围内被处理。\n\n订单与审计记录按业务及法律要求保留；审计日志按系统保留策略定期清理。您可以通过账号注销功能匿名化个人资料，历史订单仍按合规要求保留。\n\n我们采用访问控制、密码哈希、令牌版本、限流、验证码和日志审计保护数据。若需查询、更正或删除个人信息，请联系商城管理员。'
   }
 }

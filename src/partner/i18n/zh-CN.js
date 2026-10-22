@@ -42,6 +42,7 @@ export default {
   },
   shop: {
     title: '商品目录',
+    priceNoteThb: '价格均为泰铢（THB）批发底价',
     search: '搜索商品名称',
     searchBtn: '搜索',
     loading: '加载中…',
@@ -99,6 +100,7 @@ export default {
     loading: '加载中…',
     loadingMore: '加载更多…',
     empty: '暂无订单',
+    emptyGoShop: '去订货',
     delivery: '送货地址',
     placedAt: '下单时间',
     dateRangeLabel: '按下单时间筛选',

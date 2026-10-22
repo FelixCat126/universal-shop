@@ -399,7 +399,7 @@ describe('P0-Supplement.partnerOrderEdge', () => {
 })
 
 describe('P0-Supplement.partnerAdmin', () => {
-  it('P0-21 admin 删合作方路由当前未注册 → 404（dead route 暴露）', async () => {
+  it('P0-21 admin 删合作方路由已注册 → 200 且记录落库', async () => {
     const { token } = await adminCtx()
     const sequelize = TestDatabase.getSequelize()
     const { Partner } = sequelize.models
@@ -407,8 +407,10 @@ describe('P0-Supplement.partnerAdmin', () => {
     const res = await request(app)
       .delete(`/api/admin/partners/${p.id}`)
       .set('Authorization', `Bearer ${token}`)
-    // 真实情况：route 未注册 → 404；控制器有但无路由
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    const gone = await Partner.findByPk(p.id)
+    expect(gone).toBeNull()
   })
 })
 

@@ -145,7 +145,7 @@ class UploadController {
       res.status(500).json({
         success: false,
         message: '上传图片失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -182,7 +182,7 @@ class UploadController {
       res.status(500).json({
         success: false,
         message: '上传头像失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -225,7 +225,7 @@ class UploadController {
       res.status(500).json({
         success: false,
         message: '删除图片失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

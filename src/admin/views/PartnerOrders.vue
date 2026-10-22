@@ -93,7 +93,7 @@
         </el-table-column>
         <el-table-column :label="t('partnerOrdersMgmt.address')" min-width="320" show-overflow-tooltip>
           <template #default="{ row }">
-            <span class="whitespace-pre-wrap">{{ row.delivery_address || '—' }}</span>
+            <span class="address-cell-oneline">{{ row.delivery_address || '—' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="created_at" :label="t('partnerOrdersMgmt.createdAt')" width="174">
@@ -333,6 +333,14 @@ onMounted(() => {
 .partner-order-status-cell :deep(.el-select) {
   width: 100%;
   max-width: 100%;
+}
+
+/* 地址列单行截断：配合 show-overflow-tooltip 出省略号 + 悬停看全文 */
+.address-cell-oneline {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
 

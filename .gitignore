@@ -47,6 +47,10 @@ Thumbs.db
 # AI 工具本地工作目录（plan mode 临时产物等）
 .zcode/
 
+# 本地审计工具：内含明文审计账号密码（audit_admin/Audit1234），
+# 仅在本地 shop_audit 库使用，不进仓库
+scripts/audit/
+
 # Uploads
 public/uploads/*
 !public/uploads/.gitkeep

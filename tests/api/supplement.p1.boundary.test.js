@@ -24,7 +24,7 @@ beforeEach(async () => {
   await TestDatabase.clearAllData()
   _clearAuthCacheForTests()
   _resetLoginGuardForTests()
-  clearResponseCache()
+  await clearResponseCache()
 })
 
 async function makeUser (overrides = {}) {
@@ -60,18 +60,20 @@ describe('P1-Supplement.dateFilters', () => {
     expect(r).toEqual({ x: 1 })
   })
 
-  it('P1-1b applyCreatedBetween 同时 from + to → 实际静默丢失（Object.keys 不见 Symbol）', () => {
-    // 真实 bug：range 用 Op.gte/lte Symbol，但代码用 Object.keys(range).length === 0 判断
-    //   → 范围永远空 → 返回 whereBase → 实际下单列表/订单/积分明细等过滤失效
+  it('P1-1b applyCreatedBetween 同时 from + to → 返回 Symbol 范围条件', () => {
     const r = dateFilters.applyCreatedBetween({}, { created_from: '2026-01-01', created_to: '2026-01-31' })
-    expect(r).toEqual({})
+    expect(Object.keys(r)).toContain('created_at')
+    const range = r.created_at
+    expect(Reflect.ownKeys(range).length).toBe(2)
+    for (const key of Reflect.ownKeys(range)) {
+      expect(range[key]).toBeInstanceOf(Date)
+    }
   })
 
-  it('P1-1c applyCreatedBetween 只有 from → 返回原 whereBase（Op 是 Symbol，Object.keys 看不到）', () => {
-    // 当前实现：Object.keys(range).length === 0 时直接返回 whereBase
-    // 这是一个真实 bug：单边日期条件被丢弃
+  it('P1-1c applyCreatedBetween 只有 from → 返回仅 gte 的范围条件', () => {
     const r = dateFilters.applyCreatedBetween({}, { start_date: '2026-01-01' })
-    expect(r).toEqual({})
+    expect(Object.keys(r)).toContain('created_at')
+    expect(Reflect.ownKeys(r.created_at).length).toBe(1)
   })
 
   it('P1-1d applyCreatedBetween 非法格式 → 静默忽略', () => {
@@ -79,9 +81,10 @@ describe('P1-Supplement.dateFilters', () => {
     expect(r).toEqual({ x: 1 })
   })
 
-  it('P1-1e applyCreatedBetween with column prefix — 同样命中 P1-1c bug', () => {
+  it('P1-1e applyCreatedBetween with column prefix → 使用最后一段列名', () => {
     const r = dateFilters.applyCreatedBetween({}, { created_from: '2026-01-01' }, { column: 'Order.created_at' })
-    expect(r).toEqual({})
+    expect(Object.keys(r)).toContain('created_at')
+    expect(Reflect.ownKeys(r.created_at).length).toBe(1)
   })
 
   it('P1-1f parseDayStart 边界 2026-01-01', () => {

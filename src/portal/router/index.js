@@ -52,10 +52,30 @@ const router = createRouter({
       meta: { title: '用户登录' }
     },
     {
+      path: '/forgot-password',
+      name: 'ForgotPassword',
+      component: () => import('../views/ForgotPassword.vue'),
+      meta: { title: '找回密码' }
+    },
+    {
       path: '/profile',
       name: 'Profile',
       component: () => import('../views/Profile.vue'),
       meta: { title: '个人中心', requiresAuth: true }
+    },
+    {
+      path: '/privacy',
+      name: 'Privacy',
+      component: () => import('../views/LegalPage.vue'),
+      props: { kind: 'privacy' },
+      meta: { title: '隐私政策' }
+    },
+    {
+      path: '/terms',
+      name: 'Terms',
+      component: () => import('../views/LegalPage.vue'),
+      props: { kind: 'terms' },
+      meta: { title: '用户协议' }
     },
     {
       path: '/:pathMatch(.*)*',

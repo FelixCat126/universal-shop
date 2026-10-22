@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import Administrator from '../models/Administrator.js'
 import OperationLog from '../models/OperationLog.js'
 import AuditLog from '../models/AuditLog.js'
-import { JWT_SECRET } from '../config/jwtSecret.js'
+import { JWT_ADMIN_SECRET } from '../config/jwtSecret.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { invalidateAdminAuthCache } from '../middlewares/adminAuthMiddleware.js'
 import { logger } from '../utils/logger.js'
@@ -34,7 +34,7 @@ class AdministratorController {
       })
 
       if (!admin) {
-        recordLoginFailure(req, username)
+        await recordLoginFailure(req, username)
         AuditLog.logAdmin({
           admin: { username },
           event: 'admin.login.fail',
@@ -51,7 +51,7 @@ class AdministratorController {
       // 验证密码
       const isValidPassword = await admin.validatePassword(password)
       if (!isValidPassword) {
-        recordLoginFailure(req, username)
+        await recordLoginFailure(req, username)
         AuditLog.logAdmin({
           admin,
           event: 'admin.login.fail',
@@ -68,7 +68,7 @@ class AdministratorController {
       // 更新最后登录时间
       admin.last_login_at = new Date()
       await admin.save()
-      clearLoginFailures(req, username)
+      await clearLoginFailures(req, username)
 
       // 生成JWT token
       const token = jwt.sign(
@@ -76,9 +76,10 @@ class AdministratorController {
           adminId: admin.id, 
           username: admin.username, 
           role: admin.role,
-          type: 'admin' // 标识这是管理员token
+          type: 'admin', // 标识这是管理员token
+          tv: Number(admin.token_version) || 0
         },
-        JWT_SECRET,
+        JWT_ADMIN_SECRET,
         { expiresIn: '8h' } // 管理员token有效期8小时
       )
 
@@ -107,7 +108,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '登录失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -153,7 +154,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '获取管理员列表失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -219,7 +220,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '创建管理员失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -311,7 +312,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '更新管理员失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -363,7 +364,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '删除管理员失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -399,8 +400,9 @@ class AdministratorController {
       }
 
       admin.password = password
+      admin.token_version = (Number(admin.token_version) || 0) + 1
       await admin.save()
-      // 改密后立即失效鉴权缓存（约定：凭据类变更即刻收敛，虽然缓存本身不含密码）
+      // 改密后立即失效鉴权缓存与旧 JWT（约定：凭据类变更即刻收敛）
       invalidateAdminAuthCache(admin.id)
 
       // 操作日志由路由层 logOperation 中间件统一记录；
@@ -415,7 +417,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '重置密码失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -458,7 +460,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '获取操作日志失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }
@@ -521,7 +523,7 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '初始化失败',
-        error: error.message
+        code: 'INTERNAL_SERVER_ERROR'
       })
     }
   }

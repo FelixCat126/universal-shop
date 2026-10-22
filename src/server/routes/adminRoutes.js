@@ -4,7 +4,7 @@ import UserController from '../controllers/userController.js'
 import AdministratorController from '../controllers/administratorController.js'
 import AddressController from '../controllers/addressController.js'
 import { authenticateAdmin, requirePermission, requireSuperAdmin, logOperation } from '../middlewares/adminAuthMiddleware.js'
-import { loginLimiter } from '../middlewares/security.js'
+import { loginLimiter, exportLimiter } from '../middlewares/security.js'
 import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
 
 import ProductCategoryController from '../controllers/productCategoryController.js'
@@ -12,6 +12,8 @@ import PartnerAdminController from '../controllers/partnerAdminController.js'
 import PromotionController from '../controllers/promotionController.js'
 import CouponAdminController from '../controllers/couponAdminController.js'
 import BundleAdminController from '../controllers/bundleAdminController.js'
+import AfterSaleController from '../controllers/afterSaleController.js'
+import { getRuntimeMetrics } from '../middlewares/observability.js'
 import { validate, promotionPayloadSchema, promotionStatusSchema, couponTemplatePayloadSchema, couponTemplateStatusSchema, bundlePayloadSchema, bundleStatusSchema } from '../middlewares/validate.js'
 
 const router = express.Router()
@@ -41,18 +43,21 @@ router.use(authenticateAdmin)
 
 // 管理员订单路由（需要orders权限）
 // 注意：具体路径必须放在 /:id 通配之前，否则 GET /orders/export 会被 /orders/:id 抢先匹配
-router.get('/orders/export', requirePermission('orders'), logOperation('export', 'orders'), OrderController.exportOrders)
+router.get('/orders/export', requirePermission('orders'), exportLimiter, logOperation('export', 'orders'), OrderController.exportOrders)
 router.get('/orders', requirePermission('orders'), OrderController.getAllOrders)
 router.get('/orders/:id', requirePermission('orders'), OrderController.getOrderDetail)
 router.put('/orders/:id/status', requirePermission('orders'), logOperation('update_order_status', 'order'), OrderController.updateOrderStatus)
-router.delete('/orders/:id', requirePermission('orders'), logOperation('delete_order', 'order'), OrderController.deleteOrder)
+router.delete('/orders/:id', requireSuperAdmin, logOperation('delete_order', 'order'), OrderController.deleteOrder)
+router.get('/after-sales', requirePermission('orders'), AfterSaleController.listAdmin)
+router.put('/after-sales/:id/status', requirePermission('orders'), logOperation('review_after_sale', 'after_sale'), AfterSaleController.review)
 
 // 合作方（批发）与普通用户菜单隔离：独立 permission partners
 router.get('/partners', requirePermission('partners'), PartnerAdminController.listPartners)
 router.post('/partners', requirePermission('partners'), logOperation('create_partner', 'partner'), PartnerAdminController.createPartner)
 router.put('/partners/:id', requirePermission('partners'), logOperation('update_partner', 'partner'), PartnerAdminController.updatePartner)
 router.put('/partners/:id/password', requirePermission('partners'), logOperation('reset_partner_password', 'partner'), PartnerAdminController.resetPartnerPassword)
-router.get('/partner-orders/export', requirePermission('partners'), logOperation('export', 'partner_orders'), PartnerAdminController.exportPartnerOrders)
+router.delete('/partners/:id', requirePermission('partners'), logOperation('delete_partner', 'partner'), PartnerAdminController.deletePartner)
+router.get('/partner-orders/export', requirePermission('partners'), exportLimiter, logOperation('export', 'partner_orders'), PartnerAdminController.exportPartnerOrders)
 router.get('/partner-orders', requirePermission('partners'), PartnerAdminController.listPartnerOrders)
 router.put('/partner-orders/:id/status', requirePermission('partners'), logOperation('update_partner_order_status', 'partner_order'), PartnerAdminController.updatePartnerOrderStatus)
 
@@ -98,5 +103,8 @@ router.delete('/bundles/:id', requirePermission('products'), logOperation('delet
 
 // 操作日志路由（仅超级管理员）
 router.get('/operation-logs', requireSuperAdmin, AdministratorController.getOperationLogs)
+router.get('/metrics', requireSuperAdmin, (req, res) => {
+  res.json({ success: true, data: getRuntimeMetrics() })
+})
 
 export default router

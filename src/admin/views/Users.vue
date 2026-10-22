@@ -110,14 +110,14 @@
           v-loading="isLoading"
           stripe
           border
-          style="width: 100%; min-width: 1400px"
+          style="width: 100%"
           :default-sort="{ prop: 'created_at', order: 'descending' }"
           table-layout="fixed"
           class="user-table"
         >
-          <el-table-column prop="id" :label="t('users.id')" width="80" align="center" />
-          
-          <el-table-column :label="t('users.nickname')" width="240" min-width="200">
+          <el-table-column prop="id" :label="t('users.id')" width="60" align="center" />
+
+          <el-table-column :label="t('users.nickname')" width="190" min-width="170">
             <template #default="scope">
               <div class="user-nickname-cell">
                 <el-avatar
@@ -136,7 +136,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.phone')" width="200" min-width="180">
+          <el-table-column :label="t('users.phone')" width="170" min-width="160">
             <template #default="scope">
               <div class="user-phone">
                 <div class="phone-display" v-if="scope.row.phone">
@@ -149,7 +149,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.email')" width="220" min-width="200">
+          <el-table-column :label="t('users.email')" width="190" min-width="170">
             <template #default="scope">
               <div class="user-email">
                 {{ scope.row.email || t('common.notSet') }}
@@ -157,7 +157,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.referredBy')" width="160" min-width="140">
+          <el-table-column :label="t('users.referredBy')" width="120" min-width="110">
             <template #default="scope">
               <div class="referrer-info">
                 <span v-if="scope.row.referred_by_code" class="referrer-code">
@@ -168,7 +168,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.status')" width="120" align="center">
+          <el-table-column :label="t('users.status')" width="90" align="center">
             <template #default="scope">
               <el-tag 
                 :type="scope.row.is_active ? 'success' : 'danger'"
@@ -179,7 +179,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.registrationTime')" width="200" align="center">
+          <el-table-column :label="t('users.registrationTime')" width="170" align="center">
             <template #default="scope">
               <div class="registration-time">
                 <div class="datetime">{{ formatDateTime(scope.row.created_at) }}</div>
@@ -187,32 +187,22 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.actions')" width="280" align="center" fixed="right">
+          <el-table-column :label="t('users.actions')" width="110" align="center" fixed="right">
             <template #default="scope">
-              <div class="action-buttons">
-                <el-button 
-                  :type="scope.row.is_active ? 'warning' : 'success'"
-                  size="small"
-                  @click="toggleUserStatus(scope.row)"
-                  :loading="scope.row.updating"
-                >
-                  {{ scope.row.is_active ? t('users.ban') : t('users.unban') }}
+              <el-dropdown trigger="click" @command="(cmd) => handleUserAction(cmd, scope.row)">
+                <el-button size="small" :loading="scope.row.updating">
+                  {{ t('users.actions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                 </el-button>
-                <el-button
-                  type="primary"
-                  size="small"
-                  @click="viewUserDetail(scope.row)"
-                >
-                  {{ t('users.viewDetails') }}
-                </el-button>
-                <el-button
-                  type="info"
-                  size="small"
-                  @click="goUserOrders(scope.row)"
-                >
-                  {{ t('users.viewOrders') }}
-                </el-button>
-              </div>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="detail">{{ t('users.viewDetails') }}</el-dropdown-item>
+                    <el-dropdown-item command="orders">{{ t('users.viewOrders') }}</el-dropdown-item>
+                    <el-dropdown-item command="toggle" divided :disabled="scope.row.updating">
+                      {{ scope.row.is_active ? t('users.ban') : t('users.unban') }}
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </template>
           </el-table-column>
         </el-table>
@@ -562,6 +552,13 @@ const goUserOrders = (user) => {
     : ''
   const keyword = phone || user.nickname || user.username || String(user.id)
   router.push({ name: 'Orders', query: { keyword } })
+}
+
+// 操作列下拉菜单统一分发：窄列 + fixed 共存，避免宽操作列遮挡业务列
+const handleUserAction = (command, row) => {
+  if (command === 'detail') return viewUserDetail(row)
+  if (command === 'orders') return goUserOrders(row)
+  if (command === 'toggle') return toggleUserStatus(row)
 }
 
 // 查看用户详情

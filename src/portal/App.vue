@@ -106,6 +106,14 @@
         <component :is="Component" :key="route.path" />
       </Transition>
     </router-view>
+
+    <footer class="border-t bg-white/80 py-6 text-center text-xs text-gray-500">
+      <div class="flex justify-center gap-4">
+        <router-link to="/terms" class="hover:text-blue-600">{{ t('legal.termsLink') }}</router-link>
+        <span aria-hidden="true">·</span>
+        <router-link to="/privacy" class="hover:text-blue-600">{{ t('legal.privacyLink') }}</router-link>
+      </div>
+    </footer>
     
     <!-- Toast 提示容器 -->
     <ToastContainer />

@@ -56,6 +56,14 @@ npm run dev
 - 合作方门户：<http://localhost:3003/>
 - API：<http://localhost:3000/api>
 
+> ⚠️ 本地开发请统一使用 `localhost` 而不是 `127.0.0.1`：前端默认把 API 指向
+> `http://localhost:3000/api`，从 `127.0.0.1:3001` 访问页面会产生跨源请求并被
+> CORS 拦截（页面白屏）。如果确实需要用 `127.0.0.1` 或局域网 IP 调试，启动后端前设置
+> `ALLOWED_ORIGINS=http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003`（逗号分隔）。
+>
+> 💡 新增前端依赖后若页面出现 `504 Outdated Optimize Dep` 白屏，执行 `npm run clean`
+>（会清理 `node_modules/.vite` 预构建缓存）再重启 dev 进程即可。
+
 ## 4. 运行测试
 
 ```bash
