@@ -46,13 +46,17 @@ async function deliverOtp ({ countryCode, phone, otp }) {
 export async function createPasswordResetOtp (user, countryCode, phone) {
   const otp = String(crypto.randomInt(100000, 1000000))
   const key = `${countryCode}:${phone}`
+
+  // 先发送再入库：发送失败时抛错，不留下一个用户从未收到的有效 OTP。
+  // （若先入库后发送，发送失败的 OTP 会在库里有效 10 分钟，形成可用但未送达的凭证）
+  const sent = await deliverOtp({ countryCode, phone, otp })
+
   await store.set(key, {
     otpHash: hashOtp(otp),
     userId: user.id,
     expiresAt: Date.now() + OTP_TTL_MS
   }, OTP_TTL_MS)
 
-  const sent = await deliverOtp({ countryCode, phone, otp })
   return { devOtp: sent ? null : otp }
 }
 

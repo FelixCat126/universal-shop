@@ -1,5 +1,5 @@
 import User from '../models/User.js'
-import { createPasswordResetOtp, consumePasswordResetOtp } from '../services/passwordResetService.js'
+import { createPasswordResetOtp, consumePasswordResetOtp, getPasswordResetStatus } from '../services/passwordResetService.js'
 import { verifyCaptcha } from '../utils/captcha.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { logger } from '../utils/logger.js'
@@ -17,6 +17,16 @@ function validatePhone (countryCode, phone) {
 class PasswordResetController {
   static async forgotPassword (req, res) {
     try {
+      // 短信通道未部署时直接拒绝：避免消耗滑块验证码与限流配额后才失败，
+      // 同时不给调用方"流程会成功"的错误预期
+      if (!getPasswordResetStatus().smsConfigured && process.env.NODE_ENV === 'production') {
+        return res.status(503).json({
+          success: false,
+          code: 'SMS_NOT_CONFIGURED',
+          message: '短信服务未配置，暂时无法重置密码'
+        })
+      }
+
       const { country_code: countryCode = '+66', phone, captcha_token: token, captcha_answer: answer } = req.body || {}
       if (!SUPPORTED.has(countryCode) || !validatePhone(countryCode, String(phone || ''))) {
         return res.status(400).json({ success: false, message: '请提供有效的国家区号与手机号' })
