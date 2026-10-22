@@ -28,17 +28,34 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       output: {
-        // 将 ECharts / Element Plus / Vue 生态拆成独立 vendor，减少首屏主包并提高缓存命中
+        /**
+         * 将 ECharts / Element Plus / Vue 生态拆成独立 vendor，减少首屏主包并提高缓存命中。
+         *
+         * 注意：这里必须用「路径段精确匹配」而不是 includes 模糊匹配。
+         * 早期用 id.includes('node_modules/vue') 会把 node_modules/vue-echarts、
+         * node_modules/@vue/* 一并归入 vendor-vue，而 vue-echarts 依赖 echarts
+         * （被分到 vendor-echarts），形成 vendor-vue ↔ vendor-echarts 交叉依赖；
+         * Rollup 人工分块会绕过其依赖分析，最终产物在浏览器里抛
+         * "Cannot access 'xxx' before initialization"（TDZ），整个 SPA 白屏。
+         *
+         * 判据：id 形如 /abs/path/node_modules/<pkg>/...，取 <pkg> 精确比较。
+         */
         manualChunks (id) {
-          if (id.includes('node_modules/echarts') || id.includes('node_modules/vue-echarts') || id.includes('node_modules/zrender')) {
+          const m = /node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(id)
+          if (!m) return undefined
+          const pkg = m[1]
+          if (pkg === 'echarts' || pkg === 'vue-echarts' || pkg === 'zrender') {
             return 'vendor-echarts'
           }
-          if (id.includes('node_modules/element-plus') || id.includes('node_modules/@element-plus')) {
+          if (pkg === 'element-plus' || pkg === '@element-plus/icons-vue') {
             return 'vendor-element-plus'
           }
-          if (id.includes('node_modules/vue') || id.includes('node_modules/pinia') || id.includes('node_modules/vue-i18n') || id.includes('node_modules/vue-router') || id.includes('node_modules/axios')) {
+          if (pkg === 'vue' || pkg === '@vue/runtime-core' || pkg === '@vue/runtime-dom' ||
+              pkg === '@vue/shared' || pkg === '@vue/reactivity' || pkg === '@vue/compiler-sfc' ||
+              pkg === 'pinia' || pkg === 'vue-i18n' || pkg === 'vue-router' || pkg === 'axios') {
             return 'vendor-vue'
           }
+          return undefined
         }
       }
     }
