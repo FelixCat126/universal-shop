@@ -8,6 +8,7 @@ import { parsePartnerAccountKind } from '../constants/partnerAccountKind.js'
 import XLSX from '../utils/excelWorkbook.js'
 import { logger } from '../utils/logger.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
+import { parseId } from '../utils/params.js'
 
 // 单次导出行数安全上限（与 exportController 口径一致）；超出截断并在文件末尾追加说明行
 const EXPORT_ROW_LIMIT = 50000
@@ -111,7 +112,8 @@ class PartnerAdminController {
 
   static async updatePartner (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
+      if (!id) return res.status(400).json({ success: false, message: '无效的 ID' })
       const row = await Partner.findByPk(id)
       if (!row) return res.status(404).json({ success: false, message: '不存在' })
 
@@ -142,7 +144,8 @@ class PartnerAdminController {
 
   static async resetPartnerPassword (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
+      if (!id) return res.status(400).json({ success: false, message: '无效的 ID' })
       const pwd = req.body.password != null ? String(req.body.password) : ''
       if (pwd.length < 6) {
         return res.status(400).json({ success: false, message: '新密码不少于6字符' })
@@ -163,7 +166,8 @@ class PartnerAdminController {
 
   static async deletePartner (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
+      if (!id) return res.status(400).json({ success: false, message: '无效的 ID' })
       const row = await Partner.findByPk(id)
       if (!row) return res.status(404).json({ success: false, message: '不存在' })
 
@@ -244,7 +248,8 @@ class PartnerAdminController {
   static async updatePartnerOrderStatus (req, res) {
     const transaction = await sequelize.transaction()
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
+      if (!id) return res.status(400).json({ success: false, message: '无效的 ID' })
       const status = req.body.status != null ? String(req.body.status).trim() : ''
 
       const allowed = Object.keys(PARTNER_ORDER_STATUS_TRANSITIONS)

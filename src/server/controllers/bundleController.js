@@ -2,6 +2,7 @@ import Bundle from '../models/Bundle.js'
 import BundleItem from '../models/BundleItem.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
+import { parseId } from '../utils/params.js'
 
 /** 金额统一舍入到分（与计价引擎同口径） */
 const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
@@ -75,7 +76,7 @@ class BundleController {
   /** GET /api/bundles/:id：详情（口径同列表）；id 非法 → 400，不存在/已停用 → 404 */
   static async detail (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的组合包 ID' })
       }

@@ -12,7 +12,7 @@
       </h2>
       <p class="mt-2 text-center text-sm text-gray-600">
         {{ t('user.noAccount') }}
-        <router-link to="/register" class="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+        <router-link to="/register" class="inline-block py-2 -my-2 font-medium text-blue-600 hover:text-blue-500 transition-colors">
           {{ t('user.goToRegister') }}
         </router-link>
       </p>
@@ -164,7 +164,7 @@
     <div class="mt-8 text-center">
       <router-link
         :to="{ name: 'Home' }"
-        class="inline-flex items-center text-sm text-gray-600 hover:text-gray-500"
+        class="inline-flex items-center text-sm text-gray-600 hover:text-gray-500 py-1.5 -my-1"
       >
         <ArrowLeftIcon class="h-4 w-4 mr-1" />
         {{ t('nav.backToHome') }}

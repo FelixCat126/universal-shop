@@ -6,6 +6,14 @@ import { Op } from 'sequelize'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { clearResponseCache } from '../utils/responseCache.js'
+import { parseId } from '../utils/params.js'
+
+/**
+ * 单商品积分上限。
+ * 积分换购总额会写入 INTEGER 列（points_redeemed / points_line_cost / balance），
+ * 单价无上限时「超大积分 × 数量」会溢出 int4 → PG 22003 → 下单 500。
+ */
+const MAX_PRODUCT_POINTS = 1000000
 
 class ProductController {
   // 获取所有产品（分页和搜索）
@@ -232,10 +240,12 @@ class ProductController {
       const pts = points === undefined || points === null || points === ''
         ? 0
         : Number(points)
-      if (!Number.isInteger(pts) || pts < 0) {
+      // 上界：积分换购总额会写入 INTEGER 列（points_redeemed / points_line_cost），
+      // 无上限时超大积分 × 数量会溢出 int4 → PG 22003 → 下单 500
+      if (!Number.isInteger(pts) || pts < 0 || pts > MAX_PRODUCT_POINTS) {
         return res.status(400).json({
           success: false,
-          message: '积分必须为非负整数'
+          message: `积分必须为 0-${MAX_PRODUCT_POINTS} 的整数`
         })
       }
 
@@ -348,10 +358,10 @@ class ProductController {
       let nextPoints = product.points
       if (points !== undefined) {
         const pts = points === null || points === '' ? 0 : Number(points)
-        if (!Number.isInteger(pts) || pts < 0) {
+        if (!Number.isInteger(pts) || pts < 0 || pts > MAX_PRODUCT_POINTS) {
           return res.status(400).json({
             success: false,
-            message: '积分必须为非负整数'
+            message: `积分必须为 0-${MAX_PRODUCT_POINTS} 的整数`
           })
         }
         nextPoints = pts
@@ -479,7 +489,7 @@ class ProductController {
     try {
       const { id } = req.params
       const productId = parseInt(id, 10)
-      if (Number.isNaN(productId)) {
+      if (!productId) {
         return res.status(400).json({
           success: false,
           message: '无效的产品ID'
@@ -534,8 +544,8 @@ class ProductController {
         })
       }
 
-      const productId = parseInt(req.params.id, 10)
-      if (Number.isNaN(productId)) {
+      const productId = parseId(req.params.id)
+      if (!productId) {
         return res.status(400).json({
           success: false,
           message: '无效的产品ID'
@@ -584,7 +594,7 @@ class ProductController {
    */
   static async adjustStock (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       const q = parseInt(req.body.quantity, 10)
       const { type } = req.body
       if (!Number.isInteger(id) || id < 1) {

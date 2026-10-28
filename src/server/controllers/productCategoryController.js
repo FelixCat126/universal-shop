@@ -3,6 +3,7 @@ import ProductCategory from '../models/ProductCategory.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
+import { parseId } from '../utils/params.js'
 
 class ProductCategoryController {
   /** 前台 / 公共：全部类别，按排序 */
@@ -77,8 +78,8 @@ class ProductCategoryController {
 
   static async update (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
-      if (Number.isNaN(id)) {
+      const id = parseId(req.params.id)
+      if (!id) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
       const row = await ProductCategory.findByPk(id)
@@ -109,8 +110,8 @@ class ProductCategoryController {
 
   static async remove (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
-      if (Number.isNaN(id)) {
+      const id = parseId(req.params.id)
+      if (!id) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
       const row = await ProductCategory.findByPk(id)

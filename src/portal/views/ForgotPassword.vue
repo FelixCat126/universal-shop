@@ -139,7 +139,7 @@
     <div class="mt-6 text-center">
       <router-link
         to="/login"
-        class="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+        class="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 py-1.5 -my-1"
       >
         <ArrowLeftIcon class="w-4 h-4 mr-1" />
         {{ t('common.back') }}

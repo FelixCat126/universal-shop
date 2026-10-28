@@ -63,7 +63,7 @@ export const optionalAuthenticateAdmin = async (req, res, next) => {
       return next()
     }
 
-    const decoded = jwt.verify(token, JWT_ADMIN_SECRET)
+    const decoded = jwt.verify(token, JWT_ADMIN_SECRET, { algorithms: ['HS256'] })
     if (decoded.type !== 'admin') {
       return next()
     }
@@ -101,7 +101,7 @@ export const authenticateAdmin = async (req, res, next) => {
       })
     }
 
-    const decoded = jwt.verify(token, JWT_ADMIN_SECRET)
+    const decoded = jwt.verify(token, JWT_ADMIN_SECRET, { algorithms: ['HS256'] })
     
     // 验证是否为管理员token
     if (decoded.type !== 'admin') {

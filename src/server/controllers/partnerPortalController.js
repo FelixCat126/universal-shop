@@ -23,6 +23,7 @@ import {
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { logger } from '../utils/logger.js'
+import { parseId } from '../utils/params.js'
 
 function genPartnerOrderNo () {
   const r = Math.floor(Math.random() * 9000) + 1000
@@ -145,7 +146,7 @@ class PartnerPortalController {
       const token = jwt.sign(
         { type: 'partner', partnerId: partner.id, login: partner.login, tv: Number(partner.token_version) || 0 },
         JWT_PARTNER_SECRET,
-        { expiresIn: '14d' }
+        { expiresIn: '14d', algorithm: 'HS256' }
       )
 
       AuditLog.logPartner({ partner, event: 'partner.login.success', req }).catch(() => {})
@@ -555,7 +556,7 @@ class PartnerPortalController {
    */
   static async confirmPartnerOrderPayment (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!id) return res.status(400).json({ success: false, message: '无效的订单 ID' })
       const order = await PartnerOrder.findOne({
         where: { id, partner_id: req.partner.id }
@@ -683,7 +684,7 @@ class PartnerPortalController {
 
   static async orderDetail (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!id) return res.status(400).json({ success: false, message: '无效的订单 ID' })
 
       const order = await PartnerOrder.findOne({
@@ -767,7 +768,7 @@ class PartnerPortalController {
 
   static async updateAddress (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       const partner_id = req.partner.id
 
       /**
@@ -825,7 +826,7 @@ class PartnerPortalController {
 
   static async deleteAddress (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       const partner_id = req.partner.id
 
       /**
@@ -880,7 +881,7 @@ class PartnerPortalController {
    */
   static async setDefaultAddress (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       const partner_id = req.partner.id
       const row = await PartnerAddress.findOne({ where: { id, partner_id } })
       if (!row) {

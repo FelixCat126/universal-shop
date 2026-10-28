@@ -16,13 +16,13 @@ import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
 import { TestHelpers } from '../helpers/test-helpers.js'
-import { issueCaptcha } from '@server/utils/captcha.js'
+import { issueCaptcha, _getCaptchaAnswerForTests } from '@server/utils/captcha.js'
 import { clearResponseCache } from '@server/utils/responseCache.js'
 
 const models = () => TestDatabase.getSequelize().models
 
-function decodeTargetX (token) {
-  return Number(Buffer.from(token, 'base64url').toString('utf8').split('|')[1])
+async function decodeTargetX (token) {
+  return _getCaptchaAnswerForTests(token)
 }
 
 async function makeUser () {
@@ -81,14 +81,14 @@ describe('PasswordReset.availability', () => {
     delete process.env.SMS_WEBHOOK_URL
     process.env.NODE_ENV = 'production'
     const user = await makeUser()
-    const { token } = issueCaptcha()
+    const { token } = await issueCaptcha()
 
     // 生产 + 未配短信：直接 503
     const res = await request(app).post('/api/users/forgot-password').send({
       country_code: '+86',
       phone: user.phone,
       captcha_token: token,
-      captcha_answer: decodeTargetX(token)
+      captcha_answer: await decodeTargetX(token)
     })
     expect(res.status).toBe(503)
 

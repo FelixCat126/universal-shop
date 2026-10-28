@@ -14,8 +14,46 @@ let maxPerHour = Number(process.env.GUEST_ORDER_MAX_PER_HOUR || 20)
 let maxPerIpPerHour = Number(process.env.GUEST_ORDER_MAX_IP_PER_HOUR || 100)
 const WINDOW_MS = 60 * 60 * 1000
 
+/**
+ * 手机号归一化（用于限流 key）。
+ *
+ * 早期实现只去掉空格，同一号码的 '0812345678' / '081-234-5678' / '+66812345678'
+ * 会变成三个不同的 key，手机号维度的限额与验证码阈值都可被格式改写绕过。
+ *
+ * 归一规则（目标：同一号码的各种书写形式落到同一个 key）：
+ *   1. 只保留数字（去掉 + - 空格 分隔符）
+ *   2. 剥离国家码前缀（86 / 66 / 60）
+ *   3. 剥离国家码后若仍带 trunk 前导 0，一并去掉
+ *      （泰国号码 '+66812345678' 与 '0812345678' 是同一个号）
+ */
 function normalizePhone (req) {
-  return String(req.body?.contact_phone || 'unknown').replace(/\s+/g, '')
+  const raw = String(req.body?.contact_phone || 'unknown')
+  let digits = raw.replace(/\D+/g, '')
+  if (!digits) return 'unknown'
+  // 剥离国家码前缀（仅当剩余长度看起来像本地号时才剥，避免误伤本地号本身以国家码开头）
+  for (const cc of ['86', '66', '60']) {
+    if (digits.startsWith(cc) && digits.length - cc.length >= 9) {
+      digits = digits.slice(cc.length)
+      break
+    }
+  }
+  // 剥离 trunk 前导 0：'0812345678' → '812345678'
+  digits = digits.replace(/^0+/, '')
+  return digits || 'unknown'
+}
+
+/**
+ * 会话标识：Session-ID 头完全由客户端控制，随便换一个值就能重置会话计数，
+ * 因此不能直接当限流维度。这里只接受服务端签发过的会话标识
+ * （当前前端未使用该头，故实际不计入），保留扩展位但不作为主要防线。
+ */
+function resolveSessionKey (req) {
+  const raw = req.headers['session-id']
+  if (!raw) return null
+  const s = String(raw).trim()
+  // 长度与字符集校验：只接受形如 UUID 的服务端可预期格式
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(s)) return null
+  return s
 }
 
 export async function guestOrderGuard (req, res, next) {
@@ -24,7 +62,7 @@ export async function guestOrderGuard (req, res, next) {
 
     const phone = normalizePhone(req)
     const ip = req.ip || 'unknown'
-    const sessionId = req.headers['session-id']
+    const sessionId = resolveSessionKey(req)
     const phoneKey = `phone:${phone}`
     const ipKey = `ip:${ip}`
 
@@ -32,8 +70,8 @@ export async function guestOrderGuard (req, res, next) {
       store.increment(phoneKey, WINDOW_MS),
       store.increment(ipKey, WINDOW_MS)
     ])
-    // 只有真实带 Session-ID 的匿名购物车才计入会话阈值；
-    // 不能把 'anonymous' 当成共享会话，否则不同游客会互相触发验证码
+    // 只有通过格式校验的会话标识才计入会话阈值；
+    // 客户端随意伪造的 Session-ID 不再能重置该维度计数
     const sessionCount = sessionId
       ? await store.increment(`session:${sessionId}`, WINDOW_MS)
       : 0

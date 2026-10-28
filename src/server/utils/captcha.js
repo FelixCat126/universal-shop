@@ -41,6 +41,8 @@ const Y_MAX = HEIGHT - PIECE_W - 20
 const TOLERANCE = 6 // 滑块 x 与缺口 targetX 的判定容差（像素）
 
 const usedNonces = createSharedStore('captcha-used')
+// 验证码答案：只存服务端，token 里不带
+const captchaAnswers = createSharedStore('captcha-answers')
 
 const sign = (payload) =>
   crypto.createHmac('sha256', SECRET).update(payload).digest('base64url')
@@ -132,15 +134,25 @@ const buildPieceSvg = (nonce) => {
 
 /**
  * 生成滑块拼图验证码：返回 { token, bg, piece, y, width, height, pieceWidth, maxX, expires_in_ms }
+ *
+ * token 只携带 ts + nonce + 签名，**不含正确答案**：
+ *   token = base64url( ts | nonce | hmac(secret, ts|nonce) )
+ * 正确答案 targetX 存在服务端（captcha-answers store），验证时按 nonce 取回。
+ * 早期实现把 targetX 明文放进 token（base64 不是加密），客户端解码即可得到答案，
+ * 验证码形同虚设 —— 已修正。
  */
-export function issueCaptcha () {
+export async function issueCaptcha () {
   const targetX = crypto.randomInt(TARGET_X_MIN, TARGET_X_MAX + 1)
   const y = crypto.randomInt(Y_MIN, Y_MAX + 1)
   const ts = Date.now()
-  const nonce = crypto.randomBytes(8).toString('hex')
-  const payload = `${ts}|${targetX}|${nonce}`
+  const nonce = crypto.randomBytes(16).toString('hex')
+  const payload = `${ts}|${nonce}`
   const sig = sign(payload)
   const token = b64u(`${payload}|${sig}`)
+
+  // 答案存服务端，随 TTL 自动过期
+  await captchaAnswers.set(nonce, { targetX, ts }, TTL_MS)
+
   return {
     token,
     bg: buildBackgroundSvg(nonce, targetX, y),
@@ -159,6 +171,26 @@ export function issueCaptcha () {
  * @param {string} token
  * @param {string|number} userAnswer 客户端提交的滑块 x 坐标（像素）
  */
+/**
+ * 仅供测试读取正确答案（生产代码不得调用）。
+ *
+ * 答案已从 token 移到服务端存储，测试无法再从 token 解出，
+ * 因此提供这个受环境变量保护的读取口供自动化测试使用。
+ * 未设置 ENABLE_CAPTCHA_TEST_API 时一律返回 null。
+ */
+export async function _getCaptchaAnswerForTests (token) {
+  if (process.env.ENABLE_CAPTCHA_TEST_API !== '1') return null
+  try {
+    const raw = b64uDec(String(token))
+    const parts = raw.split('|')
+    if (parts.length !== 3) return null
+    const record = await captchaAnswers.get(parts[1])
+    return record ? Number(record.targetX) : null
+  } catch {
+    return null
+  }
+}
+
 export async function verifyCaptcha (token, userAnswer) {
   if (!token || userAnswer === undefined || userAnswer === null) return false
   let raw
@@ -168,13 +200,13 @@ export async function verifyCaptcha (token, userAnswer) {
     return false
   }
   const parts = raw.split('|')
-  if (parts.length !== 4) return false
-  const [tsStr, ansStr, nonce, sig] = parts
+  if (parts.length !== 3) return false
+  const [tsStr, nonce, sig] = parts
   const ts = parseInt(tsStr, 10)
   if (!Number.isFinite(ts)) return false
   if (Date.now() - ts > TTL_MS) return false
 
-  const expectedSig = sign(`${ts}|${ansStr}|${nonce}`)
+  const expectedSig = sign(`${ts}|${nonce}`)
   if (
     Buffer.byteLength(expectedSig) !== Buffer.byteLength(sig) ||
     !crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(sig))
@@ -183,13 +215,24 @@ export async function verifyCaptcha (token, userAnswer) {
   }
 
   // 一次性消费：无论答案对错都先核销 nonce，防同一 token 在 TTL 内穷举答案
-  if (await usedNonces.get(nonce)) return false
-  await usedNonces.set(nonce, true, Math.max(1, ts + TTL_MS - Date.now()))
+  // 用原子的「不存在才写入」：并发请求只有一个能抢到，其余直接失败
+  const consumed = await usedNonces.setIfAbsent(
+    nonce,
+    true,
+    Math.max(1, ts + TTL_MS - Date.now())
+  )
+  if (!consumed) return false
+
+  // 正确答案从服务端存储取（token 内不再携带）
+  const record = await captchaAnswers.get(nonce)
+  if (!record || !Number.isFinite(Number(record.targetX))) return false
+  // 用掉即删：答案不被重复消费
+  await captchaAnswers.delete(nonce)
 
   const answerNum = Number(userAnswer)
   if (!Number.isFinite(answerNum)) return false
   // 滑块 x 与缺口 targetX 容差 ±6 像素内判通过
-  if (Math.abs(answerNum - Number(ansStr)) > TOLERANCE) return false
+  if (Math.abs(answerNum - Number(record.targetX)) > TOLERANCE) return false
 
   return true
 }

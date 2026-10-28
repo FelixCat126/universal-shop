@@ -11,6 +11,8 @@ process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only-32-chars-long'
 process.env.JWT_ADMIN_SECRET = 'test-admin-jwt-secret-key-for-testing-only'
 process.env.JWT_PARTNER_SECRET = 'test-partner-jwt-secret-key-for-testing-only'
 process.env.CAPTCHA_SECRET = 'test-captcha-secret-key-for-testing-only'
+// 验证码答案已移到服务端存储（不再明文放 token），测试需要受控接口读取答案
+process.env.ENABLE_CAPTCHA_TEST_API = '1'
 
 // 默认测试库
 if (!process.env.DATABASE_URL_TEST) {

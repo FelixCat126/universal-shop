@@ -80,7 +80,7 @@ class AdministratorController {
           tv: Number(admin.token_version) || 0
         },
         JWT_ADMIN_SECRET,
-        { expiresIn: '8h' } // 管理员token有效期8小时
+        { expiresIn: '8h', algorithm: 'HS256' } // 管理员token有效期8小时
       )
 
       // 记录登录日志

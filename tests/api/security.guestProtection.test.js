@@ -8,7 +8,7 @@ import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
 import { TestHelpers } from '../helpers/test-helpers.js'
 import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
-import { issueCaptcha } from '@server/utils/captcha.js'
+import { issueCaptcha, _getCaptchaAnswerForTests } from '@server/utils/captcha.js'
 import { _resetGuestOrderProtectionForTests, _setGuestOrderProtectionForTests } from '@server/middlewares/guestOrderGuard.js'
 import { cleanupAbandonedGuestAccounts } from '@server/services/guestAccountCleanup.js'
 
@@ -35,8 +35,8 @@ async function makeUser (overrides = {}) {
   }))
 }
 
-function decodeTargetX (token) {
-  return Number(Buffer.from(token, 'base64url').toString('utf8').split('|')[1])
+async function decodeTargetX (token) {
+  return _getCaptchaAnswerForTests(token)
 }
 
 function orderBody (product, phone, extra = {}) {
@@ -67,10 +67,10 @@ describe('Security.guestProtection', () => {
     expect(second.status).toBe(428)
     expect(second.body.code).toBe('CAPTCHA_REQUIRED')
 
-    const { token } = issueCaptcha()
+    const { token } = await issueCaptcha()
     const third = await request(app).post('/api/orders').send(orderBody(product, phone, {
       captcha_token: token,
-      captcha_answer: decodeTargetX(token)
+      captcha_answer: await decodeTargetX(token)
     }))
     expect(third.status).toBe(201)
   })
@@ -89,13 +89,13 @@ describe('Security.guestProtection', () => {
   it('GP-3 忘记密码完整流程：OTP 重置 → 新密码可登录 → 旧 token 失效', async () => {
     const user = await makeUser()
     const oldToken = TestHelpers.generateToken(user)
-    const { token } = issueCaptcha()
+    const { token } = await issueCaptcha()
 
     const forgot = await request(app).post('/api/users/forgot-password').send({
       country_code: '+86',
       phone: user.phone,
       captcha_token: token,
-      captcha_answer: decodeTargetX(token)
+      captcha_answer: await decodeTargetX(token)
     })
     expect(forgot.status).toBe(200)
     expect(forgot.body.dev_otp).toBeTruthy()
@@ -121,12 +121,12 @@ describe('Security.guestProtection', () => {
 
   it('GP-4 错误 OTP 不能重置；未知手机号返回统一提示且不泄露是否存在', async () => {
     const user = await makeUser()
-    const { token } = issueCaptcha()
+    const { token } = await issueCaptcha()
     const forgot = await request(app).post('/api/users/forgot-password').send({
       country_code: '+86',
       phone: user.phone,
       captcha_token: token,
-      captcha_answer: decodeTargetX(token)
+      captcha_answer: await decodeTargetX(token)
     })
     expect(forgot.status).toBe(200)
 
@@ -138,12 +138,12 @@ describe('Security.guestProtection', () => {
     })
     expect(bad.status).toBe(400)
 
-    const { token: token2 } = issueCaptcha()
+    const { token: token2 } = await issueCaptcha()
     const unknown = await request(app).post('/api/users/forgot-password').send({
       country_code: '+86',
       phone: TestHelpers.generatePhoneNumber('+86'),
       captcha_token: token2,
-      captcha_answer: decodeTargetX(token2)
+      captcha_answer: await decodeTargetX(token2)
     })
     expect(unknown.status).toBe(200)
     expect(unknown.body.dev_otp).toBeNull()

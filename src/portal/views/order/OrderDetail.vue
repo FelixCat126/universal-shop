@@ -6,7 +6,7 @@
         <div class="flex items-center h-11">
           <button
             @click="goBack"
-            class="flex items-center text-sm text-gray-600 hover:text-gray-900"
+            class="flex items-center text-sm text-gray-600 hover:text-gray-900 py-1.5 -my-1.5"
           >
             <ArrowLeftIcon class="h-4 w-4 mr-1.5" />
             {{ t('common.back') }}

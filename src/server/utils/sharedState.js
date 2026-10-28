@@ -8,6 +8,61 @@ import Redis from 'ioredis'
 
 let redisClient = null
 
+/**
+ * 原子自增 + 固定窗口 TTL（Redis 侧）
+ *
+ * KEYS[1] = 键，ARGV[1] = TTL 毫秒（0 表示不设过期）
+ * 返回：新的计数值
+ *
+ * 关键点：键已存在时只更新值、不动 TTL —— 保证窗口从首次写入起算，
+ * 与 MemoryStore 的 expiresAt 语义完全一致。
+ */
+const INCREMENT_LUA = `
+local key = KEYS[1]
+local ttl = tonumber(ARGV[1])
+local raw = redis.call('GET', key)
+local current = 0
+if raw then
+  -- 去掉 JSON 包装（值以 " 开头）
+  if string.sub(raw, 1, 1) == '"' then
+    raw = string.sub(raw, 2, string.len(raw) - 1)
+  end
+  current = tonumber(raw) or 0
+end
+current = current + 1
+
+-- 固定窗口语义：窗口从「首次写入」起算，后续自增不得延长窗口。
+-- 实现方式：先取剩余 TTL，再用「相同剩余 TTL」重写值。
+-- 不能用 SET ... KEEPTTL（Redis 6+ 才有，生产版本不一定支持），
+-- 也不能先 SET 再查 PTTL —— SET 已清掉 TTL，PTTL 恒为 -1，
+-- 结果每次自增都重置窗口，固定窗口退化成滑动窗口（风控计数永不衰减）。
+local pttl = -1
+if ttl > 0 then
+  pttl = redis.call('PTTL', key)
+end
+
+if ttl > 0 and pttl > 0 then
+  -- 已有窗口：保留剩余 TTL 重写值
+  redis.call('SET', key, '"' .. current .. '"', 'PX', pttl)
+else
+  -- 首次写入（或原本无 TTL）：设置完整窗口
+  redis.call('SET', key, '"' .. current .. '"', 'PX', ttl)
+end
+return current
+`
+
+/**
+ * 原子「不存在才写入」：返回 1 表示写入成功（此前不存在），0 表示已存在
+ * 用于一次性 nonce 的消费，避免 get-then-set 的 TOCTOU 竞态
+ */
+const SETNX_LUA = `
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  return 0
+end
+redis.call('SET', KEYS[1], ARGV[1], 'PX', tonumber(ARGV[2]))
+return 1
+`
+
 function getRedisClient () {
   if (!process.env.REDIS_URL) return null
   if (!redisClient) {
@@ -23,6 +78,15 @@ function getRedisClient () {
   return redisClient
 }
 
+/**
+ * 内存 store 的条目上限。
+ *
+ * key 里含客户端可控成分（IP / 手机号 / Session-ID / userId），
+ * 攻击者用大量不同 key 持续请求会让 Map 无限增长 → 进程 OOM。
+ * 超限时按插入顺序淘汰最旧的条目（近似 LRU，足够防爆内存）。
+ */
+const MEMORY_STORE_MAX_ENTRIES = 10_000
+
 class MemoryStore {
   constructor (namespace) {
     this.namespace = namespace
@@ -30,6 +94,18 @@ class MemoryStore {
   }
 
   key (key) { return `${this.namespace}:${key}` }
+
+  /** 容量保护：超限则淘汰最旧的若干条目 */
+  _evictIfNeeded () {
+    if (this.map.size <= MEMORY_STORE_MAX_ENTRIES) return
+    // Map 保持插入序，迭代前若干个即最旧条目
+    const toRemove = this.map.size - MEMORY_STORE_MAX_ENTRIES
+    let removed = 0
+    for (const k of this.map.keys()) {
+      this.map.delete(k)
+      if (++removed >= toRemove) break
+    }
+  }
 
   async get (key) {
     const k = this.key(key)
@@ -48,6 +124,7 @@ class MemoryStore {
       this.map.delete(this.key(key))
       return
     }
+    this._evictIfNeeded()
     this.map.set(this.key(key), {
       value: JSON.stringify(value),
       expiresAt: ttlMs > 0 ? Date.now() + ttlMs : null
@@ -56,6 +133,24 @@ class MemoryStore {
 
   async delete (key) {
     this.map.delete(this.key(key))
+  }
+
+  /**
+   * 原子「不存在才写入」：返回 true 表示本次写入成功
+   * Map 写入是同步的（无 await 间隙），单进程内天然原子
+   */
+  async setIfAbsent (key, value, ttlMs) {
+    const k = this.key(key)
+    const existing = this.map.get(k)
+    if (existing && (!existing.expiresAt || existing.expiresAt > Date.now())) {
+      return false
+    }
+    this._evictIfNeeded()
+    this.map.set(k, {
+      value: JSON.stringify(value),
+      expiresAt: ttlMs > 0 ? Date.now() + ttlMs : null
+    })
+    return true
   }
 
   async increment (key, ttlMs) {
@@ -121,22 +216,46 @@ class RedisStore {
   }
 
   /**
-   * 计数自增。
+   * 原子「不存在才写入」：返回 true 表示本次写入成功
+   * 一次性 nonce 的消费用它替代 get-then-set，消除并发重放/穷举窗口
+   */
+  async setIfAbsent (key, value, ttlMs) {
+    const serialized = JSON.stringify(value)
+    const res = await this.client.eval(
+      SETNX_LUA,
+      1,
+      this.key(key),
+      serialized,
+      String(ttlMs > 0 ? ttlMs : 1)
+    )
+    return Number(res) === 1
+  }
+
+  /**
+   * 计数自增（原子，固定窗口语义）。
    *
-   * 用 GET+SET 而非 Redis INCR：INCR 要求键值是裸数字，
-   * 而 set 写入的是 JSON 形式（"5"），同一 key 上 INCR 会报
-   * "value is not an integer"。用 GET+SET 可与 set 保持同一存储格式。
+   * 语义要求与 MemoryStore 一致：
+   *   - 窗口从「首次写入」起算，后续自增不延长窗口（否则"每小时 20 次"
+   *     会变成"最后一次请求后 1 小时内 20 次"，风控计数永不衰减）
+   *   - 自增与设 TTL 是原子的，不能出现"计数已加但 TTL 没设"的中间态
+   *
+   * 用 Lua 一次完成 GET→加→条件 SET：
+   *   - 键不存在：写新值并设 TTL
+   *   - 键存在：只更新值，保留原有 TTL（PTTL 不变）
+   *
+   * 之所以不用 Redis INCR：INCR 要求键值是裸数字，而 set 写入的是 JSON
+   * 形式（"5"），同一 key 上 INCR 会报 "value is not an integer"。
    */
   async increment (key, ttlMs) {
     const k = this.key(key)
-    const current = Number(await this.get(key) || 0) + 1
-    const ttl = ttlMs > 0 ? ttlMs : null
-    if (ttl != null) {
-      await this.client.set(k, JSON.stringify(current), 'PX', ttl)
-    } else {
-      await this.client.set(k, JSON.stringify(current))
-    }
-    return current
+    const ttl = ttlMs > 0 ? ttlMs : 0
+    const raw = await this.client.eval(
+      INCREMENT_LUA,
+      1,
+      k,
+      String(ttl)
+    )
+    return Number(raw)
   }
 
   async clear () {

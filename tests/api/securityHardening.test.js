@@ -14,7 +14,7 @@ import app from '@server/app.js'
 import AuditLog from '@server/models/AuditLog.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { waitForCondition } from '../helpers/test-helpers.js'
-import { issueCaptcha, verifyCaptcha } from '@server/utils/captcha.js'
+import { issueCaptcha, verifyCaptcha, _getCaptchaAnswerForTests } from '@server/utils/captcha.js'
 import {
   FAIL_THRESHOLD_VALUE,
   _resetLoginGuardForTests,
@@ -29,8 +29,8 @@ beforeEach(async () => {
 })
 
 // 从 token 解出 targetX（payload 结构：ts|targetX|nonce|sig）
-const decodeTargetX = (token) =>
-  Number(Buffer.from(String(token), 'base64url').toString('utf8').split('|')[1])
+// 验证码答案已移到服务端存储（token 不再携带答案），测试从受控接口读取
+const decodeTargetX = async (token) => _getCaptchaAnswerForTests(token)
 
 // 解出 data URL 里的 SVG 原文
 const decodeSvg = (dataUrl) =>
@@ -62,7 +62,7 @@ describe('T-S1 GET /api/security/captcha', async () => {
     const r2 = await request(app).get('/api/security/captcha')
     const d1 = r1.body.data
     const bgSvg = decodeSvg(d1.bg)
-    expect(bgSvg).toContain(`translate(${decodeTargetX(d1.token)} ${d1.y})`)
+    expect(bgSvg).toContain(`translate(${await decodeTargetX(d1.token)} ${d1.y})`)
     expect(bgSvg).toContain('stroke-dasharray')
     // nonce 派生随机装饰：两次颁发的背景不应相同
     expect(d1.bg).not.toBe(r2.body.data.bg)
@@ -82,21 +82,21 @@ describe('T-S1 GET /api/security/captcha', async () => {
 
 describe('T-S2 滑块验证码自包含验证', async () => {
   it('提交 targetX 应通过，容差 ±6 内也应通过', async () => {
-    const c1 = issueCaptcha()
-    expect(await verifyCaptcha(c1.token, decodeTargetX(c1.token))).toBe(true)
-    const c2 = issueCaptcha()
-    expect(await verifyCaptcha(c2.token, decodeTargetX(c2.token) + 6)).toBe(true)
-    const c3 = issueCaptcha()
-    expect(await verifyCaptcha(c3.token, decodeTargetX(c3.token) - 6)).toBe(true)
+    const c1 = await issueCaptcha()
+    expect(await verifyCaptcha(c1.token, await decodeTargetX(c1.token))).toBe(true)
+    const c2 = await issueCaptcha()
+    expect(await verifyCaptcha(c2.token, await decodeTargetX(c2.token) + 6)).toBe(true)
+    const c3 = await issueCaptcha()
+    expect(await verifyCaptcha(c3.token, await decodeTargetX(c3.token) - 6)).toBe(true)
   })
 
   it('偏差超过容差（targetX + 20）应失败', async () => {
-    const { token } = issueCaptcha()
-    expect(await verifyCaptcha(token, decodeTargetX(token) + 20)).toBe(false)
+    const { token } = await issueCaptcha()
+    expect(await verifyCaptcha(token, await decodeTargetX(token) + 20)).toBe(false)
   })
 
   it('非数字答案应失败', async () => {
-    const { token } = issueCaptcha()
+    const { token } = await issueCaptcha()
     expect(await verifyCaptcha(token, 'abc')).toBe(false)
   })
 
@@ -105,15 +105,15 @@ describe('T-S2 滑块验证码自包含验证', async () => {
   })
 
   it('同一 token 二次消费应失败（防重放）', async () => {
-    const { token } = issueCaptcha()
-    const x = decodeTargetX(token)
+    const { token } = await issueCaptcha()
+    const x = await decodeTargetX(token)
     expect(await verifyCaptcha(token, x)).toBe(true)
     expect(await verifyCaptcha(token, x)).toBe(false)
   })
 
   it('答错也会消费 token（一次性，防穷举）', async () => {
-    const { token } = issueCaptcha()
-    const x = decodeTargetX(token)
+    const { token } = await issueCaptcha()
+    const x = await decodeTargetX(token)
     // 答错：nonce 已被核销
     expect(await verifyCaptcha(token, x + 20)).toBe(false)
     // 同一 token 再提交正确位置也拒收
@@ -130,17 +130,29 @@ describe('T-S2 滑块验证码自包含验证', async () => {
   })
 
   it('篡改签名的 token 应失败', async () => {
-    // 签名内容与 payload 不一致（签的是 targetX=999，payload 写 120）
+    // 签名内容与 payload 不一致（签的是 ts|other，payload 里的 nonce 不同）
     const ts = Date.now()
-    const badSig = crypto.createHmac('sha256', process.env.CAPTCHA_SECRET).update(`${ts}|999|tampernonce001`).digest('base64url')
-    const token = Buffer.from(`${ts}|120|tampernonce001|${badSig}`, 'utf8').toString('base64url')
+    const badSig = crypto.createHmac('sha256', process.env.CAPTCHA_SECRET).update(`${ts}|othernonce999`).digest('base64url')
+    const token = Buffer.from(`${ts}|tampernonce001|${badSig}`, 'utf8').toString('base64url')
     expect(await verifyCaptcha(token, 120)).toBe(false)
+  })
+
+  it('token 内不应再包含正确答案（防脚本解码绕过）', async () => {
+    const d = await issueCaptcha()
+    const raw = Buffer.from(d.token, 'base64url').toString('utf8')
+    const parts = raw.split('|')
+    // 载荷只剩 ts|nonce|sig 三段，不含 targetX
+    expect(parts.length).toBe(3)
+    const answer = await decodeTargetX(d.token)
+    expect(answer).not.toBeNull()
+    // 答案不应以明文形式出现在 token 里
+    expect(raw).not.toContain(String(answer))
   })
 
   it('targetX 应落在 [60, 220]，y 应落在 [20, 86]', async () => {
     for (let i = 0; i < 50; i++) {
-      const d = issueCaptcha()
-      const x = decodeTargetX(d.token)
+      const d = await issueCaptcha()
+      const x = await decodeTargetX(d.token)
       expect(x).toBeGreaterThanOrEqual(60)
       expect(x).toBeLessThanOrEqual(220)
       expect(d.y).toBeGreaterThanOrEqual(20)

@@ -9,7 +9,7 @@
         <div class="flex items-center justify-between gap-2 sm:gap-4 h-16 min-w-0">
           <!-- 网站标题（窄屏可截断避免顶栏爆裂） -->
           <div class="min-w-0 shrink">
-            <router-link :to="{ name: 'Home' }" class="block truncate text-lg sm:text-xl font-bold text-gray-900 hover:text-blue-600">
+            <router-link :to="{ name: 'Home' }" class="block truncate py-1 text-lg sm:text-xl font-bold text-gray-900 hover:text-blue-600">
               {{ t('nav.home') }}
             </router-link>
           </div>
@@ -67,14 +67,14 @@
               <template v-if="userStore.isAuthenticated">
                 <router-link
                   to="/profile"
-                  class="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
                 >
                   {{ t('nav.profile') }}
                 </router-link>
                 <button
                   type="button"
                   @click="handleLogout"
-                  class="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
                 >
                   {{ t('nav.logout') }}
                 </button>
@@ -83,13 +83,13 @@
               <template v-else>
                 <router-link
                   to="/login"
-                  class="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
                 >
                   {{ t('nav.login') }}
                 </router-link>
                 <router-link
                   to="/register"
-                  class="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 whitespace-nowrap"
                 >
                   {{ t('nav.register') }}
                 </router-link>
@@ -107,11 +107,12 @@
       </Transition>
     </router-view>
 
-    <footer class="border-t bg-white/80 py-6 text-center text-xs text-gray-500">
-      <div class="flex justify-center gap-4">
-        <router-link to="/terms" class="hover:text-blue-600">{{ t('legal.termsLink') }}</router-link>
-        <span aria-hidden="true">·</span>
-        <router-link to="/privacy" class="hover:text-blue-600">{{ t('legal.privacyLink') }}</router-link>
+    <footer class="border-t bg-white/80 py-4 sm:py-6 text-center text-xs text-gray-500">
+      <!-- 链接加 py-2 扩大触控热区到 32px（移动端易点），视觉尺寸不变 -->
+      <div class="flex justify-center gap-1 sm:gap-4">
+        <router-link to="/terms" class="inline-block px-2 py-2 hover:text-blue-600">{{ t('legal.termsLink') }}</router-link>
+        <span aria-hidden="true" class="self-center">·</span>
+        <router-link to="/privacy" class="inline-block px-2 py-2 hover:text-blue-600">{{ t('legal.privacyLink') }}</router-link>
       </div>
     </footer>
     

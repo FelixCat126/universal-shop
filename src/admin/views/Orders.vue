@@ -144,13 +144,13 @@
             table-layout="fixed"
             class="order-table"
           >
-        <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="190" align="center">
+        <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="150" align="center">
           <template #default="scope">
             <div class="order-no">{{ scope.row.order_no }}</div>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.user')" width="140" min-width="130">
+        <el-table-column :label="t('orders.user')" width="130" min-width="120">
           <template #default="scope">
             <div class="user-info">
               <div class="user-nickname">{{ scope.row.user?.nickname || t('common.unknown') }}</div>
@@ -159,7 +159,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.amount')" width="170" align="center">
+        <el-table-column :label="t('orders.amount')" width="150" align="center">
           <template #default="scope">
             <div class="amount">
               <template v-if="scope.row.payment_method === 'points'">
@@ -179,7 +179,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('common.paymentMethod')" width="120" align="center">
+        <el-table-column :label="t('common.paymentMethod')" width="110" align="center">
           <template #default="scope">
             <el-tag
               :type="scope.row.payment_method === 'cod' ? 'warning' : scope.row.payment_method === 'online' ? 'success' : 'info'"
@@ -199,7 +199,7 @@
         </el-table-column>
 
 
-        <el-table-column :label="t('orders.recipientInfo')" width="160" min-width="150">
+        <el-table-column :label="t('orders.recipientInfo')" width="150" min-width="140">
           <template #default="scope">
             <div class="contact-info">
               <div class="contact-name">{{ scope.row.contact_name }}</div>
@@ -208,7 +208,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.orderDate')" width="140" align="center">
+        <el-table-column :label="t('orders.orderDate')" width="130" align="center">
           <template #default="scope">
             <div class="created-time">{{ formatDate(scope.row.created_at) }}</div>
           </template>

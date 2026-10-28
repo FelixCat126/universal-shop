@@ -117,7 +117,7 @@
         >
           <el-table-column prop="id" :label="t('users.id')" width="60" align="center" />
 
-          <el-table-column :label="t('users.nickname')" width="190" min-width="170">
+          <el-table-column :label="t('users.nickname')" width="170" min-width="150">
             <template #default="scope">
               <div class="user-nickname-cell">
                 <el-avatar
@@ -136,7 +136,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.phone')" width="170" min-width="160">
+          <el-table-column :label="t('users.phone')" width="160" min-width="150">
             <template #default="scope">
               <div class="user-phone">
                 <div class="phone-display" v-if="scope.row.phone">
@@ -149,7 +149,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.email')" width="190" min-width="170">
+          <el-table-column :label="t('users.email')" width="170" min-width="150">
             <template #default="scope">
               <div class="user-email">
                 {{ scope.row.email || t('common.notSet') }}
@@ -157,7 +157,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.referredBy')" width="120" min-width="110">
+          <el-table-column :label="t('users.referredBy')" width="100" min-width="90">
             <template #default="scope">
               <div class="referrer-info">
                 <span v-if="scope.row.referred_by_code" class="referrer-code">
@@ -179,7 +179,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.registrationTime')" width="170" align="center">
+          <el-table-column :label="t('users.registrationTime')" width="150" align="center">
             <template #default="scope">
               <div class="registration-time">
                 <div class="datetime">{{ formatDateTime(scope.row.created_at) }}</div>

@@ -16,7 +16,7 @@ export async function authenticatePartner (req, res, next) {
 
     let decoded
     try {
-      decoded = jwt.verify(token, JWT_PARTNER_SECRET)
+      decoded = jwt.verify(token, JWT_PARTNER_SECRET, { algorithms: ['HS256'] })
     } catch {
       return res.status(403).json({ success: false, message: '无效的认证令牌' })
     }

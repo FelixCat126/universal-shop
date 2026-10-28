@@ -9,7 +9,16 @@ const stats = {
 }
 
 export function observabilityMiddleware (req, res, next) {
-  const requestId = req.headers['x-request-id'] || crypto.randomUUID()
+  /**
+   * X-Request-ID 优先用客户端传入的值，便于跨服务追踪；
+   * 但必须做长度与字符集校验 —— 未校验就回写响应头/写日志，
+   * 攻击者可用超长值放大响应头，或用换行伪造日志行。
+   */
+  const raw = req.headers['x-request-id']
+  const candidate = typeof raw === 'string' ? raw.trim() : ''
+  const requestId = /^[A-Za-z0-9_-]{1,64}$/.test(candidate)
+    ? candidate
+    : crypto.randomUUID()
   req.requestId = requestId
   res.setHeader('X-Request-ID', requestId)
   const t0 = Date.now()

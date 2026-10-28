@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
-import { JWT_SECRET } from '../config/jwtSecret.js'
+import { JWT_SECRET, JWT_ADMIN_SECRET, JWT_PARTNER_SECRET } from '../config/jwtSecret.js'
 import { createSharedStore } from '../utils/sharedState.js'
 import { logger } from '../utils/logger.js'
 
@@ -46,7 +46,7 @@ export const authenticateToken = async (req, res, next) => {
       })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] })
     // 三套身份分桶校验：拒绝 admin/partner token 进入用户接口
     if (decoded.type && decoded.type !== 'user') {
       return res.status(401).json({
@@ -85,13 +85,30 @@ export const optionalAuth = async (req, res, next) => {
   if (!token) return next()
 
   try {
-    // 先读未验证 payload 的身份类型：admin/partner 在可选认证中本就按匿名处理，
-    // 即使它们使用独立 secret 也不应被误判为用户态 401。
-    const typeHint = jwt.decode(token)?.type
-    if (typeHint === 'admin' || typeHint === 'partner') return next()
-
-    const decoded = jwt.verify(token, JWT_SECRET)
-    if (decoded?.type === 'admin' || decoded?.type === 'partner') {
+    /**
+     * 不用 jwt.decode 的未验签载荷做身份分流 —— 那是攻击者可控的数据。
+     * 改为依次用三把密钥验签：
+     *   - 用户密钥验签成功 → 走用户态校验
+     *   - 管理端/合作方密钥验签成功 → 这两类在可选认证中按匿名处理
+     *   - 全部失败 → 401
+     */
+    let decoded = null
+    let isStaffToken = false
+    try {
+      decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] })
+    } catch {
+      for (const secret of [JWT_ADMIN_SECRET, JWT_PARTNER_SECRET]) {
+        try {
+          decoded = jwt.verify(token, secret, { algorithms: ['HS256'] })
+          isStaffToken = true
+          break
+        } catch { /* 换下一把密钥试 */ }
+      }
+    }
+    if (!decoded) {
+      return res.status(401).json({ success: false, message: '认证令牌无效或已过期' })
+    }
+    if (isStaffToken || decoded?.type === 'admin' || decoded?.type === 'partner') {
       // 不是普通用户态：当作未登录处理
       return next()
     }

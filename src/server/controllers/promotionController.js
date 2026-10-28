@@ -1,6 +1,7 @@
 import Promotion from '../models/Promotion.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { logger } from '../utils/logger.js'
+import { parseId } from '../utils/params.js'
 
 /**
  * 促销管理（P1 营销体系 + P3 买多赠一）：threshold 满减 / buy_x_get_y 买赠
@@ -66,7 +67,7 @@ class PromotionController {
   /** 全量替换（与创建同校验） */
   static async update (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
@@ -94,7 +95,7 @@ class PromotionController {
 
   static async updateStatus (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
@@ -113,7 +114,7 @@ class PromotionController {
   /** 硬删：已命中订单的金额以 order_promotions 快照为准，不受影响 */
   static async remove (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }

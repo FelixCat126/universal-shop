@@ -4,6 +4,7 @@ import UserCoupon from '../models/UserCoupon.js'
 import User from '../models/User.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { logger } from '../utils/logger.js'
+import { parseId } from '../utils/params.js'
 
 /**
  * 抵扣券模板管理（P2 营销体系）
@@ -93,7 +94,7 @@ class CouponAdminController {
   /** 全量替换（与创建同校验） */
   static async update (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
@@ -123,7 +124,7 @@ class CouponAdminController {
 
   static async updateStatus (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
@@ -142,7 +143,7 @@ class CouponAdminController {
   /** 硬删：已有用户领取的模板拒绝删除（避免持券用户的券被级联清掉），可改为停用 */
   static async remove (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
@@ -165,7 +166,7 @@ class CouponAdminController {
   /** 模板实例列表：分页列出已发券（用户、code、status、时间） */
   static async instances (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }

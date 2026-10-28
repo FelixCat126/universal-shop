@@ -139,4 +139,26 @@ describe('SharedState.redisContract', () => {
       await client.quit()
     }
   })
+
+  maybe('SR-3 Redis 后端：increment 不重置 TTL（固定窗口）', async () => {
+    const { createSharedStore } = await import('@server/utils/sharedState.js')
+    const store = createSharedStore('redis-window-test')
+    await store.delete('w')
+    await store.increment('w', 400)
+    await new Promise(r => setTimeout(r, 200))
+    await store.increment('w', 400)
+    await new Promise(r => setTimeout(r, 250))
+    // 固定窗口：第二次自增不延长窗口 → 键应已过期
+    expect(await store.get('w')).toBeNull()
+  })
+
+  maybe('SR-4 Redis 后端：并发 setIfAbsent 只成功一次', async () => {
+    const { createSharedStore } = await import('@server/utils/sharedState.js')
+    const store = createSharedStore('redis-setnx-test')
+    await store.delete('cc')
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => store.setIfAbsent('cc', 1, 1000))
+    )
+    expect(results.filter(Boolean)).toHaveLength(1)
+  })
 })

@@ -6,7 +6,7 @@
       </h2>
       <p class="mt-2 text-center text-sm text-gray-600">
         {{ t('common.or') }}
-        <router-link to="/login" class="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+        <router-link to="/login" class="inline-block py-2 -my-2 font-medium text-blue-600 hover:text-blue-500 transition-colors">
           {{ t('user.loginExistingAccount') }}
         </router-link>
       </p>

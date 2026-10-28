@@ -118,7 +118,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.name')" width="200" min-width="180">
+        <el-table-column :label="t('products.name')" width="160" min-width="150">
           <template #default="scope">
             <div class="product-name-container">
               <div class="product-name" :title="scope.row.name">{{ scope.row.name }}</div>
@@ -126,13 +126,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="category" :label="t('products.category')" width="110" min-width="100">
+        <el-table-column prop="category" :label="t('products.category')" width="100" min-width="90">
           <template #default="scope">
             <el-tag>{{ getCategoryLabel(scope.row) }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.shelfStatus')" width="110" min-width="100">
+        <el-table-column :label="t('products.shelfStatus')" width="100" min-width="90">
           <template #default="scope">
             <div class="shelf-status-cell">
               <el-tag v-if="isDelisted(scope.row)" type="info" size="small">{{ t('products.shelfDelisted') }}</el-tag>
@@ -150,7 +150,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="price" :label="t('products.price')" width="130" min-width="120" align="right">
+        <el-table-column prop="price" :label="t('products.price')" width="120" min-width="110" align="right">
           <template #default="scope">
             <div class="price-container">
               <!-- 有折扣时显示折扣价 -->
@@ -169,7 +169,7 @@
 
         <el-table-column prop="points" :label="t('products.points')" width="90" align="right" />
 
-        <el-table-column prop="stock" :label="t('products.stock')" width="110" min-width="100">
+        <el-table-column prop="stock" :label="t('products.stock')" width="100" min-width="90">
           <template #default="scope">
             <div class="stock-info-inline">
               <span :class="{
@@ -199,7 +199,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('common.createTime')" width="130" min-width="120">
+        <el-table-column :label="t('common.createTime')" width="110" min-width="100">
           <template #default="scope">
             <span class="create-time">{{ formatDate(scope.row.created_at) }}</span>
           </template>

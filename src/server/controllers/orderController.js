@@ -12,6 +12,7 @@ import sequelize from '../config/database.js'
 import UserController from './userController.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import { createUserAddress } from '../services/addressService.js'
+import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
 import * as pointsService from '../services/pointsService.js'
 import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates } from '../services/pricingEngine.js'
@@ -23,6 +24,7 @@ import { resolvePagination } from '../utils/pagination.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
+import { parseId } from '../utils/params.js'
 
 /** 金额统一舍入到分：消除浮点误差，保证 Σ(行价×数量) 与订单总额严格一致 */
 const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
@@ -170,7 +172,7 @@ async function buildCreateOrderResponseData (orderId, { userId, isGuestOrder, de
     const token = jwt.sign(
       { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '7d', algorithm: 'HS256' }
     )
 
     responseData.user = user.toSafeJSON()
@@ -256,6 +258,8 @@ class OrderController {
 
       let userId = req.user?.userId
       let isGuestOrder = false
+      // 本次游客下单是否**新建**了账号（复用既有游客账号时为 false，不发注册赠券）
+      let guestUserCreated = false
 
       // 标准化处理推荐码（在所有分支之前定义）
       const normalizedReferralCode = referral_code && typeof referral_code === 'string' && referral_code.trim() ? referral_code.trim() : null
@@ -315,11 +319,16 @@ class OrderController {
           const newUser = await UserController.createUserForOrder(contact_phone, contact_name, normalizedReferralCode)
           userId = newUser.id
           isGuestOrder = true
+          guestUserCreated = newUser.__created === true
         } catch (error) {
           logger.error('创建用户失败', { err: error?.message, stack: error?.stack })
-          return res.status(400).json({
+          // 只透传业务语义错误（手机号已注册/账号禁用等），其余内部异常不外泄
+          const businessMessage = /已被注册|已被禁用|无法自动注册|无效|不符合/.test(error?.message || '')
+            ? error.message
+            : '账号创建失败，请稍后重试'
+          return res.status(businessMessage === error?.message ? 400 : 500).json({
             success: false,
-            message: error.message
+            message: businessMessage
           })
         }
       }
@@ -849,6 +858,24 @@ class OrderController {
       // 返回创建的订单信息（含订单项；游客单附带账号与 token）
       const responseData = await buildCreateOrderResponseData(result.orderId, { userId, isGuestOrder })
 
+      /**
+       * 注册赠券：游客自动注册建号时发放，但**必须等订单真正创建成功**。
+       * 早期在建号时就发券，而建号发生在商品/库存/计价校验之前，
+       * 导致"下单失败"也会留下已注册账号 + 已发放赠券 ——
+       * 攻击者可用一批手机号反复触发失败下单来批量造号并薅走注册赠券。
+       */
+      if (isGuestOrder && guestUserCreated) {
+        try {
+          await grantRegisterGiftCoupons(userId)
+        } catch (giftError) {
+          logger.error('游客订单注册赠券发放失败（不影响下单）', {
+            userId,
+            err: giftError?.message,
+            stack: giftError?.stack
+          })
+        }
+      }
+
       AuditLog.logUser({
         user: req.user || (isGuestOrder ? { id: userId } : null),
         event: isGuestOrder ? 'order.create.guest' : 'order.create',
@@ -990,7 +1017,7 @@ class OrderController {
       if (!userId) {
         return res.status(401).json({ success: false, message: '请先登录' })
       }
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isFinite(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的订单 ID' })
       }
@@ -1148,9 +1175,18 @@ class OrderController {
         offset
       })
 
+      /**
+       * 累计消费统计：只计真实成交的订单。
+       * 早期实现仅排除 points 支付，未支付（pending）与已取消（cancelled）的
+       * 订单金额也会被计入，导致前台展示的「累计消费」虚高。
+       */
+      const SPENT_EXCLUDED_STATUSES = ['pending', 'cancelled']
       const spentWhere = {
         ...where,
-        payment_method: { [Op.ne]: 'points' }
+        payment_method: { [Op.ne]: 'points' },
+        status: where.status
+          ? { [Op.and]: [where.status, { [Op.notIn]: SPENT_EXCLUDED_STATUSES }] }
+          : { [Op.notIn]: SPENT_EXCLUDED_STATUSES }
       }
       const spentRaw = await Order.sum('total_amount_thb', { where: spentWhere })
       const spentThbSum = spentRaw != null && spentRaw !== ''

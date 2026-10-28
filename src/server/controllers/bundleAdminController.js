@@ -5,6 +5,7 @@ import Product from '../models/Product.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
+import { parseId } from '../utils/params.js'
 
 /** 列表/详情统一的组件 include（含组件商品名/价/库存，供后台展示） */
 const ITEMS_INCLUDE = [{
@@ -111,7 +112,7 @@ class BundleAdminController {
   static async update (req, res) {
     const transaction = await sequelize.transaction()
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         await transaction.rollback()
         return res.status(400).json({ success: false, message: '无效的 ID' })
@@ -157,7 +158,7 @@ class BundleAdminController {
 
   static async updateStatus (req, res) {
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的 ID' })
       }
@@ -179,7 +180,7 @@ class BundleAdminController {
   static async remove (req, res) {
     const transaction = await sequelize.transaction()
     try {
-      const id = parseInt(req.params.id, 10)
+      const id = parseId(req.params.id)
       if (!Number.isInteger(id) || id < 1) {
         await transaction.rollback()
         return res.status(400).json({ success: false, message: '无效的 ID' })

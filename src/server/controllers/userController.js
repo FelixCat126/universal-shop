@@ -103,11 +103,24 @@ class UserController {
         referral_code
       }, false) // false表示是正常注册
 
+      // 注册赠券：仅在注册真正成功后发放（失败只记日志，不影响注册主流程）
+      if (user?.__created) {
+        try {
+          await grantRegisterGiftCoupons(user.id)
+        } catch (giftError) {
+          logger.error('注册赠券发放失败（不影响注册）', {
+            userId: user.id,
+            err: giftError?.message,
+            stack: giftError?.stack
+          })
+        }
+      }
+
       // 生成JWT token
       const token = jwt.sign(
         { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
         JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: '7d', algorithm: 'HS256' }
       )
 
       AuditLog.logUser({
@@ -382,7 +395,7 @@ class UserController {
       const token = jwt.sign(
         { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
         JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: '7d', algorithm: 'HS256' }
       )
 
       res.json({
@@ -756,6 +769,8 @@ class UserController {
        * 正常注册账号（用户自己设过密码）仍拒绝复用，避免冒用他人已注册手机号下单
        */
       if (isAutoRegister && existingPhone.must_reset_password === true) {
+        // 复用既有账号：不是新建，不发注册赠券
+        existingPhone.__created = false
         return existingPhone
       }
       throw new Error(isAutoRegister ? '该手机号已被注册，无法自动注册' : '该手机号已被注册')
@@ -822,6 +837,8 @@ class UserController {
           throw new Error('该手机号关联的账户已被禁用，无法下单')
         }
         if (racedUser.must_reset_password === true) {
+          // 并发下由胜方创建的账号：不是本次新建，不发注册赠券
+          racedUser.__created = false
           return racedUser
         }
       }
@@ -829,20 +846,16 @@ class UserController {
     }
 
     /**
-     * 注册赠券（P2）：仅对新建用户发放——上方"复用既有游客账号"的早退分支不会再发；
-     * await 保证调用方（注册响应/游客下单）返回前发券已落定，结果确定可测；
-     * 失败只记日志，不影响注册主流程
+     * 注册赠券（P2）：由调用方在「真正成功」之后显式调用 grantRegisterGiftCoupons，
+     * 不在这里发放。
+     *
+     * 原因：游客下单的建号发生在订单业务校验（商品存在/库存/计价）之前，
+     * 若在建号时发券，订单校验失败也会留下「已注册账号 + 已发放赠券」，
+     * 攻击者可用一批手机号反复触发失败下单来批量造号并薅走注册赠券。
+     * 拆出来之后，赠券只在自助注册成功 / 游客订单成功时发放。
      */
-    try {
-      await grantRegisterGiftCoupons(user.id)
-    } catch (giftError) {
-      logger.error('注册赠券发放失败（不影响注册）', {
-        userId: user.id,
-        err: giftError?.message,
-        stack: giftError?.stack
-      })
-    }
-
+    // 新建成功：标记出来，供调用方决定是否发放注册赠券
+    user.__created = true
     return user
   }
 

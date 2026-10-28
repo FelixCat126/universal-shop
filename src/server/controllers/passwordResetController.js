@@ -50,7 +50,10 @@ class PasswordResetController {
         success: true,
         message: '如果该手机号可以重置密码，验证码将发送到您的手机（10 分钟内有效）'
       }
-      if (process.env.NODE_ENV !== 'production') payload.dev_otp = devOtp
+      // dev_otp 只在测试环境返回。
+      // 早期实现用 NODE_ENV !== 'production' 判定，导致预发/开发环境会把明文 OTP
+      // 返回给任意手机号 —— 等同于任意账号接管。测试环境由 vitest 设定 NODE_ENV=test。
+      if (process.env.NODE_ENV === 'test') payload.dev_otp = devOtp
       return res.json(payload)
     } catch (error) {
       logger.error('forgotPassword 失败', { err: error?.message, stack: error?.stack })

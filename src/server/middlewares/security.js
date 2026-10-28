@@ -8,26 +8,74 @@
 
 import rateLimit from 'express-rate-limit'
 import { createSharedStore, isSharedStateDistributed } from '../utils/sharedState.js'
+import { logger } from '../utils/logger.js'
 
-/** Redis-backed express-rate-limit store；未配置 REDIS_URL 时继续使用内置内存 store */
+/**
+ * 共享限流 store（Redis 或进程内 Map）
+ *
+ * Redis 故障降级：Redis 不可用时**放行并告警**，而不是把错误抛给 express-rate-limit
+ * （v7 的 passOnStoreError 默认为 false，store 抛错会一路冒泡成 500，
+ *   Redis 一重启就全站接口挂掉）。限流是保护措施，不该成为单点故障。
+ */
 function createSharedRateLimitStore (namespace, windowMs) {
   const cache = createSharedStore(`rate-limit:${namespace}`)
+  // 降级期内的本地计数：Redis 恢复前仍能对单实例做基本限流
+  const fallback = new Map()
+  let degraded = false
+
+  const fallbackIncrement = (key) => {
+    const now = Date.now()
+    const row = fallback.get(key)
+    if (!row || row.resetAt <= now) {
+      fallback.set(key, { count: 1, resetAt: now + windowMs })
+      return 1
+    }
+    row.count += 1
+    return row.count
+  }
+
   return {
     async increment (key) {
-      const totalHits = await cache.increment(key, windowMs)
-      return { totalHits, resetTime: new Date(Date.now() + windowMs) }
+      try {
+        const totalHits = await cache.increment(key, windowMs)
+        if (degraded) {
+          degraded = false
+          logger.warn('[rate-limit] 共享存储已恢复', { namespace })
+        }
+        return { totalHits, resetTime: new Date(Date.now() + windowMs) }
+      } catch (err) {
+        if (!degraded) {
+          degraded = true
+          logger.error('[rate-limit] 共享存储不可用，降级为本地计数', {
+            namespace, err: err?.message
+          })
+        }
+        const totalHits = fallbackIncrement(key)
+        return { totalHits, resetTime: new Date(Date.now() + windowMs) }
+      }
     },
     async decrement (key) {
-      const current = await cache.get(key)
-      if (current != null) {
-        await cache.set(key, Math.max(0, Number(current) - 1), windowMs)
+      try {
+        const current = await cache.get(key)
+        if (current != null) {
+          await cache.set(key, Math.max(0, Number(current) - 1), windowMs)
+        }
+      } catch (err) {
+        const row = fallback.get(key)
+        if (row) row.count = Math.max(0, row.count - 1)
       }
     },
     async resetKey (key) {
-      await cache.delete(key)
+      fallback.delete(key)
+      try {
+        await cache.delete(key)
+      } catch { /* 降级期忽略 */ }
     },
     async resetAll () {
-      await cache.clear()
+      fallback.clear()
+      try {
+        await cache.clear()
+      } catch { /* 降级期忽略 */ }
     }
   }
 }
