@@ -93,7 +93,7 @@
       >
         <el-table-column prop="id" label="ID" width="60" />
 
-        <el-table-column :label="t('products.image.productImage')" width="90" align="center">
+        <el-table-column :label="t('products.image.productImage')" width="80" align="center">
           <template #default="scope">
             <el-image
               :src="scope.row.image || defaultImage"
@@ -118,7 +118,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.name')" width="160" min-width="150">
+        <el-table-column :label="t('products.name')" width="150" min-width="140">
           <template #default="scope">
             <div class="product-name-container">
               <div class="product-name" :title="scope.row.name">{{ scope.row.name }}</div>
@@ -126,7 +126,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="category" :label="t('products.category')" width="100" min-width="90">
+        <el-table-column prop="category" :label="t('products.category')" width="95" min-width="85">
           <template #default="scope">
             <el-tag>{{ getCategoryLabel(scope.row) }}</el-tag>
           </template>
@@ -150,7 +150,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="price" :label="t('products.price')" width="120" min-width="110" align="right">
+        <el-table-column prop="price" :label="t('products.price')" width="115" min-width="105" align="right">
           <template #default="scope">
             <div class="price-container">
               <!-- 有折扣时显示折扣价 -->
@@ -167,7 +167,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="points" :label="t('products.points')" width="90" align="right" />
+        <el-table-column prop="points" :label="t('products.points')" width="80" align="right" />
 
         <el-table-column prop="stock" :label="t('products.stock')" width="100" min-width="90">
           <template #default="scope">
@@ -199,7 +199,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('common.createTime')" width="110" min-width="100">
+        <el-table-column :label="t('common.createTime')" width="105" min-width="95">
           <template #default="scope">
             <span class="create-time">{{ formatDate(scope.row.created_at) }}</span>
           </template>

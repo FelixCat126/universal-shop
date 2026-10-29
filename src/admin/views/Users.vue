@@ -117,7 +117,7 @@
         >
           <el-table-column prop="id" :label="t('users.id')" width="60" align="center" />
 
-          <el-table-column :label="t('users.nickname')" width="170" min-width="150">
+          <el-table-column :label="t('users.nickname')" width="165" min-width="145">
             <template #default="scope">
               <div class="user-nickname-cell">
                 <el-avatar
@@ -149,7 +149,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.email')" width="170" min-width="150">
+          <el-table-column :label="t('users.email')" width="165" min-width="145">
             <template #default="scope">
               <div class="user-email">
                 {{ scope.row.email || t('common.notSet') }}
@@ -179,7 +179,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column :label="t('users.registrationTime')" width="150" align="center">
+          <el-table-column :label="t('users.registrationTime')" width="145" align="center">
             <template #default="scope">
               <div class="registration-time">
                 <div class="datetime">{{ formatDateTime(scope.row.created_at) }}</div>
