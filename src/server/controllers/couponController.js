@@ -86,7 +86,10 @@ class CouponController {
           valid_from: t.valid_from,
           valid_to: t.valid_to,
           remaining,
-          claimed_by_me: claimedByMe
+          claimed_by_me: claimedByMe,
+          // 每人限领数：前端据此判断是否还能继续领，
+          // 缺失时前端会硬编码成 1，导致 per_user>1 的模板被提前判定为「已领完」
+          per_user: Number(t.per_user) || 1
         })
       }
 

@@ -867,6 +867,7 @@ import ThailandAddressSelector from '../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n, formatPhoneDisplay } from '../utils/phoneValidation.js'
 import { useToast } from '../composables/useToast.js'
 import { describePasswordPolicyFailure } from '../utils/passwordPolicy.js'
+import { extractListFromResponse } from '../utils/responseData.js'
 import {
   CheckCircleIcon,
   MapPinIcon,
@@ -1551,7 +1552,7 @@ const loadAvailableCoupons = async () => {
   try {
     const res = await getAvailableCoupons()
     if (res.data?.success) {
-      availableCoupons.value = Array.isArray(res.data.data) ? res.data.data : []
+      availableCoupons.value = extractListFromResponse(res)
     } else {
       availableCoupons.value = []
       showError(res.data?.message || t('coupon.loadFailed'))
@@ -1570,7 +1571,7 @@ const loadMyCoupons = async () => {
   try {
     const res = await getMyCoupons({ status: couponStatusTab.value })
     if (res.data?.success) {
-      myCoupons.value = Array.isArray(res.data.data) ? res.data.data : []
+      myCoupons.value = extractListFromResponse(res)
     } else {
       myCoupons.value = []
       showError(res.data?.message || t('coupon.loadFailed'))

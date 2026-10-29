@@ -721,6 +721,7 @@ import getCurrentLanguageValue from '../../utils/language.js'
 import CountrySelector from '../../components/CountrySelector.vue'
 import ThailandAddressSelector from '../../components/ThailandAddressSelector.vue'
 import { validatePhoneI18n } from '../../utils/phoneValidation.js'
+import { extractListFromResponse } from '../../utils/responseData.js'
 
 // 国际化
 const { t } = useI18n()
@@ -896,6 +897,8 @@ const quote = ref(null)
 /** 组件内所有定时器：卸载时统一清理，避免向已卸载组件发请求 / 劫持路由 */
 const timers = new Set()
 const trackTimer = (id) => { timers.add(id); return id }
+/** 报价防抖定时器：单独持有，便于单独取消 */
+let quoteTimer = null
 const clearAllTimers = () => {
   for (const id of timers) clearTimeout(id)
   timers.clear()
@@ -953,7 +956,7 @@ const loadMyCoupons = async () => {
   loadingCoupons.value = true
   try {
     const res = await getMyCoupons({ status: 'unused' })
-    myUnusedCoupons.value = res.data?.success && Array.isArray(res.data.data) ? res.data.data : []
+    myUnusedCoupons.value = extractListFromResponse(res)
   } catch (_e) {
     myUnusedCoupons.value = []
   } finally {

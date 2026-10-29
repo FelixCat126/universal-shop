@@ -232,6 +232,9 @@ class PartnerPortalController {
           description: j.description,
           image: j.image,
           status: j.status,
+          // 库存：前端据此限制数量输入上限（maxQty），
+          // 缺失时 Number(undefined)=NaN → max 失效 → 用户可填超库存数量
+          stock: Number(j.stock) || 0,
           retail_base_price_thb: base,
           unit_price_thb: partnerPrice,
           currency_code: 'THB',
