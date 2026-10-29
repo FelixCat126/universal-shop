@@ -419,7 +419,7 @@
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Loading, Picture, Delete, Edit } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -894,6 +894,11 @@ export default {
       },
       { deep: true }
     )
+
+    // 卸载时清理搜索防抖定时器，避免对已卸载组件发请求
+    onUnmounted(() => {
+      if (searchTimeout.value) clearTimeout(searchTimeout.value)
+    })
 
     onMounted(async () => {
       await loadCategoryOptions()

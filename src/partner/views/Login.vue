@@ -107,6 +107,7 @@ import { BuildingStorefrontIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
 import SliderCaptcha from '../components/SliderCaptcha.vue'
+import { safeRedirectPath } from '../../utils/safeRedirect.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -139,7 +140,8 @@ async function runLogin (captcha) {
     if (r.success) {
       captchaRef.value?.succeed()
       toast.success(t('login.loginSuccess'))
-      const red = route.query.redirect || '/shop'
+      // 白名单校验，避免开放重定向
+      const red = safeRedirectPath(route.query.redirect, '/shop')
       router.push(red)
       return
     }

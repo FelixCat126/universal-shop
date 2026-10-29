@@ -110,7 +110,7 @@
                 </button>
               </div>
               <p v-if="errors.newPassword" class="mt-1 text-xs text-red-600">{{ errors.newPassword }}</p>
-              <p class="mt-1 text-xs text-gray-500">{{ t('user.passwordPolicyHint') }}</p>
+              <p class="mt-1 text-xs text-gray-500">{{ t('validation.passwordPolicyHint') }}</p>
             </div>
           </template>
 

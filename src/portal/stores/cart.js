@@ -14,11 +14,18 @@ export const useCartStore = defineStore('cart', () => {
   })
 
   const totalAmount = computed(() => {
-    return items.value.reduce((total, item) => {
+    /**
+     * 逐行按分取整后再累加。
+     * 早期直接累加浮点：12.34 × 3 = 37.019999999999996，
+     * 与券门槛 37.02 比较时会被判为「未达门槛」而错误禁用券。
+     */
+    const cents = items.value.reduce((total, item) => {
       // 跳过失效项（商品被删除等，加载时已打上 unavailable 标记），不参与总价计算
       if (item.unavailable) return total
-      return total + (item.price * item.quantity)
+      const lineCents = Math.round((Number(item.price) || 0) * (Number(item.quantity) || 0) * 100)
+      return total + lineCents
     }, 0)
+    return cents / 100
   })
 
   const isEmpty = computed(() => items.value.length === 0)

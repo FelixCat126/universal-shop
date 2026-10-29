@@ -1,5 +1,6 @@
 import axios from 'axios'
 import config from '../../config/index.js'
+import { useUserStore } from '../stores/user.js'
 // 移除循环依赖 - 在拦截器中动态导入
 
 // 创建axios实例
@@ -67,16 +68,23 @@ api.interceptors.response.use(
     // 根据HTTP状态码处理错误 - 简化版本
     switch (status) {
       case 401:
-        // 未授权，清除本地存储并跳转到登录页
+        // 未授权：清除本地存储 + Pinia 内存态（只清 localStorage 会让
+        // userStore.isLoggedIn 仍为 true，顶栏继续显示旧用户，后续请求变成匿名 → 401 循环）
         localStorage.removeItem('token')
         localStorage.removeItem('user')
-        
+        // 同步清理 Pinia 内存态（store 已在应用启动时注册）
+        try {
+          useUserStore().clearAuth()
+        } catch (e) {
+          // Pinia 未就绪时忽略（内存态本就未建立）
+        }
+
         // 如果不是登录或注册页面，则跳转到登录页（带应用 base，生产为 /portal/）
-        if (!window.location.pathname.includes('/login') && 
+        if (!window.location.pathname.includes('/login') &&
             !window.location.pathname.includes('/register')) {
           window.location.href = `${import.meta.env.BASE_URL || '/'}login`
         }
-        
+
         console.error('登录已过期，请重新登录')
         break
         

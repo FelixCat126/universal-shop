@@ -11,6 +11,15 @@ export default {
 
   // 通用
   common: {
+    refresh: "รีเฟรช",
+    ok: "ตกลง",
+    no: "ไม่",
+    yes: "ใช่",
+    open: "เปิด",
+    close: "ปิด",
+    reset: "รีเซ็ต",
+    noData: "ไม่มีข้อมูล",
+    add: "เพิ่ม",
     backToHome: 'กลับหน้าแรก',
     loading: 'กำลังโหลด...',
     error: 'เกิดข้อผิดพลาด',
@@ -48,6 +57,8 @@ export default {
 
   // 导航
   nav: {
+    language: "ภาษา",
+    orders: "คำสั่งซื้อ",
     home: 'หน้าแรก',
     products: 'สินค้า',
     cart: 'ตะกร้าสินค้า',
@@ -60,6 +71,7 @@ export default {
 
   // 商品相关
   product: {
+    insufficientStock: "สต็อกไม่พอ เหลือเพียง {stock} ชิ้น",
     title: 'สินค้า',
     name: 'ชื่อสินค้า',
     price: 'ราคา',
@@ -118,6 +130,8 @@ export default {
 
   // 购物车
   cart: {
+    addToCart: "เพิ่มลงตะกร้า",
+    continueShopping: "ช้อปต่อ",
     title: 'ตะกร้าสินค้า',
     empty: 'ตะกร้าสินค้าว่างเปล่า',
     emptyDesc: 'ไปช้อปปิ้งและค้นหาสินค้าที่ดี',
@@ -240,6 +254,8 @@ export default {
 
   // 订单
   order: {
+    cityPlaceholder: "เมือง",
+    provincePlaceholder: "จังหวัด",
     title: 'คำสั่งซื้อ',
     orderNo: 'หมายเลขคำสั่งซื้อ',
     orderTime: 'เวลาสั่งซื้อ',
@@ -310,6 +326,20 @@ export default {
 
   // 地址管理
   address: {
+    setDefaultFailed: "ตั้งที่อยู่เริ่มต้นไม่สำเร็จ",
+    setDefaultSuccess: "ตั้งที่อยู่เริ่มต้นแล้ว",
+    updateFailed: "อัปเดตที่อยู่ไม่สำเร็จ",
+    updateSuccess: "อัปเดตที่อยู่แล้ว",
+    addFailed: "เพิ่มที่อยู่ไม่สำเร็จ",
+    addSuccess: "เพิ่มที่อยู่แล้ว",
+    deleteFailed: "ลบที่อยู่ไม่สำเร็จ",
+    deleteSuccess: "ลบที่อยู่แล้ว",
+    confirmDelete: "ยืนยันการลบที่อยู่นี้?",
+    addFirst: "กรุณาเพิ่มที่อยู่จัดส่งก่อน",
+    list: "รายการที่อยู่",
+    setDefault: "ตั้งเป็นค่าเริ่มต้น",
+    delete: "ลบที่อยู่",
+    edit: "แก้ไขที่อยู่",
     add: 'เพิ่มที่อยู่จัดส่ง',
     addNew: 'เพิ่มที่อยู่ใหม่',
     noAddresses: 'คุณยังไม่ได้เพิ่มที่อยู่จัดส่ง',
@@ -361,6 +391,9 @@ export default {
 
   // 表单验证
   validation: {
+    emailRequired: "กรุณากรอกอีเมล",
+    passwordLength: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
+    emailFormat: "กรุณากรอกอีเมลที่ถูกต้อง",
     required: 'ช่องนี้จำเป็น',
     email: 'กรุณาใส่อีเมลที่ถูกต้อง',
     phone: 'กรุณาใส่เบอร์โทรศัพท์ที่ถูกต้อง',
@@ -501,6 +534,7 @@ export default {
 
   // 页面标题
   page: {
+    orderDetail: "รายละเอียดคำสั่งซื้อ",
     home: 'หน้าแรก',
     productList: 'รายการสินค้า',
     productDetail: 'รายละเอียดสินค้า',
@@ -512,6 +546,15 @@ export default {
     orders: 'คำสั่งซื้อของฉัน',
     notFound: 'ไม่พบหน้า'
   },
+  // ข้อความสำเร็จ
+  success: {
+    operation: 'ดำเนินการสำเร็จ',
+    save: 'บันทึกแล้ว',
+    delete: 'ลบแล้ว',
+    update: 'อัปเดตแล้ว',
+    add: 'เพิ่มแล้ว'
+  },
+
 
   // 语言选择
   language: {

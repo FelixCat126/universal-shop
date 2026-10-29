@@ -193,6 +193,7 @@ import CountrySelector from '../components/CountrySelector.vue'
 import SliderCaptcha from '../components/SliderCaptcha.vue'
 import { validatePhone, getCountryInfo, getPhoneLengthRange, getPhoneLengthText } from '../utils/phoneValidation.js'
 import { loadPublicConfig } from '../../utils/publicConfig.js'
+import { safeRedirectPath } from '../../utils/safeRedirect.js'
 import { 
   UserIcon, 
   EyeIcon, 
@@ -319,8 +320,8 @@ const handleLoginResult = (result) => {
 
     // 延迟跳转，让用户看到成功消息
     setTimeout(() => {
-      // 获取登录前的页面，如果没有则跳转到首页
-      const redirectTo = route.query.redirect || '/'
+      // 获取登录前的页面（需白名单校验，避免开放重定向），否则跳转到首页
+      const redirectTo = safeRedirectPath(route.query.redirect, '/')
       router.push(redirectTo)
     }, 1000)
     return

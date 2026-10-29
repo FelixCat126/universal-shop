@@ -34,6 +34,9 @@ import { logger } from '../utils/logger.js'
 /** 金额统一舍入到分：+Number.EPSILON 消除 0.5 分位的浮点误差（如 1.005*100=100.499…） */
 const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
 
+/** 组合包展开行数量上限（组件配比 × 组合包数量，配比上限 999、组合包数量上限 5000） */
+const MAX_BUNDLE_LINE_QTY = 5000 * 999
+
 /** 积分获取比例默认值：每实付 100 泰铢发 1 积分（SystemConfig key points_earn_rate 可覆盖） */
 export const DEFAULT_POINTS_EARN_RATE = 0.01
 
@@ -231,8 +234,14 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
       throw businessError(`商品 ${product.name} 已下架，无法购买`)
     }
     const qty = parseInt(item.quantity, 10)
-    if (!Number.isInteger(qty) || qty < 1 || qty > 5000) {
-      throw businessError(`商品 ${product.name} 数量无效（需为 1-5000 的整数）`)
+    /**
+     * 数量上限按「单品行」与「组合包展开行」区分。
+     * 组合包展开行的数量 = 组件配比 × 组合包数量（如配比 3、买 1667 个 → 展开 5001），
+     * 早期对展开行也套 1-5000 上限，导致合法的组合包订单被误拒。
+     */
+    const qtyLimit = item._bundle ? MAX_BUNDLE_LINE_QTY : 5000
+    if (!Number.isInteger(qty) || qty < 1 || qty > qtyLimit) {
+      throw businessError(`商品 ${product.name} 数量无效（需为 1-${qtyLimit} 的整数）`)
     }
 
     // 组合包展开行（P4）：行价 = 第 0 层分摊结果（unit_price 仅展示，line_total 为权威值）；
@@ -257,7 +266,15 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
 
     let unitPrice = round2(product.price)
     if (product.discount && product.discount > 0) {
-      unitPrice = round2(Number(product.price) * (1 - product.discount / 100))
+      /**
+       * 直降价用整数分计算，避免浮点误差。
+       * 早期实现 round2(price * (1 - d/100))：price=2052.15、d=90 时
+       * 精确值 205.215 落在半分位下方被截成 205.21（少 1 分）。
+       * 改为先取整分再按比例算、最后四舍五入，结果与十进制精确值一致。
+       */
+      const priceCents = Math.round(Number(product.price) * 100)
+      const discountCents = Math.round(priceCents * (100 - Number(product.discount)) / 100)
+      unitPrice = discountCents / 100
     }
     const lineTotal = round2(unitPrice * qty)
     lines.push({
@@ -464,11 +481,20 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
 
     const scope = template.scope && typeof template.scope === 'object' ? template.scope : { type: 'all' }
     const scopeIds = Array.isArray(scope.ids) ? scope.ids.map(Number) : []
+    const isScoped = scope.type === 'category' || scope.type === 'product'
     const eligibleLines = lines.filter(line => {
       if (scope.type === 'category') return line._category_id != null && scopeIds.includes(Number(line._category_id))
       if (scope.type === 'product') return scopeIds.includes(Number(line.product_id))
       return true
     })
+    /**
+     * 限定范围的券（指定商品/分类）必须真的有适用商品。
+     * 早期实现只用 scope 算「门槛口径」，min_spend=0 时 eligible(0) < 0 为假 → 校验直接放行，
+     * 随后抵扣额又按整单应付封顶，导致「指定商品券」可以抵扣非适用商品的金额。
+     */
+    if (isScoped && eligibleLines.length === 0) {
+      throw businessError('该抵扣券不适用于当前商品')
+    }
     const eligible = round2(eligibleLines.reduce((s, l) => s + l.line_total, 0))
     const minSpend = round2(Number(template.min_spend) || 0)
     if (eligible < minSpend) {
@@ -476,7 +502,16 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
     }
 
     const payableAfterPromo = round2(itemsTotal - discountAmount)
-    const couponOff = round2(Math.min(Number(template.amount), payableAfterPromo))
+    /**
+     * 抵扣额上限：
+     *   - 限定范围券：只能抵扣「适用商品」满减后的应付，不能溢出到范围外
+     *   - 全品类券：抵扣整单满减后应付
+     * 两者都受整单应付封顶。
+     */
+    const eligiblePayable = isScoped
+      ? round2(eligibleLines.reduce((s, l) => s + (l.line_total - l.discount_allocated), 0))
+      : payableAfterPromo
+    const couponOff = round2(Math.min(Number(template.amount), eligiblePayable, payableAfterPromo))
     if (couponOff > 0) {
       discountAmount = round2(discountAmount + couponOff)
       appliedCoupon = {
@@ -485,24 +520,42 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
         amount: couponOff
       }
 
-      // 行分摊：按各行满减后应付（line_total - 已分摊满减）占比；尾差归应付最大行；
-      // share <= 行应付（couponOff <= payableAfterPromo），不会把任何一行摊成负数
-      let allocatedSum = 0
-      let maxLine = null
-      let maxLineBase = -1
-      for (const line of lines) {
-        const lineBase = round2(line.line_total - line.discount_allocated)
-        const share = round2(couponOff * lineBase / payableAfterPromo)
-        line.discount_allocated = round2(line.discount_allocated + share)
-        allocatedSum = round2(allocatedSum + share)
-        if (lineBase > maxLineBase) {
-          maxLineBase = lineBase
-          maxLine = line
+      /**
+       * 行分摊：只在参与抵扣的行（限定范围券 = 适用商品行）之间按满减后应付占比分摊，
+       * 尾差归应付最大行。
+       *
+       * 早期实现遍历全部 lines，导致「指定商品券」的抵扣额被摊到范围外商品上。
+       * 同时保证任何一行的 discount_allocated 不会变成负数
+       * （早期逐行向上取整时 allocatedSum 可能大于 couponOff，尾差为负 → 首行被扣成负值）。
+       */
+      const allocLines = isScoped ? eligibleLines : lines
+      const allocBase = allocLines.map(line => round2(line.line_total - line.discount_allocated))
+      const allocBaseSum = round2(allocBase.reduce((s, b) => s + b, 0))
+      if (allocBaseSum > 0) {
+        let allocatedSum = 0
+        let maxLine = null
+        let maxLineBase = -1
+        for (let i = 0; i < allocLines.length; i++) {
+          const line = allocLines[i]
+          const lineBase = allocBase[i]
+          let share = round2(couponOff * lineBase / allocBaseSum)
+          // 不得超过该行自身应付（避免摊成负数）
+          if (share > lineBase) share = lineBase
+          line.discount_allocated = round2(line.discount_allocated + share)
+          allocatedSum = round2(allocatedSum + share)
+          if (lineBase > maxLineBase) {
+            maxLineBase = lineBase
+            maxLine = line
+          }
         }
-      }
-      const tail = round2(couponOff - allocatedSum)
-      if (tail !== 0 && maxLine) {
-        maxLine.discount_allocated = round2(maxLine.discount_allocated + tail)
+        // 尾差归应付最大行；若为负（逐行取整导致多摊），从最大行扣回且不得为负
+        let tail = round2(couponOff - allocatedSum)
+        if (tail !== 0 && maxLine) {
+          const current = maxLine.discount_allocated
+          let adjusted = round2(current + tail)
+          if (adjusted < 0) adjusted = 0
+          maxLine.discount_allocated = adjusted
+        }
       }
     }
   }
@@ -514,6 +567,18 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
   }
 
   const payableThb = round2(itemsTotal - discountAmount)
+
+  /**
+   * 订单金额上限守卫。
+   * orders.total_amount / total_amount_thb 是 DECIMAL(10,2)，上限 99999999.99。
+   * 早期实现没有总额上限校验：单价 20000 × 5000 件 = 1 亿 > 上限 →
+   * Order.create 触发 PG numeric field overflow → 事务回滚 → 返回 500。
+   * 这里在引擎层就拦下，返回明确的 400 业务错误。
+   */
+  const MAX_ORDER_AMOUNT = 99999999.99
+  if (itemsTotal > MAX_ORDER_AMOUNT || payableThb > MAX_ORDER_AMOUNT) {
+    throw businessError('订单金额超出系统上限，请调整购买数量')
+  }
 
   // 积分预估：按折后实付金额；积分换购单不发积分
   let pointsEstimate = 0

@@ -356,7 +356,7 @@ import { userAPI } from '../api/users.js'
 import { useAdminStore } from '../stores/admin.js'
 import CountryFlag from '../components/CountryFlag.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 
 const adminAvatarSrc = (url) => {
@@ -718,13 +718,13 @@ const handleCurrentChange = (page) => {
 const formatDate = (dateString) => {
   if (!dateString) return ''
   const date = new Date(dateString)
-  return date.toLocaleDateString('zh-CN')
+  return date.toLocaleDateString(locale.value)
 }
 
 const formatTime = (dateString) => {
   if (!dateString) return ''
   const date = new Date(dateString)
-  return date.toLocaleTimeString('zh-CN', { hour12: false })
+  return date.toLocaleTimeString(locale.value, { hour12: false })
 }
 
 const formatDateTime = (dateString) => {
@@ -737,7 +737,7 @@ const formatDateTime = (dateString) => {
   
   // 如果是今天，只显示时间
   if (isToday) {
-    return `${t('common.today')} ${date.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })}`
+    return `${t('common.today')} ${date.toLocaleTimeString(locale.value, { hour12: false, hour: '2-digit', minute: '2-digit' })}`
   }
   
   // 检查是否为今年

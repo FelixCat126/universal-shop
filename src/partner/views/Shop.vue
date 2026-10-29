@@ -104,6 +104,7 @@
                       v-model.number="row._qty"
                       type="number"
                       :min="moqU(row)"
+                      :max="maxQty(row)"
                       :step="moqM(row)"
                       inputmode="numeric"
                       class="block w-full rounded-lg border-gray-300 text-base py-2.5 px-3 focus:border-primary-500 focus:ring-primary-500 touch-manipulation"
@@ -342,6 +343,11 @@ function moqU (row) {
 }
 function moqM (row) {
   return Math.max(1, Number(row.moq_multiplier) || 1)
+}
+/** 数量上限 = 库存（无库存信息时放开，但服务端会兜底校验） */
+function maxQty (row) {
+  const stock = Number(row.stock)
+  return Number.isFinite(stock) && stock > 0 ? stock : undefined
 }
 
 function money (v) {

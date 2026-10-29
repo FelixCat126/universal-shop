@@ -1173,13 +1173,21 @@ const avatarDisplayUrl = computed(() => {
   return config.buildStaticUrl(u)
 })
 
-// 监听用户数据变化，更新表单
-watch(() => userStore.user, (newUser) => {
+/**
+ * 监听用户数据变化，更新表单。
+ *
+ * 不用 deep 监听：userStore.user 是整体替换的，deep 会让任意一次 store 更新
+ * （updateProfile 的合并、checkAuth 回写、登录后购物车合并等）都强制回填昵称/邮箱，
+ * 用户正在编辑但未保存的内容会被静默清空。
+ * 改为只在「用户 id 变化」时回填（即切换账号），其余由 refreshUserInfo 显式回填。
+ */
+watch(() => userStore.user?.id, () => {
+  const newUser = userStore.user
   if (newUser) {
     profileForm.value.nickname = newUser.nickname || ''
     profileForm.value.email = newUser.email || ''
   }
-}, { immediate: true, deep: true })
+}, { immediate: true })
 
 // 从数据库获取最新用户信息
 const refreshUserInfo = async () => {

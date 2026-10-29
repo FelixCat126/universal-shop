@@ -11,6 +11,15 @@ export default {
 
   // 通用
   common: {
+    refresh: "刷新",
+    ok: "确定",
+    no: "否",
+    yes: "是",
+    open: "打开",
+    close: "关闭",
+    reset: "重置",
+    noData: "暂无数据",
+    add: "添加",
     loading: '加载中...',
     backToHome: '返回首页',
     error: '出错了',
@@ -48,6 +57,8 @@ export default {
 
   // 导航
   nav: {
+    language: "语言",
+    orders: "我的订单",
     home: '首页',
     products: '商品',
     cart: '购物车',
@@ -60,6 +71,7 @@ export default {
 
   // 商品相关
   product: {
+    insufficientStock: "库存不足，仅剩 {stock} 件",
     title: '商品',
     name: '商品名称',
     price: '价格',
@@ -118,6 +130,8 @@ export default {
 
   // 购物车
   cart: {
+    addToCart: "加入购物车",
+    continueShopping: "继续购物",
     title: '购物车',
     empty: '购物车是空的',
     emptyDesc: '去逛逛，发现更多好商品',
@@ -240,6 +254,8 @@ export default {
 
   // 订单
   order: {
+    cityPlaceholder: "城市",
+    provincePlaceholder: "省",
     title: '订单',
     orderNo: '订单号',
     orderTime: '下单时间',
@@ -310,6 +326,20 @@ export default {
 
   // 地址管理
   address: {
+    setDefaultFailed: "默认地址设置失败",
+    setDefaultSuccess: "默认地址已设置",
+    updateFailed: "地址更新失败",
+    updateSuccess: "地址已更新",
+    addFailed: "地址添加失败",
+    addSuccess: "地址已添加",
+    deleteFailed: "地址删除失败",
+    deleteSuccess: "地址已删除",
+    confirmDelete: "确定删除该地址？",
+    addFirst: "请先添加收货地址",
+    list: "地址列表",
+    setDefault: "设为默认",
+    delete: "删除地址",
+    edit: "编辑地址",
     add: '添加收货地址',
     addNew: '添加新地址',
     noAddresses: '您还没有添加收货地址',
@@ -361,6 +391,9 @@ export default {
 
   // 表单验证
   validation: {
+    emailRequired: "请输入邮箱地址",
+    passwordLength: "密码至少 8 个字符",
+    emailFormat: "请输入有效的邮箱地址",
     required: '此项为必填项',
     email: '请输入有效的邮箱地址',
     phone: '请输入有效的手机号',
@@ -501,6 +534,7 @@ export default {
 
   // 页面标题
   page: {
+    orderDetail: "订单详情",
     home: '首页',
     productList: '商品列表',
     productDetail: '商品详情',
@@ -512,6 +546,15 @@ export default {
     orders: '我的订单',
     notFound: '页面未找到'
   },
+  // 成功消息
+  success: {
+    operation: '操作成功',
+    save: '保存成功',
+    delete: '删除成功',
+    update: '更新成功',
+    add: '添加成功'
+  },
+
 
   // 语言选择
   language: {

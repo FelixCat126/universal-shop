@@ -669,7 +669,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
@@ -893,7 +893,14 @@ const totalAmount = computed(() => {
 
 // 服务端报价（满减等促销由后端计算；失败静默回退本地计算，不影响下单）
 const quote = ref(null)
-let quoteTimer = null
+/** 组件内所有定时器：卸载时统一清理，避免向已卸载组件发请求 / 劫持路由 */
+const timers = new Set()
+const trackTimer = (id) => { timers.add(id); return id }
+const clearAllTimers = () => {
+  for (const id of timers) clearTimeout(id)
+  timers.clear()
+  if (quoteTimer) { clearTimeout(quoteTimer); quoteTimer = null }
+}
 let quoteSeq = 0
 
 // 优惠券：进入结算拉取一次我的未使用券；选中后带 user_coupon_id 重新报价
@@ -1025,7 +1032,7 @@ const fetchQuote = async () => {
 // 购物车有效项/币种/支付方式/已选券变化时重新报价（300ms 防抖）
 const loadQuote = () => {
   clearTimeout(quoteTimer)
-  quoteTimer = setTimeout(fetchQuote, 300)
+  quoteTimer = trackTimer(setTimeout(fetchQuote, 300))
 }
 
 watch(
@@ -1071,9 +1078,9 @@ const showMessage = (text, type = 'success') => {
   message.type = type
   message.show = true
   
-  setTimeout(() => {
+  trackTimer(setTimeout(() => {
     message.show = false
-  }, 5000)
+  }, 5000))
 }
 
 // 获取完整的图片URL - 使用配置管理器
@@ -1282,9 +1289,9 @@ const handleSubmitOrder = async () => {
       if (response.data.success && response.data.data.exists) {
         showMessage(t('user.phoneRegisteredLoginFirst'), 'error')
         // 可以选择跳转到登录页面
-        setTimeout(() => {
-          router.push('/login')
-        }, 2000)
+        trackTimer(setTimeout(() => {
+          if (router.currentRoute.value.name === 'Checkout') router.push('/login')
+        }, 2000))
         return
       }
     } catch (error) {
@@ -1392,14 +1399,16 @@ const submitOrder = async () => {
         const password = phone.slice(-8)
         showMessage(t('user.accountCreatedPassword', { password }), 'success')
         await nextTick()
-        setTimeout(() => {
-          router.push({ path: '/profile', query: { tab: 'orders' } })
-        }, 500)
+        trackTimer(setTimeout(() => {
+          if (router.currentRoute.value.name === 'Checkout') {
+            router.push({ path: '/profile', query: { tab: 'orders' } })
+          }
+        }, 500))
       } else if (!userStore.isLoggedIn) {
         showMessage('自动注册失败，请手动注册后再下单', 'error')
-        setTimeout(() => {
-          router.push('/register')
-        }, 2000)
+        trackTimer(setTimeout(() => {
+          if (router.currentRoute.value.name === 'Checkout') router.push('/register')
+        }, 2000))
       } else {
         await nextTick()
         await router.push({ path: '/profile', query: { tab: 'orders' } })
@@ -1488,18 +1497,23 @@ onMounted(async () => {
     // 如果购物车为空，跳转到购物车页面
     if (cartStore.isEmpty) {
       showMessage(t('cart.emptyCannotSubmit'), 'error')
-      setTimeout(() => {
-        router.push('/cart')
-      }, 2000)
+      trackTimer(setTimeout(() => {
+        if (router.currentRoute.value.name === 'Checkout') router.push('/cart')
+      }, 2000))
       return
     }
 
   } catch (error) {
     console.error('加载页面数据失败:', error)
-    showMessage(t('common.loadFailed'), 'error')
+    showMessage(t('error.loadFailed'), 'error')
   } finally {
     loading.value = false
   }
+})
+
+// 卸载时清理所有定时器：避免向已卸载组件发请求、避免延迟跳转劫持路由
+onUnmounted(() => {
+  clearAllTimers()
 })
 </script>
 

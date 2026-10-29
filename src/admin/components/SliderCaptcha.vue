@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loading, DArrowRight } from '@element-plus/icons-vue'
 import config from '../../config/index.js'
@@ -67,6 +67,8 @@ const captcha = ref(null)
 const loading = ref(false)
 const loadError = ref(false)
 const status = ref('idle') // idle | success | failed
+// 失败后延迟刷新验证码的定时器：卸载时需清理，避免对已卸载组件发请求
+let failTimer = null
 const waiting = ref(false) // 已提交答案，等待父级登录结果
 const dragging = ref(false)
 const sliderX = ref(0)
@@ -130,7 +132,8 @@ const notifyFailed = () => {
   waiting.value = false
   status.value = 'failed'
   sliderX.value = 0
-  setTimeout(() => {
+  if (failTimer) clearTimeout(failTimer)
+  failTimer = setTimeout(() => {
     if (status.value === 'failed') refresh()
   }, 600)
 }
@@ -167,6 +170,11 @@ const onPointerCancel = () => {
 }
 
 onMounted(fetchCaptcha)
+
+// 卸载时清理延迟刷新定时器，避免对已卸载组件发请求
+onBeforeUnmount(() => {
+  if (failTimer) clearTimeout(failTimer)
+})
 
 defineExpose({ refresh, notifySuccess, notifyFailed, getToken })
 </script>

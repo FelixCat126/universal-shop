@@ -127,6 +127,11 @@ export const usePartnerStore = defineStore('partner', () => {
     }
     const q = Math.floor(Number(quantity))
     if (!q || q < 1) return { ok: false, message: '数量无效' }
+    // 数量不得超过库存（否则界面金额失真；服务端仍会兜底拒绝）
+    const stock = Number(product.stock)
+    if (Number.isFinite(stock) && stock > 0 && q > stock) {
+      return { ok: false, message: `数量超出库存（最多 ${stock} 件）` }
+    }
     const u = Math.max(1, Number(product.moq_unit) || 50)
     const m = Math.max(1, Number(product.moq_multiplier) || 1)
     if (q < u || (q - u) % m !== 0) {
