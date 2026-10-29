@@ -60,14 +60,14 @@
             </el-table>
           </template>
         </el-table-column>
-        <el-table-column prop="order_no" :label="t('partnerOrdersMgmt.orderNo')" min-width="150" />
-        <el-table-column :label="t('partnerOrdersMgmt.partner')" min-width="160">
+        <el-table-column prop="order_no" :label="t('partnerOrdersMgmt.orderNo')" width="130" />
+        <el-table-column :label="t('partnerOrdersMgmt.partner')" width="110">
           <template #default="{ row }">{{ row.partner?.login }} {{ row.partner?.display_name ? `（${row.partner.display_name}）` : '' }}</template>
         </el-table-column>
-        <el-table-column prop="total_amount_thb" :label="t('partnerOrdersMgmt.totalThb')" width="120">
+        <el-table-column prop="total_amount_thb" :label="t('partnerOrdersMgmt.totalThb')" width="100">
           <template #default="{ row }">{{ formatTotalThb(row.total_amount_thb) }}</template>
         </el-table-column>
-        <el-table-column prop="status" :label="t('partnerOrdersMgmt.status')" width="124">
+        <el-table-column prop="status" :label="t('partnerOrdersMgmt.status')" width="105">
           <template #default="{ row }">
             <div class="partner-order-status-cell">
               <el-select
@@ -85,18 +85,18 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="contact_name" :label="t('partnerOrdersMgmt.contactName')" width="100" />
-        <el-table-column prop="contact_phone" :label="t('partnerOrdersMgmt.contactPhone')" width="180" show-overflow-tooltip>
+        <el-table-column prop="contact_name" :label="t('partnerOrdersMgmt.contactName')" width="90" />
+        <el-table-column prop="contact_phone" :label="t('partnerOrdersMgmt.contactPhone')" width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ displayPartnerPhone(row) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="t('partnerOrdersMgmt.address')" min-width="320" show-overflow-tooltip>
+        <el-table-column :label="t('partnerOrdersMgmt.address')" width="150" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="address-cell-oneline">{{ row.delivery_address || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" :label="t('partnerOrdersMgmt.createdAt')" width="174">
+        <el-table-column prop="created_at" :label="t('partnerOrdersMgmt.createdAt')" width="120">
           <template #default="{ row }">
             {{ formatCreatedAt(row.created_at) }}
           </template>
