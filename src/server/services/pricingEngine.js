@@ -37,6 +37,9 @@ const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
 /** 组合包展开行数量上限（组件配比 × 组合包数量，配比上限 999、组合包数量上限 5000） */
 const MAX_BUNDLE_LINE_QTY = 5000 * 999
 
+/** 单行数量上限（写入 OrderItem.quantity INTEGER，上限 int4） */
+const MAX_ITEM_QTY = 5000
+
 /** 积分获取比例默认值：每实付 100 泰铢发 1 积分（SystemConfig key points_earn_rate 可覆盖） */
 export const DEFAULT_POINTS_EARN_RATE = 0.01
 
@@ -366,6 +369,17 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
         .reduce((s, l) => s + l.quantity, 0)
       const giftQty = Math.floor(eligibleQty / buy) * get
       if (giftQty < 1) continue
+      /**
+       * 赠品数量会写入 OrderItem.quantity(INTEGER) 并参与扣库存 SQL，
+       * 超出 int4 会让 PG 抛 22003 → 500。这里兜底跳过该条规则（并记 warn），
+       * 不让一条配置异常的促销把整单下单打挂。
+       */
+      if (giftQty > MAX_ITEM_QTY) {
+        logger.warn('买赠促销赠品数量超限，已跳过该规则', {
+          promotionId: promo.id, giftQty, limit: MAX_ITEM_QTY
+        })
+        continue
+      }
 
       candidates.push({ promo, giftProductId, giftQty })
       if (!productMap.has(giftProductId)) giftIdsToLoad.add(giftProductId)

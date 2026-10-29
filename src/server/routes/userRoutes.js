@@ -4,7 +4,7 @@ import PointsController from '../controllers/pointsController.js'
 import { authenticateToken } from '../middlewares/authMiddleware.js'
 import { loginLimiter, enumerationLimiter, writeLimiter, passwordResetLimiter } from '../middlewares/security.js'
 import PasswordResetController from '../controllers/passwordResetController.js'
-import { validate, registerSchema, loginSchema } from '../middlewares/validate.js'
+import { validate, registerSchema, loginSchema, profileUpdateSchema } from '../middlewares/validate.js'
 import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
 
 const router = express.Router()
@@ -30,7 +30,7 @@ router.post('/reset-password', passwordResetLimiter, PasswordResetController.res
 router.get('/verify', authenticateToken, UserController.verifyToken)
 router.get('/profile/metrics', authenticateToken, UserController.getProfileMetrics)
 router.get('/profile', authenticateToken, UserController.getCurrentUser)
-router.put('/profile', authenticateToken, UserController.updateProfile)
+router.put('/profile', writeLimiter, authenticateToken, validate({ body: profileUpdateSchema }), UserController.updateProfile)
 // 改密挂 writeLimiter：防会话被盗后在线爆破旧密码（限流在控制器前；测试环境 no-op）
 router.put('/profile/password', writeLimiter, authenticateToken, UserController.changePassword)
 router.post('/logout', authenticateToken, UserController.logout)

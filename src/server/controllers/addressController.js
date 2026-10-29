@@ -3,6 +3,7 @@ import User from '../models/User.js'
 import sequelize from '../config/database.js'
 import { createUserAddress } from '../services/addressService.js'
 import { logger } from '../utils/logger.js'
+import { parseId } from '../utils/params.js'
 
 class AddressController {
   // 获取用户地址列表
@@ -38,16 +39,16 @@ class AddressController {
 
   // 创建新地址
   static async createAddress(req, res) {
-    const transaction = await sequelize.transaction()
-    
-    try {
-      const userId = req.user?.userId
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: '用户未登录'
-        })
-      }
+    // 认证与参数校验放在开启事务之前：
+    // 事务内提前 return 不 rollback 会让连接挂在 idle in transaction，
+    // 并发几请求即可占满连接池（PG_POOL_MAX 默认 10）
+    const userId = req.user?.userId
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: '用户未登录'
+      })
+    }
 
       const {
         contact_name,
@@ -113,6 +114,10 @@ class AddressController {
         })
       }
 
+      // 校验全部通过后再开启事务
+      const transaction = await sequelize.transaction()
+
+      try {
       // 构建完整地址
       const addressParts = [province, city, district].filter(Boolean)
       const regionPart = addressParts.join(' ')
@@ -155,7 +160,7 @@ class AddressController {
   // 更新地址
   static async updateAddress(req, res) {
     // 路径参数先校验：非正整数 id 会让 PG 抛 invalid input syntax（500）
-    const addressId = Number(req.params.id)
+    const addressId = parseId(req.params.id)
     if (!Number.isInteger(addressId) || addressId <= 0) {
       return res.status(400).json({
         success: false,

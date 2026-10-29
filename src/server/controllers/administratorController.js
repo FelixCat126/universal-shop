@@ -8,6 +8,7 @@ import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuar
 import { invalidateAdminAuthCache } from '../middlewares/adminAuthMiddleware.js'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
+import { likeContains } from '../utils/likeSearch.js'
 
 class AdministratorController {
   // 管理员登录
@@ -126,9 +127,9 @@ class AdministratorController {
       }
       if (keyword) {
         where[Op.or] = [
-          { username: { [Op.like]: `%${keyword}%` } },
-          { real_name: { [Op.like]: `%${keyword}%` } },
-          { email: { [Op.like]: `%${keyword}%` } }
+          { username: { [Op.like]: likeContains(keyword) } },
+          { real_name: { [Op.like]: likeContains(keyword) } },
+          { email: { [Op.like]: likeContains(keyword) } }
         ]
       }
 
@@ -431,7 +432,7 @@ class AdministratorController {
 
       const where = {}
       if (admin_id) where.admin_id = admin_id
-      if (action) where.action = { [Op.like]: `%${action}%` }
+      if (action) where.action = { [Op.like]: likeContains(action) }
       if (resource) where.resource = resource
       if (start_date && end_date) {
         where.created_at = {

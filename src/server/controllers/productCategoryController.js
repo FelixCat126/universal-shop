@@ -4,6 +4,7 @@ import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { parseId } from '../utils/params.js'
+import { likeContains } from '../utils/likeSearch.js'
 
 class ProductCategoryController {
   /** 前台 / 公共：全部类别，按排序 */
@@ -29,7 +30,7 @@ class ProductCategoryController {
 
       const where = {}
       if (keyword) {
-        where.name = { [Op.like]: `%${keyword}%` }
+        where.name = { [Op.like]: likeContains(keyword) }
       }
 
       const { count, rows } = await ProductCategory.findAndCountAll({

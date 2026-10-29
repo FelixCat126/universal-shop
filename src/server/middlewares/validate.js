@@ -63,9 +63,11 @@ export const createOrderSchema = Joi.object({
   // 前端可能传 ''/null/undefined：统一视作未填，避免 "must be a string" 误报
   referral_code: Joi.string().alphanum().min(4).max(32).empty(['', null]).optional(),
   address_id: Joi.number().integer().min(1).optional(),
-  province: Joi.string().allow('').max(80).default(''),
-  city: Joi.string().allow('').max(80).default(''),
-  district: Joi.string().allow('').max(80).default(''),
+  // 上界与 DB 列宽一致（orders.province/city/district 为 STRING(50)）：
+  // 放行到 80 会让 PG 抛 22001（value too long）→ 500
+  province: Joi.string().allow('').max(50).default(''),
+  city: Joi.string().allow('').max(50).default(''),
+  district: Joi.string().allow('').max(50).default(''),
   detail_address: Joi.string().allow('').max(300).default(''),
   postal_code: Joi.string().allow('').max(10).default(''),
   payment_method: Joi.string().valid('cod', 'online', 'points').default('cod'),
@@ -115,7 +117,8 @@ const promotionRulesSchema = Joi.object({
 // （缺省时仅允许 scope 恰为单商品——下单时默认赠同品，跨字段约束见下方 custom）
 const promotionBuyGetRulesSchema = Joi.object({
   buy: Joi.number().integer().min(1).required(),
-  get: Joi.number().integer().min(1).required(),
+  // 上限：赠品数量会写入 OrderItem.quantity(INTEGER)，无上限会溢出 → PG 22003 → 500
+  get: Joi.number().integer().min(1).max(999).required(),
   gift_product_id: Joi.number().integer().positive().empty([null, '']).optional()
 })
 
@@ -225,17 +228,31 @@ export const couponClaimSchema = Joi.object({
   template_id: Joi.number().integer().min(1).required()
 })
 
+/**
+ * 资料更新（PUT /api/users/profile）
+ * 此前该路由完全没有校验：昵称超 50 / 邮箱超 100 会直接撞 DB 列宽 → PG 22001 → 500。
+ */
+export const profileUpdateSchema = Joi.object({
+  // 上界与 DB 列宽一致（users.nickname 为 STRING(50)）
+  nickname: Joi.string().min(1).max(50).optional(),
+  // 上界与 DB 列宽一致（users.email 为 STRING(100)）
+  email: Joi.string().email().max(100).allow('').optional(),
+  avatar_url: Joi.string().uri({ scheme: ['http', 'https'] }).max(512).allow('').optional()
+})
+
 export const registerSchema = Joi.object({
   nickname: Joi.string().min(1).max(50).required(),
   country_code: countryCodeSchema,
   phone: phoneSchema,
-  email: Joi.string().email().max(120).optional(),
+  // 上界与 DB 列宽一致（users.email 为 STRING(100)）
+  email: Joi.string().email().max(100).optional(),
   password: Joi.string().min(6).max(128).required(),
   referral_code: Joi.string().alphanum().min(4).max(32).empty(['', null]).optional()
 })
 
 export const loginSchema = Joi.object({
-  email: Joi.string().email().max(120).optional(),
+  // 上界与 DB 列宽一致（users.email 为 STRING(100)）
+  email: Joi.string().email().max(100).optional(),
   country_code: Joi.string().valid('+86', '+66', '+60').optional(),
   phone: Joi.string().pattern(/^[1-9]\d{7,14}$/).optional(),
   password: Joi.string().min(1).max(128).required()

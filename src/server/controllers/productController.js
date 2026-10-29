@@ -7,13 +7,17 @@ import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { parseId } from '../utils/params.js'
+import { likeContains } from '../utils/likeSearch.js'
 
 /**
  * 单商品积分上限。
  * 积分换购总额会写入 INTEGER 列（points_redeemed / points_line_cost / balance），
  * 单价无上限时「超大积分 × 数量」会溢出 int4 → PG 22003 → 下单 500。
+ *
+ * 上界推导：单价 × 单次最大数量(5000) 必须 < int4 上限 2147483647
+ *           → 单价 ≤ 429496，留余量取 400000（400000 × 5000 = 2e9 < 2.147e9）
  */
-const MAX_PRODUCT_POINTS = 1000000
+const MAX_PRODUCT_POINTS = 400000
 
 class ProductController {
   // 获取所有产品（分页和搜索）
@@ -46,8 +50,8 @@ class ProductController {
       // 名称搜索（支持中文和泰文）
       if (name) {
         where[Op.or] = [
-          { name: { [Op.like]: `%${name}%` } },
-          { name_th: { [Op.like]: `%${name}%` } }
+          { name: { [Op.like]: likeContains(name) } },
+          { name_th: { [Op.like]: likeContains(name) } }
         ]
       }
 
@@ -145,7 +149,10 @@ class ProductController {
   // 获取单个产品
   static async getProduct(req, res) {
     try {
-      const { id } = req.params
+      const id = parseId(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, message: '无效的产品 ID' })
+      }
       const product = await Product.findByPk(id, {
         paranoid: !req.admin,
         include: [

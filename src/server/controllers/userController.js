@@ -14,6 +14,7 @@ import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuar
 import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
+import { likeContains } from '../utils/likeSearch.js'
 
 class UserController {
   // 用户注册
@@ -261,9 +262,17 @@ class UserController {
       }
 
       user.password = next
-      user.token_version = (Number(user.token_version) || 0) + 1
       user.must_reset_password = false
       await user.save()
+      /**
+       * token_version 原子自增：读-改-写在并发下会丢更新
+       * （并发改密 + 登出都读到 tv=0 → 都写 tv=1），
+       * 导致"改密后旧会话失效"这一安全属性在边界并发下不成立。
+       */
+      await User.update(
+        { token_version: sequelize.literal('token_version + 1') },
+        { where: { id: user.id } }
+      )
       const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
       await invalidateAuthCache(user.id)
 
@@ -440,7 +449,7 @@ class UserController {
       }
       const nameTrim = typeof name === 'string' ? name.trim() : ''
       if (nameTrim) {
-        const q = `%${nameTrim}%`
+        const q = likeContains(nameTrim)
         whereConditions.push({
           [Op.or]: [
             { nickname: { [Op.like]: q } },
@@ -452,19 +461,19 @@ class UserController {
       if (email) {
         whereConditions.push({
           [Op.or]: [
-            { email: { [Op.like]: `%${email}%` } },
-            { username: { [Op.like]: `%${email}%` } }
+            { email: { [Op.like]: likeContains(email) } },
+            { username: { [Op.like]: likeContains(email) } }
           ]
         })
       }
       if (phone) {
-        whereConditions.push({ phone: { [Op.like]: `%${phone}%` } })
+        whereConditions.push({ phone: { [Op.like]: likeContains(phone) } })
       }
       if (referral_code) {
         whereConditions.push({
           [Op.or]: [
-            { referral_code: { [Op.like]: `%${referral_code}%` } },
-            { referred_by_code: { [Op.like]: `%${referral_code}%` } }
+            { referral_code: { [Op.like]: likeContains(referral_code) } },
+            { referred_by_code: { [Op.like]: likeContains(referral_code) } }
           ]
         })
       }
@@ -653,8 +662,12 @@ class UserController {
       user.referral_code = null
       user.referred_by_code = null
       user.must_reset_password = false
-      user.token_version = (Number(user.token_version) || 0) + 1
       await user.save({ transaction })
+      // 原子自增，避免并发下丢更新
+      await User.update(
+        { token_version: sequelize.literal('token_version + 1') },
+        { where: { id: userId }, transaction }
+      )
       await transaction.commit()
 
       const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
@@ -675,8 +688,11 @@ class UserController {
       if (userId) {
         const user = await User.findByPk(userId)
         if (user) {
-          user.token_version = (Number(user.token_version) || 0) + 1
-          await user.save()
+          // 原子自增，避免并发下丢更新
+          await User.update(
+            { token_version: sequelize.literal('token_version + 1') },
+            { where: { id: userId } }
+          )
           const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
           await invalidateAuthCache(user.id)
         }

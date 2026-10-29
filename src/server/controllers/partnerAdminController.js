@@ -9,6 +9,7 @@ import XLSX from '../utils/excelWorkbook.js'
 import { logger } from '../utils/logger.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { parseId } from '../utils/params.js'
+import { likeContains } from '../utils/likeSearch.js'
 
 // 单次导出行数安全上限（与 exportController 口径一致）；超出截断并在文件末尾追加说明行
 const EXPORT_ROW_LIMIT = 50000
@@ -201,8 +202,8 @@ class PartnerAdminController {
         partner_keyword.length > 0
           ? {
               [Op.or]: [
-                { login: { [Op.like]: `%${partner_keyword}%` } },
-                { display_name: { [Op.like]: `%${partner_keyword}%` } }
+                { login: { [Op.like]: likeContains(partner_keyword) } },
+                { display_name: { [Op.like]: likeContains(partner_keyword) } }
               ]
             }
           : undefined
@@ -246,17 +247,18 @@ class PartnerAdminController {
   }
 
   static async updatePartnerOrderStatus (req, res) {
+    // 路径参数与状态校验放在事务之前：避免"提前 return 不 rollback"导致连接挂在
+    // idle in transaction，10 个并发即可占满连接池（PG_POOL_MAX 默认 10）
+    const id = parseId(req.params.id)
+    if (!id) return res.status(400).json({ success: false, message: '无效的 ID' })
+    const status = req.body.status != null ? String(req.body.status).trim() : ''
+    const allowed = Object.keys(PARTNER_ORDER_STATUS_TRANSITIONS)
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: '无效状态' })
+    }
+
     const transaction = await sequelize.transaction()
     try {
-      const id = parseId(req.params.id)
-      if (!id) return res.status(400).json({ success: false, message: '无效的 ID' })
-      const status = req.body.status != null ? String(req.body.status).trim() : ''
-
-      const allowed = Object.keys(PARTNER_ORDER_STATUS_TRANSITIONS)
-      if (!allowed.includes(status)) {
-        await transaction.rollback()
-        return res.status(400).json({ success: false, message: '无效状态' })
-      }
 
       // 行锁防并发双转移
       const order = await PartnerOrder.findByPk(id, {
@@ -326,8 +328,8 @@ class PartnerAdminController {
         partner_keyword.length > 0
           ? {
               [Op.or]: [
-                { login: { [Op.like]: `%${partner_keyword}%` } },
-                { display_name: { [Op.like]: `%${partner_keyword}%` } }
+                { login: { [Op.like]: likeContains(partner_keyword) } },
+                { display_name: { [Op.like]: likeContains(partner_keyword) } }
               ]
             }
           : undefined

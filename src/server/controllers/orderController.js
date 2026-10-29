@@ -17,6 +17,7 @@ import { thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchange
 import * as pointsService from '../services/pointsService.js'
 import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates } from '../services/pricingEngine.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
+import { likeContains } from '../utils/likeSearch.js'
 import AuditLog from '../models/AuditLog.js'
 import PointTransaction from '../models/PointTransaction.js'
 import UserPointBalance from '../models/UserPointBalance.js'
@@ -47,6 +48,13 @@ const ORDER_STATUS_TRANSITIONS = {
 const RESTORE_ON_DELETE_STATUSES = ['pending', 'paid', 'shipping']
 
 /**
+ * keyword 搜索匹配到的用户数上限。
+ * 无上限时 User.findAll 会拉回全表 id 并塞进 IN(...)，
+ * 命中量大时 PG 报 54000 too many arguments → 500。
+ */
+const KEYWORD_USER_MATCH_LIMIT = 1000
+
+/**
  * 订单取消/删除时的资源回补（必须在事务内调用，order.items 需已加载）：
  * 1) 逐订单项回补库存（paranoid:false，商品被软删也要回补，否则库存静默丢失）；
  * 2) 积分换购单退回已扣积分；
@@ -57,6 +65,16 @@ const RESTORE_ON_DELETE_STATUSES = ['pending', 'paid', 'shipping']
  * 4) 该单核销的抵扣券释放回 unused（条件 UPDATE，幂等：重复回补匹配不到行即为 0 affected）
  */
 export async function restoreOrderResources (order, transaction) {
+  /**
+   * 幂等护栏：订单已是 cancelled 说明资源此前已回补过，重复回补会让库存虚增、
+   * 用户积分被多扣（售后审批叠加订单取消时会发生）。
+   * 这里统一拦截，所有调用方（取消/删除/售后/超时清扫）自动受保护。
+   */
+  if (order.status === 'cancelled') {
+    logger.warn('订单已处于 cancelled，跳过资源回补（幂等护栏）', { orderId: order.id })
+    return { restored: false, reason: 'already_cancelled' }
+  }
+
   const items = Array.isArray(order.items) ? order.items : []
   /**
    * 回补库存与 createOrder 扣库存采用同一全局顺序（product_id 升序）获取 Product 行锁：
@@ -1217,7 +1235,11 @@ class OrderController {
   // 获取订单详情（门户：仅能查本人订单；管理端：按 id 查任意订单）
   static async getOrderDetail(req, res) {
     try {
-      const { id } = req.params
+      // 路径参数严格解析：非正整数会让 PG 抛 invalid input syntax（500）
+      const id = parseId(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, message: '无效的订单 ID' })
+      }
       const admin = req.admin
       const userId = req.user?.userId
 
@@ -1320,9 +1342,11 @@ class OrderController {
         }
       }
       if (keyword) {
-        const like = `%${keyword}%`
+        // 转义 LIKE 通配符 + 限长，避免 keyword=% 把精确筛选放大成全表匹配
+        const like = likeContains(keyword)
         const matchingUsers = await User.findAll({
           attributes: ['id'],
+          limit: KEYWORD_USER_MATCH_LIMIT,
           where: {
             [Op.or]: [
               { nickname: { [Op.like]: like } },
@@ -1441,8 +1465,12 @@ class OrderController {
   // 事务整体包 withDeadlockRetry：40P01/40001 时重建事务重跑；业务校验失败返回
   // { ok:false, status, message } 不触发重试，res 响应一律在事务外发出
   static async updateOrderStatus(req, res) {
-    const { id } = req.params
+    // 路径参数严格解析：非正整数会让 PG 抛 invalid input syntax（500）
+    const id = parseId(req.params.id)
     const { status } = req.body
+    if (!id) {
+      return res.status(400).json({ success: false, message: '无效的订单 ID' })
+    }
 
     try {
       const result = await withDeadlockRetry(async () => {

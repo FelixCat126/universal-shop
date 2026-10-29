@@ -24,6 +24,7 @@ import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { logger } from '../utils/logger.js'
 import { parseId } from '../utils/params.js'
+import { likeContains } from '../utils/likeSearch.js'
 
 function genPartnerOrderNo () {
   const r = Math.floor(Math.random() * 9000) + 1000
@@ -203,8 +204,8 @@ class PartnerPortalController {
       }
       if (name) {
         where[Op.or] = [
-          { name: { [Op.like]: `%${name}%` } },
-          { alias: { [Op.like]: `%${name}%` } }
+          { name: { [Op.like]: likeContains(name) } },
+          { alias: { [Op.like]: likeContains(name) } }
         ]
       }
 
