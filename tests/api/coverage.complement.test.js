@@ -78,9 +78,11 @@ describe('P6.coverage.complement — User 公开/资料接口', () => {
   it('CC-6 GET /api/users/check-phone/:phone → 含 exists 字段', async () => {
     const sequelize = TestDatabase.getSequelize()
     const { User } = sequelize.models
-    await User.create(await TestDataFactory.createUser({ country_code: '+86', phone: '13911112222' }))
+    // 用随机手机号：固定号码在其他用例/并发测试里可能被占用，导致断言抖动
+    const phone = '139' + String(Date.now()).slice(-8)
+    await User.create(await TestDataFactory.createUser({ country_code: '+86', phone }))
 
-    const exists = await request(app).get('/api/users/check-phone/13911112222')
+    const exists = await request(app).get(`/api/users/check-phone/${phone}`)
     expect(exists.status).toBe(200)
     expect(exists.body.data.exists).toBe(true)
 

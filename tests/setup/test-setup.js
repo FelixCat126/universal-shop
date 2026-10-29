@@ -29,6 +29,21 @@ beforeAll(async () => {
   console.log('🧪 初始化测试环境（PostgreSQL）...')
   await TestDatabase.initialize()
   await TestDatabase.syncModels()
+  /**
+   * 补建生产用的自定义索引/约束（幂等键唯一索引等）。
+   *
+   * 这些索引由 schemaEnsures.js 在**生产启动链**里创建，而测试环境
+   * NODE_ENV=test 不执行启动链 —— 结果测试库缺少
+   * uniq_orders_user_client_key 等唯一索引，
+   * 并发幂等/防重行为在测试中无法被验证（表现为"幂等键并发创建多单"）。
+   * 这里显式调用，让测试环境与生产保持一致。
+   */
+  try {
+    const { prepareSchema } = await import('../../src/server/utils/schemaEnsures.js')
+    await prepareSchema()
+  } catch (err) {
+    console.warn('⚠️ 测试环境 schema 补充失败（部分并发用例可能失真）:', err?.message)
+  }
   console.log('✅ 测试环境初始化完成')
 })
 
