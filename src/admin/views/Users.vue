@@ -744,20 +744,24 @@ const formatDateTime = (dateString) => {
   const isThisYear = date.getFullYear() === today.getFullYear()
   
   if (isThisYear) {
-    // 如果是今年，显示月-日 时:分
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${month}-${day} ${hours}:${minutes}`
+    // 今年：月-日 时:分（走 locale，切换语言时格式随之变化）
+    return date.toLocaleString(locale.value, {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
   } else {
-    // 如果不是今年，显示年-月-日 时:分
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day} ${hours}:${minutes}`
+    // 跨年：年-月-日 时:分
+    return date.toLocaleString(locale.value, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
   }
 }
 
