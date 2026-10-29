@@ -114,8 +114,25 @@ export function buildCorsOptions () {
   }
 }
 
-const isLimiterDisabled = () =>
-  process.env.RATE_LIMIT_DISABLED === '1' || process.env.NODE_ENV === 'test'
+/**
+ * 限流器是否禁用。
+ *
+ * RATE_LIMIT_DISABLED 只允许在**非生产**环境生效：
+ * 生产误设 RATE_LIMIT_DISABLED=1 会让全局/登录/写接口的限流全部裸奔
+ * （暴力破解、刷单、爬虫都可无限制请求），属于高危配置错误。
+ * 生产环境即使显式设置了该变量也强制启用限流，并在启动日志中告警。
+ */
+const isLimiterDisabled = () => {
+  if (process.env.NODE_ENV === 'test') return true
+  if (process.env.RATE_LIMIT_DISABLED === '1') {
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('生产环境忽略 RATE_LIMIT_DISABLED=1：限流强制启用（防止风控被误关闭）')
+      return false
+    }
+    return true
+  }
+  return false
+}
 
 /**
  * 通用限流器工厂；测试环境/显式禁用时返回 no-op 中间件。
