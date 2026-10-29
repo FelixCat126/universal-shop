@@ -8,12 +8,12 @@
     <el-card style="margin-top: 16px">
       <el-table v-loading="loading" :data="rows" stripe border style="width: 100%">
         <el-table-column prop="id" label="ID" width="72" />
-        <el-table-column prop="login" :label="t('partnersMgmt.login')" min-width="120" />
-        <el-table-column prop="display_name" :label="t('partnersMgmt.displayName')" min-width="120" />
+        <el-table-column prop="login" :label="t('partnersMgmt.login')" min-width="110" />
+        <el-table-column prop="display_name" :label="t('partnersMgmt.displayName')" min-width="110" />
         <el-table-column prop="account_kind" :label="t('partnersMgmt.accountKind')" min-width="100">
           <template #default="{ row }">{{ accountKindLabel(row.account_kind) }}</template>
         </el-table-column>
-        <el-table-column prop="discount_percent" min-width="118" align="right">
+        <el-table-column prop="discount_percent" min-width="108" align="right">
           <template #header>
             <span class="partners-col-discount">{{ t('partnersMgmt.discountPercent') }}</span>
           </template>
@@ -24,10 +24,10 @@
             <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? t('partnersMgmt.active') : t('partnersMgmt.inactive') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="last_login_at" :label="t('partnersMgmt.lastLogin')" min-width="170">
+        <el-table-column prop="last_login_at" :label="t('partnersMgmt.lastLogin')" min-width="160">
           <template #default="{ row }">{{ formatDateTime(row.last_login_at) }}</template>
         </el-table-column>
-        <el-table-column :label="t('common.actions')" width="220" fixed="right">
+        <el-table-column :label="t('common.actions')" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="openEdit(row)">{{ t('partnersMgmt.edit') }}</el-button>
             <el-button type="warning" link @click="openPwd(row)">{{ t('partnersMgmt.resetPwd') }}</el-button>

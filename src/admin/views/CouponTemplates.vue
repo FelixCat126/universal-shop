@@ -95,7 +95,7 @@
               </template>
             </el-table-column>
 
-            <el-table-column :label="t('coupons.validity')" min-width="180">
+            <el-table-column :label="t('coupons.validity')" min-width="150">
               <template #default="scope">
                 <span class="validity-text">{{ validityText(scope.row) }}</span>
               </template>
@@ -114,7 +114,7 @@
               </template>
             </el-table-column>
 
-            <el-table-column :label="t('coupons.actions')" width="230" fixed="right">
+            <el-table-column :label="t('coupons.actions')" width="160" fixed="right">
               <template #default="scope">
                 <div class="action-buttons">
                   <el-button size="small" @click="showInstances(scope.row)">

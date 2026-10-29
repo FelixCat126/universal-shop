@@ -127,7 +127,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="description" :label="t('operationLogs.details')" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="description" :label="t('operationLogs.details')" min-width="158" show-overflow-tooltip />
         
         <el-table-column prop="ip_address" :label="t('operationLogs.ipAddress')" width="120">
           <template #default="scope">

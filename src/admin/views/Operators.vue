@@ -41,7 +41,7 @@
             {{ row.real_name || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="email" :label="t('operators.email')" min-width="180">
+        <el-table-column prop="email" :label="t('operators.email')" min-width="140">
           <template #default="{ row }">
             {{ row.email || '-' }}
           </template>
@@ -53,12 +53,12 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="t('operators.lastLogin')" width="200" min-width="190" class-name="operators-col-last-login">
+        <el-table-column :label="t('operators.lastLogin')" width="160" min-width="190" class-name="operators-col-last-login">
           <template #default="{ row }">
             <span class="operators-last-login-text">{{ formatLastLogin(row.last_login_at) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="t('operators.actions')" width="280" fixed="right">
+        <el-table-column :label="t('operators.actions')" width="176" fixed="right">
           <template #default="{ row }">
             <el-button 
               size="small" 
