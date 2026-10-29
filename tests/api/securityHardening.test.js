@@ -145,8 +145,13 @@ describe('T-S2 滑块验证码自包含验证', async () => {
     expect(parts.length).toBe(3)
     const answer = await decodeTargetX(d.token)
     expect(answer).not.toBeNull()
-    // 答案不应以明文形式出现在 token 里
-    expect(raw).not.toContain(String(answer))
+    /**
+     * 答案不应作为 token 的**独立字段**出现。
+     * 注意不能用 `raw.not.toContain(answer)`：nonce 是 32 位随机 hex、sig 是
+     * base64url，答案的数字串可能偶然出现在其中（如答案 "17" 而 nonce 含 "17"），
+     * 会造成随机失败。判断"是否为独立字段"才准确。
+     */
+    expect(parts).not.toContain(String(answer))
   })
 
   it('targetX 应落在 [60, 220]，y 应落在 [20, 86]', async () => {
