@@ -547,9 +547,10 @@ const debounceSearch = () => {
 let orderLoadSeq = 0
 
 const loadOrders = async () => {
+  // seq 必须在 try 外声明：finally 块会访问它（块级作用域，try 内声明则不可见）
+  const seq = ++orderLoadSeq
   try {
     loading.value = true
-    const seq = ++orderLoadSeq
     const params = {
       page: pagination.page,
       limit: pagination.limit,
