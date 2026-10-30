@@ -248,6 +248,25 @@ export const logOperation = (action, resource) => {
       return originalSend.call(this, body)
     }
 
+    /**
+     * 流式导出的日志钩子。
+     * 导出改为直接 pipe 到响应（res.write + res.end），**不会调用 res.send** ——
+     * 只挂 send 会让流式导出完全不写操作日志（EX-4 回归）。
+     *
+     * 挂在 res.end 上而不是 res.write：end 是所有响应路径的终点
+     * （res.json / res.send / 流式 pipe 最终都会走它），
+     * 且在 supertest 等会包装 write 的环境下也一定触发。
+     */
+    const originalEnd = res.end
+    res.end = function (chunk, encoding, callback) {
+      // 注意：这里不能设 logged = true —— writeLog 内部靠它做一次性守卫，
+      // 提前置位会让 writeLog 直接 return，日志永远不写。
+      if (!logged && res.statusCode < 400) {
+        setImmediate(() => { writeLog(null, null) })
+      }
+      return originalEnd.call(this, chunk, encoding, callback)
+    }
+
     next()
   }
 }

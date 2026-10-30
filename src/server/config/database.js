@@ -1,4 +1,5 @@
 import { Sequelize } from 'sequelize'
+import { logger } from '../utils/logger.js'
 
 /**
  * 数据库统一为 PostgreSQL（已彻底移除 SQLite）。
@@ -56,7 +57,27 @@ const sequelize = new Sequelize(url, {
     statement_timeout: parseInt(process.env.PG_STATEMENT_TIMEOUT || '15000', 10),
     idle_in_transaction_session_timeout: parseInt(process.env.PG_IDLE_IN_TX_TIMEOUT || '10000', 10),
     ...(useSsl ? { ssl: { require: true, rejectUnauthorized: false } } : {})
-  }
+  },
+  /**
+   * 慢查询观测。
+   *
+   * PG 的 statement_timeout（15s）是最后一道防线，只在「已经卡住」时才生效；
+   * 这里加一层更细的观测：超过阈值的 SQL 直接记 warn 日志（含耗时与 SQL 摘要），
+   * 让「数据量涨上来后哪个查询开始变慢」在告警里第一时间可见，
+   * 而不是等到用户反馈页面卡。
+   *
+   * 阈值默认 300ms，可用 PG_SLOW_QUERY_MS 调整；设为 0 关闭。
+   * 只记 warn 不抛错 —— 观测不该影响业务。
+   */
+  logging: (sql, ms, options) => {
+    const threshold = parseInt(process.env.PG_SLOW_QUERY_MS || '300', 10)
+    // benchmark:true 时第二个参数才是耗时（毫秒数），否则是 options 对象
+    if (!threshold || typeof ms !== 'number' || ms < threshold) return
+    // SQL 可能含敏感值（手机号等）→ 只记前 200 字符摘要
+    const summary = String(sql).replace(/\s+/g, ' ').slice(0, 200)
+    logger.warn('慢查询', { ms, sql: summary })
+  },
+  benchmark: true
 })
 
 export default sequelize

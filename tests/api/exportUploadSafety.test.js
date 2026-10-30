@@ -77,10 +77,10 @@ describe('Export.noSensitiveColumns', () => {
     const fs = await import('fs')
     const src = fs.readFileSync('src/server/controllers/exportController.js', 'utf8')
     const idx = src.indexOf('exportUsers')
-    const block = src.slice(idx, idx + 1200)
-    expect(block).toContain('attributes:')
+    const block = src.slice(idx, idx + 3000)
+    expect(block).toContain('attributes')
     // 显式列清单里不能出现 password / token
-    const attrsMatch = block.match(/attributes:\s*\[([\s\S]*?)\]/)
+    const attrsMatch = block.match(/USER_ATTRS\s*=\s*\[([\s\S]*?)\]/)
     expect(attrsMatch).not.toBeNull()
     expect(attrsMatch[1]).not.toMatch(/password|token|hash/i)
   })
