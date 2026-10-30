@@ -12,6 +12,7 @@
 import { watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { useAdminStore } from './stores/admin.js'
 
 // 国际化
 const { locale, t } = useI18n()
@@ -68,6 +69,17 @@ watch(() => locale.value, () => {
 onMounted(() => {
   // 初始化页面标题
   updatePageTitle()
+
+  /**
+   * 校验 token 有效性。
+   * 此前 isLoggedIn 只看 localStorage 有没有 token 字符串，
+   * 过期/被停用的 token 也能先把完整后台 UI 渲染出来（菜单、角色徽标），
+   * 直到第一个接口返回 401 才被踢回登录页 —— validateToken 一直是死代码。
+   */
+  const adminStore = useAdminStore()
+  if (adminStore.isLoggedIn) {
+    adminStore.validateToken().catch(() => {})
+  }
 })
 </script>
 

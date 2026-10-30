@@ -334,6 +334,13 @@ function setupIo () {
   io.observe(el)
 }
 
+/**
+ * 请求序号守卫 + 筛选快照校验：
+ * 无限滚动加载第 2 页时改日期筛选，第 2 页（旧筛选）后到会被 concat 到
+ * 新筛选的第 1 页里，列表出现不属于当前筛选的订单。
+ */
+let orderLoadSeq = 0
+
 async function fetchOrders (append) {
   if (!filterFrom.value || !filterTo.value) {
     const d = defaultUtcRangeStrings()
@@ -344,12 +351,18 @@ async function fetchOrders (append) {
   if (append) loadingMore.value = true
   else loading.value = true
 
+  // 快照本次请求的筛选条件与页码，响应回来后校验一致才允许写入
+  const reqSeq = ++orderLoadSeq
+  const reqFrom = filterFrom.value
+  const reqTo = filterTo.value
+  const reqPage = page.value
+
   try {
     const q = new URLSearchParams({
-      page: String(page.value),
+      page: String(reqPage),
       pageSize: String(PAGE_SIZE),
-      from: filterFrom.value,
-      to: filterTo.value
+      from: reqFrom,
+      to: reqTo
     })
     const res = await partnerStore.api(`/orders?${q}`)
     const json = await res.json()
@@ -361,6 +374,9 @@ async function fetchOrders (append) {
       }
       return
     }
+    // 过期响应直接丢弃：既防止旧结果覆盖新筛选，也防止旧页被追加到新列表
+    if (reqSeq !== orderLoadSeq) return
+    if (filterFrom.value !== reqFrom || filterTo.value !== reqTo) return
     const list = json.data.orders || []
     total.value = json.data.pagination?.total ?? 0
     if (append) rows.value = rows.value.concat(list)

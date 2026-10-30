@@ -640,12 +640,20 @@ const onProductAreaTouchEnd = (e) => {
 // 无限滚动列表上限：最多保留 200 条，超出截断最早的记录并停止继续加载（触底提示复用 product.noMoreProducts）
 const MAX_HOME_PRODUCTS = 200
 
+/**
+ * 请求序号守卫：搜索防抖与分类切换会并发发起请求，
+ * 若旧请求后到就会覆盖新结果（列表与搜索框/分类对不上）。
+ * 与 admin Products.vue 的 loadSeq 同一套模式。
+ */
+let productLoadSeq = 0
+
 const loadProducts = async ({ append = false } = {}) => {
   if (append) {
     loadingMore.value = true
   } else {
     isLoading.value = true
   }
+  const seq = ++productLoadSeq
 
   try {
     const params = {
@@ -658,6 +666,7 @@ const loadProducts = async ({ append = false } = {}) => {
     }
 
     const response = await productAPI.getProducts(params)
+    if (seq !== productLoadSeq) return // 已有更新的请求在途，丢弃过期响应
 
     if (response.data.success) {
       const list = (response.data.data.products || []).map(mapProductRow)
@@ -691,8 +700,10 @@ const loadProducts = async ({ append = false } = {}) => {
       showError('加载产品失败: ' + (error.response?.data?.message || error.message))
     }
   } finally {
-    isLoading.value = false
-    loadingMore.value = false
+    if (seq === productLoadSeq) {
+      isLoading.value = false
+      loadingMore.value = false
+    }
   }
 }
 

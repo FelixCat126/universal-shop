@@ -43,10 +43,24 @@ function isChunkLoadError (error) {
   return /dynamically imported module|module script failed|error loading chunk|vite:preloadError/i.test(msg)
 }
 
+/**
+ * chunk 加载失败时刷新一次拿新版本。
+ *
+ * 失败后再失败（chunk 真的缺失）时**不能静默吞掉** ——
+ * 早期实现第二次直接 return，页面停在空 router-view，
+ * 永久白屏且控制台没有任何错误线索。
+ */
 function reloadOnceForChunk () {
-  if (chunkReloaded) return
+  if (chunkReloaded) {
+    // 已刷新过一次仍失败：明确报错，不再静默
+    console.error('[partner-router] chunk 加载失败且已刷新过一次，停止自动刷新（请检查静态资源部署是否完整）')
+    return
+  }
   try {
-    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+      console.error('[partner-router] chunk 加载失败且已刷新过一次，停止自动刷新（请检查静态资源部署是否完整）')
+      return
+    }
     sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
   } catch {
     /* sessionStorage 不可用时靠内存标记兜底 */

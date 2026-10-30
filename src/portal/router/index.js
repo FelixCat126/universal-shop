@@ -102,6 +102,17 @@ router.beforeEach((to, from, next) => {
       next('/login')
       return
     }
+    /**
+     * token 明显不是 JWT（不是三段 base64url）→ 直接判为无效并清理。
+     * 真实有效性由 userStore.checkAuth() 调 /auth/verify 确认（App 挂载时执行），
+     * 守卫里不再发请求，避免每次导航都等网络。
+     */
+    if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      next('/login')
+      return
+    }
   }
 
   next()

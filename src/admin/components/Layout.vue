@@ -100,7 +100,9 @@
               <el-icon><UserFilled /></el-icon>
               <span>{{ t('menu.system') }}</span>
             </template>
-            <el-menu-item index="/operators">{{ t('menu.operators') }}</el-menu-item>
+            <!-- 与路由守卫一致：操作员角色无 administrators 权限，
+                 此前菜单不隐藏、点击却被守卫拦下（next(false) + 弹权限不足） -->
+            <el-menu-item index="/operators" v-if="adminStore.hasPermission('administrators')">{{ t('menu.operators') }}</el-menu-item>
             <el-menu-item index="/operation-logs" v-if="adminStore.isSuperAdmin">{{ t('menu.operationLogs') }}</el-menu-item>
             <el-menu-item index="/system-config" v-if="adminStore.isSuperAdmin">{{ t('menu.systemConfig') }}</el-menu-item>
           </el-sub-menu>

@@ -177,7 +177,12 @@ class UserController {
           if (!s.startsWith('/uploads/avatars/')) {
             return res.status(400).json({ success: false, message: '头像地址无效' })
           }
-          if (s.includes('..') || s.includes('\\')) {
+          /**
+           * 白名单校验：前缀之后只允许「纯文件名 + 图片扩展名」。
+           * 早期只检查字面 '..' 与 '\\'，百分号编码（%2e%2e）能绕过字面检查 ——
+           * 虽然最终由静态服务的路径处理兜底，但校验本身不该依赖下游实现细节。
+           */
+          if (!/^\/uploads\/avatars\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|gif|webp)$/i.test(s)) {
             return res.status(400).json({ success: false, message: '头像地址无效' })
           }
           nextAvatarUrl = s

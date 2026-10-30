@@ -365,6 +365,27 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
+  /**
+   * 切换账号时重置购物车。
+   *
+   * 场景：账号 A 登录并加购 → 顶栏跳到 /login → 登录账号 B。
+   * 此时 isLoggedIn 始终为 true，「登录状态变化」监听不触发，
+   * 服务端购物车行仍属于 A —— B 能看到 A 的商品名/价格，
+   * 改数量时还会用 B 的 token 去 PUT A 的行 id。
+   * 这里先清本地态再按新账号重新拉取。
+   */
+  const resetForAccountSwitch = async () => {
+    try {
+      items.value = []
+      clearGuestCart()
+      await loadCart()
+      return { success: true }
+    } catch (error) {
+      console.error('切换账号后重置购物车失败:', error)
+      return { success: false }
+    }
+  }
+
   // 清空购物车
   const clearCart = async () => {
     try {
@@ -628,6 +649,7 @@ export const useCartStore = defineStore('cart', () => {
     isInCart,
     saveGuestCart,
     clearGuestCart,
+    resetForAccountSwitch,
     mergeGuestCartOnLogin,
     clearGuestCartOnLogout
   }

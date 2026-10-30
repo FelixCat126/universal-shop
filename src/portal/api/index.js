@@ -67,7 +67,21 @@ api.interceptors.response.use(
 
     // 根据HTTP状态码处理错误 - 简化版本
     switch (status) {
-      case 401:
+      case 401: {
+        /**
+         * 区分两种 401：
+         *   - 登录/注册接口返回的 401 = 「用户名或密码错误」，
+         *     这是**当前操作**的失败，不能当成"登录过期"去清会话，
+         *     否则用户在登录页输错一次密码，会把已登录的门户（乃至合作方）会话一起登出。
+         *   - 其它接口返回的 401 = token 失效/未授权 → 确实要清会话并跳登录。
+         */
+        const url = String(error.config?.url || '')
+        const isAuthEndpoint = /\/(login|register|forgot-password|reset-password)$/.test(url)
+        if (isAuthEndpoint) {
+          console.error('认证失败（账号或密码错误）')
+          break
+        }
+
         // 未授权：清除本地存储 + Pinia 内存态（只清 localStorage 会让
         // userStore.isLoggedIn 仍为 true，顶栏继续显示旧用户，后续请求变成匿名 → 401 循环）
         localStorage.removeItem('token')
@@ -87,6 +101,7 @@ api.interceptors.response.use(
 
         console.error('登录已过期，请重新登录')
         break
+      }
         
       case 403:
         console.error('没有权限访问')

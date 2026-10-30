@@ -764,7 +764,7 @@
             <input
               v-model="addressForm.is_default"
               type="checkbox"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              class="remember-me-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded shrink-0"
             />
             <label class="ml-2 block text-sm text-gray-700">{{ t('profile.setAsDefault') }}</label>
           </div>
@@ -2047,3 +2047,22 @@ onUnmounted(() => {
 })
 </script>
 
+
+<style scoped>
+/**
+ * 复选框触控热区扩展：用透明伪元素把热区撑到 44×44，视觉尺寸不变。
+ * 原生 checkbox 的 padding 不会扩大可点击区域（只会挤压视觉尺寸）。
+ */
+.remember-me-checkbox {
+  position: relative;
+}
+.remember-me-checkbox::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+</style>

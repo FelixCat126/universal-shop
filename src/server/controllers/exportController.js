@@ -23,7 +23,13 @@ class ExportController {
   static async exportUsers(req, res) {
     try {
       // 获取用户数据（多取 1 行用于判断是否截断）
+      // 显式限定 attributes：默认会把 password（bcrypt 哈希）等敏感列也载入内存，
+      // 一旦后续有人照抄加字段就会直接落进 Excel
       let users = await User.findAll({
+        attributes: [
+          'id', 'username', 'nickname', 'email', 'phone',
+          'referral_code', 'referred_by_code', 'created_at', 'updated_at'
+        ],
         order: [['created_at', 'DESC']],
         limit: EXPORT_ROW_LIMIT + 1
       })

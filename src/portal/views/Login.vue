@@ -92,7 +92,7 @@
                 id="remember-me"
                 v-model="formData.rememberMe"
                 type="checkbox"
-                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                class="remember-me-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded shrink-0"
               />
               <label for="remember-me" class="ml-2 block text-sm text-gray-900">
                 {{ t('user.rememberMe') }}
@@ -409,6 +409,24 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/**
+ * 复选框触控热区扩展。
+ * 原生 checkbox 的 padding 不会扩大可点击区域（只会挤压视觉尺寸），
+ * 用绝对定位的透明伪元素把热区撑到 44×44，视觉仍是 20px。
+ */
+.remember-me-checkbox {
+  position: relative;
+}
+.remember-me-checkbox::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.3s ease;
 }

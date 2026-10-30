@@ -76,17 +76,37 @@ const isChunkLoadError = (err) => {
   return /dynamically imported module|Importing a module script failed|error loading/i.test(msg)
 }
 
+const CHUNK_RELOAD_INTERVAL = 60 * 1000
+let chunkReloadAttempted = false
+
+/**
+ * chunk 加载失败时刷新一次拿新版本。
+ * 内存标记 + sessionStorage 时间戳双重节流：
+ * chunk 真的缺失时反复刷新只会白屏闪屏，必须挡住。
+ */
+const reloadForStaleChunk = () => {
+  if (chunkReloadAttempted) return
+  chunkReloadAttempted = true
+  try {
+    const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+    if (last && Date.now() - last < CHUNK_RELOAD_INTERVAL) return
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+  } catch (e) {
+    // sessionStorage 不可用（隐私模式等）时仅靠内存标记兜底
+  }
+  window.location.reload()
+}
+
 router.onError((err) => {
   if (!isChunkLoadError(err)) return
-  const now = Date.now()
-  const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
-  if (now - last < 10000) return
-  sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now))
-  window.location.reload()
+  reloadForStaleChunk()
 })
 
-window.addEventListener('vite:preloadError', () => {
-  window.location.reload()
+// Vite 预加载失败同样走节流刷新兜底：
+// 无节流的 reload 在 chunk 真的缺失时会无限刷新（白屏 + 页面不停闪）。
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  reloadForStaleChunk()
 })
 
 app.mount('#app')

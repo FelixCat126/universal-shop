@@ -2,6 +2,7 @@ import SystemConfig from '../models/SystemConfig.js'
 import { normalizeExchangeRates, FX_KEYS } from '../utils/exchangeRates.js'
 import multer from 'multer'
 import path from 'path'
+import crypto from 'crypto'
 import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
 import { fileTypeFromFile } from 'file-type'
@@ -83,10 +84,14 @@ const storage = multer.diskStorage({
     }
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname)
-    const basename = path.basename(file.originalname, ext)
-    const timestamp = Date.now()
-    cb(null, `${basename}_${timestamp}${ext}`)
+    /**
+     * 文件名随机化：早期沿用用户原始 basename（含空格/括号/中文），
+     * 落盘后的 URL 含这些字符，链接易被截断，且文件名完全由用户控制。
+     * 原始名若需要保留，存 DB 字段即可，不必进路径。
+     */
+    const ext = path.extname(file.originalname).toLowerCase()
+    const safeExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext) ? ext : ''
+    cb(null, `system_${Date.now()}_${crypto.randomUUID()}${safeExt}`)
   }
 })
 

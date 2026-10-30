@@ -10,6 +10,8 @@
 import config from '../config/index.js'
 
 const CACHE_TTL_MS = 30 * 1000
+/** 公开配置请求超时（ms）：超时后按"无配置"降级，不阻塞首屏渲染 */
+const PUBLIC_CONFIG_TIMEOUT_MS = 5000
 
 let cache = null
 let cachedAt = 0
@@ -20,7 +22,18 @@ export async function loadPublicConfig () {
   if (inFlight) return inFlight
   inFlight = (async () => {
     try {
-      const response = await fetch(config.buildApiUrl('/api/system-config/public'))
+      /**
+       * 带超时：admin 端首屏 mount 依赖这个请求的 finally，
+       * 后端「连接通但不响应」时会永远挂住 → 整页白屏（连登录页都出不来）。
+       */
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), PUBLIC_CONFIG_TIMEOUT_MS)
+      let response
+      try {
+        response = await fetch(config.buildApiUrl('/api/system-config/public'), { signal: controller.signal })
+      } finally {
+        clearTimeout(timer)
+      }
       const json = await response.json()
       if (json?.success && json.data) {
         cache = json.data

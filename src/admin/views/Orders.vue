@@ -539,9 +539,17 @@ const debounceSearch = () => {
 }
 
 // 加载订单列表
+/**
+ * 请求序号守卫：快速切换状态筛选/搜索会并发发起请求，
+ * 旧响应后到会覆盖新结果（表格与筛选器条件对不上，运营据此改状态会改错单）。
+ * 与 admin Products.vue 的 loadSeq 同一套模式。
+ */
+let orderLoadSeq = 0
+
 const loadOrders = async () => {
   try {
     loading.value = true
+    const seq = ++orderLoadSeq
     const params = {
       page: pagination.page,
       limit: pagination.limit,
@@ -555,6 +563,7 @@ const loadOrders = async () => {
     
     if (response.ok) {
       const data = await response.json()
+      if (seq !== orderLoadSeq) return // 已有更新的请求在途，丢弃过期响应
       if (data.success) {
         orders.value = data.data?.orders || []
         // 分页信息：优先取 pagination 子对象（新契约），兼容旧的扁平字段
@@ -579,7 +588,7 @@ const loadOrders = async () => {
     console.error('加载订单失败:', error)
     ElMessage.error(t('orders.messages.loadFailed') + '：' + (error.response?.data?.message || error.message))
   } finally {
-    loading.value = false
+    if (seq === orderLoadSeq) loading.value = false
   }
 }
 

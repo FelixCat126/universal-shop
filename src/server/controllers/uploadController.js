@@ -2,6 +2,7 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+import crypto from 'crypto'
 import { fileTypeFromFile } from 'file-type'
 import { logger } from '../utils/logger.js'
 import { ApiError } from '../middlewares/errorHandler.js'
@@ -36,9 +37,9 @@ const storage = multer.diskStorage({
     cb(null, uploadPath)
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    const ext = path.extname(file.originalname)
-    cb(null, 'product_' + uniqueSuffix + ext)
+    // crypto.randomUUID（122bit 熵）替代 Math.random（~30bit，可被枚举）
+    const ext = safeExt(file.originalname)
+    cb(null, 'product_' + crypto.randomUUID() + ext)
   }
 })
 
@@ -51,11 +52,23 @@ const avatarStorage = multer.diskStorage({
     cb(null, uploadPath)
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    const ext = path.extname(file.originalname)
-    cb(null, 'avatar_' + uniqueSuffix + ext)
+    const ext = safeExt(file.originalname)
+    cb(null, 'avatar_' + crypto.randomUUID() + ext)
   }
 })
+
+/**
+ * 从原始文件名取扩展名，只允许白名单内的。
+ * 用白名单而非「原样沿用」：避免 a.jpg.php 之类双扩展名落到非图片扩展名上，
+ * 也避免将来白名单变更时残留旧扩展名。
+ */
+const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+
+function safeExt (originalName) {
+  const base = path.basename(String(originalName || ''))
+  const ext = path.extname(base).toLowerCase()
+  return ALLOWED_EXTS.includes(ext) ? ext : ''
+}
 
 // 文件过滤器 - 增强安全检查
 const fileFilter = (req, file, cb) => {
@@ -91,19 +104,30 @@ const fileFilter = (req, file, cb) => {
   cb(null, true)
 }
 
+/**
+ * multer limits 补全：
+ * fileSize 限制单文件大小，但 multipart 的**字段数量与总字段体积**不受它约束 ——
+ * 攻击者可用「1 个小文件 + 数十万个文本字段」把整个 body 缓存在 Node 堆里耗尽内存。
+ * fields/parts/fileSize/fieldSize/headerPairs 一起限制总开销。
+ */
+const MULTER_LIMITS = {
+  fileSize: 2 * 1024 * 1024, // 单文件 2MB
+  files: 1,                  // 只允许 1 个文件
+  fields: 10,                // 最多 10 个普通字段
+  parts: 12,                 // 文件 + 字段总和上限
+  fieldSize: 64 * 1024,      // 单字段 64KB
+  headerPairs: 50             // multipart 头部对数上限
+}
+
 const upload = multer({
   storage: storage,
-  limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB
-  },
+  limits: MULTER_LIMITS,
   fileFilter: fileFilter
 })
 
 const avatarUpload = multer({
   storage: avatarStorage,
-  limits: {
-    fileSize: 2 * 1024 * 1024,
-  },
+  limits: MULTER_LIMITS,
   fileFilter: fileFilter
 })
 

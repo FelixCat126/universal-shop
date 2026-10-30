@@ -225,7 +225,15 @@ export const logOperation = (action, resource) => {
     res.json = function (data) {
       if (data && data.success) {
         const id = data.data?.id ?? null
-        setImmediate(() => { writeLog(id, data.data ?? null) })
+        /**
+         * 只记录「小体量」的响应体明细。
+         * 列表/导出类响应可能包含上万条记录（含手机号、地址等 PII），
+         * 整体落进 operation_logs.new_data 会造成表膨胀 + 形成 PII 副本。
+         * 超过阈值时只记摘要，不记明细。
+         */
+        const detail = data.data ?? null
+        const isBulk = Array.isArray(detail) || (detail && typeof detail === 'object' && Array.isArray(detail.items))
+        setImmediate(() => { writeLog(id, isBulk ? { truncated: true, count: Array.isArray(detail) ? detail.length : (detail.items?.length ?? null) } : detail) })
       }
       return originalJson.call(this, data)
     }

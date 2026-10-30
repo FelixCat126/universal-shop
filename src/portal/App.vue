@@ -241,7 +241,7 @@ watch(() => userStore.isLoggedIn, async (newValue, oldValue) => {
       console.error('❌ 购物车合并失败:', error)
     }
   }
-  
+
   // 从已登录变为未登录：清理购物车状态
   if (oldValue && !newValue) {
     try {
@@ -249,6 +249,21 @@ watch(() => userStore.isLoggedIn, async (newValue, oldValue) => {
     } catch (error) {
       console.error('❌ 购物车清理失败:', error)
     }
+  }
+})
+
+/**
+ * 切换账号：登录用户 id 变化（而不是登出再登录）时，
+ * 上一个账号的服务端购物车行会残留在 store 里 ——
+ * 新账号能看到别人的商品名/价格，改数量时还会用新 token 去改旧行 id。
+ * 这里在用户 id 变化时重置购物车并重新拉取当前账号的购物车。
+ */
+watch(() => userStore.user?.id, async (newId, oldId) => {
+  if (!newId || !oldId || newId === oldId) return
+  try {
+    await cartStore.resetForAccountSwitch()
+  } catch (error) {
+    console.error('❌ 切换账号后购物车重置失败:', error)
   }
 })
 
@@ -293,16 +308,22 @@ onMounted(async () => {
 
 <style scoped>
 /* 顶栏语言/币种下拉：窄屏收窄，sm+ 略放宽，下拉展开仍显示完整 option 文案 */
+/**
+ * 移动端高度必须 ≥36px：早期 padding 只有 0.25rem，实测总高 28–30px，
+ * 低于触控目标 32px 的下限，手指很难点中（iOS 建议 44px）。
+ */
 .portal-lang-select {
   font-size: 0.75rem;
   line-height: 1.25rem;
-  padding: 0.25rem 0.375rem;
+  padding: 0.4375rem 0.375rem;
+  min-height: 36px;
   min-width: 4.875rem;
 }
 .portal-currency-select {
   font-size: 0.75rem;
   line-height: 1.25rem;
-  padding: 0.1875rem 0.25rem;
+  padding: 0.4375rem 0.25rem;
+  min-height: 36px;
   min-width: 5.25rem;
   width: 5.25rem;
 }

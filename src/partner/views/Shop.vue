@@ -452,8 +452,15 @@ async function loadAddresses () {
   }
 }
 
+/**
+ * 请求序号守卫：点搜索后立刻点分类 Tab 会并发发起两个请求，
+ * 后到的旧请求会覆盖列表（出现"搜到的却是另一个分类"的商品）。
+ */
+let productLoadSeq = 0
+
 async function load () {
   loading.value = true
+  const seq = ++productLoadSeq
   try {
     const q = new URLSearchParams({ page: String(page.value), pageSize: String(pageSize.value) })
     if (keyword.value.trim()) q.set('name', keyword.value.trim())
@@ -462,6 +469,7 @@ async function load () {
     }
     const res = await partnerStore.api(`/products?${q.toString()}`)
     const json = await res.json()
+    if (seq !== productLoadSeq) return // 已有更新的请求在途，丢弃过期响应
     if (!json.success) {
       toast.error(json.message || t('common.error'))
       return
@@ -472,7 +480,7 @@ async function load () {
     }))
     total.value = json.data.pagination?.total ?? 0
   } finally {
-    loading.value = false
+    if (seq === productLoadSeq) loading.value = false
   }
 }
 
