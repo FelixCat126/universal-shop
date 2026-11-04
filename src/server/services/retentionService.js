@@ -4,6 +4,7 @@ import OperationLog from '../models/OperationLog.js'
 import PointTransaction from '../models/PointTransaction.js'
 import UserCoupon from '../models/UserCoupon.js'
 import Cart from '../models/Cart.js'
+import { cleanupExportJobs, cleanupExpiredExportFiles } from './exportJobService.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -77,12 +78,18 @@ export async function cleanupRetentionData ({
     updated_at: { [Op.lt]: guestCartCutoff }
   }, batchSize)
 
+  // 导出任务：已完成/失败的任务保留 7 天。
+  // 走 exportJobService 的清理（会连磁盘文件一起删），
+  // 不用 purgeInBatches —— 后者只删库里的行，会在磁盘留下孤儿 xlsx。
+  const exportJobDeleted = (await cleanupExportJobs({ keepDays: 7 })).removed
+
   return {
     auditDeleted,
     operationDeleted,
     pointDeleted,
     couponDeleted,
-    guestCartDeleted
+    guestCartDeleted,
+    exportJobDeleted
   }
 }
 
@@ -91,6 +98,11 @@ export function startRetentionCleanup () {
   const timer = setInterval(() => {
     cleanupRetentionData().catch((err) => {
       logger.error('数据保留清理失败', { err: err?.message, stack: err?.stack })
+    })
+    // 导出文件按 TTL 单独清理（与「任务保留 7 天」是两个独立维度：
+    // 文件可以先过期消失，任务记录留着让管理员看到「文件已过期」）
+    cleanupExpiredExportFiles().catch((err) => {
+      logger.error('导出文件清理失败', { err: err?.message })
     })
   }, 24 * 60 * 60 * 1000)
   if (typeof timer.unref === 'function') timer.unref()

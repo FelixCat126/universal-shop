@@ -1003,5 +1003,46 @@ export default {
       statusUpdateFailed: 'อัปเดตสถานะล้มเหลว',
       instancesLoadFailed: 'โหลดอินสแตนซ์คูปองล้มเหลว'
     }
+  },
+
+  // Async export jobs
+  exportTasks: {
+    title: 'งานส่งออก',
+    typeUsers: 'ข้อมูลผู้ใช้',
+    typeOrders: 'ข้อมูลคำสั่งซื้อ',
+    submit: 'ส่งคำขอส่งออก',
+    download: 'ดาวน์โหลด',
+    retry: 'ส่งออกใหม่',
+    delete: 'ลบ',
+    deleteTitle: 'ลบงานส่งออก',
+    deleteConfirm: 'ต้องการลบงานส่งออกนี้หรือไม่? ไม่สามารถย้อนกลับได้',
+    deleteSuccess: 'ลบงานส่งออกแล้ว',
+    deleteFailed: 'ลบงานส่งออกไม่สำเร็จ',
+    submitSuccess: 'ส่งงานส่งออกแล้ว เมื่อเสร็จแล้วดาวน์โหลดได้จากรายการ',
+    submitFailed: 'ส่งงานส่งออกไม่สำเร็จ',
+    downloadFailed: 'ดาวน์โหลดไฟล์ส่งออกไม่สำเร็จ',
+    loadFailed: 'อ่านรายการงานส่งออกไม่สำเร็จ',
+    reusedNotice: 'มีงานส่งออกชนิดเดียวกันกำลังทำงานอยู่ จึงใช้งานเดิม',
+    pollingHint: 'กำลังสร้างไฟล์ จะหยุดรีเฟรชอัตโนมัติเมื่อเสร็จ',
+    colType: 'ประเภท',
+    colFilters: 'ตัวกรอง',
+    colKeyword: 'คำค้น',
+    colEmail: 'อีเมล',
+    colPhone: 'โทรศัพท์',
+    colReferral: 'รหัสการแนะนำ',
+    colStartDate: 'วันที่เริ่ม',
+    colEndDate: 'วันที่สิ้นสุด',
+    noFilters: 'ข้อมูลทั้งหมด',
+    colStatus: 'สถานะ',
+    colRows: 'จำนวนแถว',
+    colSize: 'ขนาด',
+    colCreated: 'เวลาส่ง',
+    colActions: 'การดำเนินการ',
+    status: {
+      pending: 'รอคิว',
+      running: 'กำลังสร้าง',
+      done: 'เสร็จแล้ว',
+      failed: 'ล้มเหลว'
+    }
   }
 }

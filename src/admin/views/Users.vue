@@ -46,11 +46,18 @@
     </div>
 
     <div class="admin-module-toolbar">
-      <el-button type="success" @click="exportUsers" :loading="isExporting">
+      <el-button type="success" @click="openExportTasks('users')">
         <el-icon><Download /></el-icon>
         {{ t('users.exportUsers') }}
       </el-button>
     </div>
+
+    <!-- 异步导出任务（大数据量走后台生成，避免请求超时） -->
+    <ExportTaskDialog
+      v-model="showExportTasks"
+      :default-type="exportTaskType"
+      :params="exportParams"
+    />
 
     <!-- 用户统计 -->
     <div class="stats-section">
@@ -353,8 +360,8 @@ import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar, Loading, 
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { userAPI } from '../api/users.js'
-import { useAdminStore } from '../stores/admin.js'
 import CountryFlag from '../components/CountryFlag.vue'
+import ExportTaskDialog from '../components/ExportTaskDialog.vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -375,11 +382,11 @@ const nicknameInitial = (name) => {
 // 用户管理页面已加载
 
 // 使用store
-const adminStore = useAdminStore()
-
 // 响应式数据
 const isLoading = ref(false)
-const isExporting = ref(false)
+// 异步导出任务对话框
+const showExportTasks = ref(false)
+const exportTaskType = ref('users')
 const userList = ref([])
 const totalUsers = ref(0)
 const currentPage = ref(1)
@@ -394,6 +401,13 @@ const searchForm = reactive({
   phone: '',
   referral_code: ''
 })
+
+// 导出沿用当前列表的筛选条件，保证「导出的就是列表里看到的那批」
+const exportParams = computed(() => ({
+  email: searchForm.email || undefined,
+  phone: searchForm.phone || undefined,
+  referral_code: searchForm.referral_code || undefined
+}))
 
 // 用户详情对话框
 const showUserDialog = ref(false)
@@ -501,47 +515,10 @@ const resetSearch = () => {
   loadUsers()
 }
 
-// 导出用户
-const exportUsers = async () => {
-  try {
-    isExporting.value = true
-
-    const response = await adminStore.apiRequest('/api/admin/export/users', {
-      method: 'GET'
-    })
-
-    if (response.ok) {
-      const blob = await response.blob()
-
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-
-      const contentDisposition = response.headers.get('Content-Disposition')
-      let filename = `用户数据_${new Date().toISOString().split('T')[0]}.xlsx`
-
-      if (contentDisposition) {
-        const matches = contentDisposition.match(/filename\*=UTF-8''(.+)/)
-        if (matches) {
-          filename = decodeURIComponent(matches[1])
-        }
-      }
-
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-    } else {
-      const errorData = await response.json()
-      ElMessage.error(errorData.message || t('users.messages.exportFailed'))
-    }
-  } catch (error) {
-    console.error('导出用户失败:', error)
-    ElMessage.error(t('users.messages.exportFailed'))
-  } finally {
-    isExporting.value = false
-  }
+// 打开导出任务对话框
+const openExportTasks = (type = 'users') => {
+  exportTaskType.value = type
+  showExportTasks.value = true
 }
 
 // 跳转订单管理并按该用户筛选

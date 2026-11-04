@@ -1,4 +1,39 @@
 import 'dotenv/config'
+
+/**
+ * 模型必须**先于**其它模块注册。
+ *
+ * ESM 的 import 会被提升并按源码顺序求值：任何在模型之前被求值的模块
+ * （控制器、服务）一旦 import 了某个 model 文件，该模型就会先于
+ * sequelize.models 里的其它模型完成 define —— 于是 sequelize.models 的
+ * 插入顺序不再等于「User 在 Order 之前」的依赖顺序，
+ * 建表时就会撞上 "relation \"users\" does not exist"。
+ */
+import './models/User.js'
+import './models/ProductCategory.js'
+import './models/Product.js'
+import './models/Cart.js'
+import './models/Order.js'
+import './models/OrderItem.js'
+import './models/Address.js'
+import './models/Administrator.js'
+import './models/AdministrativeRegion.js'
+import './models/OperationLog.js'
+import './models/SystemConfig.js'
+import './models/UserPointBalance.js'
+import './models/PointTransaction.js'
+import './models/Partner.js'
+import './models/PartnerOrder.js'
+import './models/PartnerOrderItem.js'
+import './models/PartnerAddress.js'
+import './models/Promotion.js'
+import './models/OrderPromotion.js'
+import './models/CouponTemplate.js'
+import './models/UserCoupon.js'
+import './models/Bundle.js'
+import './models/BundleItem.js'
+import './models/AfterSale.js'
+import './models/ExportJob.js'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -36,33 +71,8 @@ import securityRoutes from './routes/securityRoutes.js'
 import { startOrderTimeoutSweeper } from './services/orderTimeoutService.js'
 import { startGuestAccountCleanup } from './services/guestAccountCleanup.js'
 import { startRetentionCleanup } from './services/retentionService.js'
+import { startExportJobWorker } from './services/exportJobService.js'
 
-// 导入模型以确保数据库同步
-import './models/User.js'
-import './models/ProductCategory.js'
-import './models/Product.js'
-import './models/Cart.js'
-import './models/Order.js'
-import './models/OrderItem.js'
-import './models/Address.js'
-import './models/Administrator.js'
-import './models/AdministrativeRegion.js'
-import './models/OperationLog.js'
-import './models/SystemConfig.js'
-import SystemConfig from './models/SystemConfig.js'
-import './models/UserPointBalance.js'
-import './models/PointTransaction.js'
-import './models/Partner.js'
-import './models/PartnerOrder.js'
-import './models/PartnerOrderItem.js'
-import './models/PartnerAddress.js'
-import './models/Promotion.js'
-import './models/OrderPromotion.js'
-import './models/CouponTemplate.js'
-import './models/UserCoupon.js'
-import './models/Bundle.js'
-import './models/BundleItem.js'
-import './models/AfterSale.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -218,6 +228,8 @@ if (process.env.NODE_ENV !== 'test') {
       try {
         startOrderTimeoutSweeper()
         startGuestAccountCleanup()
+        // 异步导出任务 worker：扫描 pending 任务并后台生成文件
+        startExportJobWorker()
         startRetentionCleanup()
       } catch (err) {
         console.error('⚠️ 订单超时清扫器启动失败（不影响主服务）:', err.message)

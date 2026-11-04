@@ -269,6 +269,38 @@ export async function ensurePartnerAddressSchemaColumns () {
   }
 }
 
+/**
+ * 异步导出任务表。
+ * 用 CREATE TABLE IF NOT EXISTS（幂等），列定义与 ExportJob 模型保持一致。
+ */
+export async function ensureExportJobsTable () {
+  const qi = sequelize.getQueryInterface()
+  const exists = await qi.showAllTables()
+  if (exists.includes('export_jobs')) return
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS export_jobs (
+      id SERIAL PRIMARY KEY,
+      admin_id INTEGER NOT NULL,
+      admin_username VARCHAR(50) NOT NULL,
+      type VARCHAR(32) NOT NULL,
+      status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      params JSONB,
+      row_count INTEGER,
+      file_name VARCHAR(255),
+      file_path VARCHAR(512),
+      file_size INTEGER,
+      error_message VARCHAR(500),
+      started_at TIMESTAMPTZ,
+      completed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  await sequelize.query('CREATE INDEX IF NOT EXISTS idx_export_job_admin_status ON export_jobs (admin_id, status)')
+  await sequelize.query('CREATE INDEX IF NOT EXISTS idx_export_job_created_at ON export_jobs (created_at)')
+  console.log('✅ 已创建 export_jobs 表（异步导出任务）')
+}
+
 /** 旧库仅有 exchange_rate：补全 exchange_rates（JSON），不覆盖已有 exchange_rates */
 export async function ensureExchangeRatesConfig () {
   const existing = await SystemConfig.findOne({ where: { config_key: 'exchange_rates' } })
@@ -304,6 +336,7 @@ export async function prepareSchema () {
   await ensureClientOrderKeyColumns()
   await ensurePartnerOrderSchemaColumns()
   await ensurePartnerAddressSchemaColumns()
+  await ensureExportJobsTable()
   await ensureExchangeRatesConfig()
   await ensureProductCategoriesMigrate()
 }

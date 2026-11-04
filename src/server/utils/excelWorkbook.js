@@ -128,6 +128,7 @@ export async function createStreamingExport ({ sheetName, headers, widths = [] }
     async addRow (values) {
       sheet.addRow(values)
     },
+    /** 输出到 HTTP 响应（同步导出用）：pipe 临时文件给客户端后清理 */
     async writeTo (stream) {
       await workbook.commit()
       await new Promise((resolve, reject) => {
@@ -139,6 +140,24 @@ export async function createStreamingExport ({ sheetName, headers, widths = [] }
       })
       // 清理临时文件（失败不阻塞主流程）
       await fs.unlink(tmpFile).catch(() => {})
+    },
+    /**
+     * 输出到磁盘（异步导出任务用）：文件保留下来供后续下载。
+     * @returns {Promise<{ path: string, size: number }>}
+     */
+    async writeToFile (targetPath) {
+      try {
+        await workbook.commit()
+        const stat = await fs.stat(tmpFile)
+        if (targetPath && targetPath !== tmpFile) {
+          await fs.rename(tmpFile, targetPath)
+        }
+        return { path: targetPath || tmpFile, size: stat.size }
+      } catch (err) {
+        // 失败时清掉临时文件，否则每次失败的导出都会在磁盘留一份垃圾
+        await fs.unlink(tmpFile).catch(() => {})
+        throw err
+      }
     }
   }
 }

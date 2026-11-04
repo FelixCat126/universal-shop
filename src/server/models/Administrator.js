@@ -117,16 +117,25 @@ Administrator.prototype.toSafeJSON = function() {
   return safeData
 }
 
+/**
+ * 角色 → 权限资源表（唯一权威定义）。
+ * 中间件、控制器、前端展示都应引用这里，避免多处各写一份导致漂移。
+ */
+export const ROLE_PERMISSIONS = {
+  super_admin: ['*'], // 所有权限
+  admin: ['orders', 'users', 'products', 'administrators', 'partners'], // 除了操作日志
+  operator: ['orders', 'users', 'products'] // 批发合作方仅限 admin/super_admin
+}
+
+/** 按角色判定权限（供非模型实例场景使用，如 req.admin 普通对象） */
+export function hasPermissionByRole (role, resource) {
+  const permissions = ROLE_PERMISSIONS[role] || []
+  return permissions.includes('*') || permissions.includes(resource)
+}
+
 // 检查权限
 Administrator.prototype.hasPermission = function(resource) {
-  const rolePermissions = {
-    super_admin: ['*'], // 所有权限
-    admin: ['orders', 'users', 'products', 'administrators', 'partners'], // 除了操作日志
-    operator: ['orders', 'users', 'products'] // 批发合作方仅限 admin/super_admin
-  }
-  
-  const permissions = rolePermissions[this.role] || []
-  return permissions.includes('*') || permissions.includes(resource)
+  return hasPermissionByRole(this.role, resource)
 }
 
 export default Administrator

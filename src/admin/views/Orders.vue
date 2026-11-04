@@ -67,11 +67,18 @@
     </div>
 
     <div class="admin-module-toolbar">
-      <el-button type="success" @click="exportOrders" :loading="isExporting">
+      <el-button type="success" @click="openExportTasks('orders')">
         <el-icon><Download /></el-icon>
         {{ t('orders.export') }}
       </el-button>
     </div>
+
+    <!-- 异步导出任务（大数据量走后台生成，避免请求超时） -->
+    <ExportTaskDialog
+      v-model="showExportTasks"
+      :default-type="exportTaskType"
+      :params="exportParams"
+    />
 
     <!-- 统计信息 -->
     <div class="stats-section">
@@ -443,6 +450,7 @@ import { Search, Refresh, Download, TrendCharts, SuccessFilled, Coin, Calendar, 
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
+import ExportTaskDialog from '../components/ExportTaskDialog.vue'
 import config from '../../config/index.js'
 import { formatRecordedOrderAmount, formatLineRecordedFromThb } from '../../portal/utils/orderBillingDisplay.js'
 
@@ -459,7 +467,9 @@ const adminStore = useAdminStore()
 // 响应式数据
 const orders = ref([])
 const loading = ref(false)
-const isExporting = ref(false)
+// 异步导出任务对话框
+const showExportTasks = ref(false)
+const exportTaskType = ref('orders')
 const showDetailModal = ref(false)
 const selectedOrder = ref(null)
 const detailLoading = ref(false)
@@ -475,6 +485,14 @@ const filters = reactive({
   startDate: '',
   endDate: ''
 })
+
+// 导出沿用当前列表的筛选条件，保证「导出的就是列表里看到的那批」
+const exportParams = computed(() => ({
+  status: filters.status || undefined,
+  keyword: filters.keyword || undefined,
+  startDate: filters.startDate || undefined,
+  endDate: filters.endDate || undefined
+}))
 
 // 分页信息
 const pagination = reactive({
@@ -686,47 +704,10 @@ const closeDetailModal = () => {
   selectedOrder.value = null
 }
 
-// 导出订单
-const exportOrders = async () => {
-  try {
-    isExporting.value = true
-
-    const response = await adminStore.apiRequest('/api/admin/export/orders', {
-      method: 'GET'
-    })
-
-    if (response.ok) {
-      const blob = await response.blob()
-
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-
-      const contentDisposition = response.headers.get('Content-Disposition')
-      let filename = `订单数据_${new Date().toISOString().split('T')[0]}.xlsx`
-
-      if (contentDisposition) {
-        const matches = contentDisposition.match(/filename\*=UTF-8''(.+)/)
-        if (matches) {
-          filename = decodeURIComponent(matches[1])
-        }
-      }
-
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-    } else {
-      const errorData = await response.json()
-      ElMessage.error(errorData.message || t('orders.messages.exportFailed'))
-    }
-  } catch (error) {
-    console.error('导出订单失败:', error)
-    ElMessage.error(t('orders.messages.exportFailed'))
-  } finally {
-    isExporting.value = false
-  }
+// 打开导出任务对话框
+const openExportTasks = (type = 'orders') => {
+  exportTaskType.value = type
+  showExportTasks.value = true
 }
 
 // 分页切换

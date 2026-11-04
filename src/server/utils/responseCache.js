@@ -9,6 +9,18 @@ import { createSharedStore } from './sharedState.js'
 
 const cache = createSharedStore('http-cache')
 
+/**
+ * 正在进行的缓存写入。
+ *
+ * cache.set 是 fire-and-forget（不阻塞响应），因此「清缓存」可能发生在
+ * 某次写入真正落库之前 —— 清完之后那次写入又把旧响应写回去了，
+ * 缓存就"复活"了一份陈旧数据。这在测试里表现为
+ * 「列表接口返回了上一个用例的数据」，非常难查。
+ *
+ * 记录在途写入，clearResponseCache 先等它们结束再清。
+ */
+const pendingWrites = new Set()
+
 export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
   return async (req, res, next) => {
     try {
@@ -31,7 +43,10 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
         try {
           if (res.statusCode === 200 && body && body.success !== false) {
             // 不阻塞响应；写缓存失败只记日志，不影响业务
-            cache.set(key, JSON.stringify(body), ttlMs).catch(() => {})
+            const write = cache.set(key, JSON.stringify(body), ttlMs)
+              .catch(() => {})
+              .finally(() => pendingWrites.delete(write))
+            pendingWrites.add(write)
             res.setHeader('X-Cache', 'MISS')
           }
         } catch {}
@@ -45,5 +60,9 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
 }
 
 export async function clearResponseCache () {
+  // 先等在途写入结束，再清 —— 否则刚清完又被写回来
+  if (pendingWrites.size > 0) {
+    await Promise.allSettled([...pendingWrites])
+  }
   await cache.clear()
 }

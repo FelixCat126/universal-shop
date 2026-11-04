@@ -1002,5 +1002,46 @@ export default {
       statusUpdateFailed: '状态更新失败',
       instancesLoadFailed: '加载券实例失败'
     }
+  },
+
+  // 异步导出任务
+  exportTasks: {
+    title: '导出任务',
+    typeUsers: '用户数据',
+    typeOrders: '订单数据',
+    submit: '提交导出',
+    download: '下载',
+    retry: '重新导出',
+    delete: '删除',
+    deleteTitle: '删除导出任务',
+    deleteConfirm: '确定删除该导出任务吗？删除后无法恢复。',
+    deleteSuccess: '已删除导出任务',
+    deleteFailed: '删除导出任务失败',
+    submitSuccess: '导出任务已提交，完成后可在列表中下载',
+    submitFailed: '提交导出任务失败',
+    downloadFailed: '下载导出文件失败',
+    loadFailed: '读取导出任务列表失败',
+    reusedNotice: '已有相同类型的导出任务在进行中，将直接复用该任务。',
+    pollingHint: '任务生成中，完成后会自动停止刷新。',
+    colType: '类型',
+    colFilters: '筛选条件',
+    colKeyword: '关键词',
+    colEmail: '邮箱',
+    colPhone: '手机号',
+    colReferral: '推荐码',
+    colStartDate: '开始日期',
+    colEndDate: '结束日期',
+    noFilters: '全部数据',
+    colStatus: '状态',
+    colRows: '行数',
+    colSize: '大小',
+    colCreated: '提交时间',
+    colActions: '操作',
+    status: {
+      pending: '排队中',
+      running: '生成中',
+      done: '已完成',
+      failed: '失败'
+    }
   }
 }

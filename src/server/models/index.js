@@ -32,6 +32,7 @@ import UserCoupon from './UserCoupon.js'
 import Bundle from './Bundle.js'
 import BundleItem from './BundleItem.js'
 import AfterSale from './AfterSale.js'
+import ExportJob from './ExportJob.js'
 import { logger } from '../utils/logger.js'
 
 // 注意：关联关系已在各个模型文件中定义，无需重复定义
@@ -62,7 +63,8 @@ export {
   UserCoupon,
   Bundle,
   BundleItem,
-  AfterSale
+  AfterSale,
+  ExportJob
 }
 
 // 导出默认对象
@@ -90,5 +92,6 @@ export default {
   UserCoupon,
   Bundle,
   BundleItem,
-  AfterSale
+  AfterSale,
+  ExportJob
 }

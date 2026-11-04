@@ -156,7 +156,9 @@ class ExportController {
         widths: [8, 20, 15, 25, 15, 12, 12, 20, 20]
       })
       let written = 0
-      let cursor = maxId
+      // 游标取「最大 id + 1」：下面查询用的是 id < cursor，
+      // 若游标等于最大 id，最新一条会被静默漏掉。
+      let cursor = maxId + 1
       while (written < EXPORT_ROW_LIMIT) {
         const size = Math.min(BATCH, EXPORT_ROW_LIMIT - written)
         const batch = await User.findAll({
@@ -412,7 +414,8 @@ class ExportController {
         widths: ORDER_EXPORT_WIDTHS
       })
       let written = 0
-      let cursor = maxOrderId
+      // 同上：游标要取最大 id + 1，否则最新一单会被漏掉
+      let cursor = maxOrderId + 1
       while (written < EXPORT_ROW_LIMIT) {
         const size = Math.min(ORDER_BATCH, EXPORT_ROW_LIMIT - written)
         const batch = await Order.findAll({

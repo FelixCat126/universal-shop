@@ -1001,5 +1001,46 @@ export default {
       statusUpdateFailed: 'Failed to update status',
       instancesLoadFailed: 'Failed to load coupon instances'
     }
+  },
+
+  // Async export jobs
+  exportTasks: {
+    title: 'Export Jobs',
+    typeUsers: 'User Data',
+    typeOrders: 'Order Data',
+    submit: 'Submit Export',
+    download: 'Download',
+    retry: 'Re-export',
+    delete: 'Delete',
+    deleteTitle: 'Delete Export Job',
+    deleteConfirm: 'Delete this export job? This cannot be undone.',
+    deleteSuccess: 'Export job deleted',
+    deleteFailed: 'Failed to delete export job',
+    submitSuccess: 'Export job submitted; download it from the list when ready',
+    submitFailed: 'Failed to submit export job',
+    downloadFailed: 'Failed to download export file',
+    loadFailed: 'Failed to load export job list',
+    reusedNotice: 'An export job of the same type is already running and has been reused.',
+    pollingHint: 'Generating; refreshing stops automatically when done.',
+    colType: 'Type',
+    colFilters: 'Filters',
+    colKeyword: 'Keyword',
+    colEmail: 'Email',
+    colPhone: 'Phone',
+    colReferral: 'Referral code',
+    colStartDate: 'Start date',
+    colEndDate: 'End date',
+    noFilters: 'All data',
+    colStatus: 'Status',
+    colRows: 'Rows',
+    colSize: 'Size',
+    colCreated: 'Submitted',
+    colActions: 'Actions',
+    status: {
+      pending: 'Queued',
+      running: 'Running',
+      done: 'Done',
+      failed: 'Failed'
+    }
   }
 }

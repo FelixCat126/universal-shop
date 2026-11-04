@@ -22,30 +22,54 @@ if (!process.env.DATABASE_URL_TEST) {
 process.env.PG_POOL_MAX = process.env.PG_POOL_MAX || '40'
 process.env.PG_POOL_ACQUIRE_MS = process.env.PG_POOL_ACQUIRE_MS || '60000'
 
-import { beforeAll, afterAll, beforeEach } from 'vitest'
+import { afterAll, beforeEach } from 'vitest'
 import { TestDatabase } from './test-database.js'
 
-beforeAll(async () => {
-  console.log('🧪 初始化测试环境（PostgreSQL）...')
-  await TestDatabase.initialize()
-  await TestDatabase.syncModels()
-  /**
-   * 补建生产用的自定义索引/约束（幂等键唯一索引等）。
-   *
-   * 这些索引由 schemaEnsures.js 在**生产启动链**里创建，而测试环境
-   * NODE_ENV=test 不执行启动链 —— 结果测试库缺少
-   * uniq_orders_user_client_key 等唯一索引，
-   * 并发幂等/防重行为在测试中无法被验证（表现为"幂等键并发创建多单"）。
-   * 这里显式调用，让测试环境与生产保持一致。
-   */
-  try {
-    const { prepareSchema } = await import('../../src/server/utils/schemaEnsures.js')
-    await prepareSchema()
-  } catch (err) {
-    console.warn('⚠️ 测试环境 schema 补充失败（部分并发用例可能失真）:', err?.message)
+/**
+ * 表结构的准备放在**模块顶层**（而不是 beforeAll）。
+ *
+ * 原因：setup 文件先于任何测试文件求值，这里做完建表，
+ * 后面所有测试文件就直接用现成的表 —— 不会有「某个文件正在重建表、
+ * 把别的文件的表抽走」这种竞态。
+ *
+ * 原本每个测试文件都在 beforeAll 里重建一次（drop 全部表 + 逐个建表），
+ * 问题有三：
+ *   1. 慢：70+ 个文件各重建一次全库；
+ *   2. 危险：重建 = DROP 全部表。重建的瞬间，别的文件正在读写表，
+ *      就会突然拿到 "relation xxx does not exist" —— 表现为随机落在
+ *      不同用例上的莫名失败，每次落在哪里都不一样，极难排查；
+ *   3. 建表顺序依赖模型注册顺序，而注册顺序取决于各测试文件 import 了谁，
+ *      于是「有时建得出来、有时建不出来」。
+ *
+ * 现在：整个进程只建一次（指纹没变就复用），建表按外键依赖顺序重试。
+ */
+console.log('🧪 初始化测试环境（PostgreSQL）...')
+await TestDatabase.initialize()
+{
+  const fingerprint = TestDatabase.schemaFingerprint()
+  if (globalThis.__shopTestSchemaFingerprint !== fingerprint) {
+    await TestDatabase.syncModels()
+    globalThis.__shopTestSchemaFingerprint = fingerprint
+  } else {
+    console.log('ℹ️ 表结构未变化，复用已建好的 schema')
   }
-  console.log('✅ 测试环境初始化完成')
-})
+}
+/**
+ * 补建生产用的自定义索引/约束（幂等键唯一索引等）。
+ *
+ * 这些索引由 schemaEnsures.js 在**生产启动链**里创建，而测试环境
+ * NODE_ENV=test 不执行启动链 —— 结果测试库缺少
+ * uniq_orders_user_client_key 等唯一索引，
+ * 并发幂等/防重行为在测试中无法被验证（表现为"幂等键并发创建多单"）。
+ * 这里显式调用，让测试环境与生产保持一致。
+ */
+try {
+  const { prepareSchema } = await import('../../src/server/utils/schemaEnsures.js')
+  await prepareSchema()
+} catch (err) {
+  console.warn('⚠️ 测试环境 schema 补充失败（部分并发用例可能失真）:', err?.message)
+}
+console.log('✅ 测试环境初始化完成')
 
 afterAll(async () => {
   console.log('🧹 清理测试环境...')

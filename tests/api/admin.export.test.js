@@ -52,6 +52,40 @@ describe('P3.admin.export', () => {
     expect(res.headers['content-type']).toMatch(/spreadsheet/)
   })
 
+  it('EX-2b 同步导出包含最新一条（keyset 游标不能漏掉最后一行）', async () => {
+    const ExcelJS = (await import('exceljs')).default
+    const { token } = await adminCtx()
+    // 造 3 个用户，其中最后一个是 id 最大的（游标以 max id 起步最容易漏）
+    const sequelize = TestDatabase.getSequelize()
+    const { User } = sequelize.models
+    for (const nick of ['u1', 'u2', 'u3']) {
+      await User.create(await TestDataFactory.createUser({
+        nickname: nick,
+        country_code: '+86', phone: TestHelpers.generatePhoneNumber('+86')
+      }))
+    }
+    const newest = await User.findOne({ order: [['id', 'DESC']] })
+
+    // xlsx 不是 supertest 默认会 buffer 的类型，需显式指定二进制解析器
+    const res = await request(app).get('/api/admin/export/users')
+      .set('Authorization', `Bearer ${token}`)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks = []
+        r.on('data', c => chunks.push(Buffer.from(c)))
+        r.on('end', () => cb(null, Buffer.concat(chunks)))
+      })
+    expect(res.status).toBe(200)
+
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(res.body)
+    const ws = wb.worksheets[0]
+    const ids = []
+    for (let r = 2; r <= ws.rowCount; r++) ids.push(ws.getRow(r).values[1])
+    expect(ids).toContain(newest.id)
+    expect(ids.length).toBe(3)
+  })
+
   it('EX-3 GET /api/admin/orders/export JSON', async () => {
     const { token } = await adminCtx()
     await makeUserAndOrder()
