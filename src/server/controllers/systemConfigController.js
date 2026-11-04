@@ -1,4 +1,5 @@
 import SystemConfig from '../models/SystemConfig.js'
+import { clearResponseCache } from '../utils/responseCache.js'
 import { normalizeExchangeRates, FX_KEYS } from '../utils/exchangeRates.js'
 import multer from 'multer'
 import path from 'path'
@@ -195,6 +196,10 @@ class SystemConfigController {
           type || 'text',
           description || '全站货币代码 THB|USD|CNY|MYR'
         )
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         return res.json({
           success: true,
           message: '货币单位已保存',
@@ -246,6 +251,10 @@ class SystemConfigController {
           description || '多币种汇算（相对泰铢标价：金额×比例；USD 等同 USDT）'
         )
         await SystemConfig.setConfig('exchange_rate', normalized.USD, 'text', '兼容字段：与 USD 同步')
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         return res.json({
           success: true,
           message: '汇率配置已保存',
@@ -283,6 +292,10 @@ class SystemConfigController {
           'text',
           description || '积分获取比例：每实付 1 泰铢获得的积分（默认 0.01，即每 100 泰铢 1 积分）'
         )
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         return res.json({
           success: true,
           message: '积分获取比例已保存',
@@ -332,6 +345,10 @@ class SystemConfigController {
         await SystemConfig.setConfig('exchange_rates', next, 'json', '多币种汇算（相对泰铢标价：金额×比例；USD 等同 USDT）')
         const config = await SystemConfig.setConfig(key, next.USD, type, description)
 
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         res.json({
           success: true,
           message: '汇算比例设置成功',
@@ -341,6 +358,10 @@ class SystemConfigController {
         // 其他配置项的常规处理
         const config = await SystemConfig.setConfig(key, value, type, description)
         
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         res.json({
           success: true,
           message: '配置设置成功',
@@ -379,6 +400,10 @@ class SystemConfigController {
       const deleted = await SystemConfig.deleteConfig(key)
       
       if (deleted) {
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         res.json({
           success: true,
           message: '配置删除成功'
@@ -443,6 +468,10 @@ class SystemConfigController {
           '首页长图'
         )
         
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         res.json({
           success: true,
           message: '首页长图上传成功',
@@ -505,6 +534,10 @@ class SystemConfigController {
           '支付二维码'
         )
         
+          // 写后必须再清一次缓存：路由里只在**写之前**清过一次，
+          // 清完之后到写完之前若有并发读 /public，会把旧值重新缓存，
+          // 导致写入「看不见」（偶发返回旧汇率/旧配置）。
+          await clearResponseCache()
         res.json({
           success: true,
           message: '支付二维码上传成功',

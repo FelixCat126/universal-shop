@@ -338,6 +338,14 @@ class AddressController {
         message: '更新地址失败',
         code: 'INTERNAL_SERVER_ERROR'
       })
+    } finally {
+      // 事务兜底：上面任何一条「提前 return」的分支（未登录、参数校验失败等）
+      // 都不会走到 commit —— 事务就一直开着，占用连接池连接、持有行锁，
+      // 负载高时会把连接池耗尽（表现为后续请求大面积超时 / 500）。
+      // transaction.finished 记录事务是否已结束，这里统一兜底回滚。
+      if (!transaction.finished) {
+        await transaction.rollback().catch(() => {})
+      }
     }
   }
 
@@ -404,6 +412,14 @@ class AddressController {
         message: '设置默认地址失败',
         code: 'INTERNAL_SERVER_ERROR'
       })
+    } finally {
+      // 事务兜底：上面任何一条「提前 return」的分支（未登录、参数校验失败等）
+      // 都不会走到 commit —— 事务就一直开着，占用连接池连接、持有行锁，
+      // 负载高时会把连接池耗尽（表现为后续请求大面积超时 / 500）。
+      // transaction.finished 记录事务是否已结束，这里统一兜底回滚。
+      if (!transaction.finished) {
+        await transaction.rollback().catch(() => {})
+      }
     }
   }
 
@@ -471,6 +487,14 @@ class AddressController {
         message: '删除地址失败',
         code: 'INTERNAL_SERVER_ERROR'
       })
+    } finally {
+      // 事务兜底：上面任何一条「提前 return」的分支（未登录、参数校验失败等）
+      // 都不会走到 commit —— 事务就一直开着，占用连接池连接、持有行锁，
+      // 负载高时会把连接池耗尽（表现为后续请求大面积超时 / 500）。
+      // transaction.finished 记录事务是否已结束，这里统一兜底回滚。
+      if (!transaction.finished) {
+        await transaction.rollback().catch(() => {})
+      }
     }
   }
 

@@ -41,19 +41,14 @@ import { TestDatabase } from './test-database.js'
  *   3. 建表顺序依赖模型注册顺序，而注册顺序取决于各测试文件 import 了谁，
  *      于是「有时建得出来、有时建不出来」。
  *
- * 现在：整个进程只建一次（指纹没变就复用），建表按外键依赖顺序重试。
+ * 现在由 TestDatabase.syncModels() 自己判断：指纹（存在磁盘标记文件里，
+ * 跨文件/跨进程共享）一致且表都在 → 直接复用；否则才重建，
+ * 且重建用 PG 咨询锁串行化（避免多个文件同时重建、互相 DROP 对方的表）。
+ * 建表按外键依赖顺序重试。
  */
 console.log('🧪 初始化测试环境（PostgreSQL）...')
 await TestDatabase.initialize()
-{
-  const fingerprint = TestDatabase.schemaFingerprint()
-  if (globalThis.__shopTestSchemaFingerprint !== fingerprint) {
-    await TestDatabase.syncModels()
-    globalThis.__shopTestSchemaFingerprint = fingerprint
-  } else {
-    console.log('ℹ️ 表结构未变化，复用已建好的 schema')
-  }
-}
+await TestDatabase.syncModels()
 /**
  * 补建生产用的自定义索引/约束（幂等键唯一索引等）。
  *
@@ -79,14 +74,40 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await TestDatabase.clearAllData()
-  // 清掉 authMiddleware 5s 用户状态 LRU 缓存
-  // 否则 PG TRUNCATE RESTART IDENTITY 后新建用户会复用旧 id，命中陈旧 cache
+  /**
+   * 下面这些都是**进程内**的共享状态（内存 store / LRU 缓存）。
+   *
+   * Vitest 每个测试文件有独立的模块注册表，但同一个 worker 进程里
+   * 这些状态仍可能跨文件存活（取决于是否被 isolate 复位）。
+   * 之前只有个别测试文件自己重置它们，其余文件直接继承了上一个文件的
+   * 计数/缓存，表现为随机落在不同用例上的断言失败。
+   *
+   * 统一在全局 beforeEach 里清一遍，所有文件口径一致。
+   */
   try {
+    // authMiddleware 5s 用户状态 LRU 缓存
+    // 否则 PG TRUNCATE RESTART IDENTITY 后新建用户会复用旧 id，命中陈旧 cache
     const { _clearAuthCacheForTests } = await import('../../src/server/middlewares/authMiddleware.js')
     _clearAuthCacheForTests()
   } catch (_) { /* 早于 module 加载时忽略 */ }
   try {
+    // 管理员状态缓存（adminAuthMiddleware）
+    const { _clearAdminAuthCacheForTests } = await import('../../src/server/middlewares/adminAuthMiddleware.js')
+    _clearAdminAuthCacheForTests()
+  } catch (_) { /* 早于 module 加载时忽略 */ }
+  try {
+    // 游客下单保护计数（按手机号 / IP 维度）
     const { _resetGuestOrderProtectionForTests } = await import('../../src/server/middlewares/guestOrderGuard.js')
     await _resetGuestOrderProtectionForTests()
+  } catch (_) { /* 早于 module 加载时忽略 */ }
+  try {
+    // 登录失败计数（超过阈值会强制验证码）
+    const { _resetLoginGuardForTests } = await import('../../src/server/middlewares/loginGuard.js')
+    await _resetLoginGuardForTests()
+  } catch (_) { /* 早于 module 加载时忽略 */ }
+  try {
+    // GET 响应缓存（URL 为键；换库后旧响应必须失效）
+    const { clearResponseCache } = await import('../../src/server/utils/responseCache.js')
+    await clearResponseCache()
   } catch (_) { /* 早于 module 加载时忽略 */ }
 })

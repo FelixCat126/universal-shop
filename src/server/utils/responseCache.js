@@ -20,6 +20,8 @@ const cache = createSharedStore('http-cache')
  * 记录在途写入，clearResponseCache 先等它们结束再清。
  */
 const pendingWrites = new Set()
+/** 等待在途写入的上限（毫秒）—— 不能无限等，否则在途写入堆积时会把请求拖死 */
+const PENDING_WAIT_TIMEOUT_MS = 500
 
 export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
   return async (req, res, next) => {
@@ -42,11 +44,19 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
       res.json = (body) => {
         try {
           if (res.statusCode === 200 && body && body.success !== false) {
-            // 不阻塞响应；写缓存失败只记日志，不影响业务
-            const write = cache.set(key, JSON.stringify(body), ttlMs)
-              .catch(() => {})
-              .finally(() => pendingWrites.delete(write))
+            /**
+             * 不阻塞响应；写缓存失败只记日志，不影响业务。
+             *
+             * 注意 pendingWrites 的登记/注销顺序：先把 promise 存进变量、再 add、
+             * 最后挂 finally 删除 —— 若把 finally 串在赋值表达式里，
+             * 同步结算时回调会在变量初始化前执行（TDZ），删除失败，
+             * 在途集合只增不减 → 每次清缓存都要 await 越来越长的列表 →
+             * 请求被拖慢甚至超时。
+             */
+            let write
+            write = cache.set(key, JSON.stringify(body), ttlMs).catch(() => {})
             pendingWrites.add(write)
+            write.then(() => pendingWrites.delete(write), () => pendingWrites.delete(write))
             res.setHeader('X-Cache', 'MISS')
           }
         } catch {}
@@ -62,7 +72,11 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
 export async function clearResponseCache () {
   // 先等在途写入结束，再清 —— 否则刚清完又被写回来
   if (pendingWrites.size > 0) {
-    await Promise.allSettled([...pendingWrites])
+    // 加超时上限：在途写入异常卡住时不能把清缓存（以及写接口）一起拖死
+    await Promise.race([
+      Promise.allSettled([...pendingWrites]),
+      new Promise(resolve => setTimeout(resolve, PENDING_WAIT_TIMEOUT_MS))
+    ])
   }
   await cache.clear()
 }
