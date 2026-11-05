@@ -117,7 +117,17 @@ const upload = multer({
       return cb(new ApiError('不支持的文件扩展名', 400), false)
     }
 
-    // 检查文件名安全性（防止路径遍历）
+    /**
+     * 文件名安全性（防路径遍历）—— **双保险**。
+     *
+     * 注意：实际上 busboy 默认会把 Content-Disposition 里的路径截掉
+     * （preservePath=false），所以原始文件名到不了这里，这道检查平时不会触发。
+     * 真正的防线是上面 storage.filename 的**文件名随机化**：
+     * 落盘名是 system_<时间戳>_<uuid><安全后缀>，用户输入完全不进路径。
+     *
+     * 保留这道检查是为了"万一将来改成 preservePath:true / 换解析器"时仍有一道；
+     * 但**不要因为它存在就以为可以放松文件名随机化** —— 那才是真正的防线。
+     */
     if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
       return cb(new ApiError('文件名包含非法字符', 400), false)
     }

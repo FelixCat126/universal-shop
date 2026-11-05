@@ -44,6 +44,17 @@ const MAX_ITEM_QTY = 5000
 export const DEFAULT_POINTS_EARN_RATE = 0.01
 
 /**
+ * 计价规则版本。
+ *
+ * 下单时把这个值快照进订单的 pricing_version —— 计价口径改过之后，
+ * 历史订单靠这个字段就能分清"是哪套规则算出来的"，
+ * 不用再靠"行的 price 存原价还是折后价"这种会随版本漂移的隐含约定去猜。
+ *
+ * **改计价逻辑时必须同步 bump 这个版本号**，否则新旧订单混在一起没法解释。
+ */
+export const PRICING_ENGINE_VERSION = '2026-11-01'
+
+/**
  * 读取积分获取比例（SystemConfig points_earn_rate，字符串数字）；
  * 未配置 / 解析失败 / 负数一律回退默认值
  */

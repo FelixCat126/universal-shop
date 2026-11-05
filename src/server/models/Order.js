@@ -56,6 +56,16 @@ const Order = sequelize.define('Order', {
     allowNull: true,
     comment: '积分换购订单消耗的积分总和（仅限 payment_method=points）'
   },
+  pricing_version: {
+    type: DataTypes.STRING(32),
+    allowNull: true,
+    comment: '计价规则版本快照（见 pricingEngine.PRICING_ENGINE_VERSION）：改动计价逻辑时必须 bump，否则新旧订单混在一起无法解释金额差异'
+  },
+  discount_snapshot: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    comment: '本单命中的优惠快照（满减促销/抵扣券/各行折后价）：用于事后解释"这单为什么是这个价"，老订单没有该列时为空'
+  },
   status: {
     type: DataTypes.STRING(20),
     allowNull: false,

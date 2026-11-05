@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
 import { TestHelpers } from '../helpers/test-helpers.js'
-import { cleanupRetentionData, startRetentionCleanup } from '@server/services/retentionService.js'
+import { cleanupRetentionData, startRetentionCleanup, runDailyInvariantCheck } from '@server/services/retentionService.js'
 
 /**
  * 回拨时间戳。
@@ -233,4 +233,19 @@ describe('数据保留策略 retention', () => {
   it('RT-6 测试环境不启动定时清理器', () => {
     expect(startRetentionCleanup()).toBeNull()
   })
+
+  it('RT-7 每日数据体检：干净库通过，发现问题时报出来且不抛错', async () => {
+    // 干净库 → 通过
+    const ok = await runDailyInvariantCheck()
+    expect(ok.ok).toBe(true)
+    expect(ok.violations).toBe(0)
+
+    // 造一处坏数据（库存为负）→ 报出来，但**不抛异常**（体检不能拖垮服务）
+    const { Product } = models()
+    await Product.create(TestDataFactory.createProduct({ stock: -3, price: 10 }))
+
+    const bad = await runDailyInvariantCheck()
+    expect(bad.ok).toBe(false)
+    expect(bad.violations).toBeGreaterThan(0)
+  }, 30000)
 })

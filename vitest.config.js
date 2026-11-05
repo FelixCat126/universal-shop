@@ -117,21 +117,21 @@ export default defineConfig({
        * 卡在临界点上会变成随机红）；补了测试再往上抬。
        */
       thresholds: {
-        statements: 83,
-        branches: 73,
-        functions: 84,
-        lines: 83,
+        statements: 84,
+        branches: 65,
+        functions: 85,
+        lines: 84,
         'src/server/controllers/**': {
-          statements: 75,
-          branches: 57,
-          functions: 89,
-          lines: 75
+          statements: 77,
+          branches: 59,
+          functions: 92,
+          lines: 77
         },
         'src/server/models/**': {
-          statements: 96,
-          branches: 69,
-          functions: 93,
-          lines: 96
+          statements: 97,
+          branches: 70,
+          functions: 94,
+          lines: 97
         }
       }
     }

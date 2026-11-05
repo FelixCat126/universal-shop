@@ -188,6 +188,68 @@ export const requireSuperAdmin = async (req, res, next) => {
   }
 }
 
+/**
+ * 审计快照：资源名 → 模型名。
+ *
+ * 只有这张表里的资源会在写操作前拍一张「改之前」的快照（落 operation_logs.old_data）。
+ * 没在表里的资源（比如上传的横幅/收款码）本来就没有行快照可言，跳过。
+ */
+const SNAPSHOT_MODELS = {
+  administrator: 'Administrator',
+  bundle: 'Bundle',
+  coupon_template: 'CouponTemplate',
+  partner: 'Partner',
+  partner_order: 'PartnerOrder',
+  product_category: 'ProductCategory',
+  promotion: 'Promotion',
+  order: 'Order',
+  user: 'User',
+  after_sale: 'AfterSale',
+  export: 'ExportJob'
+}
+
+/**
+ * 快照要排除的字段：凭证类一律不进审计表。
+ * （new_data 记的是响应体，本来就不含密码；这里额外兜住模型行里的哈希与令牌。）
+ */
+const SNAPSHOT_EXCLUDE = new Set([
+  'password', 'password_hash', 'token_version',
+  'reset_token', 'reset_token_expires_at', 'reset_code',
+  'two_factor_secret', 'secret'
+])
+
+/**
+ * 写操作前拍一张原行快照。
+ *
+ * 目的：操作日志原来只记「改成了什么」（old_data 恒为 null），
+ * 事后无法 diff、无法回滚、也说不清「这数据怎么变成这样的」。
+ * 记上原值后，审计日志才真的能当证据用。
+ *
+ * 拍不到就返回 null（不阻断业务）—— 审计是辅助能力，不能反过来拖垮主流程。
+ */
+async function snapshotRowBeforeWrite (resource, req) {
+  const modelName = SNAPSHOT_MODELS[resource]
+  if (!modelName) return null
+  const id = req.params?.id ?? req.params?.key ?? req.body?.id
+  if (id === undefined || id === null || id === '') return null
+  try {
+    const sequelize = (await import('../config/database.js')).default
+    const model = sequelize.models[modelName]
+    if (!model) return null
+    const row = await model.findByPk(id, { raw: true })
+    if (!row) return null
+    const out = {}
+    for (const [k, v] of Object.entries(row)) {
+      if (SNAPSHOT_EXCLUDE.has(k)) continue
+      out[k] = v instanceof Date ? v.toISOString() : v
+    }
+    return out
+  } catch (err) {
+    logger.warn('审计快照失败（不阻断业务）', { resource, id, err: err?.message })
+    return null
+  }
+}
+
 // 操作日志中间件
 // 同时拦截 res.json 与 res.send：
 //   - JSON 响应（CRUD/状态变更）通过 data.success 判断
@@ -211,7 +273,7 @@ export const logOperation = (action, resource) => {
           resource,
           resourceId,
           description,
-          oldData: null,
+          oldData,
           newData,
           ipAddress: req.ip,
           userAgent: req.get('User-Agent')
@@ -233,7 +295,13 @@ export const logOperation = (action, resource) => {
          */
         const detail = data.data ?? null
         const isBulk = Array.isArray(detail) || (detail && typeof detail === 'object' && Array.isArray(detail.items))
-        setImmediate(() => { writeLog(id, isBulk ? { truncated: true, count: Array.isArray(detail) ? detail.length : (detail.items?.length ?? null) } : detail) })
+        setImmediate(() => {
+          writeLog(
+            id,
+            isBulk ? { truncated: true, count: Array.isArray(detail) ? detail.length : (detail.items?.length ?? null) } : detail,
+            oldData
+          )
+        })
       }
       return originalJson.call(this, data)
     }
@@ -243,7 +311,7 @@ export const logOperation = (action, resource) => {
       // 仅对成功响应记录；对 Buffer/text 也覆盖（如 xlsx 导出）
       // res.json 内部也会调 res.send，由 logged 标志防止重复
       if (!logged && res.statusCode < 400) {
-        setImmediate(() => { writeLog(null, null) })
+        setImmediate(() => { writeLog(null, null, oldData) })
       }
       return originalSend.call(this, body)
     }
@@ -262,10 +330,13 @@ export const logOperation = (action, resource) => {
       // 注意：这里不能设 logged = true —— writeLog 内部靠它做一次性守卫，
       // 提前置位会让 writeLog 直接 return，日志永远不写。
       if (!logged && res.statusCode < 400) {
-        setImmediate(() => { writeLog(null, null) })
+        setImmediate(() => { writeLog(null, null, oldData) })
       }
       return originalEnd.call(this, chunk, encoding, callback)
     }
+
+    // 写操作：先拍原行快照（改之前的值），等响应出来再连同新值一起落库
+    const oldData = await snapshotRowBeforeWrite(resource, req)
 
     next()
   }

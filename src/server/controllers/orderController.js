@@ -15,7 +15,7 @@ import { createUserAddress } from '../services/addressService.js'
 import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
 import * as pointsService from '../services/pointsService.js'
-import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates } from '../services/pricingEngine.js'
+import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates, PRICING_ENGINE_VERSION } from '../services/pricingEngine.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import { likeContains } from '../utils/likeSearch.js'
 import AuditLog from '../models/AuditLog.js'
@@ -153,6 +153,48 @@ function isClientOrderKeyConflict (err) {
   return err?.parent?.constraint === 'uniq_orders_user_client_key' ||
     (typeof err?.parent?.detail === 'string' && err.parent.detail.includes('client_order_key')) ||
     (Array.isArray(err?.errors) && err.errors.some(e => e?.path === 'client_order_key'))
+}
+
+/**
+ * 构造订单的「优惠快照」（落 orders.discount_snapshot）。
+ *
+ * 目的是让订单**自解释**：事后拿到一个订单，能直接看出
+ *   - 命中了哪些满减促销、各减了多少
+ *   - 用了哪张抵扣券、抵了多少
+ *   - 每行的原价与折后价
+ * 不用再靠"行的 price 到底存的是原价还是折后价"这种会随版本漂移的隐含约定去猜
+ * （生产里就有一单因为这个说不清金额差 30%）。
+ *
+ * 只保留解释金额所必需的字段，不塞 PII。
+ */
+function buildDiscountSnapshot (priced, orderItems = []) {
+  const promotions = (priced?.applied_promotions || []).map(p => ({
+    promotion_id: p.promotion_id ?? null,
+    name: p.name,
+    amount: Number(p.amount || 0)
+  }))
+  const coupon = priced?.applied_coupon
+    ? {
+        user_coupon_id: priced.applied_coupon.user_coupon_id ?? null,
+        name: priced.applied_coupon.name,
+        amount: Number(priced.applied_coupon.amount || 0)
+      }
+    : null
+  const lines = (orderItems || []).map(item => ({
+    product_id: item.product_id,
+    quantity: Number(item.quantity || 0),
+    price: Number(item.price || 0),
+    original_price: item.original_price != null ? Number(item.original_price) : null,
+    discount: item.discount != null ? Number(item.discount) : null,
+    is_gift: Boolean(item.is_gift)
+  }))
+  return {
+    discount_amount: Number(priced?.discount_amount || 0),
+    payable_thb: priced?.payable_thb != null ? Number(priced.payable_thb) : null,
+    promotions,
+    coupon,
+    lines
+  }
 }
 
 /**
@@ -651,6 +693,14 @@ class OrderController {
                 currency_code: checkoutCurrency,
                 payment_method: paymentMethod,
                 points_redeemed: paymentMethod === 'points' ? pointsPurchaseTotal : null,
+                /**
+                 * 计价口径快照：规则版本 + 本单命中的优惠明细。
+                 * 事后有人问"这单为什么是这个价"，靠这两列就能答；
+                 * 没有它们只能靠猜（老订单的行存原价、总额存折后价，
+                 * 新订单反过来 —— 光看数据分不出是哪套规则算的）。
+                 */
+                pricing_version: PRICING_ENGINE_VERSION,
+                discount_snapshot: buildDiscountSnapshot(priced, orderItems),
                 status: initialOrderStatus,
                 contact_name: orderContactName,
                 contact_phone: orderContactPhone,

@@ -83,6 +83,18 @@ jobs:
           JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
           CAPTCHA_SECRET: ci-test-captcha-secret-key-at-least-32-chars
 
+      # 接口性能 SLO：p95 不得超过绝对阈值（scripts/bench-slo.json）。
+      # 用绝对阈值而不是和本地基线比 —— CI runner 与本机不同，比基线必然飘。
+      - name: ⏱ 接口性能 SLO
+        run: npm run bench:api -- --slo
+        env:
+          NODE_ENV: test
+          DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
+          JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
+          JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
+          CAPTCHA_SECRET: ci-test-captcha-secret-key-at-least-32-chars
+
       - name: 📊 覆盖率门禁
         run: npm run test:coverage
         env:

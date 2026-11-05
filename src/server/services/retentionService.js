@@ -1,10 +1,12 @@
 import { Op } from 'sequelize'
+import sequelize from '../config/database.js'
 import AuditLog from '../models/AuditLog.js'
 import OperationLog from '../models/OperationLog.js'
 import PointTransaction from '../models/PointTransaction.js'
 import UserCoupon from '../models/UserCoupon.js'
 import Cart from '../models/Cart.js'
 import { cleanupExportJobs, cleanupExpiredExportFiles } from './exportJobService.js'
+import { checkDataInvariants } from '../utils/dataInvariants.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -93,12 +95,50 @@ export async function cleanupRetentionData ({
   }
 }
 
+/**
+ * 每日数据体检（只读）。
+ *
+ * 清理任务只管"该删的删掉"，管不了"数据已经被写坏"。
+ * 积分余额与流水对不上、订单总额超过明细、库存成了负数 ——
+ * 这些单测发现不了（单测跑的是代码路径，不是生产数据），
+ * 只有拿生产数据本身跑一遍不变量检查才知道。
+ *
+ * 结果只记日志、**不抛错不影响服务**：体检是给人看的，不是用来中断业务的。
+ */
+export async function runDailyInvariantCheck () {
+  try {
+    const results = await checkDataInvariants({ sequelize })
+    const bad = results.filter(r => r.violations !== 0)
+    if (bad.length === 0) {
+      logger.info('每日数据体检通过', { checks: results.length })
+      return { ok: true, violations: 0 }
+    }
+    for (const r of bad) {
+      logger.error('数据不变量检查未通过', {
+        check: r.name,
+        title: r.title,
+        scope: r.scope,
+        violations: r.violations,
+        error: r.error || undefined,
+        sample: r.detail?.[0] || undefined
+      })
+    }
+    logger.error('每日数据体检发现问题', { failedChecks: bad.length, totalChecks: results.length })
+    return { ok: false, violations: bad.reduce((n, r) => n + Math.max(r.violations, 0), 0) }
+  } catch (err) {
+    logger.error('每日数据体检执行失败', { err: err?.message, stack: err?.stack })
+    return { ok: false, violations: -1 }
+  }
+}
+
 export function startRetentionCleanup () {
   if (process.env.NODE_ENV === 'test') return null
   const timer = setInterval(() => {
     cleanupRetentionData().catch((err) => {
       logger.error('数据保留清理失败', { err: err?.message, stack: err?.stack })
     })
+    // 清理完顺手做一次数据体检（只读，不阻断）
+    runDailyInvariantCheck().catch(() => {})
     // 导出文件按 TTL 单独清理（与「任务保留 7 天」是两个独立维度：
     // 文件可以先过期消失，任务记录留着让管理员看到「文件已过期」）
     cleanupExpiredExportFiles().catch((err) => {

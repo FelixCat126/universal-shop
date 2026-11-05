@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASELINE_FILE = path.join(__dirname, 'bench-baseline.json')
+/** 绝对 SLO（毫秒）：CI 用这个判，不受机器差异影响 */
+const SLO_FILE = path.join(__dirname, 'bench-slo.json')
 
 /** 退化容忍倍数（p95 超过基线这么多倍就判回归） */
 const REGRESSION_RATIO = Number(process.env.BENCH_REGRESSION_RATIO || 1.5)
@@ -35,6 +37,8 @@ const SIZE = {
 const args = process.argv.slice(2)
 const update = args.includes('--update')
 const jsonOnly = args.includes('--json')
+/** SLO 模式：按绝对阈值判（CI 用）；默认是与本地基线比（相对） */
+const sloMode = args.includes('--slo')
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'test'
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'bench-jwt-secret-key-at-least-32-chars-long'
@@ -59,6 +63,7 @@ async function measure (fn, times = 12) {
 }
 
 function fmt (ms) {
+  if (ms == null || Number.isNaN(ms)) return '-'
   return ms >= 100 ? `${ms.toFixed(0)}ms` : `${ms.toFixed(1)}ms`
 }
 
@@ -163,14 +168,35 @@ async function main () {
   await sequelize.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {})
   await sequelize.close().catch(() => {})
 
-  // 与基线比较
+  // 与基线（或 SLO）比较
   let baseline = null
   if (fs.existsSync(BASELINE_FILE)) {
     try { baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8')) } catch { /* 损坏就当没有 */ }
   }
 
   const regressions = []
-  if (baseline?.endpoints) {
+  if (sloMode) {
+    /**
+     * SLO 模式：**绝对阈值**，与跑在哪台机器上无关。
+     *
+     * 为什么不用基线比：基线是某台机器的实测值，CI runner 的 CPU/磁盘
+     * 与本地不同，直接比必然飘 —— 飘多了就成了"天天红"的假警报，
+     * 久了大家就不看了。绝对阈值（p95 不得超过 N 毫秒）才稳。
+     */
+    let slo = {}
+    try { slo = JSON.parse(fs.readFileSync(SLO_FILE, 'utf8')) } catch { /* 没有就跳过 */ }
+    for (const [name, limit] of Object.entries(slo)) {
+      if (name.startsWith('_')) continue // SLO 文件里的注释键
+      const cur = results[name]
+      if (!cur) {
+        regressions.push({ name, baseline: limit, current: null, ratio: null, note: '接口不存在' })
+        continue
+      }
+      if (cur.p95 > limit) {
+        regressions.push({ name, baseline: limit, current: cur.p95, ratio: cur.p95 / limit })
+      }
+    }
+  } else if (baseline?.endpoints) {
     for (const [name, cur] of Object.entries(results)) {
       const base95 = baseline.endpoints[name]?.p95
       if (base95 && cur.p95 > base95 * REGRESSION_RATIO) {
@@ -194,6 +220,8 @@ async function main () {
       for (const r of regressions) {
         console.log(`   ${r.name}: ${fmt(r.baseline)} → ${fmt(r.current)}（${r.ratio.toFixed(2)}×）`)
       }
+    } else if (sloMode) {
+      console.log('✅ 全部满足 SLO')
     } else if (baseline) {
       console.log('✅ 无明显退化')
     } else {
