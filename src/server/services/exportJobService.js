@@ -34,6 +34,15 @@ const EXPORT_ROW_LIMIT = Number(process.env.EXPORT_MAX_ROWS || 200000)
 const BATCH_SIZE = 1000
 /** 同时执行的任务数（超过则排队） */
 const MAX_CONCURRENT = Number(process.env.EXPORT_MAX_CONCURRENT || 2)
+/**
+ * 测试环境默认**不**跑导出 worker。
+ *
+ * 单元测试里 worker 会和用例抢任务（用例断言中间状态，worker 却把任务跑完了），
+ * 所以默认关掉；但 E2E 要验的正是「提交 → 后台生成 → 轮询 → 下载」这条链路，
+ * 没有 worker 任务会永远停在 pending。
+ * 需要时用 EXPORT_WORKER_ENABLED=1 显式打开。
+ */
+const workerEnabled = () => process.env.EXPORT_WORKER_ENABLED === '1'
 /** 任务文件保留时长（小时），过期由 retention 清理 */
 const FILE_TTL_HOURS = Number(process.env.EXPORT_FILE_TTL_HOURS || 48)
 
@@ -330,7 +339,8 @@ let triggering = false
 export function triggerExportJobs () {
   // 测试环境不自动触发：测试会显式调用 processPendingExportJobs，
   // 自动触发会和它抢任务，导致断言读到中间状态
-  if (process.env.NODE_ENV === 'test') return
+  // （E2E 需要真实链路，用 EXPORT_WORKER_ENABLED=1 打开）
+  if (process.env.NODE_ENV === 'test' && !workerEnabled()) return
   if (triggering) return
   triggering = true
   // 放到下一个 tick，避免阻塞当前请求的响应
@@ -345,7 +355,7 @@ export function triggerExportJobs () {
 
 /** 启动 worker（与其它后台任务同款：setInterval + unref） */
 export function startExportJobWorker () {
-  if (process.env.NODE_ENV === 'test') return null
+  if (process.env.NODE_ENV === 'test' && !workerEnabled()) return null
   const interval = Number(process.env.EXPORT_WORKER_INTERVAL_MS || 15000)
   const timer = setInterval(() => {
     recoverStaleExportJobs()

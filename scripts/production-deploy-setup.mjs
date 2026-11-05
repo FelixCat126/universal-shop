@@ -14,6 +14,7 @@ import 'dotenv/config'
 import DataSeeder from '../src/server/seeds/index.js'
 import sequelize from '../src/server/config/database.js'
 import { prepareSchema } from '../src/server/utils/schemaEnsures.js'
+import { runMigrations } from '../src/server/migrations/index.js'
 
 const LOCK_ID = 862427113
 
@@ -23,6 +24,14 @@ try {
   // 先建缺失表（after_sales 等），再补列/索引/配置，最后跑 seeder
   await sequelize.sync({ alter: false })
   await prepareSchema()
+  // 版本化迁移：结构变更按序号执行并记录（与 app.js 启动链同一套）
+  const migrationResult = await runMigrations({ sequelize })
+  if (migrationResult.failed) {
+    throw new Error(`迁移失败 ${migrationResult.failed.name}: ${migrationResult.failed.error}`)
+  }
+  if (migrationResult.applied.length) {
+    console.log(`✅ 已执行迁移: ${migrationResult.applied.join(', ')}`)
+  }
   await DataSeeder.runProductionUpdate()
 } finally {
   await sequelize.query('SELECT pg_advisory_unlock(:id)', { replacements: { id: LOCK_ID } }).catch(() => {})

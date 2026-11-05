@@ -427,7 +427,7 @@ export class TestDatabase {
        * 先删标记：重建被打断的话，下次运行一定会重建。
        */
       await invalidateSchemaFingerprint(sequelize)
-      await sequelize.drop({ cascade: true })
+      await this._dropAllTables()
       // 按依赖顺序建表（见 syncModelsInDependencyOrder）
       await syncModelsInDependencyOrder(sequelize)
       await writeSchemaFingerprint(sequelize, fingerprint)
@@ -440,6 +440,29 @@ export class TestDatabase {
         console.error('❌ syncModels 失败：', error.message)
         throw error
       }
+    }
+  }
+
+  /**
+   * 逐表 DROP（幂等、容忍表已不存在）。
+   *
+   * 不用 sequelize.drop({ cascade: true })：它是「先删外键约束、再删表」，
+   * 而 CASCADE 删父表时会把子表**一起删掉** → 轮到子表时再执行
+   * `ALTER TABLE "products" DROP CONSTRAINT ...` 就报
+   *   42P01: relation "products" does not exist
+   * → 整个重建流程中断（E2E 服务直接起不来）。
+   *
+   * DROP TABLE IF EXISTS ... CASCADE 则是幂等的：表没了就是空操作。
+   */
+  static async _dropAllTables () {
+    const schema = testSchema || 'public'
+    for (const model of Object.values(sequelize.models)) {
+      const raw = model.getTableName()
+      const tableName = typeof raw === 'string' ? raw : raw.tableName
+      const tableSchema = (typeof raw === 'string' ? null : raw.schema) || schema
+      await sequelize.query(
+        `DROP TABLE IF EXISTS "${tableSchema}"."${tableName}" CASCADE`
+      ).catch(() => {})
     }
   }
 
