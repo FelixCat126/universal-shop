@@ -9,7 +9,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, withHttpServer } from '../helpers/test-helpers.js'
 
 describe('Batch 2 并发安全', () => {
   let sequelize
@@ -45,20 +45,22 @@ describe('Batch 2 并发安全', () => {
         tokens.push(TestHelpers.generateToken(u))
       }
 
-      const tasks = tokens.map((tk) =>
-        request(app)
-          .post('/api/orders')
-          .set('Authorization', `Bearer ${tk}`)
-          .send({
-            items: [{ product_id: product.id, quantity: 1 }],
-            contact_name: 'C',
-            contact_phone: '13800138001',
-            delivery_address: 'A',
-            payment_method: 'cod'
-          })
-      )
-
-      const results = await Promise.all(tasks)
+      // 单实例 server 跑并发：避免多个 ephemeral server 并发监听/销毁的传输层抖动
+      const results = await withHttpServer(app, async (base) => {
+        const tasks = tokens.map((tk) =>
+          request(base)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${tk}`)
+            .send({
+              items: [{ product_id: product.id, quantity: 1 }],
+              contact_name: 'C',
+              contact_phone: '13800138001',
+              delivery_address: 'A',
+              payment_method: 'cod'
+            })
+        )
+        return Promise.all(tasks)
+      })
       const ok = results.filter((r) => r.status === 201).length
 
       /**

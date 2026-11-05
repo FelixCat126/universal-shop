@@ -18,7 +18,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, withHttpServer } from '../helpers/test-helpers.js'
 import { issueCaptcha, _getCaptchaAnswerForTests } from '@server/utils/captcha.js'
 
 const models = () => TestDatabase.getSequelize().models
@@ -186,14 +186,15 @@ describe('Concurrency.retail', () => {
     const orderId = created.body.data.order.id
 
     // 下单的同时取消另一笔
-    const [cancelRes] = await Promise.all([
-      request(app).put(`/api/admin/orders/${orderId}/status`)
+    // 单实例 server 跑并发：避免两个 ephemeral server 并发监听/销毁的传输层抖动
+    const [cancelRes] = await withHttpServer(app, async (base) => Promise.all([
+      request(base).put(`/api/admin/orders/${orderId}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ status: 'cancelled' }),
-      request(app).post('/api/orders')
+      request(base).post('/api/orders')
         .set('Authorization', `Bearer ${token}`)
         .send(orderBody())
-    ])
+    ]))
     expect([200, 400]).toContain(cancelRes.status)
 
     const { Product, Order } = models()

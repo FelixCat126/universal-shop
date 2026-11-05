@@ -19,7 +19,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, withHttpServer } from '../helpers/test-helpers.js'
 import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
 import { _clearAuthCacheForTests } from '@server/middlewares/authMiddleware.js'
 import { _resetLoginGuardForTests } from '@server/middlewares/loginGuard.js'
@@ -92,21 +92,24 @@ describe('P4.points.concurrentRedeem', () => {
     await TestHelpers.topUpUserPoints(user, 100)
 
     const N = 5
-    const promises = []
-    for (let i = 0; i < N; i++) {
-      promises.push(
-        request(app).post('/api/orders')
-          .set('Authorization', `Bearer ${token}`)
-          .send({
-            contact_name: 'X',
-            contact_phone: '13800000001',
-            delivery_address: 'A',
-            payment_method: 'points',
-            items: [{ product_id: product.id, quantity: 1 }]
-          })
-      )
-    }
-    const results = await Promise.all(promises)
+    // 单实例 server 跑并发：避免多个 ephemeral server 并发监听/销毁的传输层抖动
+    const results = await withHttpServer(app, async (base) => {
+      const promises = []
+      for (let i = 0; i < N; i++) {
+        promises.push(
+          request(base).post('/api/orders')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+              contact_name: 'X',
+              contact_phone: '13800000001',
+              delivery_address: 'A',
+              payment_method: 'points',
+              items: [{ product_id: product.id, quantity: 1 }]
+            })
+        )
+      }
+      return Promise.all(promises)
+    })
     const ok = results.filter((r) => r.status === 201).length
     // 100 积分 / 30 单价 = 最多 3 笔
     expect(ok).toBeLessThanOrEqual(3)

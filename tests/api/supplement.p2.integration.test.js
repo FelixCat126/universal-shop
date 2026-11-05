@@ -9,7 +9,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
-import { TestHelpers } from '../helpers/test-helpers.js'
+import { TestHelpers, withHttpServer } from '../helpers/test-helpers.js'
 import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
 import { _clearAuthCacheForTests } from '@server/middlewares/authMiddleware.js'
 import { _resetLoginGuardForTests } from '@server/middlewares/loginGuard.js'
@@ -178,15 +178,18 @@ describe('P2-Supplement.adjustStockAtomic', () => {
     const { token } = await adminCtx()
     const p = await activeProduct({ stock: 100 })
     const N = 10
-    const promises = []
-    for (let i = 0; i < N; i++) {
-      promises.push(
-        request(app).post(`/api/products/${p.id}/stock`)
-          .set('Authorization', `Bearer ${token}`)
-          .send({ type: 'add', quantity: 1 })
-      )
-    }
-    await Promise.all(promises)
+    // 单实例 server 跑 10 并发：避免 10 个 ephemeral server 并发监听/销毁的传输层抖动
+    await withHttpServer(app, async (base) => {
+      const promises = []
+      for (let i = 0; i < N; i++) {
+        promises.push(
+          request(base).post(`/api/products/${p.id}/stock`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({ type: 'add', quantity: 1 })
+        )
+      }
+      return Promise.all(promises)
+    })
     const sequelize = TestDatabase.getSequelize()
     const { Product } = sequelize.models
     const fresh = await Product.findByPk(p.id)

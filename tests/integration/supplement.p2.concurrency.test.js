@@ -53,15 +53,18 @@ describe('P2concurrency.partnerOversell', () => {
     const product = await activeProduct({ stock: 5, price: 100, discount: null })
 
     const N = 20
-    const promises = []
-    for (let i = 0; i < N; i++) {
-      promises.push(
-        request(app).post('/api/partner/orders')
-          .set('Authorization', `Bearer ${token}`)
-          .send({ items: [{ product_id: product.id, quantity: 50 }], partner_address_id: address.id })
-      )
-    }
-    const results = await Promise.all(promises)
+    // 单实例 server 跑 20 并发：避免 20 个 ephemeral server 并发监听/销毁的传输层抖动
+    const results = await withHttpServer(app, async (base) => {
+      const promises = []
+      for (let i = 0; i < N; i++) {
+        promises.push(
+          request(base).post('/api/partner/orders')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ items: [{ product_id: product.id, quantity: 50 }], partner_address_id: address.id })
+        )
+      }
+      return Promise.all(promises)
+    })
     const ok = results.filter((r) => r.status === 201).length
     const fail = results.filter((r) => r.status !== 201).length
     expect(ok).toBeLessThanOrEqual(5)
@@ -86,21 +89,23 @@ describe('P2concurrency.pointsConcurrent', () => {
     await TestHelpers.topUpUserPoints(user, 100)
 
     const N = 5
-    const promises = []
-    for (let i = 0; i < N; i++) {
-      promises.push(
-        request(app).post('/api/orders')
-          .set('Authorization', `Bearer ${token}`)
-          .send({
-            contact_name: 'X',
-            contact_phone: '13800000001',
-            delivery_address: 'A',
-            payment_method: 'points',
-            items: [{ product_id: product.id, quantity: 1 }]
-          })
-      )
-    }
-    const results = await Promise.all(promises)
+    const results = await withHttpServer(app, async (base) => {
+      const promises = []
+      for (let i = 0; i < N; i++) {
+        promises.push(
+          request(base).post('/api/orders')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+              contact_name: 'X',
+              contact_phone: '13800000001',
+              delivery_address: 'A',
+              payment_method: 'points',
+              items: [{ product_id: product.id, quantity: 1 }]
+            })
+        )
+      }
+      return Promise.all(promises)
+    })
     const ok = results.filter((r) => r.status === 201).length
     // 100 积分余额，每次扣 30（商品 points=30）+ 30 + 30 + 30 = 120 → 最多 3 笔
     expect(ok).toBeLessThanOrEqual(3)

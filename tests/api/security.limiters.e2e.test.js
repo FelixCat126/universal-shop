@@ -68,33 +68,40 @@ async function flood (app, method, path, ip, n) {
 describe('P5.security.limiters.e2e — 真实 limiter 挂在路由上', () => {
   it('LME-1 enumerationLimiter 30/min：第 31 次 → 429 + RATE_LIMITED', async () => {
     const app = buildApp(prod)
-    // 跑 30 次 200 + 第 31 次应当 429
-    for (let i = 0; i < 30; i++) {
-      const r = await request(app).get('/enum').set('X-Forwarded-For', '10.0.0.1')
-      expect(r.status).toBe(200)
-    }
-    const blocked = await request(app).get('/enum').set('X-Forwarded-For', '10.0.0.1')
-    expect(blocked.status).toBe(429)
-    expect(blocked.body.code).toBe('RATE_LIMITED')
+    // 单实例 server 打满 30 次：避免逐请求新建 ephemeral server 的传输层抖动
+    // （同文件里的 LME-3 / LME-4 就是这么写的，之前漏了这两个）
+    await withHttpServer(app, async (base) => {
+      // 跑 30 次 200 + 第 31 次应当 429
+      for (let i = 0; i < 30; i++) {
+        const r = await request(base).get('/enum').set('X-Forwarded-For', '10.0.0.1')
+        expect(r.status).toBe(200)
+      }
+      const blocked = await request(base).get('/enum').set('X-Forwarded-For', '10.0.0.1')
+      expect(blocked.status).toBe(429)
+      expect(blocked.body.code).toBe('RATE_LIMITED')
 
-    // 不同 IP 仍可
-    const otherIp = await request(app).get('/enum').set('X-Forwarded-For', '10.0.0.2')
-    expect(otherIp.status).toBe(200)
+      // 不同 IP 仍可
+      const otherIp = await request(base).get('/enum').set('X-Forwarded-For', '10.0.0.2')
+      expect(otherIp.status).toBe(200)
+    })
   })
 
   it('LME-2 loginLimiter 10/15min skipSuccessful=true：连 10 次失败后第 11 次 429', async () => {
     const app = buildApp(prod)
-    for (let i = 0; i < 10; i++) {
-      const r = await request(app).post('/login')
+    // 单实例 server 连打 10 次：避免逐请求新建 ephemeral server 的传输层抖动
+    await withHttpServer(app, async (base) => {
+      for (let i = 0; i < 10; i++) {
+        const r = await request(base).post('/login')
+          .set('X-Forwarded-For', '10.0.1.1')
+          .send({ bad: true })
+        expect(r.status).toBe(401)
+      }
+      const blocked = await request(base).post('/login')
         .set('X-Forwarded-For', '10.0.1.1')
         .send({ bad: true })
-      expect(r.status).toBe(401)
-    }
-    const blocked = await request(app).post('/login')
-      .set('X-Forwarded-For', '10.0.1.1')
-      .send({ bad: true })
-    expect(blocked.status).toBe(429)
-    expect(blocked.body.code).toBe('RATE_LIMITED')
+      expect(blocked.status).toBe(429)
+      expect(blocked.body.code).toBe('RATE_LIMITED')
+    })
   })
 
   it('LME-3 writeLimiter 60/min：跑到 60 后第 61 次 429', async () => {

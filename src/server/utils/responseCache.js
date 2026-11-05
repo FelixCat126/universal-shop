@@ -20,6 +20,17 @@ const cache = createSharedStore('http-cache')
  * 记录在途写入，clearResponseCache 先等它们结束再清。
  */
 const pendingWrites = new Set()
+/**
+ * 缓存代次：每次清缓存 +1。
+ *
+ * 写入缓存是 fire-and-forget（不阻塞响应），所以「清缓存」可能发生在某次写入
+ * **真正落库之前** —— 清完之后那次写入又把旧响应写回去了，缓存就「复活」了一份
+ * 陈旧数据。表现为「列表接口返回了上一个用例的数据」「状态机用例读到旧状态」。
+ *
+ * 用代次号消掉这个窗口：写入时记下当时的代次，写完之后若代次已变（说明期间
+ * 清过缓存），就把这条刚写进去的旧数据删掉。
+ */
+let cacheGeneration = 0
 /** 等待在途写入的上限（毫秒）—— 不能无限等，否则在途写入堆积时会把请求拖死 */
 const PENDING_WAIT_TIMEOUT_MS = 500
 
@@ -53,8 +64,16 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
              * 在途集合只增不减 → 每次清缓存都要 await 越来越长的列表 →
              * 请求被拖慢甚至超时。
              */
+            const generation = cacheGeneration
             let write
-            write = cache.set(key, JSON.stringify(body), ttlMs).catch(() => {})
+            write = cache.set(key, JSON.stringify(body), ttlMs)
+              .then(async () => {
+                // 写入期间清过缓存 → 这条是旧数据，删掉，别让它活过这次清库
+                if (generation !== cacheGeneration) {
+                  await cache.delete(key).catch(() => {})
+                }
+              })
+              .catch(() => {})
             pendingWrites.add(write)
             write.then(() => pendingWrites.delete(write), () => pendingWrites.delete(write))
             res.setHeader('X-Cache', 'MISS')
@@ -70,6 +89,8 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
 }
 
 export async function clearResponseCache () {
+  // 代次 +1：此刻之后完成的写入会被识别为「旧数据」并被丢弃
+  cacheGeneration++
   // 先等在途写入结束，再清 —— 否则刚清完又被写回来
   if (pendingWrites.size > 0) {
     // 加超时上限：在途写入异常卡住时不能把清缓存（以及写接口）一起拖死

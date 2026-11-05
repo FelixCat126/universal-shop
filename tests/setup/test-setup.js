@@ -22,7 +22,7 @@ if (!process.env.DATABASE_URL_TEST) {
 process.env.PG_POOL_MAX = process.env.PG_POOL_MAX || '40'
 process.env.PG_POOL_ACQUIRE_MS = process.env.PG_POOL_ACQUIRE_MS || '60000'
 
-import { afterAll, beforeEach } from 'vitest'
+import { afterAll, beforeAll, beforeEach } from 'vitest'
 import { TestDatabase } from './test-database.js'
 
 /**
@@ -66,8 +66,40 @@ try {
 }
 console.log('✅ 测试环境初始化完成')
 
+/**
+ * 每个测试文件只开**一个** HTTP server，整个文件复用。
+ *
+ * supertest 的 `request(app)` 每次请求都新建一个 ephemeral server 再销毁它。
+ * 一次全量套件要发几千个请求，几十上百次快速调用下会偶发
+ * ECONNRESET / socket hang up / 串端口 404 —— 仓库里 withHttpServer 的注释
+ * 早就写明了这点（它给限流用例解决了，其余文件还是逐请求新建）。
+ *
+ * supertest 的 serverAddress() 逻辑是：app 已经在监听 → 直接复用它的端口，
+ * 不再新建 server。所以这里提前 listen 一次，整个文件都走同一个 server，
+ * 彻底消掉 ephemeral server 的创建/销毁抖动。
+ */
+let httpServer = null
+
+beforeAll(async () => {
+  const { default: app } = await import('../../src/server/app.js')
+  httpServer = app.listen(0)
+  await new Promise((resolve, reject) => {
+    httpServer.once('listening', resolve)
+    httpServer.once('error', reject)
+  })
+})
+
 afterAll(async () => {
   console.log('🧹 清理测试环境...')
+  if (httpServer) {
+    // 只关**空闲**的 keep-alive 连接：close() 会一直等它们自己结束，
+    // afterAll 拖到超时 → 整个文件被判失败。
+    // 注意不能用 closeAllConnections() —— 它会把**正在处理中**的请求也掐掉，
+    // 表现为上一个用例的请求收到 ECONNRESET / socket hang up。
+    try { httpServer.closeIdleConnections?.() } catch {}
+    await new Promise(resolve => httpServer.close(resolve))
+    httpServer = null
+  }
   await TestDatabase.cleanup()
   console.log('✅ 测试环境清理完成')
 })

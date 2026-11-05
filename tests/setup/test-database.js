@@ -9,6 +9,7 @@
  */
 
 import { createHash } from 'crypto'
+import { QueryTypes } from 'sequelize'
 import os from 'node:os'
 import path from 'node:path'
 import fsPromises from 'node:fs/promises'
@@ -135,19 +136,51 @@ async function readSchemaFingerprint (db) {
  *   COMMENT 会因权限不足失败 —— 而失败被 catch 吞掉，指纹永远写不进去，
  *  于是每个文件都重建一次。）
  */
+async function invalidateSchemaFingerprint (db) {
+  try {
+    await fsPromises.unlink(markerFilePath(db))
+  } catch { /* 本来就没有标记 */ }
+}
+
 async function writeSchemaFingerprint (db, fingerprint) {
   try {
     await fsPromises.writeFile(markerFilePath(db), fingerprint, 'utf8')
   } catch { /* 写不进去就当没标记，下次重建 */ }
 }
 
-/** 业务表是否都已建好（数量够不够） */
+/**
+ * 业务表是否真的就绪。
+ *
+ * 光比「表的数量」不够：模型改了列但表没重建时，数量照样对得上，
+ * 于是「schema 已是最新」的判断会误判成真，接着所有用例都跑在旧结构上。
+ * 所以额外抽查几个关键列（token_version / client_order_key / must_reset_password），
+ * 缺任何一个都判定为「需要重建」。
+ */
+const KEY_COLUMNS = [
+  { table: 'users', column: 'token_version' },
+  { table: 'users', column: 'must_reset_password' },
+  { table: 'orders', column: 'client_order_key' },
+  { table: 'orders', column: 'total_amount_thb' },
+  { table: 'administrators', column: 'token_version' },
+  { table: 'export_jobs', column: 'admin_id' }
+]
+
 async function allTablesPresent (db, expected) {
   const [rows] = await db.query(
     `SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public'`
   ).catch(() => [[{ n: 0 }]])
   const n = Number(rows?.[0]?.n ?? rows?.[0]?.[0] ?? 0)
-  return n >= expected
+  if (n < expected) return false
+
+  for (const { table, column } of KEY_COLUMNS) {
+    const [r] = await db.query(
+      `SELECT count(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = :t AND column_name = :c`,
+      { replacements: { t: table, c: column }, type: QueryTypes.SELECT }
+    ).catch(() => [[{ n: 0 }]])
+    if (!Number(r?.[0]?.n ?? r?.[0]?.[0] ?? 0)) return false
+  }
+  return true
 }
 
 export class TestDatabase {
@@ -223,6 +256,17 @@ export class TestDatabase {
        * 偶尔会出现"表还没建好就建索引"竞态。
        * 解法：先整体 DROP（串行），再逐模型按依赖顺序 sync（不 force）。
        */
+      /**
+       * 重建前先把标记删掉。
+       *
+       * 否则：重建过程中进程被中断（Ctrl-C / 被 kill）时，表已经 DROP 了一部分、
+       * 新表还没建完，而标记文件还停留在「与当前模型一致」→ 下一次运行会认为
+       * 「schema 已是最新」而跳过重建，直接跑在一张**半残的库**上，
+       * 表现为一大批用例集体失败（relation does not exist / 表结构不对）。
+       *
+       * 先删标记：重建被打断的话，下次运行一定会重建。
+       */
+      await invalidateSchemaFingerprint(sequelize)
       await sequelize.drop({ cascade: true })
       // 按依赖顺序建表（见 syncModelsInDependencyOrder）
       await syncModelsInDependencyOrder(sequelize)
@@ -281,7 +325,18 @@ export class TestDatabase {
         const maxAttempts = 6
         for (let attempt = 1; ; attempt++) {
           try {
-            await sequelize.query(`TRUNCATE ${quoted} RESTART IDENTITY CASCADE`)
+            /**
+             * 注意：**不**用 RESTART IDENTITY。
+             *
+             * 重置序列会让 id 在每个用例里从 1 重新开始，于是「上一个用例
+             * 签发的 token 里的 userId/adminId」在下一个用例里会**指向另一个
+             * 角色/另一个人的行** —— 表现为一堆莫名其妙的 403 / 401 / 404
+             * （比如管理员 token 突然指向了 operator 行，权限校验直接 403）。
+             *
+             * 不重置序列 → id 全局单调递增 → 旧 token 永远匹配不到新行，
+             * 这类「张冠李戴」的失败从根上消失。代价只是 id 变大，无副作用。
+             */
+            await sequelize.query(`TRUNCATE ${quoted} CASCADE`)
             break
           } catch (err) {
             const isDeadlock = err?.original?.code === '40P01' || /deadlock/i.test(err?.message || '')
