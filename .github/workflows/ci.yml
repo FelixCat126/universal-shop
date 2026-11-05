@@ -73,6 +73,16 @@ jobs:
         env:
           NODE_ENV: test
 
+      - name: 📄 OpenAPI 文档与路由表一致
+        run: npm run gen:openapi -- --check
+        env:
+          NODE_ENV: test
+          DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
+          JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
+          JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
+          JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
+          CAPTCHA_SECRET: ci-test-captcha-secret-key-at-least-32-chars
+
       - name: 📊 覆盖率门禁
         run: npm run test:coverage
         env:

@@ -1,0 +1,4609 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Universal Shop API",
+    "version": "1.2.0",
+    "description": "路由骨架自动生成（来源：Express 路由表）。请求/响应体结构未自动推导 —— 以控制器与前端 api 层为准。前后端接口一致性由 tests/api/frontendContract.test.js 守护。"
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "同源 API 前缀"
+    }
+  ],
+  "tags": [
+    {
+      "name": "其它"
+    },
+    {
+      "name": "合作方"
+    },
+    {
+      "name": "商品"
+    },
+    {
+      "name": "地址"
+    },
+    {
+      "name": "安全"
+    },
+    {
+      "name": "导出任务"
+    },
+    {
+      "name": "抵扣券"
+    },
+    {
+      "name": "用户与认证"
+    },
+    {
+      "name": "管理端"
+    },
+    {
+      "name": "系统配置"
+    },
+    {
+      "name": "组合包"
+    },
+    {
+      "name": "订单"
+    }
+  ],
+  "paths": {
+    "/api/addresses": {
+      "get": {
+        "summary": "GET /api/addresses",
+        "tags": [
+          "地址"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/addresses",
+        "tags": [
+          "地址"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/addresses/{id}": {
+      "delete": {
+        "summary": "DELETE /api/addresses/:id",
+        "tags": [
+          "地址"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "get": {
+        "summary": "GET /api/addresses/:id",
+        "tags": [
+          "地址"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/addresses/:id",
+        "tags": [
+          "地址"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/addresses/{id}/default": {
+      "put": {
+        "summary": "PUT /api/addresses/:id/default",
+        "tags": [
+          "地址"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/administrators": {
+      "get": {
+        "summary": "GET /api/admin/administrators",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/admin/administrators",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/administrators/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/administrators/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/admin/administrators/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/administrators/{id}/reset-password": {
+      "put": {
+        "summary": "PUT /api/admin/administrators/:id/reset-password",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/after-sales": {
+      "get": {
+        "summary": "GET /api/admin/after-sales",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/after-sales/{id}/status": {
+      "put": {
+        "summary": "PUT /api/admin/after-sales/:id/status",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/bundles": {
+      "get": {
+        "summary": "GET /api/admin/bundles",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/admin/bundles",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/bundles/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/bundles/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/admin/bundles/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/bundles/{id}/status": {
+      "put": {
+        "summary": "PUT /api/admin/bundles/:id/status",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/coupon-templates": {
+      "get": {
+        "summary": "GET /api/admin/coupon-templates",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/admin/coupon-templates",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/coupon-templates/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/coupon-templates/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/admin/coupon-templates/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/coupon-templates/{id}/instances": {
+      "get": {
+        "summary": "GET /api/admin/coupon-templates/:id/instances",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/coupon-templates/{id}/status": {
+      "put": {
+        "summary": "PUT /api/admin/coupon-templates/:id/status",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/export/jobs": {
+      "get": {
+        "summary": "导出任务列表（前端每 3s 轮询）",
+        "tags": [
+          "导出任务"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "提交异步导出任务",
+        "tags": [
+          "导出任务"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/export/jobs/{id}": {
+      "delete": {
+        "summary": "删除导出任务（连同磁盘文件）",
+        "tags": [
+          "导出任务"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/export/jobs/{id}/download": {
+      "get": {
+        "summary": "下载已完成的导出文件",
+        "tags": [
+          "导出任务"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/export/orders": {
+      "get": {
+        "summary": "GET /api/admin/export/orders",
+        "tags": [
+          "导出任务"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/export/users": {
+      "get": {
+        "summary": "GET /api/admin/export/users",
+        "tags": [
+          "导出任务"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/init": {
+      "post": {
+        "summary": "POST /api/admin/init",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/login": {
+      "post": {
+        "summary": "管理员登录",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/metrics": {
+      "get": {
+        "summary": "GET /api/admin/metrics",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/operation-logs": {
+      "get": {
+        "summary": "GET /api/admin/operation-logs",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/orders": {
+      "get": {
+        "summary": "GET /api/admin/orders",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/orders/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/orders/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "get": {
+        "summary": "GET /api/admin/orders/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/orders/{id}/status": {
+      "put": {
+        "summary": "PUT /api/admin/orders/:id/status",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/orders/export": {
+      "get": {
+        "summary": "GET /api/admin/orders/export",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/partner-orders": {
+      "get": {
+        "summary": "GET /api/admin/partner-orders",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/partner-orders/{id}/status": {
+      "put": {
+        "summary": "PUT /api/admin/partner-orders/:id/status",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/partner-orders/export": {
+      "get": {
+        "summary": "GET /api/admin/partner-orders/export",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/partners": {
+      "get": {
+        "summary": "GET /api/admin/partners",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/admin/partners",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/partners/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/partners/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/admin/partners/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/partners/{id}/password": {
+      "put": {
+        "summary": "PUT /api/admin/partners/:id/password",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/product-categories": {
+      "get": {
+        "summary": "GET /api/admin/product-categories",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/admin/product-categories",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/product-categories/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/product-categories/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/admin/product-categories/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/promotions": {
+      "get": {
+        "summary": "GET /api/admin/promotions",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/admin/promotions",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/promotions/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/promotions/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/admin/promotions/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/promotions/{id}/status": {
+      "put": {
+        "summary": "PUT /api/admin/promotions/:id/status",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/statistics/comprehensive": {
+      "get": {
+        "summary": "GET /api/admin/statistics/comprehensive",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/statistics/order-trend": {
+      "get": {
+        "summary": "GET /api/admin/statistics/order-trend",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/statistics/overview": {
+      "get": {
+        "summary": "GET /api/admin/statistics/overview",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/statistics/user-trend": {
+      "get": {
+        "summary": "GET /api/admin/statistics/user-trend",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "summary": "GET /api/admin/users",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/users/{id}/status": {
+      "put": {
+        "summary": "PUT /api/admin/users/:id/status",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/users/{userId}/addresses": {
+      "get": {
+        "summary": "GET /api/admin/users/:userId/addresses",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/validate-token": {
+      "get": {
+        "summary": "GET /api/admin/validate-token",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/administrative-regions/all": {
+      "get": {
+        "summary": "GET /api/administrative-regions/all",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/administrative-regions/districts/{id}/sub-districts": {
+      "get": {
+        "summary": "GET /api/administrative-regions/districts/:id/sub-districts",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/administrative-regions/postal-code/{code}": {
+      "get": {
+        "summary": "GET /api/administrative-regions/postal-code/:code",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/administrative-regions/provinces": {
+      "get": {
+        "summary": "GET /api/administrative-regions/provinces",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/administrative-regions/provinces/{id}/districts": {
+      "get": {
+        "summary": "GET /api/administrative-regions/provinces/:id/districts",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/check-phone/{phone}": {
+      "get": {
+        "summary": "GET /api/auth/check-phone/:phone",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "summary": "POST /api/auth/forgot-password",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "用户登录",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "POST /api/auth/logout",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/me/delete": {
+      "post": {
+        "summary": "POST /api/auth/me/delete",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/points/balance": {
+      "get": {
+        "summary": "GET /api/auth/points/balance",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/points/transactions": {
+      "get": {
+        "summary": "GET /api/auth/points/transactions",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/profile": {
+      "get": {
+        "summary": "GET /api/auth/profile",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/auth/profile",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/profile/metrics": {
+      "get": {
+        "summary": "GET /api/auth/profile/metrics",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/profile/password": {
+      "put": {
+        "summary": "PUT /api/auth/profile/password",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "summary": "POST /api/auth/register",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "summary": "POST /api/auth/reset-password",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/verify": {
+      "get": {
+        "summary": "GET /api/auth/verify",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/auth/verify-referral/{code}": {
+      "get": {
+        "summary": "GET /api/auth/verify-referral/:code",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/bundles": {
+      "get": {
+        "summary": "GET /api/bundles",
+        "tags": [
+          "组合包"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/bundles/{id}": {
+      "get": {
+        "summary": "GET /api/bundles/:id",
+        "tags": [
+          "组合包"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/cart": {
+      "delete": {
+        "summary": "DELETE /api/cart",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "get": {
+        "summary": "GET /api/cart",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/cart",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/cart/{id}": {
+      "delete": {
+        "summary": "DELETE /api/cart/:id",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/cart/:id",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/coupons/available": {
+      "get": {
+        "summary": "GET /api/coupons/available",
+        "tags": [
+          "抵扣券"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/coupons/claim": {
+      "post": {
+        "summary": "POST /api/coupons/claim",
+        "tags": [
+          "抵扣券"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/coupons/mine": {
+      "get": {
+        "summary": "GET /api/coupons/mine",
+        "tags": [
+          "抵扣券"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "GET /api/health",
+        "tags": [
+          "其它"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "summary": "我的订单列表",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "创建订单（零售）",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "summary": "GET /api/orders/:id",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/orders/{id}/after-sales": {
+      "post": {
+        "summary": "POST /api/orders/:id/after-sales",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/orders/{id}/confirm-online-payment": {
+      "post": {
+        "summary": "POST /api/orders/:id/confirm-online-payment",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/orders/after-sales/mine": {
+      "get": {
+        "summary": "GET /api/orders/after-sales/mine",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/orders/quote": {
+      "post": {
+        "summary": "下单前试算（价格/优惠/积分）",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/addresses": {
+      "get": {
+        "summary": "GET /api/partner/addresses",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/partner/addresses",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/addresses/{id}": {
+      "delete": {
+        "summary": "DELETE /api/partner/addresses/:id",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/partner/addresses/:id",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/addresses/{id}/default": {
+      "put": {
+        "summary": "PUT /api/partner/addresses/:id/default",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/login": {
+      "post": {
+        "summary": "POST /api/partner/login",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/me": {
+      "get": {
+        "summary": "GET /api/partner/me",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/orders": {
+      "get": {
+        "summary": "GET /api/partner/orders",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/partner/orders",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/orders/{id}": {
+      "get": {
+        "summary": "GET /api/partner/orders/:id",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/orders/{id}/confirm-payment": {
+      "post": {
+        "summary": "POST /api/partner/orders/:id/confirm-payment",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/products": {
+      "get": {
+        "summary": "GET /api/partner/products",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/portal-build": {
+      "get": {
+        "summary": "GET /api/portal-build",
+        "tags": [
+          "其它"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/product-categories": {
+      "get": {
+        "summary": "GET /api/product-categories",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/products": {
+      "get": {
+        "summary": "商品列表",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/products",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/products/{id}": {
+      "delete": {
+        "summary": "DELETE /api/products/:id",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "get": {
+        "summary": "GET /api/products/:id",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/products/:id",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/products/{id}/restore": {
+      "post": {
+        "summary": "POST /api/products/:id/restore",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/products/{id}/stock": {
+      "post": {
+        "summary": "POST /api/products/:id/stock",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/products/check-stock": {
+      "post": {
+        "summary": "POST /api/products/check-stock",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/security/captcha": {
+      "get": {
+        "summary": "GET /api/security/captcha",
+        "tags": [
+          "安全"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/system-config": {
+      "get": {
+        "summary": "GET /api/system-config",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "post": {
+        "summary": "POST /api/system-config",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/system-config/{key}": {
+      "delete": {
+        "summary": "DELETE /api/system-config/:key",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "get": {
+        "summary": "GET /api/system-config/:key",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/system-config/home-banner": {
+      "delete": {
+        "summary": "DELETE /api/system-config/home-banner",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/system-config/payment-qr": {
+      "delete": {
+        "summary": "DELETE /api/system-config/payment-qr",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/system-config/public": {
+      "get": {
+        "summary": "GET /api/system-config/public",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/system-config/upload/home-banner": {
+      "post": {
+        "summary": "POST /api/system-config/upload/home-banner",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/system-config/upload/payment-qr": {
+      "post": {
+        "summary": "POST /api/system-config/upload/payment-qr",
+        "tags": [
+          "系统配置"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/upload/avatar": {
+      "post": {
+        "summary": "POST /api/upload/avatar",
+        "tags": [
+          "其它"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/upload/product-image": {
+      "post": {
+        "summary": "POST /api/upload/product-image",
+        "tags": [
+          "其它"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/upload/product-image/{filename}": {
+      "delete": {
+        "summary": "DELETE /api/upload/product-image/:filename",
+        "tags": [
+          "其它"
+        ],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/check-phone/{phone}": {
+      "get": {
+        "summary": "GET /api/users/check-phone/:phone",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/forgot-password": {
+      "post": {
+        "summary": "POST /api/users/forgot-password",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/login": {
+      "post": {
+        "summary": "POST /api/users/login",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/logout": {
+      "post": {
+        "summary": "POST /api/users/logout",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/me/delete": {
+      "post": {
+        "summary": "POST /api/users/me/delete",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/points/balance": {
+      "get": {
+        "summary": "GET /api/users/points/balance",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/points/transactions": {
+      "get": {
+        "summary": "GET /api/users/points/transactions",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/profile": {
+      "get": {
+        "summary": "GET /api/users/profile",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      },
+      "put": {
+        "summary": "PUT /api/users/profile",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/profile/metrics": {
+      "get": {
+        "summary": "GET /api/users/profile/metrics",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/profile/password": {
+      "put": {
+        "summary": "PUT /api/users/profile/password",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/register": {
+      "post": {
+        "summary": "POST /api/users/register",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/reset-password": {
+      "post": {
+        "summary": "POST /api/users/reset-password",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/verify": {
+      "get": {
+        "summary": "GET /api/users/verify",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/users/verify-referral/{code}": {
+      "get": {
+        "summary": "GET /api/users/verify-referral/:code",
+        "tags": [
+          "用户与认证"
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误"
+          },
+          "401": {
+            "description": "未登录或凭证失效"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "资源不存在"
+          }
+        },
+        "x-generated-from": "express-route-table"
+      }
+    }
+  }
+}

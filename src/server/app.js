@@ -217,6 +217,21 @@ if (process.env.NODE_ENV !== 'test') {
     })
     .then(() => prepareSchema())
     .then(async () => {
+      /**
+       * 版本化迁移：prepareSchema 负责「补齐缺失的列/索引」，
+       * 迁移负责「有序、可记录、可回滚」的结构变更。
+       * 迁移失败必须让服务起不来（宁可停机也不要带着半截结构对外服务）。
+       */
+      const { runMigrations } = await import('./migrations/index.js')
+      const migrationResult = await runMigrations({ sequelize })
+      if (migrationResult.failed) {
+        throw new Error(`迁移失败 ${migrationResult.failed.name}: ${migrationResult.failed.error}`)
+      }
+      if (migrationResult.applied.length) {
+        console.log(`✅ 已执行迁移: ${migrationResult.applied.join(', ')}`)
+      }
+    })
+    .then(async () => {
       dbReadyState = 'ready'
       console.log('✅ 数据库模型同步成功')
       await sequelize.query('SELECT pg_advisory_unlock(862427113)').catch(() => {})

@@ -18,8 +18,15 @@ process.env.ENABLE_CAPTCHA_TEST_API = '1'
 if (!process.env.DATABASE_URL_TEST) {
   process.env.DATABASE_URL_TEST = 'postgres://shop:shop@127.0.0.1:5432/shop_test'
 }
-// 并发测试需要较大的连接池（默认 10 在 50 并发时会触发 acquire 超时）
-process.env.PG_POOL_MAX = process.env.PG_POOL_MAX || '40'
+/**
+ * 连接池大小。
+ *
+ * 每个测试文件一个 sequelize 实例 → 一个池；并行跑 N 个文件就有 N 个池。
+ * 现在并发度是 4（vitest.config.js 的 maxWorkers），4×20=80 < PG 的 100 连接上限。
+ * 单个文件内部 50 并发的用例仍然需要较大的池（默认 10 会 acquire 超时），
+ * 所以给到 20：既够并发用例用，又不会把 PG 的连接数吃满。
+ */
+process.env.PG_POOL_MAX = process.env.PG_POOL_MAX || '20'
 process.env.PG_POOL_ACQUIRE_MS = process.env.PG_POOL_ACQUIRE_MS || '60000'
 
 import crypto from 'node:crypto'

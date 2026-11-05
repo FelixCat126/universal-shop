@@ -30,18 +30,28 @@ export default defineConfig({
       'tests/vue/**',
       'tests/e2e/**'
     ],
-    // PostgreSQL 支持高并发，但测试间共享同一个数据库需要串行避免互相 TRUNCATE
-    fileParallelism: false,
     /**
-     * 文件之间必须串行：所有测试文件共用同一个 PostgreSQL 库，
-     * 每个文件的 beforeEach 会 TRUNCATE 全部业务表。
-     * 若两个文件并发，一个文件的清库会抹掉另一个文件刚建好的夹具数据，
-     * 表现为「随机落在不同用例上的 404 / 401 / 条数不对」等假失败。
+     * 文件之间可以并行了。
      *
-     * 注意不要用 poolOptions.forks.singleFork —— 在 Vitest 1.x 里
-     * singleFork 反而会让文件**并发**执行（实测两个文件的 syncModels
-     * 撞在一起，sequelize.drop 报 relation "products" does not exist）。
+     * 以前必须串行，是因为所有文件共用同一个 PostgreSQL schema，
+     * 每个文件的 beforeEach 会 TRUNCATE 全部业务表 —— 并发时互相抹数据。
+     * 现在**每个测试文件有自己的 schema**（t_<pid>_<随机>），隔离由数据库保证，
+     * 与执行顺序无关，串行的理由已经消失。
+     *
+     * 用 forks 池而不是 threads：forks 每个文件一个独立进程，
+     * process.env 也是进程级的 —— threads 池下多个文件共享同一进程的 env，
+     * 某个用例临时改 env（比如改超时阈值）会漏给并行跑的其它文件。
+     * forks 彻底隔离这类共享状态。
      */
+    pool: 'forks',
+    /**
+     * 并发度上限：4 个文件同时跑。
+     *
+     * 每个文件一个连接池（测试里 PG_POOL_MAX=20），4×20=80 < PG 的 100 连接上限，
+     * 留有余量；再高就可能把 PG 的连接数吃满（表现为随机 acquire 超时）。
+     */
+    maxWorkers: 4,
+    minWorkers: 1,
     sequence: {
       concurrent: false,
       // hooks: 'list' —— 必须显式指定。

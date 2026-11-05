@@ -156,10 +156,10 @@ const authAPI = {
   logout: () => api.post('/auth/logout'),
   
   // 验证token
-  verify: () => api.get('/auth/verify'),
-  
-  // 刷新token
-  refresh: () => api.post('/auth/refresh')
+  verify: () => api.get('/auth/verify')
+  // 注：曾有一个 refresh() 调 POST /api/auth/refresh ——
+  // 后端从来没有这个路由（全项目也没有调用方，JWT 无 refresh token 机制），
+  // 属于指向不存在接口的死代码，已删除（前后端接口契约测试会挡住再犯）。
 }
 
 // 请求方法封装
