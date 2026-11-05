@@ -19,6 +19,9 @@
  *   # 指定 schema（测试库用；生产是 public，不用传）
  *   npm run check:invariants -- --schema=myschema
  *
+ *   # 调整"近期严格"类检查的窗口天数（默认 30）
+ *   npm run check:invariants -- --recent-days=7
+ *
  * 退出码：0 = 全部通过；1 = 有违规（或查询失败）。
  */
 
@@ -30,6 +33,8 @@ const jsonOut = args.includes('--json')
 const only = (args.find(a => a.startsWith('--only=')) || '').replace('--only=', '')
 // 生产用 public；测试库里表在各自的 schema 里，跑之前用 --schema 指定
 const schema = (args.find(a => a.startsWith('--schema=')) || '').replace('--schema=', '')
+// 近期窗口天数（"近期严格"类检查的范围）
+const recentDays = Number((args.find(a => a.startsWith('--recent-days=')) || '').replace('--recent-days=', '') || 30)
 
 const isProd = process.env.NODE_ENV === 'production'
 
@@ -46,7 +51,7 @@ try {
   if (schema) {
     await sequelize.query(`SET search_path TO "${schema}"`)
   }
-  const results = await checkDataInvariants({ sequelize })
+  const results = await checkDataInvariants({ sequelize, recentDays })
   const filtered = only ? results.filter(r => r.name === only) : results
 
   if (jsonOut) {
@@ -63,7 +68,7 @@ try {
         console.log(`  ⚠️  ${r.title} —— 查询失败：${r.error}`)
       } else {
         bad++
-        console.log(`  ❌ ${r.title} —— ${r.violations} 条违规`)
+        console.log(`  ❌ ${r.title} —— ${r.violations} 条违规（范围：${r.scope}）`)
         for (const d of r.detail) {
           console.log(`       ${JSON.stringify(d)}`)
         }

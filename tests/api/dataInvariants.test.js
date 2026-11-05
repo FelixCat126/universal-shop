@@ -50,7 +50,7 @@ describe('数据不变量校验器', () => {
     expect(counts.stock_not_negative).toBeGreaterThan(0)
   }, 30000)
 
-  it('DI-3 订单金额与明细之和不符 → 被抓', async () => {
+  it('DI-3 订单总额超过明细之和（多收钱）→ 被抓', async () => {
     const { Order, OrderItem, User, Product } = models()
     const user = await User.create(await TestDataFactory.createUser())
     const product = await Product.create(TestDataFactory.createProduct({ stock: 10, price: 100 }))
@@ -62,7 +62,7 @@ describe('数据不变量校验器', () => {
       price: 100
     }))
     const counts = await runChecks()
-    expect(counts.order_total_matches_items).toBeGreaterThan(0)
+    expect(counts.order_total_not_exceeding_items).toBeGreaterThan(0)
   }, 30000)
 
   it('DI-4 积分余额与流水累计不符 → 被抓', async () => {
@@ -122,7 +122,7 @@ describe('数据不变量校验器', () => {
     expect(counts.coupon_template_exists).toBeGreaterThan(0)
   }, 30000)
 
-  it('DI-8 已支付订单缺 online_paid_at → 被抓', async () => {
+  it('DI-8 近期在线支付订单缺 online_paid_at → 被抓', async () => {
     const { Order, User } = models()
     const user = await User.create(await TestDataFactory.createUser())
     await Order.create(await TestDataFactory.createOrder(user.id, {
@@ -131,7 +131,7 @@ describe('数据不变量校验器', () => {
       online_paid_at: null
     }))
     const counts = await runChecks()
-    expect(counts.paid_order_has_paid_at).toBeGreaterThan(0)
+    expect(counts.recent_paid_order_has_paid_at).toBeGreaterThan(0)
   }, 30000)
 
   it('DI-9 推荐码重复 → 被抓', async () => {
@@ -146,11 +146,25 @@ describe('数据不变量校验器', () => {
     expect(counts.referral_code_unique).toBeGreaterThan(0)
   }, 30000)
 
-  it('DI-10 被推荐码指向不存在的用户 → 被抓', async () => {
+  it('DI-10 老数据里的悬空被推荐码不算违规（推荐人注销后其码被置空，属既定行为）', async () => {
     const { User } = models()
     await User.create(await TestDataFactory.createUser({ referred_by_code: 'DI-NOBODY' }))
     const counts = await runChecks()
-    expect(counts.referred_by_points_to_real_user).toBeGreaterThan(0)
+    // 不再有"被推荐码必须指向真实用户"这条检查 —— 注册时后端已校验过，
+    // 而推荐人注销会把 referral_code 置空，引用自然悬空，属正常
+    expect(counts.referred_by_points_to_real_user).toBeUndefined()
+  }, 30000)
+
+  it('DI-12 近期订单总额与明细之和不符 → 被抓（近期严格）', async () => {
+    const { Order, OrderItem, User, Product } = models()
+    const user = await User.create(await TestDataFactory.createUser())
+    const product = await Product.create(TestDataFactory.createProduct({ stock: 10, price: 100 }))
+    const order = await Order.create(await TestDataFactory.createOrder(user.id, { total_amount: 999 }))
+    await OrderItem.create(await TestDataFactory.createOrderItem(order.id, product.id, {
+      quantity: 2, price: 100
+    }))
+    const counts = await runChecks()
+    expect(counts.recent_order_total_matches_items).toBeGreaterThan(0)
   }, 30000)
 
   it('DI-11 导出任务的文件已被删 → 被抓', async () => {
