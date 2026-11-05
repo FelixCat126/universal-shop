@@ -16,7 +16,20 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./tests/setup/test-setup.js'],
-    exclude: ['node_modules/**', 'dist/**'],
+    /**
+     * 排除：
+     *   - tests/vue/** —— Vue 组件/组合式单测，需要 happy-dom + @vitejs/plugin-vue，
+     *     跑在 vitest.vue.config.js 里（npm run test:vue）。放进本配置会因
+     *     「无法解析 .vue」「localStorage is not defined」整片失败。
+     *   - tests/e2e/** —— Playwright 用例，由 npm run test:e2e 跑。
+     *     Playwright 的 test.beforeEach 在 vitest 里会直接抛错。
+     */
+    exclude: [
+      'node_modules/**',
+      'dist/**',
+      'tests/vue/**',
+      'tests/e2e/**'
+    ],
     // PostgreSQL 支持高并发，但测试间共享同一个数据库需要串行避免互相 TRUNCATE
     fileParallelism: false,
     /**

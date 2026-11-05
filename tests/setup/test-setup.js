@@ -43,6 +43,62 @@ import { TestDatabase } from './test-database.js'
 const TEST_SCHEMA = `t_${process.pid}_${crypto.randomBytes(6).toString('hex')}`
 
 /**
+ * supertest 的临时 server 必须**走 IPv6 回环**（或与它绑定的地址族一致）。
+ *
+ * 背景：supertest 每次 request(app) 都会 listen(0) 一个临时端口。
+ * 不指定 host 时 Node 绑的是 **IPv6 通配地址 `::`**，
+ * 而 supertest 的客户端连的是 **127.0.0.1（IPv4）**。
+ *
+ * 在 macOS/BSD 上，**IPv6 通配监听与 IPv4 监听可以共存于同一个端口**：
+ * 只要本机另一个进程（IDE、微信、Electron……）先监听了 127.0.0.1:P，
+ * 我们的 server 依然能成功绑定 ::P —— 于是客户端连 127.0.0.1:P 时，
+ * **应答的是那个进程，不是我们的 app**，我们的 app 压根没收到请求。
+ *
+ * 实测（本机）：某端口被 ZCode 占用、另一端口被 wechatweb 占用，
+ * 测试分别收到 404 / 500 / 426 —— 这些状态码我们的代码里根本不存在。
+ *
+ * 修法：客户端改连 **[::1]**（IPv6 回环）。
+ * IPv6 回环的连接只会匹配 IPv6 socket —— 本机那些 IPv4 监听者（IDE/微信）
+ * 抢不走我们的请求；真要抢端口，它们得先占住 IPv6 的同名端口，
+ * 那我们的 :: 绑定就会 EADDRINUSE，操作系统会换端口给我们。
+ *
+ * 若机器没开 IPv6（server 绑成 IPv4），则回退到 127.0.0.1 ——
+ * 此时端口在 IPv4 上本来就是独占的，同样安全。
+ *
+ * 只影响测试（supertest 只在测试里用），不涉及生产代码。
+ */
+{
+  const supertest = (await import('supertest')).default
+  const Test = supertest?.Test
+  if (Test && !Test.prototype.__shopLoopbackPatched) {
+    Test.prototype.serverAddress = function (app, path) {
+      if (!app.address()) this._server = app.listen(0)
+      const bound = app.address()
+      if (!bound) {
+        throw new Error('supertest 临时 server 绑定失败')
+      }
+      const host = bound.family === 'IPv6' ? '[::1]' : '127.0.0.1'
+      return `http://${host}:${bound.port}${path}`
+    }
+    Test.prototype.__shopLoopbackPatched = true
+  }
+}
+
+/**
+ * PROBE：把服务端错误打到 stdout。
+ *
+ * 测试环境里 logger 是 silent 的（没有 transport），所以接口返回 500 时
+ * **看不到原因** —— 只能看到「预期 404 实际 500」这种无信息量的断言失败。
+ * 这里临时挂一个 Console transport，把 logger.error 的内容打出来。
+ */
+if (process.env.PROBE_ERRORS) {
+  const winston = (await import('winston')).default
+  const { logger } = await import('../../src/server/utils/logger.js')
+  logger.silent = false
+  logger.add(new winston.transports.Console({ level: 'error' }))
+}
+
+/**
  * 表结构的准备放在**模块顶层**（而不是 beforeAll）。
  *
  * 原因：setup 文件先于任何测试文件求值，这里做完建表，
@@ -87,6 +143,12 @@ const TEST_SCHEMA = `t_${process.pid}_${crypto.randomBytes(6).toString('hex')}`
   // 否则那条连接的 search_path 是默认的 public，PG 的 enum 类型
   // （CREATE TYPE 不带 schema）就会跑到 public，和表对不上。
   TestDatabase.installSchemaHook(sequelize, TEST_SCHEMA)
+  // Sequelize 的 describeTable 有两段跨 schema 的标量子查询
+  // （enum 按 typname 匹配、表名按 relname 匹配），多 schema 共存时会报
+  // "more than one row returned by a subquery used as an expression"，
+  // 导致 prepareSchema() 中断、幂等等唯一索引建不出来 → 大批用例随机失败。
+  // 详见 patchDescribeTableQuery 的注释。
+  TestDatabase.patchDescribeTableQuery(sequelize)
   // 交给 TestDatabase（模块变量 —— 不能放 process.env，那是进程级的，
   // 下一个文件会覆盖它，导致上一个文件的 afterAll 删掉下一个文件的 schema）
   TestDatabase.setSchema(TEST_SCHEMA)

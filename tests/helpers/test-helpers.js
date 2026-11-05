@@ -274,9 +274,14 @@ export async function waitForCondition(fn, { timeout = 3000, interval = 100 } = 
  * supertest 的 request(app) 每个请求都新建/销毁一个 ephemeral server，
  * 几十到几百次快速调用在高负载下会偶发 ECONNRESET / 串端口 404；
  * 这里手动 listen 一次、请求走固定端口，结束后关闭。
+ *
+ * **必须显式绑定 127.0.0.1（IPv4）**：默认 listen(0) 监听的是 IPv6 通配 `::`，
+ * 而请求走 127.0.0.1（IPv4）—— macOS/BSD 上这两种监听可以共存于同一端口，
+ * 于是本机别的进程（IDE/微信等）若已监听该 IPv4 端口，
+ * 我们的请求会被它应答，app 根本收不到（表现为莫名其妙的 404/500/426）。
  */
 export async function withHttpServer (app, fn) {
-  const server = app.listen(0)
+  const server = app.listen(0, '127.0.0.1')
   await new Promise((resolve, reject) => {
     server.once('listening', resolve)
     server.once('error', reject)

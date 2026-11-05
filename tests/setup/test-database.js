@@ -174,22 +174,36 @@ const KEY_COLUMNS = [
   { table: 'export_jobs', column: 'admin_id' }
 ]
 
+/**
+ * 取 SELECT 查询的行数组。
+ *
+ * 注意 Sequelize 6 在 `type: QueryTypes.SELECT` 且没有 model 时，
+ * `query()` 返回的是**行数组本身**（不是 [rows, metadata]）——
+ * 早前按 [rows, meta] 解构，拿到的是「第一行对象」，
+ * 于是所有计数都变成 0 → 判定永远为「表没建好」→ 每次都重建。
+ */
+function selectRows (result) {
+  if (Array.isArray(result?.[0])) return result[0]
+  if (Array.isArray(result)) return result
+  return []
+}
+
 async function allTablesPresent (db, expected) {
   const schema = testSchema || 'public'
-  const [rows] = await db.query(
+  const rows = selectRows(await db.query(
     `SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = :s`,
     { replacements: { s: schema }, type: QueryTypes.SELECT }
-  ).catch(() => [[{ n: 0 }]])
-  const n = Number(rows?.[0]?.n ?? rows?.[0]?.[0] ?? 0)
+  ).catch(() => [{ n: 0 }]))
+  const n = Number(rows?.[0]?.n ?? 0)
   if (n < expected) return false
 
   for (const { table, column } of KEY_COLUMNS) {
-    const [r] = await db.query(
+    const r = selectRows(await db.query(
       `SELECT count(*)::int AS n FROM information_schema.columns
        WHERE table_schema = :s AND table_name = :t AND column_name = :c`,
       { replacements: { s: schema, t: table, c: column }, type: QueryTypes.SELECT }
-    ).catch(() => [[{ n: 0 }]])
-    if (!Number(r?.[0]?.n ?? r?.[0]?.[0] ?? 0)) return false
+    ).catch(() => [{ n: 0 }]))
+    if (!Number(r?.[0]?.n ?? 0)) return false
   }
   return true
 }
@@ -199,6 +213,57 @@ export class TestDatabase {
   /** 设定本测试文件专属的 schema（必须在模型定义之前调用） */
   static setSchema (name) {
     testSchema = name || null
+  }
+
+  /**
+   * 把 Sequelize 的 describeTable 查询按 schema 限定住。
+   *
+   * Sequelize 6 的 postgres describeTableQuery 里有两个**标量**子查询是跨 schema 的：
+   *
+   *   1) enum 标签：
+   *        WHERE t.typname = c.udt_name
+   *      pg_type 是**库级**目录，typname 跨 schema 不唯一。
+   *      只要存在第二个 schema 也叫 enum_products_status，就匹配到多行 →
+   *      "more than one row returned by a subquery used as an expression"
+   *      → prepareSchema() 中断 → 幂等等唯一索引建不出来 →
+   *      大量用例莫名失败（并发下单建出 5 单、断言条数不对……）。
+   *
+   *   2) 字段注释：
+   *        pg_statio_all_tables 按 relname 关联，没限定 schema
+   *      同名的表（public.users 与本文件 schema 的 users）同样会匹配到多行。
+   *
+   * 补上 schema 限定后，describeTable 在任意 schema 组合下都正确。
+   * 生产只有一个 schema（public），补限定前后语义完全一致 → 行为不变。
+   */
+  static patchDescribeTableQuery (db) {
+    const qg = db.dialect.queryGenerator
+    if (qg.__describeTableSchemaScoped) return
+    const original = qg.describeTableQuery.bind(qg)
+
+    const ENUM_SQL =
+      'FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON t.oid=e.enumtypid WHERE t.typname=c.udt_name'
+    const ENUM_SQL_SCOPED =
+      'FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace JOIN pg_catalog.pg_enum e ON t.oid=e.enumtypid WHERE t.typname=c.udt_name AND n.nspname=c.table_schema'
+    const COMMENT_SQL =
+      'INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) WHERE c.ordinal_position=pgd.objsubid AND c.table_name=st.relname'
+    const COMMENT_SQL_SCOPED =
+      'INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) WHERE c.ordinal_position=pgd.objsubid AND c.table_name=st.relname AND st.schemaname=c.table_schema'
+
+    qg.describeTableQuery = function (tableName, schema, schemaDelimiter) {
+      const sql = original(tableName, schema, schemaDelimiter)
+      if (!sql.includes(ENUM_SQL) || !sql.includes(COMMENT_SQL)) {
+        // Sequelize 换了版本 → 补丁失效。必须**大声**报出来，
+        // 否则会退回到「跨 schema 匹配 → 随机失败」的老坑，且极难排查。
+        throw new Error(
+          'describeTableQuery 补丁失效：Sequelize 的 SQL 结构与预期不符，' +
+          '跨 schema 的 enum/表名匹配问题会重新出现。请检查 sequelize 版本。'
+        )
+      }
+      return sql
+        .replace(ENUM_SQL, ENUM_SQL_SCOPED)
+        .replace(COMMENT_SQL, COMMENT_SQL_SCOPED)
+    }
+    qg.__describeTableSchemaScoped = true
   }
 
   /**
@@ -218,6 +283,49 @@ export class TestDatabase {
     })
   }
 
+  /**
+   * 删除「创建它的进程已经不在了」的测试 schema。
+   *
+   * schema 名格式：t_<pid>_<hex>
+   *   - pid 还活着 → 别的进程正在用它，绝不能删（删了就是随机失败）
+   *   - pid 已经不在 → 上次跑崩/被 kill 留下的垃圾，删掉
+   *
+   * 当前文件自己的 schema 永远跳过。
+   */
+  static async dropStaleSchemas (db, currentSchema = null) {
+    let rows = []
+    try {
+      const result = await db.query(
+        currentSchema
+          ? `SELECT nspname FROM pg_namespace WHERE nspname LIKE 't\\_%' AND nspname <> :cur`
+          : `SELECT nspname FROM pg_namespace WHERE nspname LIKE 't\\_%'`,
+        { replacements: { cur: currentSchema }, type: QueryTypes.SELECT }
+      )
+      rows = selectRows(result)
+    } catch (err) {
+      // 清理失败不该阻断测试：只是会多留几个 schema（不影响隔离性）
+      console.warn('⚠️ 清理历史测试 schema 失败（忽略）：', err?.message)
+      return
+    }
+    const names = rows.map(r => r.nspname).filter(Boolean)
+    for (const name of names) {
+      const pid = Number.parseInt(String(name).split('_')[1], 10)
+      if (!Number.isInteger(pid) || pid <= 0) continue
+      if (pid === process.pid) continue
+      // 进程还在 → 它的 schema 是活的，别动
+      try {
+        process.kill(pid, 0)
+        continue
+      } catch (err) {
+        // ESRCH = 进程不存在 → 确实是垃圾；EPERM = 存在但不是我们 → 也别动
+        if (err?.code !== 'ESRCH') continue
+      }
+      await db.query(`DROP SCHEMA IF EXISTS "${name}" CASCADE`).catch((err) => {
+        console.warn(`⚠️ 删除残留 schema ${name} 失败（忽略）：`, err?.message)
+      })
+    }
+  }
+
   static async initialize () {
     if (sequelize) return sequelize
 
@@ -230,39 +338,16 @@ export class TestDatabase {
         /**
          * 清掉「历史遗留」的测试 schema。
          *
-         * PG 的 enum 类型名在各 schema 之间**不唯一**，而 Sequelize 的
-         * describeTable 里有一段标量子查询按 typname 匹配（没有 schema 限定）——
-         * 只要历史上留下过一个带同名 enum 的 schema，describeTable 就会报
-         *   more than one row returned by a subquery used as an expression
-         * 于是 prepareSchema() 中断，后续索引/约束都建不出来，
-         * 表现为大批用例莫名失败。
+         * schema 名是 t_<pid>_<随机>：pid 是创建它的进程号。
+         * 只有**进程已经不在了**的 schema 才是垃圾（跑崩了 / 被 kill 的那次留下的）。
+         * 还在跑的进程（比如另一个终端同时在跑测试）它的 schema 是活的，
+         * 删掉就等于把人家的表抽走 —— 那正是「relation xxx does not exist」
+         * 这类随机失败的经典来源，所以必须先判断 pid 是否还活着。
          *
-         * schema 名里带创建它的进程号，所以只清**别的进程**留下的，
-         * 当前进程自己的不能动。
+         * （以前这里是「删掉除当前以外的所有 t_%」，而且整段被 .catch(() => {})
+         *   吞掉：既可能误删别人的活 schema，失败时又一声不响。）
          */
-        await sequelize.query(
-          `DO $$
-           DECLARE s text; t text;
-           BEGIN
-             -- 1) 别的进程留下的测试 schema，整体删掉
-             FOR s IN SELECT nspname FROM pg_namespace
-                        WHERE nspname LIKE 't\_%' AND nspname <> '${testSchema}'
-             LOOP
-               EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE', s);
-             END LOOP;
-             -- 2) 其它 schema 里的 enum 类型也要清：PG 的 typname 跨 schema 不唯一，
-             --    Sequelize 的 describeTable 按 typname 匹配且不限定 schema，
-             --    残留的同名 enum 会让 describeTable 报
-             --    "more than one row returned by a subquery" → prepareSchema 中断。
-             --    （public 是旧方案共用 schema 时留下的，这里一并清掉。）
-             FOR t IN SELECT t.typname FROM pg_type t
-                        JOIN pg_namespace n ON n.oid = t.typnamespace
-                        WHERE t.typtype = 'e' AND n.nspname <> '${testSchema}'
-             LOOP
-               EXECUTE format('DROP TYPE IF EXISTS %I CASCADE', t);
-             END LOOP;
-           END $$;`
-        ).catch(() => {})
+        await this.dropStaleSchemas(sequelize, testSchema)
 
         await sequelize.query(`CREATE SCHEMA IF NOT EXISTS "${testSchema}"`)
         await sequelize.query(`SET search_path TO "${testSchema}"`)
@@ -366,6 +451,9 @@ export class TestDatabase {
         if (schema) {
           await sequelize.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {})
         }
+        // 指纹标记文件也一并删掉：每个文件一个 schema → 每次跑都新增一个标记文件，
+        // 攒在 /tmp 里没人清。schema 都没了，标记留着也没意义。
+        await invalidateSchemaFingerprint(sequelize).catch(() => {})
         await sequelize.close()
       } catch {}
       sequelize = null
