@@ -40,7 +40,7 @@ let testSchema = null
  * 这里用「反复重试直到不再进展」：某个模型若因为父表还没建好而失败，
  * 就留到下一轮再试；一轮下来没有任何进展才判定为真的失败。
  */
-async function syncModelsInDependencyOrder (db) {
+export async function syncModelsInDependencyOrder (db) {
   let pending = Object.values(db.models)
   let lastError = null
   while (pending.length > 0) {

@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-11-05T11:12:31.082Z",
+  "size": {
+    "products": 300,
+    "users": 200,
+    "orders": 300
+  },
+  "regressionRatio": 1.5,
+  "endpoints": {
+    "GET /api/products": {
+      "p50": 1.269125,
+      "p95": 22.011584,
+      "min": 0.696375,
+      "max": 22.011584
+    },
+    "GET /api/products/:id": {
+      "p50": 0.269084,
+      "p95": 2.123625,
+      "min": 0.250292,
+      "max": 2.123625
+    },
+    "GET /api/coupons/available": {
+      "p50": 1.484167,
+      "p95": 5.119458,
+      "min": 0.972041,
+      "max": 5.119458
+    },
+    "GET /api/admin/users": {
+      "p50": 3.204125,
+      "p95": 6.402834,
+      "min": 2.40675,
+      "max": 6.402834
+    },
+    "GET /api/admin/statistics/overview": {
+      "p50": 1.930125,
+      "p95": 4.74125,
+      "min": 1.612375,
+      "max": 4.74125
+    },
+    "GET /api/admin/orders": {
+      "p50": 4.131083,
+      "p95": 5.511584,
+      "min": 2.692375,
+      "max": 5.511584
+    }
+  }
+}

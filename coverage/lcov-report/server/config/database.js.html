@@ -1,0 +1,334 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for server/config/database.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">server/config</a> database.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">92.77% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>77/83</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">11.11% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>1/9</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>1/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">92.77% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>77/83</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">36523x</span>
+<span class="cline-any cline-yes">36523x</span>
+<span class="cline-any cline-yes">36523x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Sequelize } from 'sequelize'
+import { logger } from '../utils/logger.js'
+&nbsp;
+/**
+ * 数据库统一为 PostgreSQL（已彻底移除 SQLite）。
+ *
+ * 必备环境变量：
+ *   DATABASE_URL          完整连接串，例如 postgres://shop:shop@localhost:5432/shop_dev
+ *   DATABASE_URL_TEST     测试环境覆盖；NODE_ENV=test 时优先用它
+ *
+ * 可选调优变量：
+ *   PG_POOL_MAX           连接池上限（默认 10；生产建议 20-50 视并发量）
+ *   PG_POOL_MIN           连接池下限（默认 0）
+ *   PG_POOL_ACQUIRE_MS    取连接超时（默认 30000）
+ *   PG_POOL_IDLE_MS       空闲回收（默认 10000）
+ *   PG_SSL                'true' 启用 SSL（云数据库一般需要）
+ *   PG_STATEMENT_TIMEOUT          单条 SQL 超时毫秒（默认 15000）
+ *   PG_IDLE_IN_TX_TIMEOUT         事务空闲超时毫秒（默认 10000）
+ *
+ * 本地开发：可执行 `docker compose up -d postgres` 启动随仓库附带的 PG 实例，
+ * 见 docker-compose.yml。.env.example 已附默认连接串。
+ */
+&nbsp;
+const DEFAULT_LOCAL_URL = 'postgres://shop:shop@127.0.0.1:5432/shop_dev'
+const DEFAULT_LOCAL_TEST_URL = 'postgres://shop:shop@127.0.0.1:5432/shop_test'
+&nbsp;
+const isTest = process.env.NODE_ENV === 'test'
+&nbsp;
+const url =
+  (isTest ? process.env.DATABASE_URL_TEST <span class="branch-0 cbranch-no" title="branch not covered" >: process.env.DATABASE_URL)</span> <span class="branch-0 cbranch-no" title="branch not covered" >||</span>
+  process.env.DATABASE_URL <span class="branch-0 cbranch-no" title="branch not covered" >||</span>
+<span class="cstat-no" title="statement not covered" >  (isTest ? DEFAULT_LOCAL_TEST_URL : DEFAULT_LOCAL_URL)</span>
+&nbsp;
+if (!url) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >  throw new Error('DATABASE_URL 未设置；请在 .env 中填入 PostgreSQL 连接串')</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+&nbsp;
+const useSsl = String(process.env.PG_SSL || '').toLowerCase() === 'true'
+&nbsp;
+const sequelize = new Sequelize(url, {
+  dialect: 'postgres',
+  logging: false,
+  pool: {
+    max: parseInt(process.env.PG_POOL_MAX <span class="branch-0 cbranch-no" title="branch not covered" >|| '10',</span> 10),
+    min: parseInt(process.env.PG_POOL_MIN || '0', 10),
+    acquire: parseInt(process.env.PG_POOL_ACQUIRE_MS <span class="branch-0 cbranch-no" title="branch not covered" >|| '30000',</span> 10),
+    idle: parseInt(process.env.PG_POOL_IDLE_MS || '10000', 10)
+  },
+  define: {
+    freezeTableName: true,
+    underscored: true
+  },
+  // 语句级保护：pg 驱动把这两个 GUC 作为连接启动参数下发（毫秒整数）——
+  // 慢 SQL 超 15s、事务空闲超 10s 由 PG 侧中断，防止悬挂查询/事务占满连接池；
+  // 生产可用 PG_STATEMENT_TIMEOUT / PG_IDLE_IN_TX_TIMEOUT 覆盖；测试环境同值（现有最长用例远低于此）
+  dialectOptions: {
+    statement_timeout: parseInt(process.env.PG_STATEMENT_TIMEOUT || '15000', 10),
+    idle_in_transaction_session_timeout: parseInt(process.env.PG_IDLE_IN_TX_TIMEOUT || '10000', 10),
+    ...(useSsl <span class="branch-0 cbranch-no" title="branch not covered" >? { ssl: { require: true, rejectUnauthorized: false } } </span>: {})
+  },
+  /**
+   * 慢查询观测。
+   *
+   * PG 的 statement_timeout（15s）是最后一道防线，只在「已经卡住」时才生效；
+   * 这里加一层更细的观测：超过阈值的 SQL 直接记 warn 日志（含耗时与 SQL 摘要），
+   * 让「数据量涨上来后哪个查询开始变慢」在告警里第一时间可见，
+   * 而不是等到用户反馈页面卡。
+   *
+   * 阈值默认 300ms，可用 PG_SLOW_QUERY_MS 调整；设为 0 关闭。
+   * 只记 warn 不抛错 —— 观测不该影响业务。
+   */
+  logging: (sql, ms, options) =&gt; {
+    const threshold = parseInt(process.env.PG_SLOW_QUERY_MS || '300', 10)
+    // benchmark:true 时第二个参数才是耗时（毫秒数），否则是 options 对象
+    if (!threshold || typeof ms !== 'number' || ms &lt; threshold) return
+<span class="cstat-no" title="statement not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >    // SQL 可能含敏感值（手机号等）→ 只记前 200 字符摘要</span></span>
+<span class="cstat-no" title="statement not covered" >    const summary = String(sql).replace(/\s+/g, ' ').slice(0, 200)</span>
+<span class="cstat-no" title="statement not covered" >    logger.warn('慢查询', { ms, sql: summary })</span>
+  },
+  benchmark: true
+})
+&nbsp;
+export default sequelize
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-05T11:15:28.834Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

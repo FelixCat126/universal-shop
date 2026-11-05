@@ -87,24 +87,41 @@ export default defineConfig({
         'src/admin/**/*.js',
         'src/admin/**/*.vue'
       ],
+      /**
+       * 覆盖率门槛（棘轮：只许升不许降）。
+       *
+       * **格式必须是 Vitest 1.6 的写法**：
+       *   - 全局门槛 = **顶层数字键**（statements / branches / functions / lines）
+       *   - 分目录门槛 = glob 键，且要带 `**`（如 'src/server/controllers/**'）
+       *
+       * 之前写的是 `{ global: {...}, 'src/server/controllers/': {...} }`，
+       * Vitest 1.6 根本不认 `global` 这个键 —— 它会把 `global` 当成 glob 模式，
+       * 匹配不到任何文件 → 那个分组是空的 → 直接跳过；
+       * 而 'src/server/controllers/'（带尾斜杠）同样匹配不到文件。
+       * 结果：**门槛从未生效过**（实测 branches 64% < 写的 70%，CI 照样绿）。
+       *
+       * 注意「全局」这一组 = **没被任何 glob 匹配到的文件**（即除 controllers/models 之外），
+       * 它的数字比报告里的 "All files" 低，别拿 All files 直接抄。
+       *
+       * 数字取当前实测值并留 1~2 个点的余量（覆盖率在不同运行间会有小幅浮动，
+       * 卡在临界点上会变成随机红）；补了测试再往上抬。
+       */
       thresholds: {
-        global: {
-          branches: 70,
-          functions: 75,
-          lines: 80,
-          statements: 80
+        statements: 83,
+        branches: 73,
+        functions: 84,
+        lines: 83,
+        'src/server/controllers/**': {
+          statements: 75,
+          branches: 57,
+          functions: 89,
+          lines: 75
         },
-        'src/server/controllers/': {
-          branches: 75,
-          functions: 80,
-          lines: 85,
-          statements: 85
-        },
-        'src/server/models/': {
-          branches: 80,
-          functions: 85,
-          lines: 90,
-          statements: 90
+        'src/server/models/**': {
+          statements: 96,
+          branches: 69,
+          functions: 93,
+          lines: 96
         }
       }
     }

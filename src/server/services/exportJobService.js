@@ -297,12 +297,20 @@ export async function processPendingExportJobs (limit = 5) {
   for (const job of jobs) {
     if (running >= MAX_CONCURRENT) break
     running++
-    // 抢占式标记为 running，避免多实例重复执行
-    const claimed = await ExportJob.update(
+    /**
+     * 抢占式标记为 running，避免多实例重复执行。
+     *
+     * 注意 Sequelize 的 Model.update() 返回的是 **[影响行数]**（数组），
+     * 数组恒为真值 —— 早前写成 `if (!claimed)` 永远不成立，
+     * 于是「抢占失败」（任务已被另一个 worker 置为 running）也会继续往下跑，
+     * 同一个任务会被导出两次（文件写两遍、file_path 取决于谁最后写回）。
+     * 必须拆开数组看首元素。
+     */
+    const [affected] = await ExportJob.update(
       { status: 'running', started_at: new Date() },
       { where: { id: job.id, status: 'pending' } }
     )
-    if (!claimed) { running--; continue }
+    if (!affected) { running--; continue }
     try {
       await runExportJob(job)
     } finally {

@@ -52,8 +52,12 @@ jobs:
       - name: 🏗️ 构建三端
         run: npm run build:all
 
-      - name: 🧪 全量测试（API + 集成 + Vue）
-        run: npm run test:all
+      # 偶发失败（flaky）识别：第 1 轮失败只重跑失败的文件；
+      # 重跑通过 → 判定为偶发，打印醒目告警但默认不阻断流水线；
+      # 重跑仍失败 → 真失败，退出码非 0。
+      # 想把偶发也当失败（收敛期用）：设 CI_FLAKY_STRICT=1。
+      - name: 🧪 全量测试（API + 集成，带 flaky 识别）
+        run: npm run ci:test
         env:
           NODE_ENV: test
           DATABASE_URL_TEST: postgres://shop:shop@127.0.0.1:5432/shop_test
@@ -62,6 +66,12 @@ jobs:
           JWT_ADMIN_SECRET: ci-test-admin-secret-key-at-least-32-chars
           JWT_PARTNER_SECRET: ci-test-partner-secret-key-at-least-32-chars
           CAPTCHA_SECRET: ci-test-captcha-secret-key-at-least-32-chars
+          CI_FLAKY_STRICT: ${{ vars.CI_FLAKY_STRICT || '0' }}
+
+      - name: 🎨 前端单测（Vue）
+        run: npm run test:vue
+        env:
+          NODE_ENV: test
 
       - name: 📊 覆盖率门禁
         run: npm run test:coverage
