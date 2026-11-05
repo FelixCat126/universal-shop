@@ -22,8 +22,25 @@ if (!process.env.DATABASE_URL_TEST) {
 process.env.PG_POOL_MAX = process.env.PG_POOL_MAX || '40'
 process.env.PG_POOL_ACQUIRE_MS = process.env.PG_POOL_ACQUIRE_MS || '60000'
 
+import crypto from 'node:crypto'
 import { afterAll, beforeAll, beforeEach } from 'vitest'
 import { TestDatabase } from './test-database.js'
+
+/**
+ * 每个测试文件用**独立的 PG schema**。
+ *
+ * 所有文件共用一个库、靠 beforeEach 的 TRUNCATE 隔离，是残留随机失败的根源：
+ * 只要有一点异步残留（上个用例 fire-and-forget 的写、下个用例的钩子与上个
+ * 用例收尾交叠），就会出现「行被抹掉 / 角色串了 / 表不见了」，而且每次落在
+ * 哪个用例上都不一样。独立 schema 之后，隔离由数据库本身保证，与执行顺序无关。
+ *
+ * 关键：schema 必须在**模型被定义之前**定下来 —— Sequelize 在 define 时就把
+ * 表名绑定到 schema 上，之后再改 options 已经晚了。setup 文件先于任何测试
+ * 文件求值，正好是那个时机。
+ *
+ * schema 名带进程号：只清「别的进程」留下的，当前进程自己的不能动。
+ */
+const TEST_SCHEMA = `t_${process.pid}_${crypto.randomBytes(6).toString('hex')}`
 
 /**
  * 表结构的准备放在**模块顶层**（而不是 beforeAll）。
@@ -46,9 +63,34 @@ import { TestDatabase } from './test-database.js'
  * 且重建用 PG 咨询锁串行化（避免多个文件同时重建、互相 DROP 对方的表）。
  * 建表按外键依赖顺序重试。
  */
-console.log('🧪 初始化测试环境（PostgreSQL）...')
-await TestDatabase.initialize()
-await TestDatabase.syncModels()
+/**
+ * 模块顶层：只把 schema **绑定**到模型上（必须在模型定义之前）。
+ *
+ * 注意这里**不建 schema、不建表** —— 那些放到 beforeAll 里做。
+ * 原因：PG 的 enum 类型名跨 schema 不唯一，而 Sequelize 的 describeTable
+ * 按 typname 匹配且不限定 schema —— 若多个 schema 同时存在（收集阶段会把
+ * 所有文件的 setup 都求值一遍），describeTable 就会报
+ * "more than one row returned by a subquery used as an expression"，
+ * prepareSchema() 中断，后续索引/约束都建不出来。
+ * 改成测试时才建 → 任一时刻只有一个 schema 带 enum，冲突消失。
+ */
+{
+  // 先把连接串模块加载进来，并在**模型定义之前**指定 schema
+  const { default: sequelize } = await import('../../src/server/config/database.js')
+  // 模型层：define.schema 决定表建在哪、查询指向哪
+  sequelize.options.define.schema = TEST_SCHEMA
+  // 查询生成器层：qi.describeTable('users') 这类不带 schema 的调用默认查 public，
+  // 这里要跟着走，否则 schemaEnsures 会「表不存在」而中断
+  sequelize.dialect.queryGenerator.options.schema = TEST_SCHEMA
+  // 连接池的**每条连接**都要切到本文件的 schema。
+  // 必须在任何连接被创建之前装上（authenticate() 会建第一条连接）——
+  // 否则那条连接的 search_path 是默认的 public，PG 的 enum 类型
+  // （CREATE TYPE 不带 schema）就会跑到 public，和表对不上。
+  TestDatabase.installSchemaHook(sequelize, TEST_SCHEMA)
+  // 交给 TestDatabase（模块变量 —— 不能放 process.env，那是进程级的，
+  // 下一个文件会覆盖它，导致上一个文件的 afterAll 删掉下一个文件的 schema）
+  TestDatabase.setSchema(TEST_SCHEMA)
+}
 /**
  * 补建生产用的自定义索引/约束（幂等键唯一索引等）。
  *
@@ -58,54 +100,66 @@ await TestDatabase.syncModels()
  * 并发幂等/防重行为在测试中无法被验证（表现为"幂等键并发创建多单"）。
  * 这里显式调用，让测试环境与生产保持一致。
  */
-try {
-  const { prepareSchema } = await import('../../src/server/utils/schemaEnsures.js')
-  await prepareSchema()
-} catch (err) {
-  console.warn('⚠️ 测试环境 schema 补充失败（部分并发用例可能失真）:', err?.message)
-}
 console.log('✅ 测试环境初始化完成')
 
 /**
- * 每个测试文件只开**一个** HTTP server，整个文件复用。
+ * 每个文件的表结构准备放在 **beforeAll**（测试时），而不是模块顶层。
  *
- * supertest 的 `request(app)` 每次请求都新建一个 ephemeral server 再销毁它。
- * 一次全量套件要发几千个请求，几十上百次快速调用下会偶发
- * ECONNRESET / socket hang up / 串端口 404 —— 仓库里 withHttpServer 的注释
- * 早就写明了这点（它给限流用例解决了，其余文件还是逐请求新建）。
- *
- * supertest 的 serverAddress() 逻辑是：app 已经在监听 → 直接复用它的端口，
- * 不再新建 server。所以这里提前 listen 一次，整个文件都走同一个 server，
- * 彻底消掉 ephemeral server 的创建/销毁抖动。
+ * 原因：PG 的 enum 类型是「不带 schema」创建的（CREATE TYPE "enum_xxx"），
+ * 落到哪个 schema 取决于连接的 search_path。如果在收集阶段就把所有文件的
+ * schema 都建出来，几十个 schema 同时带同名 enum，
+ * Sequelize 的 describeTable（其子查询按 typname 匹配且不限定 schema）就会报
+ * "more than one row returned by a subquery used as an expression"，
+ * prepareSchema() 中断，后续索引/约束全建不出来。
+ * 放到测试时才建 → 任一时刻只有一个 schema 带 enum，冲突消失。
  */
-let httpServer = null
-
 beforeAll(async () => {
-  const { default: app } = await import('../../src/server/app.js')
-  httpServer = app.listen(0)
-  await new Promise((resolve, reject) => {
-    httpServer.once('listening', resolve)
-    httpServer.once('error', reject)
-  })
+  console.log('🧪 初始化测试环境（PostgreSQL）...')
+  await TestDatabase.initialize()
+  await TestDatabase.syncModels()
+  /**
+   * 补建生产用的自定义索引/约束（幂等键唯一索引等）。
+   *
+   * 这些索引由 schemaEnsures.js 在**生产启动链**里创建，而测试环境
+   * NODE_ENV=test 不执行启动链 —— 结果测试库缺少
+   * uniq_orders_user_client_key 等唯一索引，
+   * 并发幂等/防重行为在测试中无法被验证（表现为"幂等键并发创建多单"）。
+   * 这里显式调用，让测试环境与生产保持一致。
+   */
+  try {
+    const { prepareSchema } = await import('../../src/server/utils/schemaEnsures.js')
+    await prepareSchema()
+  } catch (err) {
+    console.warn('⚠️ 测试环境 schema 补充失败（部分并发用例可能失真）:', err?.message)
+  }
+  console.log('✅ 测试环境初始化完成')
 })
 
 afterAll(async () => {
-  console.log('🧹 清理测试环境...')
-  if (httpServer) {
-    // 只关**空闲**的 keep-alive 连接：close() 会一直等它们自己结束，
-    // afterAll 拖到超时 → 整个文件被判失败。
-    // 注意不能用 closeAllConnections() —— 它会把**正在处理中**的请求也掐掉，
-    // 表现为上一个用例的请求收到 ECONNRESET / socket hang up。
-    try { httpServer.closeIdleConnections?.() } catch {}
-    await new Promise(resolve => httpServer.close(resolve))
-    httpServer = null
+  if (process.env.PROBE_POOL) {
+    const samples = globalThis.__poolSamples || []
+    const maxUsed = samples.reduce((m, s) => Math.max(m, s.used || 0), 0)
+    const minAvail = samples.reduce((m, s) => Math.min(m, s.avail ?? 999), 999)
+    console.log('PROBE_POOL_SUMMARY samples=', samples.length,
+      'maxUsed=', maxUsed, 'minAvail=', minAvail,
+      'tail=', JSON.stringify(samples.slice(-5)))
   }
+  console.log('🧹 清理测试环境...')
   await TestDatabase.cleanup()
   console.log('✅ 测试环境清理完成')
 })
 
 beforeEach(async () => {
+  // PROBE: 连接池水位（不额外建连接，读 Sequelize 连接池自身状态）
+  if (process.env.PROBE_POOL) {
+    const pool = TestDatabase.getSequelize()?.connectionManager?.pool
+    if (pool) {
+      globalThis.__poolSamples = (globalThis.__poolSamples || [])
+      globalThis.__poolSamples.push({ used: pool.used, avail: pool.available, size: pool.size })
+    }
+  }
   await TestDatabase.clearAllData()
+
   /**
    * 下面这些都是**进程内**的共享状态（内存 store / LRU 缓存）。
    *

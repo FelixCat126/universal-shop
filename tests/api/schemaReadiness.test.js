@@ -63,7 +63,7 @@ describe('Schema.prepareSchema', () => {
     const sequelize = TestDatabase.getSequelize()
     // sequelize.query 返回 [rows, metadata]，rows 才是结果集
     const [rows] = await sequelize.query(
-      "select count(*)::int as n from information_schema.tables where table_schema = 'public' and table_name = 'after_sales'"
+      "select count(*)::int as n from information_schema.tables where table_schema = current_schema() and table_name = 'after_sales'"
     )
     expect(rows[0].n).toBe(1)
   })

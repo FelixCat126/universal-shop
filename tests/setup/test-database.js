@@ -15,6 +15,15 @@ import path from 'node:path'
 import fsPromises from 'node:fs/promises'
 
 let sequelize = null
+/**
+ * 本测试文件专属的 schema。
+ *
+ * 必须放**模块变量**，不能放 process.env —— process.env 是进程级的，
+ * 而 Vitest 每个测试文件有独立的模块注册表：下一个文件会覆盖 env，
+ * 于是上一个文件的 afterAll 读到的是下一个文件的 schema 名，
+ * 把下一个文件的 schema 给 DROP 掉（下一个文件的表瞬间消失）。
+ */
+let testSchema = null
 
 
 /**
@@ -113,7 +122,7 @@ function schemaFingerprint (models) {
  */
 function markerFilePath (db) {
   const dbName = (db.config && db.config.database) || 'shop_test'
-  const schema = 'public'
+  const schema = testSchema || 'public'
   return path.join(os.tmpdir(), `.shop-test-schema-${dbName}-${schema}.marker`)
 }
 
@@ -166,8 +175,10 @@ const KEY_COLUMNS = [
 ]
 
 async function allTablesPresent (db, expected) {
+  const schema = testSchema || 'public'
   const [rows] = await db.query(
-    `SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public'`
+    `SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = :s`,
+    { replacements: { s: schema }, type: QueryTypes.SELECT }
   ).catch(() => [[{ n: 0 }]])
   const n = Number(rows?.[0]?.n ?? rows?.[0]?.[0] ?? 0)
   if (n < expected) return false
@@ -175,15 +186,38 @@ async function allTablesPresent (db, expected) {
   for (const { table, column } of KEY_COLUMNS) {
     const [r] = await db.query(
       `SELECT count(*)::int AS n FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = :t AND column_name = :c`,
-      { replacements: { t: table, c: column }, type: QueryTypes.SELECT }
+       WHERE table_schema = :s AND table_name = :t AND column_name = :c`,
+      { replacements: { s: schema, t: table, c: column }, type: QueryTypes.SELECT }
     ).catch(() => [[{ n: 0 }]])
     if (!Number(r?.[0]?.n ?? r?.[0]?.[0] ?? 0)) return false
   }
   return true
 }
 
+
 export class TestDatabase {
+  /** 设定本测试文件专属的 schema（必须在模型定义之前调用） */
+  static setSchema (name) {
+    testSchema = name || null
+  }
+
+  /**
+   * 在**任何连接被创建之前**给连接池装上 search_path 钩子。
+   *
+   * 关键：PG 的 enum 类型是**不带 schema**创建的（CREATE TYPE "enum_xxx"），
+   * 落到哪个 schema 取决于连接的 search_path。而连接池的第一条连接是由
+   * authenticate() 建的 —— 如果那时钩子还没装上，那条连接的 search_path 就是
+   * 默认的 public，于是**表在测试 schema、enum 类型却跑到 public**，
+   * 两边对不上，describeTable 就会因为同名 enum 匹配到多行而报错。
+   *
+   * 所以钩子必须比 authenticate() 更早装上。
+   */
+  static installSchemaHook (db, schema) {
+    db.addHook('afterConnect', async (connection) => {
+      await connection.query(`SET search_path TO "${schema}"`)
+    })
+  }
+
   static async initialize () {
     if (sequelize) return sequelize
 
@@ -192,6 +226,47 @@ export class TestDatabase {
 
     try {
       await sequelize.authenticate()
+      if (testSchema) {
+        /**
+         * 清掉「历史遗留」的测试 schema。
+         *
+         * PG 的 enum 类型名在各 schema 之间**不唯一**，而 Sequelize 的
+         * describeTable 里有一段标量子查询按 typname 匹配（没有 schema 限定）——
+         * 只要历史上留下过一个带同名 enum 的 schema，describeTable 就会报
+         *   more than one row returned by a subquery used as an expression
+         * 于是 prepareSchema() 中断，后续索引/约束都建不出来，
+         * 表现为大批用例莫名失败。
+         *
+         * schema 名里带创建它的进程号，所以只清**别的进程**留下的，
+         * 当前进程自己的不能动。
+         */
+        await sequelize.query(
+          `DO $$
+           DECLARE s text; t text;
+           BEGIN
+             -- 1) 别的进程留下的测试 schema，整体删掉
+             FOR s IN SELECT nspname FROM pg_namespace
+                        WHERE nspname LIKE 't\_%' AND nspname <> '${testSchema}'
+             LOOP
+               EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE', s);
+             END LOOP;
+             -- 2) 其它 schema 里的 enum 类型也要清：PG 的 typname 跨 schema 不唯一，
+             --    Sequelize 的 describeTable 按 typname 匹配且不限定 schema，
+             --    残留的同名 enum 会让 describeTable 报
+             --    "more than one row returned by a subquery" → prepareSchema 中断。
+             --    （public 是旧方案共用 schema 时留下的，这里一并清掉。）
+             FOR t IN SELECT t.typname FROM pg_type t
+                        JOIN pg_namespace n ON n.oid = t.typnamespace
+                        WHERE t.typtype = 'e' AND n.nspname <> '${testSchema}'
+             LOOP
+               EXECUTE format('DROP TYPE IF EXISTS %I CASCADE', t);
+             END LOOP;
+           END $$;`
+        ).catch(() => {})
+
+        await sequelize.query(`CREATE SCHEMA IF NOT EXISTS "${testSchema}"`)
+        await sequelize.query(`SET search_path TO "${testSchema}"`)
+      }
       console.log('✅ 测试数据库连接成功（PG）')
     } catch (error) {
       console.error('❌ 测试数据库连接失败：', error.message)
@@ -285,7 +360,12 @@ export class TestDatabase {
 
   static async cleanup () {
     if (sequelize) {
+      const schema = testSchema
       try {
+        // 删掉本文件的 schema（含其中的表），不留垃圾
+        if (schema) {
+          await sequelize.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {})
+        }
         await sequelize.close()
       } catch {}
       sequelize = null
