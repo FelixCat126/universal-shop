@@ -15,7 +15,7 @@ import {
   imageVariants,
   imageSrcSet,
   imageLoadingFor
-} from '@portal/utils/imageVariants.js'
+} from '@/utils/imageVariants.js'
 
 describe('VC.utils.imageVariants', () => {
   it('IV-1 上传目录的图片 → 推出 thumb/mid 变体 URL', () => {

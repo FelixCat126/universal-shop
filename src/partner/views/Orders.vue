@@ -107,6 +107,7 @@
                   <img
                     v-if="itemImg(it)"
                     :src="itemImg(it)"
+                    :srcset="imageSrcSet(itemImg(it))"
                     alt=""
                     class="w-full h-full object-cover"
                     loading="lazy"
@@ -164,6 +165,7 @@ import config from '../../config/index.js'
 import { loadPublicConfig } from '../../utils/publicConfig.js'
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
+import { imageSrcSet } from '../../utils/imageVariants.js'
 import PartnerOnlinePayModal from '../components/PartnerOnlinePayModal.vue'
 
 const PAGE_SIZE = 5

@@ -118,6 +118,8 @@
  */
 import { ref, watch, onUnmounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { Download, Refresh } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import {

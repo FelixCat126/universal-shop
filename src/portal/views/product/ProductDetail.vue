@@ -236,7 +236,7 @@ import config from '../../../config/index.js'
 import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import SkeletonDetail from '../../components/ui/SkeletonDetail.vue'
 import ImageFade from '../../components/ui/ImageFade.vue'
-import { imageSrcSet } from '../../utils/imageVariants.js'
+import { imageSrcSet } from '../../../utils/imageVariants.js'
 import { softSpring, subtleSpring } from '../../composables/useSpring.js'
 import { useReducedMotion } from '../../composables/useReducedMotion.js'
 

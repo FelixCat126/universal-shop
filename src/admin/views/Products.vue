@@ -421,6 +421,8 @@
 <script>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { Plus, Search, Refresh, Loading, Picture, Delete, Edit, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { productAPI } from '../api/products.js'

@@ -446,6 +446,8 @@
 <script setup>
 import { ref, reactive, onMounted, computed, watch, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { Search, Refresh, Download, TrendCharts, SuccessFilled, Coin, Calendar, Document, User, Location, ShoppingBag, ChatLineRound, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'

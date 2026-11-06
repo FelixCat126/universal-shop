@@ -358,6 +358,8 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { Plus, Search, Refresh, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { promotionAPI } from '../api/promotions.js'

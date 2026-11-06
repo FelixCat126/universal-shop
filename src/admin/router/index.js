@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
 import { ElMessage } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL || '/'),

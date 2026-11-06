@@ -80,6 +80,7 @@
                   <img
                     v-if="imgUrl(row.image)"
                     :src="imgUrl(row.image)"
+                    :srcset="imageSrcSet(imgUrl(row.image))"
                     alt=""
                     class="w-full h-full object-cover"
                     loading="lazy"
@@ -293,6 +294,7 @@ import { loadPublicConfig } from '../../utils/publicConfig.js'
 import { formatPhoneDisplay } from '../../portal/utils/phoneValidation.js'
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
+import { imageSrcSet } from '../../utils/imageVariants.js'
 import PartnerOnlinePayModal from '../components/PartnerOnlinePayModal.vue'
 
 const { t } = useI18n()

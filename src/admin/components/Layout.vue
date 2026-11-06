@@ -123,6 +123,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
 import { useAdminStore } from '../stores/admin.js'
 
 // 国际化

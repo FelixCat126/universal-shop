@@ -1,5 +1,7 @@
 import { createApp } from 'vue'
-import 'element-plus/dist/index.css'
+// Element Plus 样式改为**按需引入**（vite.admin.config.js 的 Components 插件）：
+// 整包 CSS 有 350KB 且是渲染阻塞的，登录页用不到那么多。
+// JS API（ElMessage 等）的样式由各使用处显式 import。
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 

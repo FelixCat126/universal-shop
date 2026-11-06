@@ -26,6 +26,8 @@ import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestDataFactory } from '../factories/index.js'
 import { TestHelpers } from '../helpers/test-helpers.js'
+import { imageVariants } from '@/utils/imageVariants.js'
+import sharp from 'sharp'
 
 const models = () => TestDatabase.getSequelize().models
 const UPLOAD_ROOT = path.resolve(process.cwd(), 'public/uploads')
@@ -137,6 +139,47 @@ describe('上传接口', () => {
     expect(fs.existsSync(sentinel)).toBe(true)
     fs.rmSync(sentinel, { force: true })
   })
+
+  it('UL-9 上传后自动生成 WebP 主图 + 缩略图/中图变体', async () => {
+    // 用一张真实尺寸的图（1x1 的退化图缩略后和主图一样大，验不了"变体更小"）
+    const big = await sharp({
+      create: { width: 900, height: 900, channels: 3, background: { r: 30, g: 120, b: 200 } }
+    }).png().toBuffer()
+
+    const res = await request(app)
+      .post('/api/upload/product-image')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('image', big, { filename: '管线测试.png', contentType: 'image/png' })
+
+    expect(res.status).toBe(200)
+    const { filename, url, variants } = res.body.data
+
+    // 主图统一转成 WebP（URL 不再是 .png）
+    expect(filename).toMatch(/\.webp$/)
+    expect(url).toBe(`/uploads/products/${filename}`)
+
+    // 变体落盘
+    const dir = path.join(UPLOAD_ROOT, 'products')
+    expect(fs.existsSync(path.join(dir, filename))).toBe(true)
+    expect(variants.thumb).toBeTruthy()
+    expect(variants.mid).toBeTruthy()
+    expect(fs.existsSync(path.join(dir, path.basename(variants.thumb)))).toBe(true)
+    expect(fs.existsSync(path.join(dir, path.basename(variants.mid)))).toBe(true)
+
+    // 缩略图必须比主图小（否则 srcset 白做）
+    const mainSize = fs.statSync(path.join(dir, filename)).size
+    const thumbSize = fs.statSync(path.join(dir, path.basename(variants.thumb))).size
+    expect(thumbSize).toBeLessThan(mainSize)
+
+    // 前端按约定推出的变体名要和后端生成的**完全一致**（否则浏览器下不到缩略图）
+    const derived = imageVariants(url)
+    expect(derived.thumb).toBe(variants.thumb)
+    expect(derived.mid).toBe(variants.mid)
+
+    for (const f of [filename, path.basename(variants.thumb), path.basename(variants.mid)]) {
+      fs.rmSync(path.join(dir, f), { force: true })
+    }
+  }, 30000)
 
   it('UL-8 删除商品图：文件不存在 → 404', async () => {
     const res = await request(app)

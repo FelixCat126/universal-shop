@@ -115,6 +115,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
 import { TrendCharts, Coin, User, UserFilled, Refresh } from '@element-plus/icons-vue'
 import CountUp from '../components/CountUp.vue'
 

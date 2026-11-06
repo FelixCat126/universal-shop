@@ -108,6 +108,8 @@
 import { reactive, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { useAdminStore } from '../stores/admin.js'
 
 const { t } = useI18n()

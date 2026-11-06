@@ -16,7 +16,19 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['tests/vue/**/*.test.js'],
     exclude: ['node_modules/**', 'dist/**'],
-    testTimeout: 10000
+    testTimeout: 10000,
+    /**
+     * element-plus 要**内联**（走 vite 管线），否则它内部的
+     * `import 'element-plus/theme-chalk/el-message.css'` 这类样式导入
+     * 会落到 node 的 ESM 加载器上 → "Unknown file extension .css" → 整个测试文件起不来。
+     *
+     * 起因：管理端改成了 Element Plus 样式按需引入，组件里出现了 CSS import。
+     */
+    server: {
+      deps: {
+        inline: ['element-plus']
+      }
+    }
   },
   resolve: {
     alias: {

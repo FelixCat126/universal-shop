@@ -152,6 +152,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

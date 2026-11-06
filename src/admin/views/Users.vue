@@ -356,6 +356,8 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar, Loading, Location, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'

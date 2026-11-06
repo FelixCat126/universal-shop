@@ -387,7 +387,7 @@ import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import ImageFade from '../components/ui/ImageFade.vue'
 import { appleSpring, subtleSpring, bouncySpring } from '../composables/useSpring.js'
 import { useReducedMotion } from '../composables/useReducedMotion.js'
-import { imageSrcSet, imageLoadingFor } from '../utils/imageVariants.js'
+import { imageSrcSet, imageLoadingFor } from '../../utils/imageVariants.js'
 
 const portalCurrency = usePortalCurrencyStore()
 

@@ -253,6 +253,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import { Upload, Delete, Refresh } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin.js'
 import config from '../../config/index.js'

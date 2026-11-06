@@ -85,27 +85,33 @@ export async function processImageFile (filePath) {
   const out = { main: fileName, thumb: null, mid: null }
 
   /**
-   * 1) 主图：压到最长边 1600。
+   * 1) 主图：压到最长边 1600，并统一存成 **WebP**。
    *
-   * **只就地覆盖 jpg/jpeg**（内容与扩展名一致，安全）；
-   * 其它格式（png/webp/…）保持原样 —— 改名成 .jpg 会让库里已存的 URL 失效，
-   * 而这些图省下来的那点体积本来就由**变体**承担（浏览器按 srcset 只下缩略图）。
+   * 为什么主图也转 WebP：同画质下比 JPEG 小 25~35% ——
+   * 详情页/购物车这些"要原图"的场景也省得到。
+   *
+   * 命名：主图改成 <原名>.webp（库里存的就是它），变体仍是
+   * <主图名去扩展名>_thumb.webp / _mid.webp —— 前端按同一规则推导 ✓。
+   *
+   * 原图（png/jpg…）保留：库里可能还有别处引用它。
+   * 失败不阻断上传：保留原图（只是没瘦身）。
    */
   const sharp = await getSharp()
   if (!sharp) return { main: fileName, thumb: null, mid: null }
 
-  if (ext === '.jpg' || ext === '.jpeg') {
-    try {
-      const buf = await sharp(filePath)
-        .rotate() // 按 EXIF 方向摆正，省得竖图躺倒
-        .resize({ width: MAIN_MAX_EDGE, height: MAIN_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 82, mozjpeg: true })
-        .toBuffer()
-      await fs.writeFile(filePath, buf)
-    } catch (err) {
-      // 压缩失败不阻断上传：保留原图，只是没瘦身
-      console.warn('[imageProcessor] 主图压缩失败，保留原图', err?.message)
-    }
+  try {
+    const buf = await sharp(filePath)
+      .rotate() // 按 EXIF 方向摆正，省得竖图躺倒
+      .resize({ width: MAIN_MAX_EDGE, height: MAIN_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer()
+    const webpName = fileName.slice(0, fileName.length - path.extname(fileName).length) + '.webp'
+    await fs.writeFile(path.join(dir, webpName), buf)
+    out.main = webpName
+  } catch (err) {
+    // 压缩失败不阻断上传：保留原图，只是没瘦身
+    console.warn('[imageProcessor] 主图压缩失败，保留原图', err?.message)
+    out.main = fileName
   }
 
   // 2) 变体：缩略图 / 中图（WebP）

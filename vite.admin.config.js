@@ -26,12 +26,15 @@ export default defineConfig({
      * 外加 `import * as ElementPlusIconsVue` 把 290 个图标全注册了一遍。
      * 改按需后：模板里用到的组件自动按需引入，图标各文件本来就已按需 import。
      *
-     * importStyle: false —— 样式仍走 main.js 里的整包 CSS（避免 JS API
-     * （ElMessage 等）样式丢失）；按需引入的组件样式与整包 CSS 是同一批文件，
-     * 打包时会去重，不会变大。
+     * importStyle: 'css' —— 组件样式**按需引入**：每个组件只带自己那份 CSS，
+     * 登录页就不会把 350KB 的整包样式拖下来（整包 CSS 是渲染阻塞的）。
+     *
+     * JS API（ElMessage / ElMessageBox）的样式是**显式**引的 ——
+     * 它们是按需引入插件管不到的（插件只处理模板里的组件），
+     * 漏了就表现为"提示框没样式"。相关 import 已加到 17 个用到它们的文件里。
      */
     Components({
-      resolvers: [ElementPlusResolver({ importStyle: false })],
+      resolvers: [ElementPlusResolver({ importStyle: 'css' })],
       dts: false
     })
   ],
