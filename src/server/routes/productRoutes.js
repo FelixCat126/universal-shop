@@ -3,7 +3,8 @@ import ProductController from '../controllers/productController.js'
 import {
   optionalAuthenticateAdmin,
   authenticateAdmin,
-  requirePermission
+  requirePermission,
+  logOperation
 } from '../middlewares/adminAuthMiddleware.js'
 import { enumerationLimiter } from '../middlewares/security.js'
 import { validate, checkStockSchema } from '../middlewares/validate.js'
@@ -24,6 +25,8 @@ router.get('/:id', cacheGet({ ttlMs: 15_000 }), optionalAuthenticateAdmin, Produ
 router.post('/', authenticateAdmin, requirePermission('products'), ProductController.createProduct)
 router.put('/:id', authenticateAdmin, requirePermission('products'), ProductController.updateProduct)
 router.delete('/:id', authenticateAdmin, requirePermission('products'), ProductController.deleteProduct)
+// 批量操作：上下架 / 删除（一次最多 200 个）
+router.post('/bulk', authenticateAdmin, requirePermission('products'), logOperation('bulk_update_product', 'product'), ProductController.bulkUpdate)
 router.post('/:id/stock', authenticateAdmin, requirePermission('products'), ProductController.adjustStock)
 router.post('/:id/restore', authenticateAdmin, requirePermission('products'), ProductController.restoreProduct)
 

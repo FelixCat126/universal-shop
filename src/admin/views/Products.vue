@@ -80,7 +80,27 @@
           </div>
         </template>
         <div class="table-wrapper">
-      <el-table 
+      <!-- 批量操作：选中后出现（成批上下架/删除，运营的高频动作） -->
+      <div
+        v-if="selectedProductIds.length"
+        class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2"
+      >
+        <span class="text-sm text-blue-800">
+          {{ t('products.bulkSelected', { count: selectedProductIds.length }) }}
+        </span>
+        <el-button size="small" :loading="bulkActing" @click="bulkUpdate('activate')">
+          {{ t('products.bulkActivate') }}
+        </el-button>
+        <el-button size="small" :loading="bulkActing" @click="bulkUpdate('deactivate')">
+          {{ t('products.bulkDeactivate') }}
+        </el-button>
+        <el-button size="small" type="danger" plain :loading="bulkActing" @click="bulkDelete">
+          {{ t('common.delete') }}
+        </el-button>
+      </div>
+
+      <el-table
+        ref="productTableRef"
         :data="filteredProducts" 
         style="width: 100%"
         v-loading="loading"
@@ -90,7 +110,9 @@
         table-layout="fixed"
         class="product-table"
         :row-class-name="tableRowClassName"
+        @selection-change="onSelectionChange"
       >
+        <el-table-column type="selection" width="46" :selectable="row => !isDelisted(row)" />
         <el-table-column prop="id" label="ID" width="60" />
 
         <el-table-column :label="t('products.image.productImage')" width="80" align="center">
@@ -145,6 +167,15 @@
                 >
                   {{ scope.row.status === 'active' ? t('products.saleActive') : t('products.saleInactive') }}
                 </el-tag>
+                <!-- 上/下架开关：以前只能看状态、没有任何地方能改（后端 update 也不认 status） -->
+                <el-switch
+                  :model-value="scope.row.status === 'active'"
+                  :loading="statusToggling.has(scope.row.id)"
+                  :aria-label="t('products.saleActive')"
+                  class="ml-1"
+                  @click.stop
+                  @change="(v) => toggleShelf(scope.row, v)"
+                />
               </template>
             </div>
           </template>
@@ -360,6 +391,7 @@
             :on-success="handleImageSuccess"
             :on-error="handleImageError"
             :before-upload="beforeImageUpload"
+            :on-progress="handleImageProgress"
             accept="image/*"
             name="image"
           >
@@ -367,6 +399,13 @@
             <el-icon v-else class="image-uploader-icon"><Plus /></el-icon>
           </el-upload>
           <div class="image-tips">{{ t('products.image.uploadTips') }}</div>
+          <!-- 上传进度：2-5MB 的图在慢线上要好几秒，没有进度就像卡死了 -->
+          <el-progress
+            v-if="imageUploading"
+            :percentage="imageProgress"
+            :stroke-width="4"
+            class="mt-2"
+          />
           <div class="image-actions" v-if="productForm.imagePreview">
             <el-button size="small" @click="clearImage">{{ t('products.image.clearImage') }}</el-button>
           </div>
@@ -808,17 +847,33 @@ export default {
     }
 
     const handleImageSuccess = (response, file) => {
+      imageUploading.value = false
+      imageProgress.value = 100
       if (response.success) {
         // 使用服务器返回的图片URL
         productForm.image = response.data.url
         productForm.imagePreview = response.data.url
-        ElMessage.success('图片上传成功')
+        // 服务端会自动压缩并生成缩略图 —— 告诉运营一声，
+        // 否则"图怎么变糊了/怎么小了"会变成反复问的问题
+        const orig = Number(response.data.originalSize || 0)
+        const opt = Number(response.data.optimizedSize || 0)
+        if (orig > 0 && opt > 0 && opt < orig) {
+          ElMessage.success(
+            t('products.image.uploadedCompressed', {
+              before: (orig / 1024).toFixed(0),
+              after: (opt / 1024).toFixed(0)
+            })
+          )
+        } else {
+          ElMessage.success('图片上传成功')
+        }
       } else {
         ElMessage.error(response.message || t('products.image.uploadFailed'))
       }
     }
 
     const handleImageError = (error, file) => {
+      imageUploading.value = false
       console.error('图片上传失败:', error)
       ElMessage.error(t('products.image.uploadFailed') + '，请重试')
     }
@@ -829,18 +884,104 @@ export default {
       ElMessage.info('图片已清除')
     }
 
+    /** 表格引用（批量操作后要清空勾选） */
+    const productTableRef = ref(null)
+    /** 当前勾选的商品 id */
+    const selectedProductIds = ref([])
+    /** 批量操作进行中 */
+    const bulkActing = ref(false)
+
+    const onSelectionChange = (rows) => {
+      selectedProductIds.value = rows.map(r => r.id)
+    }
+
+    /** 批量上下架 */
+    const bulkUpdate = async (action) => {
+      const ids = [...selectedProductIds.value]
+      if (!ids.length || bulkActing.value) return
+      bulkActing.value = true
+      try {
+        const res = await productAPI.bulkUpdate(ids, action)
+        if (res?.data?.success) {
+          ElMessage.success(res.data.message || t('common.success'))
+          await loadProducts()
+        } else {
+          ElMessage.error(res?.data?.message || t('common.error'))
+        }
+      } catch (e) {
+        ElMessage.error(e?.response?.data?.message || t('common.error'))
+      } finally {
+        bulkActing.value = false
+        productTableRef.value?.clearSelection?.()
+        selectedProductIds.value = []
+      }
+    }
+
+    /** 批量删除（软删） */
+    const bulkDelete = async () => {
+      const ids = [...selectedProductIds.value]
+      if (!ids.length || bulkActing.value) return
+      try {
+        await ElMessageBox.confirm(
+          t('products.bulkDeleteConfirm', { count: ids.length }),
+          t('common.confirm'),
+          { type: 'warning' }
+        )
+      } catch {
+        return
+      }
+      await bulkUpdate('delete')
+    }
+
+    /** 正在切换上架状态的商品（避免连点） */
+    const statusToggling = ref(new Set())
+
+    /**
+     * 上/下架。
+     *
+     * 之前管理端能看到上架状态，却**没有任何地方能改** —— 后端 update 不认 status，
+     * 也没有单独的上下架接口。运营想临时下架一个商品只能删库/改数据库。
+     */
+    const toggleShelf = async (row, nextActive) => {
+      if (statusToggling.value.has(row.id)) return
+      statusToggling.value.add(row.id)
+      const prev = row.status
+      try {
+        await productAPI.updateProduct(row.id, { status: nextActive ? 'active' : 'inactive' })
+        row.status = nextActive ? 'active' : 'inactive'
+        ElMessage.success(nextActive ? t('products.shelfOn') : t('products.saleInactive'))
+      } catch (e) {
+        row.status = prev // 失败回滚显示
+        ElMessage.error((e?.response?.data?.message) || t('common.error'))
+      } finally {
+        statusToggling.value.delete(row.id)
+      }
+    }
+
+    /** 上传中 + 进度（0-100） */
+    const imageUploading = ref(false)
+    const imageProgress = ref(0)
+
+    const handleImageProgress = (evt) => {
+      imageProgress.value = evt?.percent ?? 0
+    }
+
     const beforeImageUpload = (file) => {
       const isJPGOrPNG = file.type === 'image/jpeg' || file.type === 'image/png'
-      const isLt2M = file.size / 1024 / 1024 < 2
+      // 上限与服务端一致（5MB）—— 之前前端限 2MB，比服务端严，
+      // 运营传 3MB 的图被挡在门外还不知为什么
+      const isLt5M = file.size / 1024 / 1024 < 5
 
       if (!isJPGOrPNG) {
         ElMessage.error(t('products.image.onlyImageAllowed'))
         return false
       }
-      if (!isLt2M) {
+      if (!isLt5M) {
         ElMessage.error(t('products.image.imageTooLarge'))
         return false
       }
+      imageUploading.value = true
+      imageProgress.value = 0
       return true
     }
 
@@ -954,6 +1095,18 @@ export default {
       handleImageError,
       clearImage,
       beforeImageUpload,
+      handleImageProgress,
+      imageUploading,
+      imageProgress,
+      // 上/下架开关 + 批量操作
+      statusToggling,
+      toggleShelf,
+      selectedProductIds,
+      onSelectionChange,
+      bulkActing,
+      bulkUpdate,
+      bulkDelete,
+      productTableRef,
       loadProducts,
       loadCategoryOptions
     }

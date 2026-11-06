@@ -74,6 +74,112 @@ describe('P3.admin.product', () => {
     expect(parseFloat(res.body.data.price)).toBe(60)
   })
 
+  it('AP-4b PUT /:id 改上架状态 → 200（管理端以前没有地方能上下架）', async () => {
+    const { token } = await adminCtx()
+    const category = await makeCategory()
+    const { Product } = TestDatabase.getSequelize().models
+    const p = await Product.create(TestDataFactory.createProduct({
+      name: '上下架测试', category_id: category.id, price: 100, status: 'active'
+    }))
+
+    // 下架
+    const off = await request(app)
+      .put(`/api/products/${p.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'inactive' })
+    expect(off.status).toBe(200)
+    await p.reload()
+    expect(p.status).toBe('inactive')
+
+    // 再上架
+    const on = await request(app)
+      .put(`/api/products/${p.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'active' })
+    expect(on.status).toBe(200)
+    await p.reload()
+    expect(p.status).toBe('active')
+
+    // 非法状态 → 400（不能把脏值写进 ENUM 字段变成 500）
+    const bad = await request(app)
+      .put(`/api/products/${p.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'deleted' })
+    expect(bad.status).toBe(400)
+    await p.reload()
+    expect(p.status).toBe('active') // 非法值没有生效
+  })
+
+  it('AP-4c POST /bulk 批量上下架/删除', async () => {
+    const { token } = await adminCtx()
+    const category = await makeCategory()
+    const { Product } = TestDatabase.getSequelize().models
+    const ps = []
+    for (let i = 0; i < 3; i++) {
+      ps.push(await Product.create(TestDataFactory.createProduct({
+        name: `批量${i}`, category_id: category.id, price: 100, status: 'active'
+      })))
+    }
+
+    // 批量下架
+    const off = await request(app)
+      .post('/api/products/bulk')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ids: ps.map(p => p.id), action: 'deactivate' })
+    expect(off.status).toBe(200)
+    expect(off.body.data.affected).toBe(3)
+    for (const p of ps) {
+      await p.reload()
+      expect(p.status).toBe('inactive')
+    }
+
+    // 批量上架
+    const on = await request(app)
+      .post('/api/products/bulk')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ids: ps.map(p => p.id), action: 'activate' })
+    expect(on.status).toBe(200)
+    for (const p of ps) {
+      await p.reload()
+      expect(p.status).toBe('active')
+    }
+
+    // 批量删除（软删）
+    const del = await request(app)
+      .post('/api/products/bulk')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ids: ps.map(p => p.id), action: 'delete' })
+    expect(del.status).toBe(200)
+    expect(del.body.data.affected).toBe(3)
+    // 软删：管理员仍能在列表里看到（可以恢复），但 deletedAt 已被标记
+    for (const p of ps) {
+      const fresh = await Product.findByPk(p.id, { paranoid: false })
+      expect(fresh.deleted_at).toBeTruthy()
+    }
+    // 匿名（前台）列表查不到
+    const pub = await request(app).get('/api/products')
+    for (const p of ps) {
+      expect(pub.body.data.products.find(x => x.id === p.id)).toBeUndefined()
+    }
+  })
+
+  it('AP-4d POST /bulk 参数非法 → 400', async () => {
+    const { token } = await adminCtx()
+    const post = (body) => request(app)
+      .post('/api/products/bulk')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+
+    expect((await post({ ids: [], action: 'activate' })).status).toBe(400)
+    expect((await post({ ids: 'abc', action: 'activate' })).status).toBe(400)
+    expect((await post({ ids: [1], action: 'unknown' })).status).toBe(400)
+    // 超量
+    expect((await post({ ids: Array.from({ length: 201 }, (_, i) => i + 1), action: 'activate' })).status).toBe(400)
+    // 未登录
+    const noAuth = await request(app).post('/api/products/bulk').send({ ids: [1], action: 'activate' })
+    expect(noAuth.status).toBe(401)
+  })
+
   it('AP-5 POST /:id/stock add → 200，stock 增加', async () => {
     const { token } = await adminCtx()
     const cat = await makeCategory()

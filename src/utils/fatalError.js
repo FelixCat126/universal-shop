@@ -26,6 +26,8 @@ export function reportFatalError (err, info) {
   fatalError.value = {
     message: String(message || 'unknown error').slice(0, 300),
     info: typeof info === 'string' ? info.slice(0, 300) : undefined,
+    // 堆栈：现场排查时能直接看出是哪一行出的问题（不用复现）
+    stack: typeof err?.stack === 'string' ? err.stack.slice(0, 800) : undefined,
     at: new Date().toISOString()
   }
   console.error('[fatalError]', err, info)

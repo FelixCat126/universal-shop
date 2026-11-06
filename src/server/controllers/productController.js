@@ -17,6 +17,9 @@ import { likeContains } from '../utils/likeSearch.js'
  * 上界推导：单价 × 单次最大数量(5000) 必须 < int4 上限 2147483647
  *           → 单价 ≤ 429496，留余量取 400000（400000 × 5000 = 2e9 < 2.147e9）
  */
+/** 商品上架状态的合法取值（与模型 ENUM 一致） */
+const PRODUCT_STATUS_VALUES = ['active', 'inactive']
+
 const MAX_PRODUCT_POINTS = 400000
 
 class ProductController {
@@ -349,7 +352,8 @@ class ProductController {
         stock,
         discount,
         image,
-        points
+        points,
+        status
       } = req.body
 
       const legacyCat = req.body.category
@@ -440,6 +444,24 @@ class ProductController {
         }
       }
 
+      /**
+       * 上架状态：之前 updateProduct **完全不处理 status** ——
+       * 管理端能看到上架/下架状态，却没有任何接口能改它
+       * （既没有单独的 status 接口，update 也不认这个字段）。
+       * 结果：运营想临时下架一个商品，只能删库或直接改数据库。
+       */
+      let nextStatus = product.status
+      if (status !== undefined && status !== null && status !== '') {
+        const st = String(status).trim().toLowerCase()
+        if (!PRODUCT_STATUS_VALUES.includes(st)) {
+          return res.status(400).json({
+            success: false,
+            message: `上架状态必须是 ${PRODUCT_STATUS_VALUES.join(' / ')} 之一`
+          })
+        }
+        nextStatus = st
+      }
+
       await product.update({
         name: name || product.name,
         alias: alias !== undefined ? (alias || null) : product.alias,
@@ -449,7 +471,8 @@ class ProductController {
         stock: nextStock,
         discount: nextDiscount,
         image: image !== undefined ? image : product.image,
-        points: nextPoints
+        points: nextPoints,
+        status: nextStatus
       })
 
       await product.reload({
@@ -492,6 +515,61 @@ class ProductController {
   }
 
   // 下架产品：逻辑删除（保留行与订单外键），并清理购物车中该商品
+  /**
+   * 批量操作商品（上下架 / 删除）。
+   *
+   * 运营的日常动作是成批的（换季一次性下架几十个、补货后批量上架），
+   * 一个一个点既慢又容易漏。
+   *
+   * 限制：一次最多 200 个 id（防止误传全表 id 把库刷一遍）。
+   */
+  static async bulkUpdate (req, res) {
+    try {
+      const { ids, action } = req.body || {}
+      const BULK_MAX = 200
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: '请选择要操作的产品' })
+      }
+      if (ids.length > BULK_MAX) {
+        return res.status(400).json({ success: false, message: `一次最多操作 ${BULK_MAX} 个产品` })
+      }
+      const idList = ids.map(v => parseInt(v, 10)).filter(v => Number.isInteger(v) && v > 0)
+      if (idList.length === 0) {
+        return res.status(400).json({ success: false, message: '无效的产品ID' })
+      }
+
+      if (action === 'activate' || action === 'deactivate') {
+        const status = action === 'activate' ? 'active' : 'inactive'
+        const [affected] = await Product.update(
+          { status },
+          { where: { id: { [Op.in]: idList } } }
+        )
+        await clearResponseCache()
+        return res.json({
+          success: true,
+          message: action === 'activate' ? '已上架' : '已下架',
+          data: { affected: affected || 0 }
+        })
+      }
+
+      if (action === 'delete') {
+        const affected = await Product.destroy({ where: { id: { [Op.in]: idList } } })
+        await clearResponseCache()
+        return res.json({
+          success: true,
+          message: '已删除',
+          data: { affected: affected || 0 }
+        })
+      }
+
+      return res.status(400).json({ success: false, message: '不支持的批量操作' })
+    } catch (error) {
+      logger.error('批量操作商品失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '批量操作失败', code: 'INTERNAL_SERVER_ERROR' })
+    }
+  }
+
   static async deleteProduct(req, res) {
     try {
       const { id } = req.params

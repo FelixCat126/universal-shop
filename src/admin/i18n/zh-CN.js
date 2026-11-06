@@ -682,6 +682,10 @@ export default {
 
   // 产品管理页面
   products: {
+    bulkActivate: '批量上架',
+    bulkDeactivate: '批量下架',
+    bulkSelected: '已选 {count} 个商品',
+    bulkDeleteConfirm: '确定删除选中的 {count} 个商品吗？删除后仍可从「已删除」里恢复。',
     title: '产品管理',
     description: '管理所有产品信息、库存和状态',
     addProduct: '添加产品',
@@ -772,6 +776,7 @@ export default {
     },
     // 图片相关
     image: {
+      uploadedCompressed: '上传成功，图片已自动压缩（{before}KB → {after}KB）',
       loadFailed: '加载失败',
       clearImage: '清除图片',
       uploadTips: '支持 JPG、PNG 格式，文件大小不超过 2MB',

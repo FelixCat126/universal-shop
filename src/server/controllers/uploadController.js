@@ -172,6 +172,19 @@ class UploadController {
       // 构建文件URL
       const fileUrl = `/uploads/products/${mainName}`
 
+      // 体积信息：运营需要知道"图被压缩过"（否则会以为图变糊了）
+      let optimizedSize = null
+      let thumbSize = null
+      try {
+        const fsPromises = await import('node:fs/promises')
+        const pathMod = await import('node:path')
+        const dir = pathMod.dirname(req.file.path)
+        optimizedSize = (await fsPromises.stat(pathMod.join(dir, mainName)).catch(() => null))?.size ?? null
+        thumbSize = processed?.thumb
+          ? (await fsPromises.stat(pathMod.join(dir, processed.thumb)).catch(() => null))?.size ?? null
+          : null
+      } catch (_) { /* 拿不到体积就算了，不影响上传 */ }
+
       res.json({
         success: true,
         message: '图片上传成功',
@@ -180,6 +193,9 @@ class UploadController {
           originalName: req.file.originalname,
           url: fileUrl,
           size: req.file.size,
+          originalSize: req.file.size,
+          optimizedSize,
+          thumbSize,
           // 变体文件名（前端按约定拼 srcset；这里一并给出便于调用方直接用）
           variants: {
             thumb: processed?.thumb ? `/uploads/products/${processed.thumb}` : null,

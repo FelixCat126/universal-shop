@@ -681,6 +681,10 @@ export default {
 
   // Product management
   products: {
+    bulkActivate: 'Activate',
+    bulkDeactivate: 'Deactivate',
+    bulkSelected: '{count} product(s) selected',
+    bulkDeleteConfirm: 'Delete the {count} selected product(s)? They can still be restored from the deleted list.',
     title: 'Product Management',
     description: 'Manage all product information, inventory and status',
     addProduct: 'Add Product',
@@ -771,6 +775,7 @@ export default {
     },
     // Image related
     image: {
+      uploadedCompressed: 'Uploaded — the image was compressed automatically ({before}KB → {after}KB)',
       loadFailed: 'Load Failed',
       clearImage: 'Clear Image',
       uploadTips: 'Support JPG, PNG formats, file size no more than 2MB',

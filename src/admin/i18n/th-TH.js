@@ -683,6 +683,10 @@ export default {
 
   // 产品管理页面
   products: {
+    bulkActivate: 'เปิดขายทั้งหมด',
+    bulkDeactivate: 'ปิดขายทั้งหมด',
+    bulkSelected: 'เลือกแล้ว {count} รายการ',
+    bulkDeleteConfirm: 'ลบสินค้าที่เลือก {count} รายการใช่หรือไม่? ยังกู้คืนได้จากรายการที่ลบไป',
     title: 'จัดการสินค้า',
     description: 'จัดการข้อมูลสินค้า คลังสินค้า และสถานะทั้งหมด',
     addProduct: 'เพิ่มสินค้า',
@@ -773,6 +777,7 @@ export default {
     },
     // 图片相关
     image: {
+      uploadedCompressed: 'อัปโหลดแล้ว ระบบบีบอัดรูปให้อัตโนมัติ ({before}KB → {after}KB)',
       loadFailed: 'โหลดล้มเหลว',
       clearImage: 'ลบภาพ',
       uploadTips: 'รองรับรูปแบบ JPG, PNG ขนาดไฟล์ไม่เกิน 2MB',

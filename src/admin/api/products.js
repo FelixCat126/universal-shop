@@ -69,6 +69,10 @@ export const productAPI = {
   },
 
   // 更新产品
+  /** 批量操作：{ ids, action: 'activate'|'deactivate'|'delete' } */
+  bulkUpdate(ids, action) {
+    return api.post('/products/bulk', { ids, action })
+  },
   updateProduct(id, data) {
     return api.put(`/products/${id}`, data)
   },
