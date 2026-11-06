@@ -223,6 +223,7 @@ export default {
 
   // 购物车
   cart: {
+    undo: 'Undo',
     title: 'Shopping Cart',
     empty: 'Cart is Empty',
     emptyDesc: 'Your cart is currently empty',

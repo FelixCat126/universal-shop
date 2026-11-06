@@ -788,6 +788,21 @@ const clientOrderKey = ref(generateClientOrderKey())
 const addresses = ref([])
 const selectedAddress = ref(null)
 
+/** 记住"上次用的地址"（下次结算自动选中） */
+const REMEMBERED_ADDRESS_KEY = 'portal_last_address_id'
+const readRememberedAddressId = () => {
+  try {
+    const raw = localStorage.getItem(REMEMBERED_ADDRESS_KEY)
+    return raw ? Number(raw) : null
+  } catch (_) { return null }
+}
+const rememberAddressId = (id) => {
+  try {
+    if (id) localStorage.setItem(REMEMBERED_ADDRESS_KEY, String(id))
+    else localStorage.removeItem(REMEMBERED_ADDRESS_KEY)
+  } catch (_) { /* ignore */ }
+}
+
 // 默认图片
 const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik02MCA2MEgxNDBWMTQwSDYwVjYwWiIgc3Ryb2tlPSIjOUI5QkEwIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPGNpcmNsZSBjeD0iODAiIGN5PSI4MCIgcj0iMTAiIGZpbGw9IiM5QjlCQTAiLz4KPHBhdGggZD0iTTkwIDEwMEwxMjAgNzBMMTMwIDgwTDEyMCAxMDBMOTAgMTAwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K'
 
@@ -1169,14 +1184,26 @@ const loadAddresses = async () => {
     if (response.data.success) {
       addresses.value = response.data.data || []
       
-      // 自动选择默认地址
-      const defaultAddress = addresses.value.find(addr => addr.is_default)
-      if (defaultAddress) {
-        selectedAddress.value = defaultAddress
+      /**
+       * 自动选地址，优先级：
+       *   1. **上次下单用的地址**（很多人常寄同一个地址，但没把它设成默认）
+       *   2. 默认地址
+       *   3. 列表第一个
+       * 原来只看 is_default —— 用户没设默认地址时**一个都不选**，
+       * 还得自己点一下才能下单。
+       */
+      const rememberedId = readRememberedAddressId()
+      const picked =
+        (rememberedId && addresses.value.find(a => a.id === rememberedId)) ||
+        addresses.value.find(addr => addr.is_default) ||
+        addresses.value[0] ||
+        null
+      if (picked) {
+        selectedAddress.value = picked
         // 自动填充表单
-        orderForm.contact_name = defaultAddress.contact_name
-        orderForm.contact_phone = defaultAddress.contact_phone
-        orderForm.delivery_address = `${defaultAddress.province} ${defaultAddress.city} ${defaultAddress.district} ${defaultAddress.detail_address} ${defaultAddress.postal_code || ''}`.trim()
+        orderForm.contact_name = picked.contact_name
+        orderForm.contact_phone = picked.contact_phone
+        orderForm.delivery_address = `${picked.province} ${picked.city} ${picked.district} ${picked.detail_address} ${picked.postal_code || ''}`.trim()
       }
     } else {
       addresses.value = []
@@ -1248,6 +1275,7 @@ const handleCheckoutAddressRegionChange = (regionData) => {
 // 选择地址
 const selectAddress = (address) => {
   selectedAddress.value = address
+  rememberAddressId(address?.id)
   orderForm.contact_name = address.contact_name
   orderForm.contact_country_code = address.contact_country_code || '+66'
   orderForm.contact_phone = address.contact_phone
@@ -1418,6 +1446,9 @@ const submitOrder = async () => {
         : {})
     }
 
+
+    // 记住这次用的地址：下次结算直接选中它（哪怕用户没手动点过）
+    rememberAddressId(selectedAddress.value?.id)
 
     // 调用API创建订单
     const response = await createOrder(orderData)

@@ -139,6 +139,7 @@ export default {
 
   // 购物车
   cart: {
+    undo: '撤销',
     addToCart: "加入购物车",
     continueShopping: "继续购物",
     title: '购物车',

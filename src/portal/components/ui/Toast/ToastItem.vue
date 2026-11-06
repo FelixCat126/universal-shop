@@ -21,6 +21,16 @@
         <p :class="['text-sm font-medium', textClasses]">
           {{ toast.message }}
         </p>
+        <!-- 操作按钮（如"撤销"）：误操作了不用重新来一遍 -->
+        <button
+          v-if="toast.action && toast.action.label"
+          type="button"
+          class="mt-1.5 text-sm font-semibold underline underline-offset-2 hover:opacity-80"
+          :class="textClasses"
+          @click="runAction"
+        >
+          {{ toast.action.label }}
+        </button>
       </div>
       
       <!-- 关闭按钮 -->
@@ -65,7 +75,17 @@ const props = defineProps({
   }
 })
 
-defineEmits(['close'])
+const emit = defineEmits(['close'])
+
+/** 执行 toast 上的操作并关闭它 */
+function runAction () {
+  const action = props.toast.action
+  try {
+    action?.onClick?.()
+  } finally {
+    emit('close', props.toast.id)
+  }
+}
 
 // 根据类型选择图标
 const iconComponent = computed(() => {

@@ -523,9 +523,18 @@
       <div 
         v-if="showMessage" 
         :class="messageClass"
-        class="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40"
+        class="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40 flex items-center gap-4"
       >
-        {{ message }}
+        <span>{{ message }}</span>
+        <!-- 撤销：误删了不用重新找一遍商品 -->
+        <button
+          v-if="undoAction"
+          type="button"
+          class="font-semibold underline underline-offset-2 hover:opacity-80 whitespace-nowrap"
+          @click="runUndo"
+        >
+          {{ t('cart.undo') }}
+        </button>
       </div>
     </Transition>
   </div>
@@ -561,6 +570,8 @@ const clearing = ref(false)
 const showMessage = ref(false)
 const message = ref('')
 const messageType = ref('success')
+/** 撤销动作（删除商品后 5 秒内可撤销） */
+const undoAction = ref(null)
 
 // 默认图片
 const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDMwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwVjIwME0xMDAgMTUwSDIwMCIgc3Ryb2tlPSIjRDREMEQ4IiBzdHJva2Utd2lkdGg9IjQiLz4KPHN2Zz4K'
@@ -660,13 +671,41 @@ const removeItem = async (item) => {
   try {
     const result = await cartStore.removeFromCart(item.id)
     if (result.success) {
-      showMessageToast(result.message, 'success')
+      /**
+       * 删除后给一个"撤销"入口。
+       *
+       * 误删（手滑点错、想删一件结果删了两件）之后，
+       * 原来的做法是回到列表重新找一遍商品 —— 尤其在购物车很长时很烦。
+       */
+      showMessageToast(result.message, 'success', {
+        run: () => restoreItem(item)
+      })
     } else {
       showMessageToast(result.message, 'error')
     }
   } finally {
     updating.value.delete(item.id)
   }
+}
+
+/** 撤销删除：把商品按原数量加回去 */
+const restoreItem = async (item) => {
+  try {
+    if (item.bundle_id) {
+      await cartStore.addBundleToCart(item.bundle, item.quantity)
+    } else if (item.product) {
+      await cartStore.addToCart(item.product, item.quantity)
+    }
+  } catch (e) {
+    console.error('撤销删除失败', e)
+  }
+}
+
+/** 执行撤销并收起提示 */
+const runUndo = () => {
+  const action = undoAction.value
+  undoAction.value = null
+  action?.run?.()
 }
 
 // 确认清空购物车
@@ -700,11 +739,12 @@ const goBack = () => {
 }
 
 // 显示消息提示
-const showMessageToast = (msg, type = 'success') => {
+const showMessageToast = (msg, type = 'success', undo = null) => {
   // 如果消息是键名，则进行国际化转换
   const translatedMsg = getTranslatedMessage(msg)
   message.value = translatedMsg
   messageType.value = type
+  undoAction.value = undo
   showMessage.value = true
   
   setTimeout(() => {

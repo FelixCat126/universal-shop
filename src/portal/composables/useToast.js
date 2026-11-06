@@ -6,13 +6,22 @@ let toastId = 0
 
 export const useToast = () => {
   // 显示toast
-  const showToast = (message, type = 'info', duration = 3000) => {
+  /**
+   * 显示一个 toast。
+   * @param {string} message 文案
+   * @param {'info'|'success'|'error'|'warning'} type
+   * @param {number} duration 自动消失时间（毫秒）
+   * @param {{label: string, onClick: Function}} [action] 可选的操作按钮
+   *   （例：删除商品后给一个"撤销"入口 —— 误删了不用重新找一遍）
+   */
+  const showToast = (message, type = 'info', duration = 3000, action = null) => {
     const id = ++toastId
     const toast = {
       id,
       message,
       type,
       duration,
+      action,
       visible: true
     }
     
