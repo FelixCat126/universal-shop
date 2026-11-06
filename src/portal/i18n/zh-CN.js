@@ -263,6 +263,9 @@ export default {
 
   // 订单
   order: {
+    unavailableItemsTitle: '有 {count} 件商品已失效（已下架或被删除），不会一起下单',
+    stockInsufficientTitle: '有 {count} 件商品库存不足',
+    stockOnlyLeft: '仅剩 {stock} 件',
     cityPlaceholder: "城市",
     provincePlaceholder: "省",
     title: '订单',

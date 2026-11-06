@@ -105,6 +105,7 @@ import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { categoryAdminAPI } from '../api/categories.js'
+import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 const { t } = useI18n()
 
@@ -116,7 +117,8 @@ const page = ref(1)
 const pageSize = ref(20)
 const totalPages = ref(0)
 
-const searchForm = reactive({ keyword: '' })
+const searchForm = usePersistentFilters('product-categories', {
+ keyword: '' })
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -125,7 +127,7 @@ const form = reactive({
   id: null,
   name: '',
   sort_order: 0
-})
+  })
 
 const rules = {
   name: [{ required: true, message: t('categories.nameRequired'), trigger: 'blur' }]

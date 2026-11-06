@@ -371,6 +371,7 @@ import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { couponAPI } from '../api/coupons.js'
 import { productAPI } from '../api/products.js'
+import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 const { t } = useI18n()
 
@@ -384,9 +385,10 @@ const totalTemplates = ref(0)
 const templateFormRef = ref(null)
 
 // 搜索表单
-const searchForm = reactive({
+const searchForm = usePersistentFilters('coupon-templates', {
+
   status: ''
-})
+  })
 
 // 券模板表单（total 可空 = 不限量；timeRange 为 [valid_from, valid_to] 字符串对，提交时展开）
 const templateForm = reactive({

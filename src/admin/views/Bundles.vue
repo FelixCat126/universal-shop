@@ -279,6 +279,7 @@ import { Plus, Search, Refresh, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { bundleAPI } from '../api/bundles.js'
 import { productAPI } from '../api/products.js'
+import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 const { t } = useI18n()
 
@@ -292,9 +293,10 @@ const totalBundles = ref(0)
 const bundleFormRef = ref(null)
 
 // 搜索表单
-const searchForm = reactive({
+const searchForm = usePersistentFilters('bundles', {
+
   status: ''
-})
+  })
 
 // 套餐表单（items 为动态组件行，提交时归一为 [{ product_id, quantity }]）
 const bundleForm = reactive({

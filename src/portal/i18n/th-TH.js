@@ -263,6 +263,9 @@ export default {
 
   // 订单
   order: {
+    unavailableItemsTitle: 'มีสินค้า {count} รายการที่ไม่พร้อมใช้งานแล้ว (ถูกถอดออกหรือลบ) และจะไม่ถูกสั่งซื้อ',
+    stockInsufficientTitle: 'สินค้า {count} รายการมีจำนวนไม่พอ',
+    stockOnlyLeft: 'เหลือเพียง {stock} ชิ้น',
     cityPlaceholder: "เมือง",
     provincePlaceholder: "จังหวัด",
     title: 'คำสั่งซื้อ',

@@ -364,6 +364,7 @@ import { useRouter } from 'vue-router'
 import { userAPI } from '../api/users.js'
 import CountryFlag from '../components/CountryFlag.vue'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
+import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -398,11 +399,12 @@ const pageSize = ref(20)
 const serverStats = ref(null)
 
 // 搜索表单
-const searchForm = reactive({
+const searchForm = usePersistentFilters('users', {
+
   email: '',
   phone: '',
   referral_code: ''
-})
+  })
 
 // 导出沿用当前列表的筛选条件，保证「导出的就是列表里看到的那批」
 const exportParams = computed(() => ({

@@ -40,6 +40,38 @@
               {{ t('order.items') }} ({{ availableItemCount }} {{ t('common.unit') }})
             </h2>
             
+            <!-- 失效商品提示：原来被静默过滤，用户不知道哪几件没下单 -->
+            <div
+              v-if="unavailableItems.length"
+              class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              role="status"
+            >
+              <p class="font-medium mb-1">
+                {{ t('order.unavailableItemsTitle', { count: unavailableItems.length }) }}
+              </p>
+              <ul class="list-disc pl-5 space-y-0.5">
+                <li v-for="item in unavailableItems" :key="item.id">
+                  {{ itemName(item) }} × {{ item.quantity }}
+                </li>
+              </ul>
+            </div>
+
+            <!-- 库存不足提示：下单前就说清楚，别等后端 400 -->
+            <div
+              v-if="stockIssues.length"
+              class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              role="alert"
+            >
+              <p class="font-medium mb-1">
+                {{ t('order.stockInsufficientTitle', { count: stockIssues.length }) }}
+              </p>
+              <ul class="list-disc pl-5 space-y-0.5">
+                <li v-for="issue in stockIssues" :key="issue.id">
+                  {{ issue.name }}：{{ t('order.stockOnlyLeft', { stock: issue.stock }) }}
+                </li>
+              </ul>
+            </div>
+
             <div class="space-y-4">
               <div
                 v-for="item in availableCartItems"
@@ -807,6 +839,30 @@ const availableCartItems = computed(() =>
   cartStore.items.filter(item => (item.product || item.bundle) && !item.unavailable)
 )
 
+/** 失效商品（商品被删除/下架）：会被排除在下单之外 —— 但要让用户知道 */
+const unavailableItems = computed(() =>
+  cartStore.items.filter(item => item.unavailable || !(item.product || item.bundle))
+)
+
+/**
+ * 库存不足的商品。
+ *
+ * 购物车里的 stock 是加购那一刻的快照，久了会过期；
+ * 与其等提交后端报 400（"商品 X 库存不足"），不如下单前就说清楚。
+ */
+const stockIssues = computed(() => {
+  const issues = []
+  for (const item of availableCartItems.value) {
+    const stock = Number(item.product?.stock)
+    const qty = Number(item.quantity || 0)
+    if (!Number.isFinite(stock) || stock <= 0) continue
+    if (qty > stock) {
+      issues.push({ id: item.id, name: itemName(item), stock, quantity: qty })
+    }
+  }
+  return issues
+})
+
 const availableItemCount = computed(() =>
   availableCartItems.value.reduce((total, item) => total + item.quantity, 0)
 )
@@ -1319,6 +1375,11 @@ const handleSubmitOrder = async () => {
 
 // 实际提交订单
 const submitOrder = async () => {
+  // 提交前先自查库存：把"下单失败"提前成"这里还剩几件"
+  if (stockIssues.value.length) {
+    showMessage(t('order.stockInsufficientTitle', { count: stockIssues.value.length }), 'error')
+    return
+  }
   submitting.value = true
 
   try {

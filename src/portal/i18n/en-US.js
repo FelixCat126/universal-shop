@@ -265,6 +265,9 @@ export default {
 
   // 订单
   order: {
+    unavailableItemsTitle: '{count} item(s) are no longer available and will not be ordered',
+    stockInsufficientTitle: '{count} item(s) do not have enough stock',
+    stockOnlyLeft: 'only {stock} left',
     title: 'Order',
     orderNo: 'Order Number',
     orderTime: 'Order Time',

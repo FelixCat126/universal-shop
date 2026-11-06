@@ -364,6 +364,7 @@ import { Plus, Search, Refresh, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { promotionAPI } from '../api/promotions.js'
 import { productAPI } from '../api/products.js'
+import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 const { t } = useI18n()
 
@@ -377,10 +378,11 @@ const totalPromotions = ref(0)
 const promotionFormRef = ref(null)
 
 // 搜索表单
-const searchForm = reactive({
+const searchForm = usePersistentFilters('promotions', {
+
   status: '',
   type: ''
-})
+  })
 
 // 促销表单（timeRange 为 [start_at, end_at] 字符串对，提交时展开）
 // buyGet.giftProductId 用 0 表示「同购买商品」（仅单个商品范围可选），提交时归一为 null

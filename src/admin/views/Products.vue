@@ -426,6 +426,7 @@ import 'element-plus/es/components/message-box/style/css'
 import { Plus, Search, Refresh, Loading, Picture, Delete, Edit, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { productAPI } from '../api/products.js'
+import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 export default {
   name: 'Products',
@@ -457,12 +458,13 @@ export default {
 
 
     // 搜索表单
-    const searchForm = reactive({
+    const searchForm = usePersistentFilters('products', {
+
       name: '',
       category_id: '',
       stockStatus: '',
       listingStatus: ''
-    })
+  })
 
     // 产品表单
     const productForm = reactive({
