@@ -54,6 +54,39 @@ describe('P2.partner.profile_catalog', () => {
     expect(found.discount_percent_applied).toBe(20)
   })
 
+  it('PP-2b GET /api/partner/products?ids=… 只返回指定商品（"再来一单"要按 id 回查）', async () => {
+    await seedSystemConfigBaseline({
+      partner_order_moq_unit: 50,
+      partner_order_moq_multiplier: 1
+    })
+    const { token } = await TestHelpers.createPartnerWithAddress({ discount_percent: 20 })
+    const { Product } = TestDatabase.getSequelize().models
+    const wanted = await Product.create(
+      TestDataFactory.createProduct({ price: 100, status: 'active', stock: 1000 })
+    )
+    const other = await Product.create(
+      TestDataFactory.createProduct({ price: 200, status: 'active', stock: 1000 })
+    )
+
+    const res = await request(app)
+      .get(`/api/partner/products?ids=${wanted.id},${other.id}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    const ids = res.body.data.products.map(p => p.id)
+    expect(ids).toContain(wanted.id)
+    expect(ids).toContain(other.id)
+
+    // 只要其中一个 → 只返回一个
+    const one = await request(app)
+      .get(`/api/partner/products?ids=${wanted.id}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(one.status).toBe(200)
+    expect(one.body.data.products.length).toBe(1)
+    expect(one.body.data.products[0].id).toBe(wanted.id)
+    // 仍按合作方折扣算价
+    expect(one.body.data.products[0].unit_price_thb).toBe(80)
+  })
+
   it('PP-3 未登录 → 401', async () => {
     const res = await request(app).get('/api/partner/products')
     expect(res.status).toBe(401)

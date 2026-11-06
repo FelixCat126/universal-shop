@@ -196,6 +196,19 @@ class PartnerPortalController {
       const discountPercent = req.partner.discount_percent
 
       const where = { status: 'active' }
+
+      /**
+       * 按 id 批量取商品（?ids=1,2,3）。
+       *
+       * "再来一单"要用**当前**的价与库存（订单里的快照是下单那会儿的），
+       * 所以得按 id 回查商品 —— 分页接口拿不全，单独给一个按 id 的入口。
+       */
+      const idsRaw = req.query.ids != null ? String(req.query.ids).trim() : ''
+      if (idsRaw) {
+        const ids = idsRaw.split(',').map(v => parseInt(v, 10)).filter(v => Number.isFinite(v) && v > 0)
+        if (ids.length) where.id = { [Op.in]: ids.slice(0, 200) }
+      }
+
       if (categoryIdRaw !== '') {
         const cid = parseInt(categoryIdRaw, 10)
         if (Number.isFinite(cid) && cid > 0) {

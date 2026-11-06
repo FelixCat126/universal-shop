@@ -97,6 +97,15 @@
               >
                 {{ t('orders.goPay') }}
               </button>
+              <!-- 再来一单：合作方是定期补货，上次订的货往往还是那些 -->
+              <button
+                type="button"
+                :disabled="reorderingId === order.id"
+                class="mt-2 touch-manipulation block w-full rounded-lg border border-primary-600 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-50 disabled:opacity-50"
+                @click.prevent.stop="reorder(order)"
+              >
+                {{ reorderingId === order.id ? t('orders.reordering') : t('orders.reorder') }}
+              </button>
             </div>
             <ChevronDownIcon class="w-5 h-5 text-gray-400 shrink-0 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
           </summary>
@@ -177,6 +186,66 @@ const toast = useToast()
 const loading = ref(false)
 const loadingMore = ref(false)
 const rows = ref([])
+
+/**
+ * 再来一单：把历史订单里的商品按原数量加回订货清单。
+ *
+ * 合作方是**定期补货**，上次订的货往往还是那些 ——
+ * 每次重新挑一遍费时又容易漏。这是刚需，不是锦上添花。
+ *
+ * 注意要用**当前**的价与库存（订单里的是下单那会儿的快照），
+ * 所以按 id 回查商品（?ids=1,2,3），而不是直接用订单里的旧数据。
+ */
+const reorderingId = ref(null)
+
+async function reorder (order) {
+  if (reorderingId.value !== null) return
+  const items = (order.items || []).filter(it => it.product_id)
+  if (!items.length) {
+    toast.error(t('orders.reorderNoItems'))
+    return
+  }
+  reorderingId.value = order.id
+  try {
+    const ids = [...new Set(items.map(it => it.product_id))]
+    const res = await partnerStore.api(`/products?ids=${ids.join(',')}&pageSize=100`)
+    const products = res?.data?.data?.products || res?.products || []
+    const byId = new Map(products.map(p => [Number(p.id), p]))
+
+    let added = 0
+    let skipped = 0
+    for (const it of items) {
+      const product = byId.get(Number(it.product_id))
+      if (!product) { skipped++; continue }
+      let qty = Math.max(1, Number(it.quantity) || 1)
+      const stock = Number(product.stock)
+      if (Number.isFinite(stock) && stock > 0 && qty > stock) { skipped++; continue }
+
+      // 起订量可能变过（上次订 10 件，现在 MOQ 提到 50）→ 向上取到合法数量
+      const unit = Math.max(1, Number(product.moq_unit) || 1)
+      const mult = Math.max(1, Number(product.moq_multiplier) || 1)
+      if (qty < unit) qty = unit
+      else if ((qty - unit) % mult !== 0) qty = unit + Math.ceil((qty - unit) / mult) * mult
+
+      const r = partnerStore.addToCart(product, qty)
+      if (r?.ok === false) {
+        skipped++   // 超过 3 个 SKU / 数量不合规等
+      } else {
+        added++
+      }
+    }
+    if (added > 0) {
+      toast.success(t('orders.reorderDone', { added, skipped }))
+    } else {
+      toast.error(t('orders.reorderFailed'))
+    }
+  } catch (e) {
+    console.error('再来一单失败', e)
+    toast.error(t('orders.reorderFailed'))
+  } finally {
+    reorderingId.value = null
+  }
+}
 const page = ref(1)
 const total = ref(0)
 const filterFrom = ref('')

@@ -95,6 +95,11 @@ export default {
     qrCodeSaveTip: 'Tip: right-click the QR code to save/download.'
   },
   orders: {
+    reorder: 'Order again',
+    reordering: 'Working...',
+    reorderDone: 'Added {added} item(s), skipped {skipped}',
+    reorderFailed: 'Could not reorder — please try again later',
+    reorderNoItems: 'This order has no items to reorder',
     title: 'My orders',
     refresh: 'Refresh',
     loading: 'Loading…',

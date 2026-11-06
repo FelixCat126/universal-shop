@@ -95,6 +95,11 @@ export default {
     qrCodeSaveTip: 'เคล็ดลับ: คลิกขวาที่คิวอาร์เพื่อบันทึก/ดาวน์โหลด'
   },
   orders: {
+    reorder: 'สั่งซื้ออีกครั้ง',
+    reordering: 'กำลังดำเนินการ...',
+    reorderDone: 'เพิ่ม {added} รายการ ข้าม {skipped} รายการ',
+    reorderFailed: 'สั่งซื้อซ้ำไม่สำเร็จ กรุณาลองใหม่ภายหลัง',
+    reorderNoItems: 'คำสั่งซื้อนี้ไม่มีสินค้าให้สั่งซื้อซ้ำ',
     title: 'คำสั่งซื้อของฉัน',
     refresh: 'รีเฟรช',
     loading: 'กำลังโหลด…',

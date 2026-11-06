@@ -95,6 +95,11 @@ export default {
     qrCodeSaveTip: '提示：右键点击二维码可保存下载'
   },
   orders: {
+    reorder: '再来一单',
+    reordering: '处理中...',
+    reorderDone: '已加入 {added} 种商品，未加入 {skipped} 种',
+    reorderFailed: '无法重新下单，请稍后再试',
+    reorderNoItems: '该订单没有可再次下单的商品',
     title: '我的订单',
     refresh: '刷新',
     loading: '加载中…',
