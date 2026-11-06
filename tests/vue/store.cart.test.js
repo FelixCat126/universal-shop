@@ -5,6 +5,8 @@
  *     CS-2 游客 addToCart → push items + 写 localStorage
  *     CS-3 游客 addToCart 库存不足 → success:false
  *     CS-4 已登录 addToCart 走 api.post('/cart')
+ *     CS-4b 已登录 addToCart 乐观更新（不等服务端就进列表）
+ *     CS-4c/4d 服务端失败或抛错 → 回滚乐观项
  *     CS-5 updateQuantity 0 → 调用 removeFromCart
  *     CS-6 clearCart 已登录 → api.delete('/cart')
  *     CS-7 mergeGuestCartOnLogin 把 localStorage 中商品逐个 POST + 全成功后清空
@@ -86,6 +88,43 @@ describe('VS.store.cart', () => {
     expect(r.success).toBe(true)
     expect(api.post).toHaveBeenCalledWith('/cart', { product_id: 1, quantity: 1 })
     expect(c.items[0].id).toBe(99)
+  })
+
+  it('CS-4b 已登录 addToCart 是乐观更新：请求未回就已经出现在列表里', async () => {
+    useUserStore().__setLogged(true)
+    let resolvePost
+    api.post.mockImplementation(() => new Promise(resolve => { resolvePost = resolve }))
+    const c = useCartStore()
+
+    const p = c.addToCart({ id: 1, price: 10, stock: 5 }, 1)
+    // 服务端还没回，商品已经进列表了（角标/列表立刻变化）
+    expect(c.items.length).toBe(1)
+    expect(c.items[0].optimistic).toBe(true)
+
+    resolvePost({ data: { success: true, data: { id: 77 } } })
+    await p
+    // 服务端回来后换成真实 id，乐观标记去掉
+    expect(c.items.length).toBe(1)
+    expect(c.items[0].id).toBe(77)
+    expect(c.items[0].optimistic).toBeUndefined()
+  })
+
+  it('CS-4c 服务端失败 → 回滚乐观加入的商品', async () => {
+    useUserStore().__setLogged(true)
+    api.post.mockResolvedValue({ data: { success: false } })
+    const c = useCartStore()
+    const r = await c.addToCart({ id: 1, price: 10, stock: 5 }, 1)
+    expect(r.success).toBe(false)
+    expect(c.items.length).toBe(0) // 回滚了，不会留下幽灵商品
+  })
+
+  it('CS-4d 请求抛错 → 同样回滚', async () => {
+    useUserStore().__setLogged(true)
+    api.post.mockRejectedValue(new Error('network'))
+    const c = useCartStore()
+    const r = await c.addToCart({ id: 1, price: 10, stock: 5 }, 1)
+    expect(r.success).toBe(false)
+    expect(c.items.length).toBe(0)
   })
 
   it('CS-5 updateQuantity(0) → 走 remove 分支', async () => {

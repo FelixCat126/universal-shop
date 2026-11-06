@@ -40,8 +40,14 @@ export const productAPI = {
   },
 
   // 获取产品列表（分页）
-  getProducts(params = {}) {
-    return api.get('/products', { params })
+  /**
+   * 拉商品列表。
+   * @param {object} params 查询参数
+   * @param {AbortSignal} [signal] 取消信号 —— 搜索时新词会中止旧请求，
+   *   不只是前端丢弃响应（那样服务端还在白算）。
+   */
+  getProducts(params = {}, signal) {
+    return api.get('/products', { params, signal })
   },
 
   // 获取单个产品详情

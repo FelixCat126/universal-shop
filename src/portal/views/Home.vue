@@ -139,13 +139,45 @@
             v-model="searchQuery"
             type="text"
             :placeholder="t('product.searchPlaceholder')"
-            class="w-full min-w-0 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+            :aria-label="t('product.searchPlaceholder')"
+            class="w-full min-w-0 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+            @keydown.enter.prevent="searchNow"
+            @keydown.esc.prevent="clearSearch"
           >
           <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 shrink-0 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
+          <!-- 搜索中：输入框内的转圈（比"结果突然变了"友好得多） -->
+          <span
+            v-if="searching"
+            class="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 rounded-full border-2 border-gray-300 border-t-blue-500 animate-spin"
+            role="status"
+            :aria-label="t('product.searching')"
+          />
+          <!-- 清除：Esc 或点 × -->
+          <button
+            v-else-if="searchQuery"
+            type="button"
+            class="absolute right-2.5 top-1/2 transform -translate-y-1/2 h-6 w-6 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center"
+            :aria-label="t('product.clearSearch')"
+            @click="clearSearch"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       </div>
+
+      <!-- 搜索结果数：搜的时候告诉用户"命中多少"，避免"结果没变"被误读成没搜到 -->
+      <p
+        v-if="searchQuery && !searching"
+        class="mb-4 text-sm text-gray-500"
+        role="status"
+        aria-live="polite"
+      >
+        {{ t('product.searchResultCount', { count: searchTotal }) }}
+      </p>
 
       <!-- 分类 Tab：横向滑动仅滚动本区域；下移出视口时粘在视窗顶部 -->
       <div
@@ -301,10 +333,15 @@
               <div class="flex space-x-2">
                 <button
                   @click.stop="addToCart(product)"
-                  :disabled="product.stock === 0"
-                  class="flex-1 px-3 py-2.5 sm:py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
+                  :disabled="product.stock === 0 || isAdding(product.id)"
+                  class="flex-1 px-3 py-2.5 sm:py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-1.5"
                 >
-                  {{ t('product.addToCart') }}
+                  <span
+                    v-if="isAdding(product.id)"
+                    class="h-3.5 w-3.5 rounded-full border-2 border-gray-400 border-t-transparent animate-spin"
+                    aria-hidden="true"
+                  />
+                  {{ isAdding(product.id) ? t('product.adding') : t('product.addToCart') }}
                 </button>
                 <button
                   @click.stop="buyNow(product)"
@@ -319,17 +356,34 @@
         </div>
       </div>
       
-      <!-- 空状态 -->
+      <!-- 空状态：区分"搜不到"与"没有商品"，并给出下一步动作 -->
       <div v-else class="text-center py-12">
         <svg class="mx-auto h-24 w-24 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
         </svg>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">
-          {{ t('product.noProducts') }}
-        </h3>
-        <p class="text-gray-500">
-          {{ t('cart.emptyDesc') }}
-        </p>
+        <template v-if="searchQuery">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">
+            {{ t('product.noSearchResult', { keyword: searchQuery }) }}
+          </h3>
+          <p class="text-gray-500 mb-5">
+            {{ t('product.noSearchResultHint') }}
+          </p>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            @click="clearSearch"
+          >
+            {{ t('product.clearSearch') }}
+          </button>
+        </template>
+        <template v-else>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">
+            {{ t('product.noProducts') }}
+          </h3>
+          <p class="text-gray-500">
+            {{ t('cart.emptyDesc') }}
+          </p>
+        </template>
       </div>
 
       <!-- 触底加载：延后触发便于在列表底部看到加载态 -->
@@ -416,6 +470,12 @@ const isLoading = ref(false)
 const loadingMore = ref(false)
 const products = ref([])
 const searchQuery = ref('')
+/** 搜索中（用于输入框转圈 + 结果数置灰） */
+const searching = ref(false)
+/** 命中总数（用于"找到 N 件"） */
+const searchTotal = ref(0)
+/** 正在进行的搜索请求的 AbortController：新的搜索会中止旧的（服务端也不用白算） */
+let searchAbort = null
 const currentPage = ref(1)
 const totalPages = ref(1)
 const pageSize = 8
@@ -678,12 +738,23 @@ const loadProducts = async ({ append = false } = {}) => {
         : {})
     }
 
-    const response = await productAPI.getProducts(params)
+    // 搜索请求可被新的搜索/清除中止（避免服务端白算）
+    const isSearch = !!params.name
+    if (isSearch) {
+      abortSearch()
+      searchAbort = new AbortController()
+    }
+    const response = await productAPI.getProducts(params, searchAbort?.signal)
     if (seq !== productLoadSeq) return // 已有更新的请求在途，丢弃过期响应
+    searching.value = false
 
     if (response.data.success) {
       const list = (response.data.data.products || []).map(mapProductRow)
       totalPages.value = response.data.data.totalPages || 1
+      // "找到 N 件"：搜索时给出命中总数（分页前）
+      if (isSearch) {
+        searchTotal.value = Number(response.data.data.total ?? list.length) || 0
+      }
 
       if (append) {
         const seen = new Set(products.value.map((p) => p.id))
@@ -706,6 +777,10 @@ const loadProducts = async ({ append = false } = {}) => {
       showError('加载产品失败: ' + response.data.message)
     }
   } catch (error) {
+    // 被新的搜索中止的请求：**不是错误**，静默丢弃（用户已经在搜下一个词了）
+    if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+      return
+    }
     console.error('加载产品失败:', error)
     if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
       showError('无法连接到服务器，请确保后端服务已启动 (npm run dev:server)')
@@ -789,13 +864,20 @@ const goToProductDetail = (productId) => {
   router.push(`/products/${productId}`)
 }
 
+// 正在加购的商品 id（防止连点导致加多次）
+const addingIds = ref(new Set())
+const isAdding = (id) => addingIds.value.has(id)
+
 // 添加到购物车 - 游客可用
 const addToCart = async (product) => {
   if (product.stock === 0) {
     showMessageToast('outOfStock', 'error')
     return
   }
-  
+  // 已经在加购中 → 忽略连点
+  if (addingIds.value.has(product.id)) return
+  addingIds.value.add(product.id)
+
   try {
     const result = await cartStore.addToCart(product, 1)
     
@@ -806,6 +888,8 @@ const addToCart = async (product) => {
     }
   } catch (error) {
     showMessageToast('addFailed', 'error')
+  } finally {
+    addingIds.value.delete(product.id)
   }
 }
 
@@ -875,6 +959,9 @@ watch(
   () => searchQuery.value,
   () => {
     clearTimeout(searchDebounceTimer)
+    // 词还在变 → 上一轮的请求没有意义了，直接中止（服务端也少算一次）
+    abortSearch()
+    searching.value = true
     searchDebounceTimer = setTimeout(async () => {
       currentPage.value = 1
       await loadProducts({ append: false })
@@ -883,6 +970,38 @@ watch(
     }, 400)
   }
 )
+
+/** 中止在途的搜索请求 */
+function abortSearch () {
+  if (searchAbort) {
+    try { searchAbort.abort() } catch (_) {}
+    searchAbort = null
+  }
+}
+
+/** 回车：立刻搜索（不等防抖） */
+function searchNow () {
+  clearTimeout(searchDebounceTimer)
+  abortSearch()
+  searching.value = true
+  currentPage.value = 1
+  loadProducts({ append: false }).then(async () => {
+    await nextTick()
+    attachInfiniteScroll()
+  })
+}
+
+/** 清除搜索（Esc / ×）：恢复完整列表 */
+function clearSearch () {
+  clearTimeout(searchDebounceTimer)
+  searchQuery.value = ''
+  searching.value = false
+  currentPage.value = 1
+  loadProducts({ append: false }).then(async () => {
+    await nextTick()
+    attachInfiniteScroll()
+  })
+}
 
 watch(
   () => locale.value,

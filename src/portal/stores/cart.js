@@ -113,6 +113,12 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   // 添加商品到购物车
+  /** 回滚乐观加入的商品（服务端失败时） */
+  function rollbackOptimistic (tempId) {
+    const idx = items.value.findIndex(i => i.id === tempId)
+    if (idx >= 0) items.value.splice(idx, 1)
+  }
+
   const addToCart = async (product, quantity = 1) => {
     try {
       isLoading.value = true
@@ -137,23 +143,50 @@ export const useCartStore = defineStore('cart', () => {
         return result
       } else {
         if (userStore.isLoggedIn) {
-          // 已登录用户：调用API添加到服务器购物车
-          const response = await api.post('/cart', {
+          /**
+           * 已登录用户：**乐观更新**。
+           *
+           * 原来要等服务端返回才把商品放进列表 —— 弱网下（泰国商城的移动网络）
+           * 点了"加入购物车"要等一两秒才有反应，像卡住了。
+           * 现在：先本地加进去（角标/列表立刻变），服务端回来再换成真实 id；
+           * 失败则回滚（商品从列表消失 + 错误提示）。
+           */
+          const tempId = `tmp_${Date.now()}_${product.id}`
+          const optimisticItem = {
+            id: tempId,
             product_id: product.id,
-            quantity
-          })
-          
-          if (response.data.success) {
-            const newItem = {
-              id: response.data.data.id,
+            product: product,
+            quantity,
+            price: getActualPrice(product),
+            optimistic: true
+          }
+          items.value.push(optimisticItem)
+
+          try {
+            const response = await api.post('/cart', {
               product_id: product.id,
-              product: product,
-              quantity,
-              price: getActualPrice(product)
+              quantity
+            })
+
+            if (response.data.success) {
+              const idx = items.value.findIndex(i => i.id === tempId)
+              const realItem = {
+                id: response.data.data.id,
+                product_id: product.id,
+                product: product,
+                quantity,
+                price: getActualPrice(product)
+              }
+              if (idx >= 0) items.value.splice(idx, 1, realItem)
+              else items.value.push(realItem)
+              return { success: true, message: 'addSuccess' }
             }
-            items.value.push(newItem)
-            return { success: true, message: 'addSuccess' }
-          } else {
+            // 服务端拒绝 → 回滚乐观项
+            rollbackOptimistic(tempId)
+            return { success: false, message: 'addFailed' }
+          } catch (error) {
+            console.error('Add to cart error:', error)
+            rollbackOptimistic(tempId)
             return { success: false, message: 'addFailed' }
           }
         } else {
