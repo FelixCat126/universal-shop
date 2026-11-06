@@ -1,28 +1,16 @@
 import axios from 'axios'
+import config from '../../config/index.js'
 
-// 获取API基础URL
-const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    const { protocol, hostname, port } = window.location
-    
-    // 开发环境
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:3000/api'
-    }
-    
-    // 生产环境 - 使用当前页面的协议和主机
-    if (port && port !== '80' && port !== '443') {
-      return `${protocol}//${hostname}:${port}/api`
-    } else {
-      return `${protocol}//${hostname}/api`
-    }
-  }
-  return 'http://localhost:3000/api'
-}
-
-// 创建axios实例
+/**
+ * API 基址**用共享的那一份**（src/config/index.js）。
+ *
+ * 原来这里自己抄了一份判断（"localhost 或 127.0.0.1 → localhost:3000"），
+ * 与共享配置、admin/config/api.js 三处各说各话 ——
+ * 结果就是「同一份构建在不同域名下行为不同」，很难查。
+ * 现在只有 src/config/index.js 一个地方说了算。
+ */
 const api = axios.create({
-  baseURL: getApiBaseUrl(),
+  baseURL: config.apiBaseUrl,
   timeout: 10000
 })
 

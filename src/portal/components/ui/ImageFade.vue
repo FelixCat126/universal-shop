@@ -33,6 +33,8 @@ const props = defineProps({
 const emit = defineEmits(['load', 'error'])
 
 const loaded = ref(false)
+/** 是否已经退回过主图（防止无限重试） */
+let fellBack = false
 
 function onLoad (e) {
   loaded.value = true
@@ -40,7 +42,19 @@ function onLoad (e) {
 }
 
 function onError (e) {
-  // 即使失败也 fade-in，避免一直空白
+  /**
+   * srcset 里的变体可能不存在（老图没跑过 scripts/reprocess-images.mjs）——
+   * 浏览器**不会**在 srcset 候选失败时自动回退到 src，图会直接裂掉。
+   * 所以这里主动退回主图再试一次。
+   */
+  const el = e?.target
+  if (!fellBack && el && props.src) {
+    fellBack = true
+    el.srcset = ''
+    el.src = props.src
+    return
+  }
+  // 退回主图仍失败 → 确实没有图了，fade-in 避免一直空白
   loaded.value = true
   emit('error', e)
 }

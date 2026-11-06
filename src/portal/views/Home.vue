@@ -69,6 +69,7 @@
               </span>
               <ImageFade
                 :src="bundle.image || defaultImage"
+                :srcset="imageSrcSet(bundle.image)"
                 :alt="getCurrentLanguageValue(bundle, 'name')"
                 custom-class="w-full h-48 object-cover"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
@@ -233,10 +234,12 @@
             </div>
             <ImageFade
               :src="product.image_url || defaultImage"
+              :srcset="imageSrcSet(product.image_url)"
               :alt="getCurrentLanguageValue(product, 'name')"
               custom-class="w-full h-48 object-cover"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
-              loading="lazy"
+              :loading="cardLoading(idx).loading"
+              :fetchpriority="cardLoading(idx).fetchpriority"
               @error="handleImageError"
               @load="handleImageLoad"
             />
@@ -384,8 +387,18 @@ import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import ImageFade from '../components/ui/ImageFade.vue'
 import { appleSpring, subtleSpring, bouncySpring } from '../composables/useSpring.js'
 import { useReducedMotion } from '../composables/useReducedMotion.js'
+import { imageSrcSet, imageLoadingFor } from '../utils/imageVariants.js'
 
 const portalCurrency = usePortalCurrencyStore()
+
+/**
+ * 首屏前几张图用 eager + fetchpriority=high。
+ *
+ * 原来**所有**图都是 loading="lazy" —— 连首屏那几张也是：
+ * 浏览器要先算完布局才知道它可见，等于首屏图反而最后才到，
+ * 白白多等一轮。首屏之外的保持 lazy（滚到才下）。
+ */
+const cardLoading = (index) => imageLoadingFor(index, 4)
 
 // Home.vue组件已加载
 

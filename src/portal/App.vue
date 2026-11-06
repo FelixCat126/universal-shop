@@ -190,13 +190,12 @@ const updatePageTitle = () => {
   document.title = t(titleKey)
 }
 
-// 切换语言：同步币种为语言默认（见 portalCurrency.store）
+// 切换语言：**不**动展示币种。
+// 语言是给人看的，币种是钱的事 —— 用户手动选过就尊重他，没选过就跟随站点配置的结算币种。
 const changeLanguage = () => {
   localStorage.setItem('language', currentLanguage.value)
 
   locale.value = currentLanguage.value
-
-  portalCurrency.applyDefaultForLocale(currentLanguage.value)
 
   window.dispatchEvent(new CustomEvent('language-changed', {
     detail: { language: currentLanguage.value }

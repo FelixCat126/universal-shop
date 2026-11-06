@@ -1,7 +1,5 @@
 import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 
@@ -30,9 +28,9 @@ const i18n = createI18n({
 const app = createApp(App)
 
 // 注册所有Element Plus图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
-}
+// 图标不再全局注册：每个 .vue 都已按需 import 自己用到的图标，
+// 全局注册会把 290 个图标全打进首屏包（见 vite.admin.config.js 的按需引入说明）。
+// Element Plus 组件本身由 unplugin-vue-components 自动按需引入。
 
 // 发版后旧页面持有的 chunk 哈希已失效，动态 import 会失败：自动刷新拉取新资源
 // sessionStorage 时间戳节流（60s 内最多刷一次），防止部署异常时无限刷新循环
@@ -71,7 +69,7 @@ window.addEventListener('vite:preloadError', (event) => {
 })
 
 app.use(createPinia())
-app.use(ElementPlus)
+// Element Plus 不再整包 app.use —— 组件由 unplugin-vue-components 按需引入
 app.use(i18n)
 app.use(router)
 

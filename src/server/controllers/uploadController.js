@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import crypto from 'crypto'
 import { fileTypeFromFile } from 'file-type'
+import { processImageFile } from '../utils/imageProcessor.js'
 import { logger } from '../utils/logger.js'
 import { ApiError } from '../middlewares/errorHandler.js'
 
@@ -151,17 +152,39 @@ class UploadController {
         return res.status(e.status || 400).json({ success: false, message: e.message })
       }
 
+      /**
+       * 压缩 + 生成缩略图/中图变体。
+       *
+       * 原来原图直接存、原图直接发：线上有张 1.9MB 的商品图，
+       * 而列表页只显示 192px 宽 —— 首屏光图片就传了 1MB。
+       * 压完主图再派生 400px/800px 的 WebP，前端用 srcset 按屏宽挑档。
+       *
+       * 处理失败不阻断上传（图片已落盘，只是没瘦身）。
+       */
+      let processed = null
+      try {
+        processed = await processImageFile(req.file.path)
+      } catch (e) {
+        logger.warn('图片压缩处理失败（保留原图）', { err: e?.message })
+      }
+      const mainName = processed?.main || req.file.filename
+
       // 构建文件URL
-      const fileUrl = `/uploads/products/${req.file.filename}`
+      const fileUrl = `/uploads/products/${mainName}`
 
       res.json({
         success: true,
         message: '图片上传成功',
         data: {
-          filename: req.file.filename,
+          filename: mainName,
           originalName: req.file.originalname,
           url: fileUrl,
-          size: req.file.size
+          size: req.file.size,
+          // 变体文件名（前端按约定拼 srcset；这里一并给出便于调用方直接用）
+          variants: {
+            thumb: processed?.thumb ? `/uploads/products/${processed.thumb}` : null,
+            mid: processed?.mid ? `/uploads/products/${processed.mid}` : null
+          }
         }
       })
     } catch (error) {

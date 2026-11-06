@@ -41,6 +41,7 @@
           >
             <ImageFade
               :src="product.image_url || defaultImage"
+              :srcset="imageSrcSet(product.image_url)"
               :alt="getCurrentLanguageValue(product, 'name')"
               custom-class="w-full h-96 object-cover rounded-lg"
               sizes="(max-width: 1024px) 100vw, 50vw"
@@ -235,6 +236,7 @@ import config from '../../../config/index.js'
 import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import SkeletonDetail from '../../components/ui/SkeletonDetail.vue'
 import ImageFade from '../../components/ui/ImageFade.vue'
+import { imageSrcSet } from '../../utils/imageVariants.js'
 import { softSpring, subtleSpring } from '../../composables/useSpring.js'
 import { useReducedMotion } from '../../composables/useReducedMotion.js'
 

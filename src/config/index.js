@@ -79,13 +79,21 @@ class ConfigManager {
       return true
     }
     
-    // 基于域名判断（localhost通常为开发环境）
+    /**
+     * 基于域名判断：**只有 localhost 算开发环境**。
+     *
+     * 原来把 127.0.0.1 / 192.168.* 也算成开发环境 → API 地址被写死成
+     * http://localhost:3000/api。于是任何**从 127.0.0.1 提供的构建**
+     * （预览服、内网直连、局域网 IP 访问）都会把请求打到本机 3000 端口，
+     * 而真正的 API 在当前站点 → 登录/接口全失败。
+     *
+     * 现在只有 vite dev（localhost:3002 → API 在 localhost:3000）走开发默认，
+     * 其余一律按当前站点推导（同源），生产域名访问的行为完全不变。
+     */
     if (typeof window !== 'undefined') {
-      return window.location.hostname === 'localhost' || 
-             window.location.hostname === '127.0.0.1' ||
-             window.location.hostname.startsWith('192.168.')
+      return window.location.hostname === 'localhost'
     }
-    
+
     return false
   }
 

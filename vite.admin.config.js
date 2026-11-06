@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
 
 /**
@@ -15,7 +17,24 @@ function viteAdminBase () {
 }
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    /**
+     * Element Plus **按需引入**。
+     *
+     * 原来 main.js 里 `app.use(ElementPlus)` 把整库（1MB+）打进了首屏主包，
+     * 外加 `import * as ElementPlusIconsVue` 把 290 个图标全注册了一遍。
+     * 改按需后：模板里用到的组件自动按需引入，图标各文件本来就已按需 import。
+     *
+     * importStyle: false —— 样式仍走 main.js 里的整包 CSS（避免 JS API
+     * （ElMessage 等）样式丢失）；按需引入的组件样式与整包 CSS 是同一批文件，
+     * 打包时会去重，不会变大。
+     */
+    Components({
+      resolvers: [ElementPlusResolver({ importStyle: false })],
+      dts: false
+    })
+  ],
   root: 'src/admin',
   base: viteAdminBase(),
   resolve: {
@@ -47,8 +66,16 @@ export default defineConfig({
           if (pkg === 'echarts' || pkg === 'vue-echarts' || pkg === 'zrender') {
             return 'vendor-echarts'
           }
+          /**
+           * element-plus / 图标**不**再人工合并成一个大块。
+           *
+           * 合并的后果：那个块包含所有用到的组件（~950KB），而登录页就要用
+           * ElInput/ElButton —— 于是**首屏就得把整块下完**，路由懒加载的意义全没了。
+           * 不合并后 Rollup 会按「谁用谁带」自然分包：登录页只带输入框/按钮，
+           * 商品页才带表格/上传器，各页各下各的。
+           */
           if (pkg === 'element-plus' || pkg === '@element-plus/icons-vue') {
-            return 'vendor-element-plus'
+            return undefined
           }
           if (pkg === 'vue' || pkg === '@vue/runtime-core' || pkg === '@vue/runtime-dom' ||
               pkg === '@vue/shared' || pkg === '@vue/reactivity' || pkg === '@vue/compiler-sfc' ||

@@ -8,7 +8,13 @@ export { loadPublicConfig }
 
 const STORAGE_KEY = 'portal_currency'
 
-/** 与语言首次绑定的默认展示币种 */
+/**
+ * 兜底用的默认展示币种（**只在站点配置还没拿到时**用）。
+ *
+ * 正式规则是「跟随站点配置的结算币种」（system_configs.currency_unit）：
+ * 这是一家泰国商城，商品价就是泰铢，中文界面不代表要用人民币标价。
+ * 界面语言是给人看的，币种是钱的事 —— 两者不该绑在一起。
+ */
 export const DEFAULT_CURRENCY_BY_LOCALE = {
   'zh-CN': 'CNY',
   'en-US': 'USD',
@@ -21,6 +27,8 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
   const selectedCode = ref('THB')
   const rates = ref({ USD: '0.00', CNY: '0.00', MYR: '0.00' })
   const loaded = ref(false)
+  /** 站点配置的结算币种（system_configs.currency_unit，THB/USD/CNY/MYR） */
+  const siteCurrency = ref(null)
 
   const options = PORTAL_CURRENCIES
 
@@ -37,6 +45,9 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
           MYR: er.MYR ?? '0.00'
         }
       }
+      // 站点配置的结算币种：用户没手动选过时，展示币种跟它走
+      const site = String(data?.currency_code || data?.currency_unit || '').trim().toUpperCase()
+      if (VALID.has(site)) siteCurrency.value = site
     } finally {
       loaded.value = true
     }
@@ -46,13 +57,14 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
     return DEFAULT_CURRENCY_BY_LOCALE[locale] || 'THB'
   }
 
-  /** 切换界面语言时：按业务规则同步默认币种（会覆盖当前选择） */
+  /**
+   * 恢复默认展示币种：**跟随站点配置**（不是界面语言）。
+   *
+   * 注意**不写** localStorage：自动推导出来的值不能被当成"用户选过"，
+   * 否则以后站点改了结算币种，这些用户会一直卡在旧值上。
+   */
   function applyDefaultForLocale (locale) {
-    const d = defaultForLocale(locale)
-    selectedCode.value = d
-    try {
-      localStorage.setItem(STORAGE_KEY, d)
-    } catch (_) {}
+    selectedCode.value = siteCurrency.value || defaultForLocale(locale)
   }
 
   function setCurrency (code) {
@@ -64,13 +76,25 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
     } catch (_) {}
   }
 
-  /** 应用启动：有合法缓存则尊重用户上次选择，否则跟语言默认 */
+  /**
+   * 应用启动：
+   *   1. 用户**手动**选过币种 → 尊重他的选择
+   *   2. 没选过 → 跟随**站点配置的结算币种**（泰国商城 = THB）
+   *   3. 配置还没拿到 → 用语言兜底
+   *
+   * 迁移：老版本会把"按语言自动推导的默认值"也写进 localStorage，
+   * 于是中文界面的老用户缓存里是 CNY —— 那是自动值不是他选的，
+   * 这里按"等于语言默认值"判定为自动值 → 改跟随站点币种。
+   */
   function initFromStorage (locale) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (raw && VALID.has(raw)) {
-        selectedCode.value = raw
-        return
+        const isLegacyAuto = raw === defaultForLocale(locale)
+        if (!isLegacyAuto) {
+          selectedCode.value = raw
+          return
+        }
       }
     } catch (_) {}
     applyDefaultForLocale(locale)
@@ -88,6 +112,7 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
     selectedCode,
     rates,
     loaded,
+    siteCurrency,
     options,
     labelFor,
     loadRates,
