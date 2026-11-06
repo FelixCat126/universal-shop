@@ -16,6 +16,8 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+// 生产库的连接串在服务器的 .env 里，必须先加载
+import 'dotenv/config'
 import { ensureVariantsInDir, MAIN_MAX_EDGE } from '../src/server/utils/imageProcessor.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))

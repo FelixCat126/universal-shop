@@ -21,6 +21,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+// 生产库的连接串在服务器的 .env 里，必须先加载
+import 'dotenv/config'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
