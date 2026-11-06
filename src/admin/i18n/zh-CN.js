@@ -16,6 +16,9 @@ export default {
 
   // 通用
   common: {
+    somethingWentWrong: '页面出了点问题',
+    tryAgainHint: '刷新一下通常就能恢复。如果一直这样，请把下面的错误信息告诉我们。',
+    reload: '刷新页面',
     confirm: '确认',
     cancel: '取消',
     save: '保存',

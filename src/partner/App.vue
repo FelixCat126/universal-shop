@@ -1,5 +1,22 @@
 <template>
   <div class="min-h-[100dvh] flex flex-col bg-gray-50 text-gray-900">
+    <!-- 致命错误兜底：组件抛错时别白屏 -->
+    <div
+      v-if="fatalError"
+      class="fixed inset-0 z-[100] bg-white/95 backdrop-blur flex flex-col items-center justify-center gap-4 px-6 text-center"
+      role="alert"
+    >
+      <h2 class="text-lg font-semibold text-gray-900">{{ t('common.somethingWentWrong') }}</h2>
+      <p class="text-sm text-gray-500 max-w-md">{{ t('common.tryAgainHint') }}</p>
+      <p v-if="fatalError.message" class="text-xs text-gray-400 max-w-md break-words font-mono">{{ fatalError.message }}</p>
+      <button
+        type="button"
+        class="mt-2 px-5 py-2.5 rounded-lg bg-primary-600 text-white text-sm font-medium hover:opacity-90"
+        @click="reloadPage"
+      >
+        {{ t('common.reload') }}
+      </button>
+    </div>
     <ToastContainer />
     <header
       v-if="showNav"
@@ -129,13 +146,14 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ensureLocale } from './i18n/index.js'
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
 import ToastContainer from './components/ToastContainer.vue'
 import { usePartnerStore } from './stores/partner.js'
+import { fatalError, reportFatalError } from '../utils/fatalError.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -196,4 +214,13 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
 })
+
+onErrorCaptured((err, instance, info) => {
+  reportFatalError(err, info)
+  return false
+})
+
+function reloadPage () {
+  window.location.reload()
+}
 </script>

@@ -182,6 +182,9 @@ export default {
     postalCodeAuto: 'Filled after sub-district'
   },
   common: {
+    somethingWentWrong: 'Something went wrong',
+    tryAgainHint: 'A refresh usually fixes it. If it keeps happening, please send us the error below.',
+    reload: 'Reload page',
     loading: 'Loading',
     error: 'Something went wrong',
     selectCountry: 'Dial code'

@@ -1,5 +1,25 @@
 <template>
   <div id="app" class="min-h-screen bg-gray-50">
+    <!-- 致命错误兜底：组件抛错时别白屏，给一句说明 + 重试 -->
+    <div
+      v-if="fatalError"
+      class="fixed inset-0 z-[100] bg-white/95 backdrop-blur flex flex-col items-center justify-center gap-4 px-6 text-center"
+      role="alert"
+    >
+      <svg class="h-14 w-14 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      </svg>
+      <h2 class="text-lg font-semibold text-gray-900">{{ t('common.somethingWentWrong') }}</h2>
+      <p class="text-sm text-gray-500 max-w-md">{{ t('common.tryAgainHint') }}</p>
+      <p v-if="fatalError.message" class="text-xs text-gray-400 max-w-md break-words font-mono">{{ fatalError.message }}</p>
+      <button
+        type="button"
+        class="mt-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+        @click="reloadPage"
+      >
+        {{ t('common.reload') }}
+      </button>
+    </div>
     <!-- 顶部导航栏（滚动时 backdrop-blur 渐变） -->
     <header
       class="bg-white/85 backdrop-blur-md border-b sticky top-0 z-40 transition-shadow duration-300"
@@ -122,9 +142,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, onErrorCaptured } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { fatalError, reportFatalError } from '../utils/fatalError.js'
 import { useCartStore } from './stores/cart.js'
 import { useUserStore } from './stores/user.js'
 import ToastContainer from './components/ui/Toast/ToastContainer.vue'
@@ -155,6 +176,21 @@ const currentLanguage = computed({
     ensureLocale(val).then(() => { locale.value = val })
   }
 })
+
+/**
+ * 致命错误兜底。
+ *
+ * 组件渲染抛错时 Vue 默认会把这块界面清空 → 用户看到的是**白屏**，
+ * 既不知道出了什么事，也没法继续用。这里把它收住，渲染一个可操作的兜底页。
+ */
+onErrorCaptured((err, instance, info) => {
+  reportFatalError(err, info)
+  return false // 不再往上传，避免重复处理
+})
+
+function reloadPage () {
+  window.location.reload()
+}
 
 // 顶栏滚动阴影
 const hasScrolled = ref(false)

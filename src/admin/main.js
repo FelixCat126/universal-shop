@@ -11,8 +11,14 @@ import './styles/admin-ui-overrides.css'
 
 // i18n 实例（语言包按需加载，见 src/admin/i18n/index.js）
 import i18n, { ensureLocale } from './i18n/index.js'
+import { reportFatalError } from '../utils/fatalError.js'
 
 const app = createApp(App)
+
+// 未捕获的组件错误：收进兜底页，别让用户对着白屏
+app.config.errorHandler = (err, instance, info) => {
+  reportFatalError(err, info)
+}
 
 // 注册所有Element Plus图标
 // 图标不再全局注册：每个 .vue 都已按需 import 自己用到的图标，

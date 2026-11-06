@@ -11,6 +11,9 @@ export default {
 
   // 通用
   common: {
+    somethingWentWrong: 'Something went wrong',
+    tryAgainHint: 'A refresh usually fixes it. If it keeps happening, please send us the error below.',
+    reload: 'Reload page',
     backToHome: 'Back to Home',
     confirm: 'Confirm',
     cancel: 'Cancel',
