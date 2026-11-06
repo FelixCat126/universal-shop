@@ -3,29 +3,14 @@ import { createApp } from 'vue'
 // 整包 CSS 有 350KB 且是渲染阻塞的，登录页用不到那么多。
 // JS API（ElMessage 等）的样式由各使用处显式 import。
 import { createPinia } from 'pinia'
-import { createI18n } from 'vue-i18n'
 
 import router from './router'
 import { fetchAndApplyCurrencyUnit } from '../utils/currencyI18n.js'
 import App from './App.vue'
 import './styles/admin-ui-overrides.css'
 
-// 导入语言包
-import zhCN from './i18n/zh-CN.js'
-import thTH from './i18n/th-TH.js'
-import enUS from './i18n/en-US.js'
-
-// 创建i18n实例
-const i18n = createI18n({
-  legacy: false,
-  locale: localStorage.getItem('admin-language') || 'zh-CN',
-  fallbackLocale: 'zh-CN',
-  messages: {
-    'zh-CN': zhCN,
-    'th-TH': thTH,
-    'en-US': enUS
-  }
-})
+// i18n 实例（语言包按需加载，见 src/admin/i18n/index.js）
+import i18n, { ensureLocale } from './i18n/index.js'
 
 const app = createApp(App)
 
@@ -76,5 +61,8 @@ app.use(i18n)
 app.use(router)
 
 fetchAndApplyCurrencyUnit(i18n, '').finally(() => {
+  // 语言包按需加载：首屏要用哪种语言就先把它拉下来（默认中文已在首屏包里，零等待）
+ensureLocale(i18n.global.locale.value).finally(() => {
   app.mount('#app')
+})
 })

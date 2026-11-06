@@ -121,6 +121,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ensureLocale } from '../i18n/index.js'
 import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -149,7 +150,9 @@ function onMenuSelect (index) {
 const currentLanguage = ref(locale.value)
 
 // 切换语言
-const changeLanguage = (lang) => {
+const changeLanguage = async (lang) => {
+  // 语言包按需加载：先拉下来再切，避免那一瞬间显示成 fallback
+  await ensureLocale(lang)
   locale.value = lang
   currentLanguage.value = lang
   localStorage.setItem('admin-language', lang)

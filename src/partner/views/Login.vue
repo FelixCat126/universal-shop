@@ -103,6 +103,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ensureLocale } from '../i18n/index.js'
 import { BuildingStorefrontIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
@@ -118,7 +119,8 @@ const { t, locale } = useI18n()
 const localeModel = computed({
   get: () => locale.value,
   set: (v) => {
-    locale.value = v
+    // 语言包按需加载：先拉下来再切
+    ensureLocale(v).then(() => { locale.value = v })
   }
 })
 

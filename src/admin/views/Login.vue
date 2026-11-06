@@ -123,6 +123,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ensureLocale } from '../i18n/index.js'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { User, Lock, Right, Warning } from '@element-plus/icons-vue'
@@ -243,7 +244,9 @@ const resetCaptchaState = () => {
 }
 
 // 切换语言
-const changeLanguage = (lang) => {
+const changeLanguage = async (lang) => {
+  // 语言包按需加载：先拉下来再切，避免那一瞬间显示成 fallback
+  await ensureLocale(lang)
   locale.value = lang
   localStorage.setItem('admin-language', lang)
   ElMessage.success(t('language.switchSuccess'))

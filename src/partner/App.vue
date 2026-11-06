@@ -132,6 +132,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ensureLocale } from './i18n/index.js'
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
 import ToastContainer from './components/ToastContainer.vue'
 import { usePartnerStore } from './stores/partner.js'
@@ -168,7 +169,10 @@ function onMobileLogout () {
 }
 
 function onLocaleChange () {
-  localStorage.setItem('partner-locale', locale.value)
+  // 语言包按需加载：切之前先把它拉下来，避免闪一下 fallback
+  ensureLocale(locale.value).finally(() => {
+    localStorage.setItem('partner-locale', locale.value)
+  })
 }
 
 function logout () {

@@ -155,9 +155,13 @@ export async function ensureVariantsInDir (dir) {
     const stat = await fs.stat(full).catch(() => null)
     if (!stat?.isFile()) continue
 
-    const thumbPath = path.join(dir, variantFileName(name, 'thumb'))
-    const already = await fs.stat(thumbPath).catch(() => null)
-    if (already) { skipped++; continue }
+    // 跳过条件：**主图(.webp)与缩略图都在**才算处理过。
+    // 只看缩略图会漏掉「有变体但主图还是 jpg」的情况 ——
+    // 那正是存量图切 WebP 需要的那一步。
+    const base = name.slice(0, name.length - path.extname(name).length)
+    const hasWebp = await fs.stat(path.join(dir, `${base}.webp`)).catch(() => null)
+    const hasThumb = await fs.stat(path.join(dir, variantFileName(name, 'thumb'))).catch(() => null)
+    if (hasWebp && hasThumb) { skipped++; continue }
 
     const before = stat.size
     const res = await processImageFile(full)

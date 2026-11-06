@@ -130,6 +130,7 @@ import { useUserStore } from './stores/user.js'
 import ToastContainer from './components/ui/Toast/ToastContainer.vue'
 import i18n from './i18n'
 import { fetchAndApplyCurrencyUnit } from '../utils/currencyI18n.js'
+import { ensureLocale } from './i18n/index.js'
 import { usePortalCurrencyStore } from './stores/portalCurrency.js'
 
 // 门户端主应用组件已加载
@@ -148,7 +149,11 @@ const portalCurrency = usePortalCurrencyStore()
 // 响应式数据
 const currentLanguage = computed({
   get: () => locale.value,
-  set: (val) => { locale.value = val }
+  set: (val) => {
+    // 语言包是按需加载的：切到未加载的语言前先把它拉下来，
+    // 否则那一瞬间界面会显示成 fallback（中文）或裸 key
+    ensureLocale(val).then(() => { locale.value = val })
+  }
 })
 
 // 顶栏滚动阴影
@@ -192,13 +197,14 @@ const updatePageTitle = () => {
 
 // 切换语言：**不**动展示币种。
 // 语言是给人看的，币种是钱的事 —— 用户手动选过就尊重他，没选过就跟随站点配置的结算币种。
-const changeLanguage = () => {
-  localStorage.setItem('language', currentLanguage.value)
-
-  locale.value = currentLanguage.value
+const changeLanguage = (val) => {
+  // 用事件带的新值，不要读 currentLanguage.value ——
+  // 语言包是异步加载的，setter 还没把 locale 换过去，读到的会是旧值
+  const lang = val ?? currentLanguage.value
+  localStorage.setItem('language', lang)
 
   window.dispatchEvent(new CustomEvent('language-changed', {
-    detail: { language: currentLanguage.value }
+    detail: { language: lang }
   }))
 }
 
@@ -272,16 +278,12 @@ onMounted(async () => {
   window.addEventListener('scroll', onScroll, { passive: true })
 
   // 从localStorage恢复语言设置，默认中文
-  const savedLanguage = localStorage.getItem('language')
-  if (savedLanguage) {
-    currentLanguage.value = savedLanguage
-  } else {
-    currentLanguage.value = 'zh-CN'
-    localStorage.setItem('language', 'zh-CN')
-  }
-  
-  // 确保vue-i18n的locale与当前语言设置同步
-  locale.value = currentLanguage.value
+  const savedLanguage = localStorage.getItem('language') || 'zh-CN'
+  localStorage.setItem('language', savedLanguage)
+
+  // 语言包按需加载：恢复的语言若还没下过，先加载再切（避免闪一下 fallback）
+  await ensureLocale(savedLanguage)
+  locale.value = savedLanguage
   
   try {
     // 两者共用同一份 public 配置（in-flight 去重后实际只发一次请求），并行等待
