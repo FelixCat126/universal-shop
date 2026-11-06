@@ -174,6 +174,42 @@
       </router-link>
     </div>
 
+    <!-- 相关推荐：同分类的其它在售商品（提升客单价的最直接手段） -->
+    <section
+      v-if="relatedProducts.length"
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12"
+      aria-labelledby="related-heading"
+    >
+      <h2 id="related-heading" class="text-lg font-semibold text-gray-900 mb-4">
+        {{ t('product.relatedProducts') }}
+      </h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <router-link
+          v-for="rp in relatedProducts"
+          :key="rp.id"
+          :to="`/products/${rp.id}`"
+          class="group rounded-xl bg-white border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+        >
+          <div class="aspect-square w-full bg-gray-100 overflow-hidden">
+            <img
+              :src="rp.image_url || defaultImage"
+              :alt="getCurrentLanguageValue(rp, 'name')"
+              class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+              loading="lazy"
+            />
+          </div>
+          <div class="p-3">
+            <h3 class="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
+              {{ getCurrentLanguageValue(rp, 'name') }}
+            </h3>
+            <p class="text-sm font-semibold text-blue-600">
+              {{ portalCurrency.formatThb(rp.price) }}
+            </p>
+          </div>
+        </router-link>
+      </div>
+    </section>
+
     <!-- 图片预览模态框（极简高级感：缩放 + 模糊背景） -->
     <Transition name="modal">
       <div
@@ -286,6 +322,8 @@ const loadProduct = async () => {
     
     if (response.data.success) {
       product.value = response.data.data
+      // 拉到商品后顺带拉相关推荐（不阻塞首屏，失败就当没有）
+      loadRelatedProducts(response.data.data)
     } else {
       product.value = null
     }
@@ -294,6 +332,28 @@ const loadProduct = async () => {
     product.value = null
   } finally {
     isLoading.value = false
+  }
+}
+
+/**
+ * 相关推荐：同分类的其它在售商品。
+ *
+ * 复购型商场的客单价主要靠"顺手再买一件" ——
+ * 详情页给不出别的选择，用户就只买他本来想买的那一样。
+ */
+const relatedProducts = ref([])
+
+async function loadRelatedProducts (current) {
+  relatedProducts.value = []
+  const categoryId = current?.category_id
+  if (!categoryId) return
+  try {
+    const res = await productAPI.getProducts({ category_id: categoryId, page: 1, pageSize: 5 })
+    const list = res?.data?.data?.products || []
+    relatedProducts.value = list.filter(p => p.id !== current.id).slice(0, 4)
+  } catch (e) {
+    // 推荐失败不影响详情页本身
+    console.warn('加载相关推荐失败', e)
   }
 }
 

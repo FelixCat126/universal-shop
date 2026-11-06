@@ -259,6 +259,15 @@
                     >
                       {{ t('profile.viewDetails') }}
                     </button>
+                    <!-- 再来一单：复购型商场的刚需 —— 老客户不该每次都重新挑一遍 -->
+                    <button
+                      type="button"
+                      :disabled="reorderingId === order.id"
+                      @click="reorder(order)"
+                      class="rounded border border-blue-600 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                    >
+                      {{ reorderingId === order.id ? t('order.reordering') : t('order.reorder') }}
+                    </button>
                   </div>
                 </div>
                 <div ref="ordersLoadSentinel" class="h-1 w-full shrink-0" aria-hidden="true" />
@@ -856,8 +865,9 @@ import { useI18n } from 'vue-i18n'
 import { formatRecordedOrderAmount } from '../utils/orderBillingDisplay.js'
 import { useUserStore } from '../stores/user.js'
 import { usePortalCurrencyStore, loadPublicConfig } from '../stores/portalCurrency.js'
+import { useCartStore } from '../stores/cart.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
-import { getUserOrders, confirmOnlinePayment as confirmOnlinePaymentApi } from '../api/orders.js'
+import { getUserOrders, getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi } from '../api/orders.js'
 import { getAvailableCoupons, claimCoupon, getMyCoupons } from '../api/coupons.js'
 import { userAPI } from '../api/users.js'
 import api from '../api/index.js'
@@ -1324,6 +1334,56 @@ async function confirmOnlinePayInProfile () {
 // 订单操作方法
 const viewOrderDetail = (orderId) => {
   router.push(`/orders/${orderId}`)
+}
+
+/**
+ * 再来一单：把历史订单里的商品按原数量加回购物车。
+ *
+ * 复购型商品（这里的主力是电子烟/批发 partner）的用户反复买同几样，
+ * 每次重新挑一遍既费时间又容易漏 —— 这是刚需功能，不是锦上添花。
+ *
+ * 列表接口不返回明细（保持轻），点的时候再按需拉订单详情。
+ */
+const reorderingId = ref(null)
+const cartStore = useCartStore()
+
+const reorder = async (order) => {
+  if (reorderingId.value !== null) return
+  reorderingId.value = order.id
+  try {
+    const res = await getOrderDetail(order.id)
+    const items = res?.data?.data?.items || []
+    if (!items.length) {
+      showError(t('order.reorderNoItems'))
+      return
+    }
+    let added = 0
+    let skipped = 0
+    for (const item of items) {
+      const product = item.product
+      if (!product || product.status !== 'active') { skipped++; continue }
+      const qty = Math.max(1, Number(item.quantity) || 1)
+      const stock = Number(product.stock)
+      if (Number.isFinite(stock) && qty > stock) { skipped++; continue }
+      const r = await cartStore.addToCart(product, qty)
+      if (r?.success) added++
+      else skipped++
+    }
+    if (added > 0) {
+      const msg = skipped > 0
+        ? t('order.reorderDonePartial', { added, skipped })
+        : t('order.reorderDone', { added })
+      if (skipped > 0) warning(msg)
+      else success(msg)
+    } else {
+      showError(t('order.reorderFailed'))
+    }
+  } catch (e) {
+    console.error('再来一单失败', e)
+    showError(t('order.reorderFailed'))
+  } finally {
+    reorderingId.value = null
+  }
 }
 
 

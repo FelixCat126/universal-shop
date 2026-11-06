@@ -74,6 +74,7 @@ export default {
 
   // 商品相关
   product: {
+    relatedProducts: 'สินค้าที่คนอื่นมักซื้อ',
     insufficientStock: "สต็อกไม่พอ เหลือเพียง {stock} ชิ้น",
     title: 'สินค้า',
     name: 'ชื่อสินค้า',
@@ -264,6 +265,12 @@ export default {
 
   // 订单
   order: {
+    reorder: 'ซื้ออีกครั้ง',
+    reordering: 'กำลังดำเนินการ...',
+    reorderDone: 'เพิ่มสินค้า {added} รายการเข้าตะกร้าแล้ว',
+    reorderDonePartial: 'เพิ่ม {added} รายการ ข้าม {skipped} รายการ (หมดสินค้าหรือของไม่พอ)',
+    reorderFailed: 'สั่งซื้อซ้ำไม่สำเร็จ กรุณาลองใหม่ภายหลัง',
+    reorderNoItems: 'คำสั่งซื้อนี้ไม่มีสินค้าให้สั่งซื้อซ้ำ',
     unavailableItemsTitle: 'มีสินค้า {count} รายการที่ไม่พร้อมใช้งานแล้ว (ถูกถอดออกหรือลบ) และจะไม่ถูกสั่งซื้อ',
     stockInsufficientTitle: 'สินค้า {count} รายการมีจำนวนไม่พอ',
     stockOnlyLeft: 'เหลือเพียง {stock} ชิ้น',

@@ -158,6 +158,7 @@ export default {
 
   // 商品相关
   product: {
+    relatedProducts: 'You may also like',
     title: 'Products',
     name: 'Product Name',
     price: 'Price',
@@ -266,6 +267,12 @@ export default {
 
   // 订单
   order: {
+    reorder: 'Buy again',
+    reordering: 'Working...',
+    reorderDone: 'Added {added} item(s) to your cart',
+    reorderDonePartial: 'Added {added}, skipped {skipped} (unavailable or out of stock)',
+    reorderFailed: 'Could not reorder — please try again later',
+    reorderNoItems: 'This order has no items to reorder',
     unavailableItemsTitle: '{count} item(s) are no longer available and will not be ordered',
     stockInsufficientTitle: '{count} item(s) do not have enough stock',
     stockOnlyLeft: 'only {stock} left',
