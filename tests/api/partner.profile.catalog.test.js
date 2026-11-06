@@ -62,10 +62,10 @@ describe('P2.partner.profile_catalog', () => {
     const { token } = await TestHelpers.createPartnerWithAddress({ discount_percent: 20 })
     const { Product } = TestDatabase.getSequelize().models
     const wanted = await Product.create(
-      TestDataFactory.createProduct({ price: 100, status: 'active', stock: 1000 })
+      TestDataFactory.createProduct({ price: 100, discount: null, status: 'active', stock: 1000 })
     )
     const other = await Product.create(
-      TestDataFactory.createProduct({ price: 200, status: 'active', stock: 1000 })
+      TestDataFactory.createProduct({ price: 200, discount: null, status: 'active', stock: 1000 })
     )
 
     const res = await request(app)
