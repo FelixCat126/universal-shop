@@ -1,4 +1,5 @@
 export default {
+  appTitle: '合作方门户 · 订货',
   nav: {
     brand: '合作方门户',
     shop: '订货',

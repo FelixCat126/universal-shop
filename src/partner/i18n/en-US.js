@@ -1,4 +1,5 @@
 export default {
+  appTitle: 'Partner Portal · Orders',
   nav: {
     brand: 'Partner Portal',
     shop: 'Order',

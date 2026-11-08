@@ -145,6 +145,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, onErrorCaptured } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { syncDocumentLang } from '../utils/htmlLang.js'
 import { useRoute, useRouter } from 'vue-router'
 import { fatalError, reportFatalError } from '../utils/fatalError.js'
 import { useCartStore } from './stores/cart.js'
@@ -268,9 +269,10 @@ watch(() => route.name, () => {
   updatePageTitle()
 }, { immediate: true })
 
-// 监听语言变化，更新页面标题
+// 监听语言变化，更新页面标题 + <html lang>
 watch(() => locale.value, () => {
   updatePageTitle()
+  syncDocumentLang(locale.value)
 })
 
 // 监听用户登录状态变化，处理购物车合并
@@ -321,6 +323,8 @@ onMounted(async () => {
   // 语言包按需加载：恢复的语言若还没下过，先加载再切（避免闪一下 fallback）
   await ensureLocale(savedLanguage)
   locale.value = savedLanguage
+  // <html lang> 跟着界面语言走（保存的语言可能与默认值相同 → watcher 不触发，这里兜底）
+  syncDocumentLang(locale.value)
   
   try {
     // 两者共用同一份 public 配置（in-flight 去重后实际只发一次请求），并行等待

@@ -118,4 +118,13 @@ describe('服务器外壳 app.js', () => {
     expect(res.status).toBe(404)
     expect(res.type).not.toMatch(/html/)
   })
+
+  it('AS-10 三个端的 favicon 都能取到（标签页图标不是空白）', async () => {
+    // 注意别把循环变量叫 app —— 会把 import 进来的 Express app 遮掉
+    for (const appName of ['portal', 'admin', 'partner']) {
+      const res = await request(app).get(`/${appName}/favicon.svg`)
+      expect(res.status, appName).toBe(200)
+      expect(res.headers['content-type'], appName).toMatch(/svg|xml/)
+    }
+  })
 })

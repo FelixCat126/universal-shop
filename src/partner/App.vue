@@ -150,6 +150,7 @@
 import { computed, ref, watch, onMounted, onUnmounted, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { syncDocumentLang } from '../utils/htmlLang.js'
 import { ensureLocale } from './i18n/index.js'
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
 import ToastContainer from './components/ToastContainer.vue'
@@ -202,6 +203,22 @@ function logout () {
 watch(
   () => route.fullPath,
   () => closeNavMenu()
+)
+
+/**
+ * 切语言时：
+ *  1) 更新浏览器标签页标题 —— 之前**从不更新**，切到泰文/英文后标签页
+ *     还写着中文"合作方门户 · 订货"（多标签时尤其明显）；
+ *  2) 同步 <html lang> —— 否则浏览器以为内容是中文，
+ *     屏幕阅读器用中文音读规则念泰文、泰文字体回退也可能出错。
+ */
+watch(
+  () => locale.value,
+  (val) => {
+    syncDocumentLang(val)
+    document.title = t('appTitle')
+  },
+  { immediate: true }
 )
 
 function onKeydown (e) {

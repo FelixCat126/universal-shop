@@ -29,6 +29,7 @@
 <script setup>
 import { watch, onMounted, onErrorCaptured } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { syncDocumentLang } from '../utils/htmlLang.js'
 import { useRoute } from 'vue-router'
 import { useAdminStore } from './stores/admin.js'
 import { fatalError, reportFatalError } from '../utils/fatalError.js'
@@ -79,15 +80,22 @@ watch(() => route.name, () => {
   updatePageTitle()
 }, { immediate: true })
 
-// 监听语言变化，更新页面标题
+// 监听语言变化，更新页面标题 + <html lang>
 watch(() => locale.value, () => {
   updatePageTitle()
+  syncDocumentLang(locale.value)
 })
 
 // 初始化
 onMounted(() => {
   // 初始化页面标题
   updatePageTitle()
+  /**
+   * 同步 <html lang>。
+   * 管理端的 locale 是 i18n 创建时从 localStorage 读的（可能直接就是 en-US），
+   * 那时 watcher 不会触发（值没"变"）→ lang 会一直停在 index.html 写死的 zh-CN。
+   */
+  syncDocumentLang(locale.value)
 
   /**
    * 校验 token 有效性。

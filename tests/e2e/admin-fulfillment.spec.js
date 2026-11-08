@@ -58,7 +58,12 @@ test.describe('管理端订单履约', () => {
 
     await test.step('选择新状态', async () => {
       await page.locator('.el-dialog__footer .el-select').click()
-      // 移动端下拉是 teleport 到 body 的，可能渲染到视口外 → ��键盘选，
+      // 等下拉面板真的挂载再按键：Element Plus 的下拉是 teleport 到 body 的，
+      // 点完还要走一轮 Vue 渲染 + 过渡动画；不等就按方向键的话，
+      // 按键会落到文档上 → 没选中状态 → 保存时 status 为空 → 什么都不发生
+      // → 用例以「等不到成功提示」超时告终（表现为偶发失败）。
+      await expect(page.locator('.el-select-dropdown:visible')).toBeVisible({ timeout: 10_000 })
+      // 移动端下拉是 teleport 到 body 的，可能渲染到视口外 → 用键盘选，
       // 不依赖下拉项的几何位置（桌面端同样走这条路，更稳）
       await page.keyboard.press('ArrowDown')
       await page.keyboard.press('Enter')
@@ -94,6 +99,8 @@ test.describe('管理端订单履约', () => {
 
     // 选目标状态（下拉是 teleport 的，用键盘选，避免依赖几何位置）
     await bulkBar.locator('.el-select').click()
+    // 先等下拉面板挂载（否则按键早于渲染落空 —— 偶发失败的根因）
+    await expect(page.locator('.el-select-dropdown:visible')).toBeVisible({ timeout: 10_000 })
     await page.keyboard.press('ArrowDown')
     await page.keyboard.press('Enter')
 
