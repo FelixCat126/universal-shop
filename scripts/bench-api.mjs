@@ -49,8 +49,29 @@ if (!process.env.DATABASE_URL_TEST) {
   process.env.DATABASE_URL_TEST = 'postgres://shop:shop@127.0.0.1:5432/shop_test'
 }
 
-/** 打 N 次取分位数 */
-async function measure (fn, times = 12) {
+/**
+ * 打 N 次取分位数。
+ *
+ * 三个必须做对的地方，否则这个门禁测的是噪声而不是性能：
+ *
+ * 1) **预热**：前几次请求要付 JIT 编译、PG 查询计划编译、首次连接的成本。
+ *    不预热的话，第 1 次请求经常比后面慢一个数量级 —— 而 p95 在样本少时
+ *    恰好等于最大值，于是**一次冷启动就把门禁打红**。
+ *    预热样本单独跑，不进分位数。
+ *
+ * 2) **样本数**：12 个样本时 p95 的下标是 floor(12×0.95)=11 → p95 === max。
+ *    也就是说"p95"其实是"最慢的那一次"，一个抖动就红。样本提到 40 后
+ *    p95 才是真正的 p95（第 38 小），抖动只影响 max。
+ *
+ * 3) **max/p99 单独报**：最慢值仍然有意义（要能看见毛刺），但不该用它判回归。
+ */
+const WARMUP = 5
+const SAMPLES = 40
+
+async function measure (fn, times = SAMPLES) {
+  // 预热：不计入分位数
+  for (let i = 0; i < WARMUP; i++) await fn()
+
   const samples = []
   for (let i = 0; i < times; i++) {
     const t0 = process.hrtime.bigint()
@@ -59,7 +80,13 @@ async function measure (fn, times = 12) {
   }
   samples.sort((a, b) => a - b)
   const pct = (p) => samples[Math.min(samples.length - 1, Math.floor(samples.length * p))]
-  return { p50: pct(0.5), p95: pct(0.95), min: samples[0], max: samples[samples.length - 1] }
+  return {
+    p50: pct(0.5),
+    p95: pct(0.95),
+    p99: pct(0.99),
+    min: samples[0],
+    max: samples[samples.length - 1]
+  }
 }
 
 function fmt (ms) {
@@ -174,6 +201,10 @@ async function main () {
     try { baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8')) } catch { /* 损坏就当没有 */ }
   }
 
+  if (baseline?.generatedAt && !sloMode) {
+    console.log(`\nℹ️ 基线采集于 ${baseline.generatedAt}（机器相关；换机器后请用 --update 重新采集）`)
+  }
+
   const regressions = []
   if (sloMode) {
     /**
@@ -209,10 +240,13 @@ async function main () {
     console.log(JSON.stringify({ generatedAt: new Date().toISOString(), size: SIZE, endpoints: results }, null, 2))
   } else {
     console.log('')
-    console.log('接口'.padEnd(38) + 'p50'.padStart(10) + 'p95'.padStart(10))
-    console.log('-'.repeat(58))
+    console.log('接口'.padEnd(38) + 'p50'.padStart(10) + 'p95'.padStart(10) + 'p99'.padStart(10) + 'max'.padStart(10))
+    console.log('-'.repeat(78))
     for (const [name, r] of Object.entries(results)) {
-      console.log(name.padEnd(38) + fmt(r.p50).padStart(10) + fmt(r.p95).padStart(10))
+      console.log(
+        name.padEnd(38) + fmt(r.p50).padStart(10) + fmt(r.p95).padStart(10) +
+        fmt(r.p99).padStart(10) + fmt(r.max).padStart(10)
+      )
     }
     console.log('-'.repeat(58))
     if (regressions.length) {

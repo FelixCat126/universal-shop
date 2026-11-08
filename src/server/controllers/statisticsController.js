@@ -248,28 +248,36 @@ class StatisticsController {
 
   // 内部方法：获取总览统计数据
   static async getOverviewStatsData() {
-    const totalOrders = await Order.count()
-    
-    const totalAmountResult = await Order.findOne({
-      attributes: [
-        [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
-      ]
-    })
-    const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
-    
-    const totalUsers = await User.count()
-    
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    
-    const activeUsers = await User.count({
-      where: {
-        last_login_at: {
-          [Op.gte]: sevenDaysAgo,
-          [Op.ne]: null
+
+    /**
+     * 四个查询**并发**发出去，而不是一个算完再算下一个。
+     *
+     * 之前是 4 个串行 await = 4 次「发查询 → 等结果 → 再发下一个」的往返；
+     * 数据库端的计算量没变，但**网络往返延迟 ×4**。
+     * 面板每次打开都要跑一遍，往返延迟是用户直接感受到的（尤其跨机房时）。
+     * Promise.all 把 4 次往返压成 1 次。
+     */
+    const [totalOrders, totalAmountResult, totalUsers, activeUsers] = await Promise.all([
+      Order.count(),
+      Order.findOne({
+        attributes: [
+          [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
+        ]
+      }),
+      User.count(),
+      User.count({
+        where: {
+          last_login_at: {
+            [Op.gte]: sevenDaysAgo,
+            [Op.ne]: null
+          }
         }
-      }
-    })
+      })
+    ])
+
+    const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
 
     return {
       totalOrders,

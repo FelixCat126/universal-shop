@@ -485,6 +485,20 @@ class UserController {
 
       const finalWhereCondition = whereConditions.length > 0 ? { [Op.and]: whereConditions } : {}
 
+      /**
+       * 列表与统计互不依赖（统计只看 created_at，不看本页行）→ 并发发出。
+       * 之前是"先等列表，再发 3 条统计"，两次往返；现在一次。
+       */
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+      const startOfWeek = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000)
+      const startOfMonth = new Date(startOfToday.getTime() - 29 * 24 * 60 * 60 * 1000)
+      const statsPromise = Promise.all([
+        User.count({ where: { created_at: { [Op.gte]: startOfToday } } }),
+        User.count({ where: { created_at: { [Op.gte]: startOfWeek } } }),
+        User.count({ where: { created_at: { [Op.gte]: startOfMonth } } })
+      ])
+
       const { count, rows } = await User.findAndCountAll({
         where: finalWhereCondition,
         limit,
@@ -496,15 +510,7 @@ class UserController {
       const totalPages = Math.ceil(count / pageSize)
 
       // 服务端统计：今日/近7日/近30日新增用户数（按 created_at，不受分页与筛选影响）
-      const startOfToday = new Date()
-      startOfToday.setHours(0, 0, 0, 0)
-      const startOfWeek = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000)
-      const startOfMonth = new Date(startOfToday.getTime() - 29 * 24 * 60 * 60 * 1000)
-      const [today, week, month] = await Promise.all([
-        User.count({ where: { created_at: { [Op.gte]: startOfToday } } }),
-        User.count({ where: { created_at: { [Op.gte]: startOfWeek } } }),
-        User.count({ where: { created_at: { [Op.gte]: startOfMonth } } })
-      ])
+      const [today, week, month] = await statsPromise
 
       res.json({
         success: true,

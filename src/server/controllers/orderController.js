@@ -1418,6 +1418,43 @@ class OrderController {
         where[Op.or] = orClauses
       }
 
+      /**
+       * 列表与统计是**两条互不依赖**的查询（统计只看 where，不看本页行），
+       * 之前是串行的：先等列表返回，再发统计 → 两次往返。
+       * 并发发出 → 一次往返。订单页每次打开都要跑，延迟是用户直接感受到的。
+       */
+      const statsPromise = (async () => {
+        const toFiniteNumber = (v) => {
+          const n = Number(v)
+          return Number.isFinite(n) ? n : 0
+        }
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        const statsWhere = { ...where }
+        delete statsWhere.status
+        const statusLit = status ? sequelize.escape(String(status)) : null
+        const todayLit = sequelize.escape(todayStart)
+        const totalAmountFilter = statusLit ? ` FILTER (WHERE status = ${statusLit})` : ''
+        const todayAmountFilter = statusLit
+          ? ` FILTER (WHERE created_at >= ${todayLit} AND status = ${statusLit})`
+          : ` FILTER (WHERE created_at >= ${todayLit})`
+        const [statsRow] = await Order.findAll({
+          attributes: [
+            [sequelize.literal(`COUNT(*) FILTER (WHERE status = 'completed')`), 'completed'],
+            [sequelize.literal(`COALESCE(SUM(total_amount_thb)${totalAmountFilter}, 0)`), 'totalAmount'],
+            [sequelize.literal(`COALESCE(SUM(total_amount_thb)${todayAmountFilter}, 0)`), 'todayAmount']
+          ],
+          where: statsWhere,
+          raw: true
+        })
+        // total 由外层用 count 填（这里拿不到分页的 count）
+        return {
+          completed: toFiniteNumber(statsRow?.completed),
+          totalAmount: toFiniteNumber(statsRow?.totalAmount),
+          todayAmount: toFiniteNumber(statsRow?.todayAmount)
+        }
+      })()
+
       const { count, rows: orders } = await Order.findAndCountAll({
         where,
         include: [
@@ -1462,29 +1499,11 @@ class OrderController {
       //   totalAmount —— 尊重用户 status 筛选（有筛选时 FILTER 叠加 status 条件）；
       //   todayAmount —— "今日 0 点起"与筛选条件中 created_at 范围的交集，FILTER 追加 created_at 下限
       // status/todayStart 均经 sequelize.escape 转义后才进 literal，防注入
+      const statsRow = await statsPromise
       const toFiniteNumber = (v) => {
         const n = Number(v)
         return Number.isFinite(n) ? n : 0
       }
-      const todayStart = new Date()
-      todayStart.setHours(0, 0, 0, 0)
-      const statsWhere = { ...where }
-      delete statsWhere.status
-      const statusLit = status ? sequelize.escape(String(status)) : null
-      const todayLit = sequelize.escape(todayStart)
-      const totalAmountFilter = statusLit ? ` FILTER (WHERE status = ${statusLit})` : ''
-      const todayAmountFilter = statusLit
-        ? ` FILTER (WHERE created_at >= ${todayLit} AND status = ${statusLit})`
-        : ` FILTER (WHERE created_at >= ${todayLit})`
-      const [statsRow] = await Order.findAll({
-        attributes: [
-          [sequelize.literal(`COUNT(*) FILTER (WHERE status = 'completed')`), 'completed'],
-          [sequelize.literal(`COALESCE(SUM(total_amount_thb)${totalAmountFilter}, 0)`), 'totalAmount'],
-          [sequelize.literal(`COALESCE(SUM(total_amount_thb)${todayAmountFilter}, 0)`), 'todayAmount']
-        ],
-        where: statsWhere,
-        raw: true
-      })
       const stats = {
         total: toFiniteNumber(count),
         completed: toFiniteNumber(statsRow?.completed),

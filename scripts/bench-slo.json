@@ -1,5 +1,5 @@
 {
-  "_comment": "接口性能 SLO（p95 上限，毫秒）。CI 用 npm run bench:api -- --slo 按这份判。阈值比本机实测值留了约 10 倍余量 —— CI runner 的 CPU/磁盘与本地不同，阈值必须留够余量才不会天天误报；但「慢了 10 倍」这种真退化一定拦得住。本机实测 p95：products 25.7ms / products/:id 3.6ms / coupons 12.6ms / admin/users 7.7ms / statistics 5.5ms / admin/orders 5.0ms（数据集：300 商品 / 200 用户 / 300 订单）。",
+  "_comment": "接口性能 SLO（p95 上限，毫秒）。CI 用 npm run bench:api -- --slo 按这份判。阈值比本机实测值留了约 30~100 倍余量 —— CI runner 的 CPU/磁盘与本地不同，阈值必须留够余量才不会天天误报；但「慢了 30 倍」这种真退化一定拦得住。本机实测 p95（2026-11-08，预热 5 次 + 40 个样本）：products 3.2ms / products/:id 0.8ms / coupons 1.5ms / admin/users 6.4ms / statistics/overview 4.7ms / admin/orders 6.1ms（数据集：300 商品 / 200 用户 / 300 订单）。",
   "GET /api/products": 300,
   "GET /api/products/:id": 200,
   "GET /api/coupons/available": 300,
