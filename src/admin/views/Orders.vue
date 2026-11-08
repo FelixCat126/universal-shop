@@ -261,11 +261,53 @@
     <el-dialog
       v-model="showDetailModal"
       :title="t('orders.orderDetails')"
-      width="900px"
+      width="min(900px, 94vw)"
       top="5vh"
       class="order-detail-dialog"
       :before-close="closeDetailModal"
     >
+      <!-- 履约操作：改状态 / 填物流单号 / 内部备注 -->
+      <template #footer>
+        <!-- 窄屏（手机/平板）下改成整行堆叠，固定宽度会挤爆弹窗底部 -->
+        <div class="flex flex-col sm:flex-row sm:flex-wrap items-end gap-3 sm:justify-end">
+          <div class="w-full sm:w-44">
+            <label class="block text-xs text-gray-500 mb-1">{{ t('orders.trackingNumber') }}</label>
+            <el-input
+              v-model="fulfillForm.tracking_number"
+              size="small"
+              :placeholder="t('orders.trackingNumberPlaceholder')"
+            />
+          </div>
+          <div class="w-full sm:w-56">
+            <label class="block text-xs text-gray-500 mb-1">{{ t('orders.adminNote') }}</label>
+            <el-input
+              v-model="fulfillForm.admin_note"
+              size="small"
+              :placeholder="t('orders.adminNotePlaceholder')"
+            />
+          </div>
+          <div class="w-full sm:w-40">
+            <label class="block text-xs text-gray-500 mb-1">{{ t('orders.status') }}</label>
+            <el-select v-model="fulfillForm.status" size="small" :placeholder="t('orders.pickStatus')">
+              <el-option
+                v-for="st in allowedNextStatuses"
+                :key="st"
+                :label="getStatusText(st)"
+                :value="st"
+              />
+            </el-select>
+          </div>
+          <el-button
+            type="primary"
+            :loading="fulfillSaving"
+            :disabled="!fulfillForm.status"
+            @click="submitFulfillment"
+          >
+            {{ t('orders.saveFulfillment') }}
+          </el-button>
+        </div>
+      </template>
+
       <div v-loading="detailLoading" class="order-detail-loading-wrap">
         <div v-if="selectedOrder" class="order-detail-container">
         <!-- 订单状态和基本信息卡片 -->
@@ -283,12 +325,24 @@
                   <el-tag type="info" size="small">{{ selectedOrder.order_no }}</el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('orders.status')">
-                  <el-tag 
+                  <el-tag
                     :type="getStatusTagType(selectedOrder.status)"
                     size="small"
                   >
                     {{ getStatusText(selectedOrder.status) }}
                   </el-tag>
+                </el-descriptions-item>
+                <el-descriptions-item :label="t('orders.trackingNumber')">
+                  <span v-if="selectedOrder.tracking_number">{{ selectedOrder.tracking_number }}</span>
+                  <span v-else class="text-gray-400">-</span>
+                </el-descriptions-item>
+                <el-descriptions-item :label="t('orders.shippedAt')">
+                  <span v-if="selectedOrder.shipped_at">{{ formatDate(selectedOrder.shipped_at) }}</span>
+                  <span v-else class="text-gray-400">-</span>
+                </el-descriptions-item>
+                <el-descriptions-item :label="t('orders.adminNote')" :span="2">
+                  <span v-if="selectedOrder.admin_note" class="whitespace-pre-wrap">{{ selectedOrder.admin_note }}</span>
+                  <span v-else class="text-gray-400">-</span>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('orders.amount')">
                   <span class="amount-text">
@@ -453,6 +507,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
+import { updateOrderStatus } from '../api/orders.js'
 import config from '../../config/index.js'
 import { formatRecordedOrderAmount, formatLineRecordedFromThb } from '../../portal/utils/orderBillingDisplay.js'
 
@@ -475,6 +530,61 @@ const exportTaskType = ref('orders')
 const showDetailModal = ref(false)
 const selectedOrder = ref(null)
 const detailLoading = ref(false)
+
+/**
+ * 履约操作表单：改状态 / 填物流单号 / 内部备注。
+ *
+ * 之前管理端**根本没有改订单状态的入口** —— 后端接口有（PUT /admin/orders/:id/status），
+ * 但没有任何页面调用它，运营在后台无法发货/完成/取消订单。
+ */
+const fulfillForm = reactive({ status: '', tracking_number: '', admin_note: '' })
+const fulfillSaving = ref(false)
+
+/** 订单状态机（与后端 ORDER_STATUS_TRANSITIONS 保持一致） */
+const ORDER_STATUS_TRANSITIONS = {
+  pending: ['paid', 'shipping', 'cancelled'],
+  paid: ['shipping', 'cancelled'],
+  shipping: ['shipped', 'delivered', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['completed'],
+  completed: [],
+  cancelled: []
+}
+const allowedNextStatuses = computed(() =>
+  selectedOrder.value ? (ORDER_STATUS_TRANSITIONS[selectedOrder.value.status] || []) : []
+)
+
+/** 打开详情时把履约信息带进表单 */
+const fillFulfillForm = (order) => {
+  fulfillForm.status = ''
+  fulfillForm.tracking_number = order?.tracking_number || ''
+  fulfillForm.admin_note = order?.admin_note || ''
+}
+
+/** 提交履约操作 */
+const submitFulfillment = async () => {
+  if (!selectedOrder.value || !fulfillForm.status || fulfillSaving.value) return
+  fulfillSaving.value = true
+  try {
+    const payload = { status: fulfillForm.status }
+    if (fulfillForm.tracking_number) payload.tracking_number = fulfillForm.tracking_number
+    if (fulfillForm.admin_note) payload.admin_note = fulfillForm.admin_note
+    const res = await updateOrderStatus(selectedOrder.value.id, payload)
+    if (res?.data?.success) {
+      ElMessage.success(res.data.message || t('orders.fulfillmentSaved'))
+      await loadOrders()
+      // 重新拉详情，让物流单号/状态立刻反映出来
+      // （注意：详情函数是 viewOrderDetail(order)，不是 openDetail）
+      await viewOrderDetail(selectedOrder.value)
+    } else {
+      ElMessage.error(res?.data?.message || t('common.error'))
+    }
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || t('common.error'))
+  } finally {
+    fulfillSaving.value = false
+  }
+}
 
 // 分页数据
 const currentPage = ref(1)
@@ -691,6 +801,7 @@ const viewOrderDetail = async (order) => {
       return
     }
     selectedOrder.value = data.data
+    fillFulfillForm(data.data)
   } catch (error) {
     console.error('加载订单详情失败:', error)
     ElMessage.error(t('orders.messages.detailLoadFailed'))
@@ -1374,5 +1485,31 @@ onUnmounted(() => {
   margin: 0 !important;
   min-width: 60px;
   flex-shrink: 0;
+}
+</style>
+
+<!--
+  非 scoped：el-dialog 的根元素**不带**父组件的 scope 属性，
+  写在 scoped 块里的 .order-detail-dialog 规则根本匹配不到（实测 maxHeight=none）。
+
+  订单详情弹窗必须**不能超过视口**，超出部分让 body 滚动 ——
+  之前弹窗内容比手机视口还高（实测 1197px vs 851px），
+  底部固定的操作区（状态 / 物流单号 / 保存）被顶到屏幕外，
+  手机上根本点不到："改订单状态"这件事在小屏上等于不存在。
+-->
+<style>
+.order-detail-dialog {
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+.order-detail-dialog .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.order-detail-dialog .el-dialog__footer {
+  flex: 0 0 auto;
 }
 </style>

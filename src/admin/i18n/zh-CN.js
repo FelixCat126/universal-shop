@@ -110,6 +110,7 @@ export default {
 
   // 导航菜单
   menu: {
+    toggleSidebar: '切换侧边栏',
     dashboard: '统计总览',
     productsMenu: '产品',
     productsList: '产品管理',
@@ -599,6 +600,14 @@ export default {
 
   // 订单管理页面
   orders: {
+    trackingNumber: '物流单号',
+    trackingNumberPlaceholder: '快递单号（选填）',
+    shippedAt: '发货时间',
+    adminNote: '内部备注',
+    adminNotePlaceholder: '仅内部可见（如：客户要求放前台）',
+    pickStatus: '选择新状态',
+    saveFulfillment: '保存并更新状态',
+    fulfillmentSaved: '已保存',
     title: '订单管理',
     description: '管理所有订单信息，支持搜索和筛选',
     status: '订单状态',

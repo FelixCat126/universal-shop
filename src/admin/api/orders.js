@@ -11,8 +11,16 @@ export const getOrderDetail = (orderId) => {
 }
 
 // 更新订单状态
-export const updateOrderStatus = (orderId, status) => {
-  return api.put(`/admin/orders/${orderId}/status`, { status })
+/**
+ * 改订单状态（可同时带履约信息：物流单号 / 内部备注）。
+ * @param {number|string} orderId
+ * @param {string|object} statusOrPayload 状态字符串，或完整 payload（含 tracking_number/admin_note）
+ */
+export const updateOrderStatus = (orderId, statusOrPayload) => {
+  const payload = (typeof statusOrPayload === 'object' && statusOrPayload !== null)
+    ? statusOrPayload
+    : { status: statusOrPayload }
+  return api.put(`/admin/orders/${orderId}/status`, payload)
 }
 
 // 删除订单

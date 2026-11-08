@@ -110,6 +110,7 @@ export default {
 
   // 导航菜单
   menu: {
+    toggleSidebar: 'สลับแถบด้านข้าง',
     dashboard: 'สถิติภาพรวม',
     productsMenu: 'สินค้า',
     productsList: 'จัดการสินค้า',
@@ -600,6 +601,14 @@ export default {
 
   // 订单管理页面
   orders: {
+    trackingNumber: 'เลขพัสดุ',
+    trackingNumberPlaceholder: 'เลขพัสดุของขนส่ง (ไม่บังคับ)',
+    shippedAt: 'เวลาจัดส่ง',
+    adminNote: 'บันทึกภายใน',
+    adminNotePlaceholder: 'เฉพาะทีมงาน (เช่น ลูกค้าขอให้วางที่หน้าเคาน์เตอร์)',
+    pickStatus: 'เลือกสถานะใหม่',
+    saveFulfillment: 'บันทึกและเปลี่ยนสถานะ',
+    fulfillmentSaved: 'บันทึกแล้ว',
     title: 'จัดการคำสั่งซื้อ',
     description: 'จัดการข้อมูลคำสั่งซื้อทั้งหมด รองรับการค้นหาและกรอง',
     status: 'สถานะคำสั่งซื้อ',

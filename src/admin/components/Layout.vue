@@ -3,6 +3,17 @@
     <!-- 顶部导航栏 -->
     <el-header class="header">
       <div class="header-left">
+        <!-- 小屏抽屉开关：侧边栏在小屏上会占掉一半屏幕，必须能收起来 -->
+        <button
+          type="button"
+          class="sidebar-toggle md:hidden"
+          :aria-label="t('menu.toggleSidebar')"
+          @click="toggleSidebar"
+        >
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
         <h2>{{ t('login.title') }}</h2>
       </div>
       <div class="header-right">
@@ -49,7 +60,7 @@
 
     <el-container class="layout-inner">
       <!-- 侧边栏 -->
-      <el-aside width="200px" class="sidebar">
+      <el-aside width="200px" class="sidebar" :class="{ 'sidebar-open': sidebarOpen }">
         <el-menu
           :default-active="activeMenuPath"
           class="sidebar-menu"
@@ -110,6 +121,13 @@
       </el-aside>
 
       <!-- 主内容区 -->
+      <!-- 小屏抽屉的遮罩 -->
+      <div
+        v-if="sidebarOpen"
+        class="sidebar-overlay md:hidden"
+        @click="sidebarOpen = false"
+      />
+
       <el-main class="main-content">
         <router-view />
       </el-main>
@@ -118,7 +136,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ensureLocale } from '../i18n/index.js'
@@ -145,6 +163,17 @@ function onMenuSelect (index) {
   if (!path || submenuGroupIndices.has(path)) return
   router.push(path)
 }
+
+/**
+ * 小屏侧边栏抽屉。
+ *
+ * 侧边栏固定 200px 且**没有响应式**：手机上 393px 的屏被吃掉一半，
+ * 内容区只剩 193px —— 管理端在手机上基本没法用。
+ * 现在小屏收进抽屉，点汉堡按钮或遮罩收起，路由切换也自动收起。
+ */
+const sidebarOpen = ref(false)
+const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
+watch(() => route.path, () => { sidebarOpen.value = false })
 
 // 语言切换
 const currentLanguage = ref(locale.value)
@@ -235,6 +264,49 @@ const getRoleText = (role) => {
   overflow-y: auto;
   position: relative;
   z-index: 101;
+}
+
+/**
+ * 小屏（<768px）：侧边栏变成抽屉。
+ *
+ * 之前侧边栏是固定 200px 的常驻栏，手机上直接占掉一半屏幕。
+ */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 200px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 2001;
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 2000;
+  }
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 8px;
+  border-radius: 6px;
+  color: #606266;
+  touch-action: manipulation;
+}
+.sidebar-toggle:hover {
+  background: #f2f4f7;
 }
 
 .sidebar-menu {

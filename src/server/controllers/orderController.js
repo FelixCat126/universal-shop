@@ -1517,7 +1517,7 @@ class OrderController {
   static async updateOrderStatus(req, res) {
     // 路径参数严格解析：非正整数会让 PG 抛 invalid input syntax（500）
     const id = parseId(req.params.id)
-    const { status } = req.body
+    const { status, tracking_number, admin_note } = req.body
     if (!id) {
       return res.status(400).json({ success: false, message: '无效的订单 ID' })
     }
@@ -1590,7 +1590,26 @@ class OrderController {
             await restoreOrderResources(order, transaction)
           }
 
-          await order.update({ status }, { transaction })
+          /**
+           * 履约信息：标记发货时记物流单号与发货时间；运营备注随时可改。
+           * 之前只有状态没有运单信息 —— 客服查不到快递，仓库也没有交接凭据。
+           */
+          const patch = { status }
+          if (tracking_number !== undefined) {
+            const tn = tracking_number == null ? null : String(tracking_number).trim().slice(0, 64)
+            patch.tracking_number = tn || null
+          }
+          if (admin_note !== undefined) {
+            patch.admin_note = admin_note == null ? null : String(admin_note).slice(0, 2000)
+          }
+          /**
+           * 进入「已发货」及之后的状态时自动记录发货时间（没手动给就用现在）。
+           * 状态机：pending→paid→shipping(备货中)→shipped(已发货)→delivered→completed
+           */
+          if (['shipped', 'delivered', 'completed'].includes(status) && !order.shipped_at) {
+            patch.shipped_at = new Date()
+          }
+          await order.update(patch, { transaction })
           await transaction.commit()
           return { ok: true, orderId: order.id }
         } catch (e) {

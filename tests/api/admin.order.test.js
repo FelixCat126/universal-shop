@@ -76,6 +76,38 @@ describe('P3.admin.order', () => {
     expect(res.body.data.status).toBe('shipped')
   })
 
+  it('AO-3b PUT /:id/status 可同时记录物流单号与内部备注（履约信息）', async () => {
+    const { token } = await adminCtx()
+    const { order } = await orderWithItems()
+    const res = await request(app)
+      .put(`/api/admin/orders/${order.id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'shipped', tracking_number: 'SF1234567890', admin_note: '客户要求放前台' })
+    expect(res.status).toBe(200)
+
+    const fresh = await request(app)
+      .get(`/api/admin/orders/${order.id}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(fresh.body.data.tracking_number).toBe('SF1234567890')
+    expect(fresh.body.data.admin_note).toBe('客户要求放前台')
+    // 标记发货 → 自动记录发货时间
+    expect(fresh.body.data.shipped_at).toBeTruthy()
+  })
+
+  it('AO-3c 物流单号超长会被截断（不写超长脏数据）', async () => {
+    const { token } = await adminCtx()
+    const { order } = await orderWithItems()
+    const res = await request(app)
+      .put(`/api/admin/orders/${order.id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'shipped', tracking_number: 'X'.repeat(200) })
+    expect(res.status).toBe(200)
+    const fresh = await request(app)
+      .get(`/api/admin/orders/${order.id}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(String(fresh.body.data.tracking_number).length).toBeLessThanOrEqual(64)
+  })
+
   it('AO-4 PUT /:id/status 不存在订单 → 404', async () => {
     const { token } = await adminCtx()
     const res = await request(app).put('/api/admin/orders/999999/status')

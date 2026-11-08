@@ -107,6 +107,24 @@ const Order = sequelize.define('Order', {
     allowNull: true,
     comment: '邮政编码'
   },
+  /** 物流单号：运营标记发货时填（前台可见，便于用户查询） */
+  tracking_number: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+    comment: '物流单号（运营发货时填写）'
+  },
+  /** 发货时间：标记已发货时自动记录 */
+  shipped_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: '发货时间（状态变为已发货时自动写入）'
+  },
+  /** 运营内部备注：用户看不到（客服备注用） */
+  admin_note: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: '管理员内部备注（用户不可见）'
+  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,

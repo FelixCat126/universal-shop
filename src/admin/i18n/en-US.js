@@ -108,6 +108,7 @@ export default {
 
   // Navigation menu
   menu: {
+    toggleSidebar: 'Toggle sidebar',
     dashboard: 'Dashboard',
     productsMenu: 'Catalog',
     productsList: 'Products',
@@ -598,6 +599,14 @@ export default {
 
   // Order management
   orders: {
+    trackingNumber: 'Tracking number',
+    trackingNumberPlaceholder: 'Courier tracking no. (optional)',
+    shippedAt: 'Shipped at',
+    adminNote: 'Internal note',
+    adminNotePlaceholder: 'Staff only (e.g. customer asked to leave at reception)',
+    pickStatus: 'New status',
+    saveFulfillment: 'Save & update status',
+    fulfillmentSaved: 'Saved',
     title: 'Order Management',
     description: 'Manage all order information with search and filter support',
     status: 'Order Status',
