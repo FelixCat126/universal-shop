@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').Promotion} Promotion
+ */
 import api from './index.js'
 
 /** 后台促销管理（满减等营销活动，挂 products 权限） */

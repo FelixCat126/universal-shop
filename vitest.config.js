@@ -113,18 +113,28 @@ export default defineConfig({
        * 注意「全局」这一组 = **没被任何 glob 匹配到的文件**（即除 controllers/models 之外），
        * 它的数字比报告里的 "All files" 低，别拿 All files 直接抄。
        *
-       * 数字取当前实测值并留 1~2 个点的余量（覆盖率在不同运行间会有小幅浮动，
+       * ⚠️ 更要命的是：**门禁实际比对的数字，和报告 "All files" 那一行不是一个数**。
+       * 实测（2026-11）：
+       *   报告 All files : statements 85.22% / branches 68.21% / functions 91.15%
+       *   门禁实际比对的 : statements 89%    / branches 77.16% / functions 88.41%
+       * 差了好几个点 —— 门禁只统计"本次运行真正加载过的文件"，
+       * 报告那行还把没被加载的文件按 0% 算进去了。
+       * 所以阈值必须**按门禁的实际值**来定：
+       *   想要门禁实际值 → 把阈值临时设成 99，跑一次看 ERROR 行里报的实际百分比。
+       * 直接照抄报告里的 All files 数字 → 阈值要么形同虚设，要么永远红。
+       *
+       * 数字取门禁实测值并留 2~3 个点的余量（覆盖率在不同运行间会有小幅浮动，
        * 卡在临界点上会变成随机红）；补了测试再往上抬。
        */
       thresholds: {
-        statements: 84,
-        branches: 65,
-        functions: 85,
-        lines: 84,
+        statements: 87,
+        branches: 75,
+        functions: 86,
+        lines: 87,
         'src/server/controllers/**': {
           statements: 77,
-          branches: 59,
-          functions: 92,
+          branches: 60,
+          functions: 91,
           lines: 77
         },
         'src/server/models/**': {

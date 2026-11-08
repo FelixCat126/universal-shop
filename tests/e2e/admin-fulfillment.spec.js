@@ -75,4 +75,35 @@ test.describe('管理端订单履约', () => {
       await expect(page.locator('.el-dialog')).toContainText(tracking)
     })
   })
+
+  test('AF-3 勾选多单 → 批量改状态一次搞定', async ({ page }) => {
+    await loginAdmin(page)
+    await page.goto('/admin/orders')
+    await expect(page.getByRole('button', { name: '操作' }).first()).toBeVisible({ timeout: 20_000 })
+
+    // 勾选前两行（表格第一列是勾选框；Element Plus 把原生 input 藏起来了，
+    // 所以要点 .el-checkbox 这个可见的壳）
+    const checkboxes = page.locator('.order-table .el-table__body-wrapper .el-checkbox:not(.is-disabled)')
+    await expect(checkboxes.first()).toBeVisible({ timeout: 20_000 })
+    await checkboxes.nth(0).click()
+    await checkboxes.nth(1).click()
+
+    // 批量操作条出现
+    const bulkBar = page.locator('.bulk-bar')
+    await expect(bulkBar).toBeVisible({ timeout: 10_000 })
+
+    // 选目标状态（下拉是 teleport 的，用键盘选，避免依赖几何位置）
+    await bulkBar.locator('.el-select').click()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+
+    await bulkBar.getByRole('button', { name: /应用到所选/ }).click()
+
+    // 二次确认
+    await expect(page.locator('.el-message-box')).toBeVisible({ timeout: 10_000 })
+    await page.locator('.el-message-box').getByRole('button', { name: /确认|确定|OK/ }).click()
+
+    // 结果提示
+    await expect(page.locator('.el-message--success').or(page.locator('.el-message--warning'))).toBeVisible({ timeout: 20_000 })
+  })
 })

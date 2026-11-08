@@ -1,3 +1,7 @@
+/**
+ * @typedef {import('../../types/api').Cart} Cart
+ * @typedef {import('../../types/api').CartAddRequest} CartAddRequest
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../api/index.js'

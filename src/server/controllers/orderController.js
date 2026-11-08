@@ -25,6 +25,7 @@ import { resolvePagination } from '../utils/pagination.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
+import { clearResponseCache } from '../utils/responseCache.js'
 import { parseId } from '../utils/params.js'
 
 /** 金额统一舍入到分：消除浮点误差，保证 Σ(行价×数量) 与订单总额严格一致 */
@@ -1514,6 +1515,146 @@ class OrderController {
   // 管理员更新订单状态（状态白名单 + 状态机校验 + 取消回补，全部在同一事务内）
   // 事务整体包 withDeadlockRetry：40P01/40001 时重建事务重跑；业务校验失败返回
   // { ok:false, status, message } 不触发重试，res 响应一律在事务外发出
+  /**
+   * 批量改订单状态（发货/完成等）。
+   *
+   * 运营的日常动作是成批的（今天这几单一起发、这批单全部完成），
+   * 一个一个点既慢又容易漏 —— 而且漏的那单往往就是客户催得最急的。
+   *
+   * 限制：一次最多 200 个 id；每单仍按**各自当前状态**校验流转合法性
+   * （不合法的那些会跳过并报出来，不会把不该改的单硬改掉）。
+   */
+  static async bulkUpdateOrderStatus (req, res) {
+    try {
+      const { ids, status, tracking_number, admin_note } = req.body || {}
+      const BULK_MAX = 200
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: '请选择要操作的订单' })
+      }
+      if (ids.length > BULK_MAX) {
+        return res.status(400).json({ success: false, message: `一次最多操作 ${BULK_MAX} 个订单` })
+      }
+      if (!ORDER_STATUS_VALUES.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: `无效的订单状态：${status}（合法值：${ORDER_STATUS_VALUES.join('/')}）`
+        })
+      }
+      const idList = [...new Set(ids.map(v => parseInt(v, 10)).filter(v => Number.isInteger(v) && v > 0))]
+      if (idList.length === 0) {
+        return res.status(400).json({ success: false, message: '无效的订单 ID' })
+      }
+
+      /**
+       * 整批一个事务：要么这批全改，要么全不改 —— 避免"改了一半、另一半没改"的
+       * 半成品状态（运营会以为全改完了）。
+       * 事务整体包 withDeadlockRetry：40P01/40001 时重建事务重跑。
+       */
+      const result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          // 行锁：并发改同一批订单时串行化，避免两个运营各改一半
+          const orders = await Order.findAll({
+            where: { id: { [Op.in]: idList } },
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+            order: [['id', 'ASC']]
+          })
+
+          const found = new Set(orders.map(o => o.id))
+          const changed = []
+          const skipped = []
+
+          // 请求里给了但库里没有的 id：如实回报，不静默吞掉
+          for (const id of idList) {
+            if (!found.has(id)) {
+              skipped.push({ id, status: null, reason: '订单不存在' })
+            }
+          }
+
+          for (const order of orders) {
+            const allowed = ORDER_STATUS_TRANSITIONS[order.status] || []
+            if (!allowed.includes(status)) {
+              skipped.push({
+                id: order.id,
+                status: order.status,
+                reason: `不允许从「${order.status}」变更为「${status}」`
+              })
+              continue
+            }
+
+            /**
+             * 批量取消必须与单条取消一样回补资源（库存/积分/券），
+             * 否则"批量取消"会白送库存 —— 库存虚增、积分不退。
+             * 同时沿用单条路径的护栏：已发放的购物积分被用掉时不允许取消。
+             */
+            if (status === 'cancelled') {
+              const earnTxs = await PointTransaction.findAll({
+                where: { order_id: order.id, type: 'earn_purchase' },
+                transaction
+              })
+              const totalEarned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
+              if (totalEarned > 0) {
+                const balanceRow = await UserPointBalance.findOne({
+                  where: { user_id: order.user_id },
+                  transaction,
+                  lock: transaction.LOCK.UPDATE
+                })
+                const currentBalance = Number(balanceRow?.balance) || 0
+                if (currentBalance < totalEarned) {
+                  skipped.push({
+                    id: order.id,
+                    status: order.status,
+                    reason: `该订单获得的 ${totalEarned} 积分已被使用（当前余额 ${currentBalance}），无法取消`
+                  })
+                  continue
+                }
+              }
+
+              order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
+              await restoreOrderResources(order, transaction)
+            }
+
+            const patch = { status }
+            if (tracking_number !== undefined) {
+              const tn = tracking_number == null ? null : String(tracking_number).trim().slice(0, 64)
+              patch.tracking_number = tn || null
+            }
+            if (admin_note !== undefined) {
+              patch.admin_note = admin_note == null ? null : String(admin_note).slice(0, 2000)
+            }
+            if (['shipped', 'delivered', 'completed'].includes(status) && !order.shipped_at) {
+              patch.shipped_at = new Date()
+            }
+            await order.update(patch, { transaction })
+            changed.push(order.id)
+          }
+
+          await transaction.commit()
+          return { ok: true, changed, skipped }
+        } catch (e) {
+          await transaction.rollback().catch(() => {})
+          throw e
+        }
+      })
+
+      await clearResponseCache()
+
+      const skippedCount = result.skipped.length
+      return res.json({
+        success: true,
+        message: skippedCount > 0
+          ? `已更新 ${result.changed.length} 个订单，跳过 ${skippedCount} 个`
+          : `已更新 ${result.changed.length} 个订单`,
+        data: { changed: result.changed, skipped: result.skipped }
+      })
+    } catch (error) {
+      logger.error('批量更新订单状态失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '批量操作失败', code: 'INTERNAL_SERVER_ERROR' })
+    }
+  }
+
   static async updateOrderStatus(req, res) {
     // 路径参数严格解析：非正整数会让 PG 抛 invalid input syntax（500）
     const id = parseId(req.params.id)

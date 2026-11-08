@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').ExportJob} ExportJob
+ */
 import api from './index.js'
 
 /**

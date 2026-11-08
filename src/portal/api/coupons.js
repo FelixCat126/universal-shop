@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').CouponTemplate} CouponTemplate
+ */
 import api from './index.js'
 
 // 领券中心：可领取的券模板列表

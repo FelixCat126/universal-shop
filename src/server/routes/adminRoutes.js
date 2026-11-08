@@ -46,6 +46,8 @@ router.use(authenticateAdmin)
 router.get('/orders/export', requirePermission('orders'), exportLimiter, logOperation('export', 'orders'), OrderController.exportOrders)
 router.get('/orders', requirePermission('orders'), OrderController.getAllOrders)
 router.get('/orders/:id', requirePermission('orders'), OrderController.getOrderDetail)
+// 批量改订单状态（一次最多 200 个；不合法的流转会跳过并回报）
+router.post('/orders/bulk/status', requirePermission('orders'), logOperation('bulk_update_order_status', 'order'), OrderController.bulkUpdateOrderStatus)
 router.put('/orders/:id/status', requirePermission('orders'), logOperation('update_order_status', 'order'), OrderController.updateOrderStatus)
 router.delete('/orders/:id', requireSuperAdmin, logOperation('delete_order', 'order'), OrderController.deleteOrder)
 router.get('/after-sales', requirePermission('orders'), AfterSaleController.listAdmin)

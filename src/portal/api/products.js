@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').Product} Product
+ */
 import axios from 'axios'
 import config from '../../config/index.js'
 

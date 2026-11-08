@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').Bundle} Bundle
+ */
 import api from './index.js'
 
 /** 后台组合套餐管理（固定组合包，挂 products 权限） */

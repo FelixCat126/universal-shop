@@ -141,16 +141,50 @@
         </template>
 
         <div class="table-wrapper">
+          <!-- 批量改状态：选中后出现（今天这几单一起发/这批单全部完成，运营的高频动作） -->
+          <div
+            v-if="selectedOrderIds.length"
+            class="bulk-bar"
+          >
+            <span class="bulk-bar__count">{{ t('orders.bulkSelected', { count: selectedOrderIds.length }) }}</span>
+            <el-select
+              v-model="bulkStatus"
+              :placeholder="t('orders.bulkTargetStatus')"
+              size="small"
+              style="width: 160px"
+            >
+              <el-option
+                v-for="s in bulkStatusOptions"
+                :key="s"
+                :label="t(`orders.statusOptions.${s}`)"
+                :value="s"
+              />
+            </el-select>
+            <el-button
+              size="small"
+              type="primary"
+              :loading="bulkActing"
+              :disabled="!bulkStatus"
+              @click="applyBulkStatus"
+            >
+              {{ t('orders.bulkApply') }}
+            </el-button>
+          </div>
+
           <el-table
+            ref="orderTableRef"
             :data="orders"
             v-loading="loading"
             stripe
             border
+            row-key="id"
             style="width: 100%"
             :default-sort="{ prop: 'created_at', order: 'descending' }"
             table-layout="fixed"
             class="order-table"
+            @selection-change="onSelectionChange"
           >
+        <el-table-column type="selection" width="46" />
         <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="140" align="center">
           <template #default="scope">
             <div class="order-no">{{ scope.row.order_no }}</div>
@@ -507,7 +541,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
-import { updateOrderStatus } from '../api/orders.js'
+import { updateOrderStatus, bulkUpdateOrderStatus } from '../api/orders.js'
 import config from '../../config/index.js'
 import { formatRecordedOrderAmount, formatLineRecordedFromThb } from '../../portal/utils/orderBillingDisplay.js'
 
@@ -589,6 +623,92 @@ const submitFulfillment = async () => {
 // 分页数据
 const currentPage = ref(1)
 const pageSize = ref(20)
+
+/**
+ * 批量改订单状态。
+ *
+ * 之前只能一单一单点开详情改 —— 今天要发的十几单要点十几次，
+ * 而且漏掉的那单往往就是客户催得最急的那单。
+ *
+ * 目标状态**只列出所选订单里至少有一单能流转到的状态**
+ * （终态订单 completed/cancelled 不可再变，选了也没意义，不该出现在下拉里）。
+ */
+const orderTableRef = ref(null)
+const selectedOrderIds = ref([])
+const bulkStatus = ref('')
+const bulkActing = ref(false)
+
+const selectedOrders = computed(() => {
+  const ids = new Set(selectedOrderIds.value)
+  return orders.value.filter(o => ids.has(o.id))
+})
+
+/** 所选订单能流转到的目标状态（并集） */
+const bulkStatusOptions = computed(() => {
+  const set = new Set()
+  for (const o of selectedOrders.value) {
+    for (const s of (ORDER_STATUS_TRANSITIONS[o.status] || [])) set.add(s)
+  }
+  return [...set]
+})
+
+const onSelectionChange = (rows) => {
+  selectedOrderIds.value = rows.map(r => r.id)
+  // 目标状态可能因为选择变化而失效 → 清掉，避免带着旧值去提交
+  if (bulkStatus.value && !bulkStatusOptions.value.includes(bulkStatus.value)) {
+    bulkStatus.value = ''
+  }
+}
+
+const applyBulkStatus = async () => {
+  const ids = [...selectedOrderIds.value]
+  if (!ids.length || !bulkStatus.value || bulkActing.value) {
+    if (!ids.length) ElMessage.warning(t('orders.bulkNoSelection'))
+    return
+  }
+  const status = bulkStatus.value
+  try {
+    await ElMessageBox.confirm(
+      t('orders.bulkConfirm', { count: ids.length, status: t(`orders.statusOptions.${status}`) }),
+      t('orders.bulkTargetStatus'),
+      { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  bulkActing.value = true
+  try {
+    const res = await bulkUpdateOrderStatus(ids, status)
+    const payload = res?.data
+    if (!payload?.success) {
+      ElMessage.error(payload?.message || t('common.error'))
+      return
+    }
+    const changed = payload.data?.changed?.length || 0
+    const skipped = payload.data?.skipped || []
+    if (skipped.length) {
+      // 跳过的单要**看得见**：只报"成功"会让运营以为全改完了
+      ElMessage.warning(t('orders.bulkPartial', { count: changed, skipped: skipped.length }))
+      ElMessageBox.alert(
+        skipped.map(s => `#${s.id}（${t(`orders.statusOptions.${s.status}`) || s.status}）：${s.reason || ''}`).join('\n'),
+        t('orders.bulkSkippedTitle'),
+        { type: 'warning' }
+      ).catch(() => {})
+    } else {
+      ElMessage.success(t('orders.bulkSuccess', { count: changed }))
+    }
+    await loadOrders()
+    // 清空选择，避免重复操作同一批
+    selectedOrderIds.value = []
+    bulkStatus.value = ''
+    orderTableRef.value?.clearSelection()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || t('common.error'))
+  } finally {
+    bulkActing.value = false
+  }
+}
 
 // 筛选条件
 const filters = reactive({
@@ -983,6 +1103,25 @@ onUnmounted(() => {
 /* 搜索筛选区域 */
 .filter-section {
   margin-bottom: 20px;
+}
+
+/* 批量操作条：选中订单后出现 */
+.bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #c6e2ff;
+  border-radius: 8px;
+  background: #ecf5ff;
+}
+
+.bulk-bar__count {
+  font-size: 13px;
+  color: #337ecc;
+  font-weight: 600;
 }
 
 .search-form {

@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').ProductCategory} ProductCategory
+ */
 import api from './index.js'
 
 /** 后台类别管理 */

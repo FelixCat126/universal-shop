@@ -1,3 +1,7 @@
+/**
+ * @typedef {import('../../types/api').Order} Order
+ * @typedef {import('../../types/api').OrderDetail} OrderDetail
+ */
 import api from './index.js'
 
 // 创建订单

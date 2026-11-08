@@ -286,6 +286,10 @@
 </template>
 
 <script setup>
+/**
+ * @typedef {import('../../types/api').Product} Product
+ * @typedef {import('../../types/api').ProductCategory} ProductCategory
+ */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'

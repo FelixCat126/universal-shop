@@ -59,6 +59,7 @@ const SUMMARIES = {
 
 const { default: app } = await import(path.join(ROOT, 'src/server/app.js'))
 const { collectRoutes } = await import(path.join(ROOT, 'src/server/utils/routeInventory.js'))
+const { COMPONENT_SCHEMAS, ROUTE_SCHEMAS } = await import(path.join(ROOT, 'src/server/utils/routeSchemas.js'))
 
 const routes = collectRoutes(app)
 
@@ -72,6 +73,7 @@ for (const route of routes) {
   if (!route.fullPath.startsWith('/api/')) continue // 只收录 API
   const oaPath = toOpenApiPath(route.fullPath)
   const key = `${route.method} ${route.fullPath}`
+  const registered = ROUTE_SCHEMAS[key]
 
   // 路径参数
   const params = [...route.fullPath.matchAll(/:([A-Za-z_]\w*)/g)].map(m => ({
@@ -81,18 +83,50 @@ for (const route of routes) {
     schema: { type: 'string' }
   }))
 
+  // 请求体（登记了的才有；没登记的路由在文档里明确标注"结构未知"）
+  const requestBody = registered?.request
+    ? {
+        required: true,
+        content: { 'application/json': { schema: registered.request } }
+      }
+    : undefined
+
+  // 响应体：200 用登记的 schema；错误响应统一是错误信封
+  const okResponse = {
+    description: '成功',
+    content: registered?.response
+      ? { 'application/json': { schema: registered.response } }
+      : undefined
+  }
+  if (!okResponse.content) delete okResponse.content
+
   paths[oaPath] = paths[oaPath] || {}
   paths[oaPath][route.method.toLowerCase()] = {
     summary: SUMMARIES[key] || `${route.method} ${route.fullPath}`,
     tags: [tagOf(route.fullPath)],
     parameters: params,
+    ...(requestBody ? { requestBody } : {}),
     responses: {
-      200: { description: '成功' },
-      400: { description: '参数错误' },
-      401: { description: '未登录或凭证失效' },
-      403: { description: '权限不足' },
-      404: { description: '资源不存在' }
+      200: okResponse,
+      400: {
+        description: '参数错误',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+      },
+      401: {
+        description: '未登录或凭证失效',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+      },
+      403: {
+        description: '权限不足',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+      },
+      404: {
+        description: '资源不存在',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+      }
     },
+    // 没登记 schema 的接口：明确写出来，别让人以为文档覆盖了它
+    'x-schema': registered ? 'defined' : 'unknown',
     'x-generated-from': 'express-route-table'
   }
 }
@@ -103,29 +137,36 @@ const doc = {
     title: 'Universal Shop API',
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     description:
-      '路由骨架自动生成（来源：Express 路由表）。请求/响应体结构未自动推导 —— ' +
-      '以控制器与前端 api 层为准。前后端接口一致性由 tests/api/frontendContract.test.js 守护。'
+      '自动生成（来源：Express 路由表 + Sequelize 模型）。\n\n' +
+      '- 路径与参数：从路由表推导\n' +
+      '- 请求/响应体：从 Sequelize 模型自动推导（见 src/server/utils/routeSchemas.js 的登记表）\n' +
+      '- 标记 `x-schema: unknown` 的接口尚未登记 body 结构 —— 明确标注"未知"，不是"没有"\n\n' +
+      '前后端接口路径一致性由 tests/api/frontendContract.test.js 守护；' +
+      '文档与代码的一致性由 tests/api/openapiContract.test.js 守护。'
   },
   servers: [{ url: '/api', description: '同源 API 前缀' }],
   tags: [...new Set(Object.values(paths).flatMap(p => Object.values(p).flatMap(op => op.tags)))]
     .sort()
     .map(name => ({ name })),
+  components: { schemas: COMPONENT_SCHEMAS },
   paths
 }
 
 const json = JSON.stringify(doc, null, 2)
+/** 落盘内容（末尾带换行）—— 写入与 --check 必须用同一个字符串，否则永远不一致 */
+const content = json + '\n'
 
 if (process.argv.includes('--check')) {
   // CI 用：文档是否与当前路由表一致
   const existing = fs.existsSync(OUT_FILE) ? fs.readFileSync(OUT_FILE, 'utf8') : ''
-  if (existing !== json) {
+  if (existing !== content) {
     console.error('❌ docs/openapi.json 与当前路由表不一致 —— 请运行 npm run gen:openapi')
     process.exit(1)
   }
   console.log('✅ docs/openapi.json 与当前路由表一致')
 } else {
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true })
-  fs.writeFileSync(OUT_FILE, json + '\n', 'utf8')
+  fs.writeFileSync(OUT_FILE, content, 'utf8')
   const count = Object.values(paths).reduce((n, p) => n + Object.keys(p).length, 0)
   console.log(`✅ 已生成 ${path.relative(ROOT, OUT_FILE)}（${Object.keys(paths).length} 条路径 / ${count} 个操作）`)
 }

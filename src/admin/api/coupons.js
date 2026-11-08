@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').CouponTemplate} CouponTemplate
+ */
 import api from './index.js'
 
 /** 后台抵扣券模板管理（挂 products 权限） */

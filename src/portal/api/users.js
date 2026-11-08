@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').User} User
+ */
 import axios from 'axios'
 import { useUserStore } from '../stores/user.js'
 

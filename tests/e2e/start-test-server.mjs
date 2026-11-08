@@ -95,7 +95,8 @@ await Product.create(TestDataFactory.createProduct({
 }
 
 /**
- * 一张待发货订单：管理端「改状态 + 填物流单号」的 E2E 用它。
+ * ���张待发货订单：管理端「改状态 + 填物流单号」的 E2E 用它。
+ * 建**两张**（不是一张）：批量改状态至少要能勾选多行才有意义。
  */
 {
   const { User, Order, OrderItem } = TestDatabase.getSequelize().models
@@ -109,30 +110,32 @@ await Product.create(TestDataFactory.createProduct({
     is_active: true
   })
   const product = await Product.findOne({ where: { name: 'E2E 测试商品' } })
-  const order = await Order.create({
-    user_id: user.id,
-    order_no: 'E2E-FULFILL-' + Date.now(),
-    contact_name: '履约测试客户',
-    contact_phone: '8090000001',
-    delivery_address: 'Bangkok',
-    province: 'Bangkok',
-    city: 'Bangkok',
-    district: 'Pathum Wan',
-    status: 'shipping',
-    total_amount: product ? Number(product.price) * 2 : 200,
-    total_amount_thb: product ? Number(product.price) * 2 : 200,
-    currency_code: 'THB',
-    payment_method: 'cod'
-  })
-  if (product) {
-    await OrderItem.create({
-      order_id: order.id,
-      product_id: product.id,
-      quantity: 2,
-      price: product.price,
-      original_price: product.price,
-      product_name_zh: product.name
+  for (let i = 1; i <= 2; i++) {
+    const order = await Order.create({
+      user_id: user.id,
+      order_no: 'E2E-FULFILL-' + Date.now() + '-' + i,
+      contact_name: '履约测试客户',
+      contact_phone: '8090000001',
+      delivery_address: 'Bangkok',
+      province: 'Bangkok',
+      city: 'Bangkok',
+      district: 'Pathum Wan',
+      status: 'shipping',
+      total_amount: product ? Number(product.price) * 2 : 200,
+      total_amount_thb: product ? Number(product.price) * 2 : 200,
+      currency_code: 'THB',
+      payment_method: 'cod'
     })
+    if (product) {
+      await OrderItem.create({
+        order_id: order.id,
+        product_id: product.id,
+        quantity: 2,
+        price: product.price,
+        original_price: product.price,
+        product_name_zh: product.name
+      })
+    }
   }
 }
 

@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').User} User
+ */
 import api from './index.js'
 
 const API_BASE_URL = '/users'

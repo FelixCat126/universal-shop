@@ -1,3 +1,7 @@
+/**
+ * @typedef {import('../../types/api').Partner} Partner
+ * @typedef {import('../../types/api').PartnerOrder} PartnerOrder
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import config from '../../config/index.js'

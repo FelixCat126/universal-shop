@@ -33,6 +33,28 @@ export function parseDate (value) {
 }
 
 /**
+ * 严格解析整数：只接受「整数」或「纯数字字符串」，其余一律 null。
+ *
+ * 为什么不用 parseInt —— 它有两个静默吞值的坑：
+ *   parseInt('1.5')   → 1    （小数被悄悄截断，库存少算/多算都难查）
+ *   parseInt('10abc') → 10   （尾部脏字符被吞掉，脏输入被当成合法值）
+ * 数量、库存这类字段必须**拒绝**这种情况，而不是替用户猜一个值。
+ *
+ * @param {unknown} value
+ * @returns {number|null}
+ */
+export function parseStrictInt (value) {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) ? value : null
+  }
+  if (typeof value !== 'string') return null
+  const s = value.trim()
+  if (!/^-?\d+$/.test(s)) return null
+  const n = Number(s)
+  return Number.isSafeInteger(n) ? n : null
+}
+
+/**
  * 校验并夹取分页参数
  * @param {unknown} value
  * @param {number} def

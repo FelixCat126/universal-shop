@@ -6,7 +6,7 @@ import { Op } from 'sequelize'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { clearResponseCache } from '../utils/responseCache.js'
-import { parseId } from '../utils/params.js'
+import { parseId, parseStrictInt } from '../utils/params.js'
 import { likeContains } from '../utils/likeSearch.js'
 
 /**
@@ -680,7 +680,11 @@ class ProductController {
   static async adjustStock (req, res) {
     try {
       const id = parseId(req.params.id)
-      const q = parseInt(req.body.quantity, 10)
+      /**
+       * 严格解析数量：parseInt('1.5') → 1、parseInt('10abc') → 10，
+       * 那两个坑会让「小数/脏输入」被悄悄当成合法值 —— 库存改错还查不出来。
+       */
+      const q = parseStrictInt(req.body.quantity)
       const { type } = req.body
       if (!Number.isInteger(id) || id < 1) {
         return res.status(400).json({ success: false, message: '无效的产品 ID' })
@@ -688,8 +692,8 @@ class ProductController {
       if (!['set', 'add', 'subtract'].includes(type)) {
         return res.status(400).json({ success: false, message: '无效的调整类型' })
       }
-      if (!Number.isInteger(q) || q < 0 || q > 1000000) {
-        return res.status(400).json({ success: false, message: '调整数量无效（0-1000000）' })
+      if (q === null || q < 0 || q > 1000000) {
+        return res.status(400).json({ success: false, message: '调整数量无效（0-1000000 的整数）' })
       }
 
       const product = await Product.findByPk(id, { paranoid: !req.admin })

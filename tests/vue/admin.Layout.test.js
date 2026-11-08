@@ -42,7 +42,13 @@ const messages = {
       operators: '操作员',
       operationLogs: '操作日志',
       systemConfig: '系统配置',
-      logout: '登出'
+      logout: '登出',
+      // 下面这几个键是 Layout.vue 真实用到的 —— mock 里缺了会刷一屏 intlify 警告，
+      // 掩盖真正要看的报错
+      toggleSidebar: '切换侧边栏',
+      promotions: '促销管理',
+      bundles: '组合套餐',
+      coupons: '抵扣券管理'
     },
     language: {
       switchSuccess: '语言切换成功',
@@ -145,5 +151,19 @@ describe('VA.admin.Layout', () => {
       }
     })
     expect(wrapper.text()).toContain('testadmin')
+  })
+
+  it('AL-6 移动端侧边栏抽屉：默认收起，有开关按钮', async () => {
+    const router = makeRouter()
+    await router.push('/dashboard')
+    const wrapper = mount(Layout, {
+      global: {
+        plugins: [makeI18n(), router]
+      }
+    })
+    // 手机上侧边栏是抽屉：默认不占据屏幕，顶部有开关
+    const toggle = wrapper.find('.sidebar-toggle')
+    expect(toggle.exists()).toBe(true)
+    expect(toggle.attributes('aria-label')).toBe('切换侧边栏')
   })
 })

@@ -1,3 +1,6 @@
+/**
+ * @typedef {import('../../types/api').Address} Address
+ */
 import api from './index.js'
 
 // 获取用户地址列表

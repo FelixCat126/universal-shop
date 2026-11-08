@@ -32,19 +32,29 @@ const retries = Math.max(1, Number(process.env.CI_FLAKY_RETRIES || 1))
 
 const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-vitest-'))
 
+/**
+ * 测试配置：默认用覆盖率配置（与 CI 一致），
+ * 可用 --config=xxx 覆盖（自测时用轻量配置，跑得快）。
+ */
+const configArg = (args.find(a => a.startsWith('--config=')) || '').replace('--config=', '')
+const VITEST_CONFIG = configArg || process.env.CI_TEST_CONFIG || 'vitest.coverage.config.js'
+// --config 只传一次：vitest 的 CLI 不允许同一个选项出现两次，
+// 所以从透传给 vitest 的参数里去掉（配置已经用 VITEST_CONFIG 传过了）
+const VITEST_ARGS = args.filter(a => !a.startsWith('--config='))
+
 /** 跑一次 vitest，返回 { code, failedFiles } */
 function runVitest (label, extraArgs = []) {
   const outFile = path.join(outDir, `${label}.json`)
   const cmd = [
     'npx', 'vitest', 'run',
-    '--config', 'vitest.coverage.config.js',
+    '--config', VITEST_CONFIG,
     '--reporter=default',
     '--reporter=json',
     `--outputFile=${outFile}`,
-    ...args,
+    ...VITEST_ARGS,
     ...extraArgs
   ]
-  console.log(`\n▶ ${label}: npx vitest run ${args.join(' ')} ${extraArgs.join(' ')}`)
+  console.log(`\n▶ ${label}: npx vitest run ${VITEST_ARGS.join(' ')} ${extraArgs.join(' ')}`)
   return new Promise((resolve) => {
     const child = spawn(cmd[0], cmd.slice(1), {
       stdio: ['ignore', 'inherit', 'inherit'],

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "checkJs": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@server/*": ["src/server/*"],
+      "@portal/*": ["src/portal/*"],
+      "@admin/*": ["src/admin/*"],
+      "@partner/*": ["src/partner/*"]
+    }
+  },
+  "include": ["src/**/*.js", "src/**/*.vue", "src/types/**/*.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
