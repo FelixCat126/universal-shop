@@ -1083,6 +1083,10 @@ export default {
 
   // Async export jobs
   exportTasks: {
+    typePartnerOrders: 'คำสั่งซื้อพาร์ทเนอร์',
+    typeProducts: 'ข้อมูลสินค้า',
+    typePartners: 'รายชื่อพาร์ทเนอร์',
+    typeCategories: 'หมวดหมู่สินค้า',
     formatXlsx: 'Excel (.xlsx)',
     formatCsv: 'CSV (บัญชี/นำเข้า)',
     title: 'งานส่งออก',

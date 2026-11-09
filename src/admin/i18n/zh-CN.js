@@ -1082,6 +1082,10 @@ export default {
 
   // 异步导出任务
   exportTasks: {
+    typePartnerOrders: '合作方订单',
+    typeProducts: '商品数据',
+    typePartners: '合作方名单',
+    typeCategories: '商品分类',
     formatXlsx: 'Excel (.xlsx)',
     formatCsv: 'CSV（对账/导入）',
     title: '导出任务',

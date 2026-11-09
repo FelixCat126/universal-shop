@@ -9,6 +9,7 @@ import Partner from '../models/Partner.js'
 import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import Product from '../models/Product.js'
+import ProductCategory from '../models/ProductCategory.js'
 import User from '../models/User.js'
 import UserCoupon from '../models/UserCoupon.js'
 import { createStreamingExport } from '../utils/excelWorkbook.js'
@@ -59,6 +60,13 @@ const ORDER_EXPORT_HEADERS = [
 const USER_EXPORT_HEADERS = [
   'ID', '用户名', '昵称', '邮箱', '手机号', '推荐码', '被推荐码', '注册时间', '更新时间'
 ]
+const PRODUCT_EXPORT_HEADERS = [
+  'ID', '名称', '泰文名', '分类', '售价THB', '库存', '积分', '状态', '创建时间'
+]
+const PARTNER_EXPORT_HEADERS = [
+  'ID', '登录名', '商家名称', '账号类别', '折扣%', '启用', '最后登录', '创建时间'
+]
+const CATEGORY_EXPORT_HEADERS = ['ID', '分类名', '排序', '创建时间']
 const PARTNER_ORDER_EXPORT_HEADERS = [
   '订单号', '合作方登录名', '合作方名称', '状态', '收货人', '收货电话', '送货地址',
   '订单总额THB', '商品ID', '商品快照名', '数量', '合作方折扣快照',
@@ -259,6 +267,36 @@ function buildPartnerOrderFilter (params = {}) {
   return where
 }
 
+function buildProductFilter (params = {}) {
+  const where = {}
+  if (params.status) {
+    where.status = String(params.status)
+  }
+  if (params.keyword) {
+    const like = likeContains(params.keyword)
+    where[Op.or] = [
+      { name: { [Op.like]: like } },
+      { name_th: { [Op.like]: like } },
+      { alias: { [Op.like]: like } }
+    ]
+  }
+  return where
+}
+
+function buildPartnerFilter (params = {}) {
+  const where = {}
+  if (params.login) {
+    where.login = { [Op.like]: likeContains(params.login) }
+  }
+  if (params.display_name) {
+    where.display_name = { [Op.like]: likeContains(params.display_name) }
+  }
+  if (params.account_kind) {
+    where.account_kind = String(params.account_kind)
+  }
+  return where
+}
+
 function buildUserFilter (params = {}) {
   const where = {}
   if (params.email) {
@@ -363,10 +401,138 @@ async function exportPartnerOrdersTo (job) {
   return { fileName, filePath: target, fileSize: size, rowCount: written }
 }
 
+/**
+ * 导出商品。
+ */
+async function exportProductsTo (job) {
+  const { exporter, fileName } = await makeExporter(job, {
+    sheetName: '商品列表',
+    headers: PRODUCT_EXPORT_HEADERS,
+    widths: [8, 24, 24, 16, 12, 10, 8, 10, 20],
+    baseName: '商品数据'
+  })
+  const target = path.join(EXPORT_DIR, fileName)
+  await ensureDir()
+
+  let written = 0
+  let cursor = 0
+  const filter = buildProductFilter(job.params)
+  const first = await Product.findOne({ attributes: ['id'], where: filter, order: [['id', 'DESC']] })
+  cursor = first ? first.id + 1 : 0
+
+  while (written < EXPORT_ROW_LIMIT) {
+    const size = Math.min(BATCH_SIZE, EXPORT_ROW_LIMIT - written)
+    const batch = await Product.findAll({
+      where: { ...filter, id: { [Op.lt]: cursor } },
+      order: [['id', 'DESC']],
+      limit: size,
+      include: [{ model: ProductCategory, as: 'productCategory', attributes: ['id', 'name'], required: false }]
+    })
+    if (batch.length === 0) break
+    for (const product of batch) {
+      await exporter.addRow([
+        product.id,
+        sanitizeCell(product.name || ''),
+        sanitizeCell(product.name_th || ''),
+        sanitizeCell(product.productCategory?.name || ''),
+        product.price != null ? Number(product.price).toFixed(2) : '',
+        product.stock ?? '',
+        product.points ?? '',
+        sanitizeCell(product.status || ''),
+        product.created_at ? new Date(product.created_at).toISOString() : ''
+      ])
+      written++
+    }
+    cursor = batch[batch.length - 1].id
+    if (batch.length < size) break
+  }
+
+  const { size } = await exporter.writeToFile(target)
+  return { fileName, filePath: target, fileSize: size, rowCount: written }
+}
+
+/**
+ * 导出合作方名单。
+ */
+async function exportPartnersTo (job) {
+  const { exporter, fileName } = await makeExporter(job, {
+    sheetName: '合作方名单',
+    headers: PARTNER_EXPORT_HEADERS,
+    widths: [8, 18, 22, 12, 10, 8, 20, 20],
+    baseName: '合作方数据'
+  })
+  const target = path.join(EXPORT_DIR, fileName)
+  await ensureDir()
+
+  let written = 0
+  let cursor = 0
+  const filter = buildPartnerFilter(job.params)
+  const first = await Partner.findOne({ attributes: ['id'], where: filter, order: [['id', 'DESC']] })
+  cursor = first ? first.id + 1 : 0
+
+  while (written < EXPORT_ROW_LIMIT) {
+    const size = Math.min(BATCH_SIZE, EXPORT_ROW_LIMIT - written)
+    const batch = await Partner.findAll({
+      where: { ...filter, id: { [Op.lt]: cursor } },
+      order: [['id', 'DESC']],
+      limit: size
+    })
+    if (batch.length === 0) break
+    for (const partner of batch) {
+      await exporter.addRow([
+        partner.id,
+        sanitizeCell(partner.login || ''),
+        sanitizeCell(partner.display_name || ''),
+        sanitizeCell(partner.account_kind || ''),
+        partner.discount_percent != null ? Number(partner.discount_percent).toFixed(2) : '',
+        partner.is_active ? 'true' : 'false',
+        partner.last_login_at ? new Date(partner.last_login_at).toISOString() : '',
+        partner.created_at ? new Date(partner.created_at).toISOString() : ''
+      ])
+      written++
+    }
+    cursor = batch[batch.length - 1].id
+    if (batch.length < size) break
+  }
+
+  const { size } = await exporter.writeToFile(target)
+  return { fileName, filePath: target, fileSize: size, rowCount: written }
+}
+
+/**
+ * 导出商品分类。
+ */
+async function exportCategoriesTo (job) {
+  const { exporter, fileName } = await makeExporter(job, {
+    sheetName: '商品分类',
+    headers: CATEGORY_EXPORT_HEADERS,
+    widths: [8, 24, 10, 20],
+    baseName: '商品分类数据'
+  })
+  const target = path.join(EXPORT_DIR, fileName)
+  await ensureDir()
+
+  const rows = await ProductCategory.findAll({ order: [['id', 'ASC']] })
+  for (const cat of rows) {
+    await exporter.addRow([
+      cat.id,
+      sanitizeCell(cat.name || ''),
+      cat.sort_order ?? '',
+      cat.created_at ? new Date(cat.created_at).toISOString() : ''
+    ])
+  }
+
+  const { size } = await exporter.writeToFile(target)
+  return { fileName, filePath: target, fileSize: size, rowCount: rows.length }
+}
+
 const RUNNERS = {
   users: exportUsersTo,
   orders: exportOrdersTo,
-  partner_orders: exportPartnerOrdersTo
+  partner_orders: exportPartnerOrdersTo,
+  products: exportProductsTo,
+  partners: exportPartnersTo,
+  categories: exportCategoriesTo
 }
 
 /** 创建导出任务 */

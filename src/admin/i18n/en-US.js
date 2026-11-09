@@ -1081,6 +1081,10 @@ export default {
 
   // Async export jobs
   exportTasks: {
+    typePartnerOrders: 'Partner orders',
+    typeProducts: 'Products',
+    typePartners: 'Partners',
+    typeCategories: 'Categories',
     formatXlsx: 'Excel (.xlsx)',
     formatCsv: 'CSV (accounting/import)',
     title: 'Export Jobs',

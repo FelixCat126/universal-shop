@@ -9,9 +9,14 @@
   >
     <!-- 提交栏 -->
     <div class="export-task-submit">
+      <!-- 导出类型：数据驱动（新增类型只要加一条 EXPORT_TYPES + 一个 i18n 键） -->
       <el-select v-model="type" style="width: 180px">
-        <el-option :label="t('exportTasks.typeUsers')" value="users" />
-        <el-option :label="t('exportTasks.typeOrders')" value="orders" />
+        <el-option
+          v-for="opt in EXPORT_TYPES"
+          :key="opt.value"
+          :label="t(opt.labelKey)"
+          :value="opt.value"
+        />
       </el-select>
       <!-- 格式：xlsx 带样式给人看；csv 给财务对账 / ERP 导入（体积小得多） -->
       <el-select v-model="format" style="width: 170px">
@@ -40,7 +45,7 @@
     <el-table v-loading="loading" :data="jobs" size="small" empty-text=" ">
       <el-table-column :label="t('exportTasks.colType')" width="100">
         <template #default="{ row }">
-          {{ row.type === 'orders' ? t('exportTasks.typeOrders') : t('exportTasks.typeUsers') }}
+          {{ typeLabel(row.type) }}
         </template>
       </el-table-column>
       <el-table-column :label="t('exportTasks.colStatus')" width="110">
@@ -145,6 +150,25 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const { t } = useI18n()
+
+/**
+ * 可导出的类型（数据驱动）。
+ * 新增一种导出只要：后端 RUNNERS 加一条 + 这里加一条 + 补一个 i18n 键。
+ */
+const EXPORT_TYPES = [
+  { value: 'users', labelKey: 'exportTasks.typeUsers' },
+  { value: 'orders', labelKey: 'exportTasks.typeOrders' },
+  { value: 'partner_orders', labelKey: 'exportTasks.typePartnerOrders' },
+  { value: 'products', labelKey: 'exportTasks.typeProducts' },
+  { value: 'partners', labelKey: 'exportTasks.typePartners' },
+  { value: 'categories', labelKey: 'exportTasks.typeCategories' }
+]
+
+/** 任务类型 → 展示文案（未知类型退回原始值，不显示空白） */
+const typeLabel = (rowType) => {
+  const opt = EXPORT_TYPES.find(o => o.value === rowType)
+  return opt ? t(opt.labelKey) : String(rowType || '-')
+}
 
 const type = ref(props.defaultType)
 /** 导出格式：xlsx（带样式，给人看）/ csv（财务对账、ERP 导入，体积小得多） */

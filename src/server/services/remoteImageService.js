@@ -48,14 +48,50 @@ export async function downloadAndStoreImage (rawUrl, options = {}) {
   const ext = EXT_BY_TYPE[type]
   if (!ext) throw new Error('不支持的图片格式')
 
-  // 3) 落盘（随机名，不带用户提供的任何字符）
+  /**
+   * 3) 落盘。
+   *
+   * 文件名用**内容哈希**（sha256 前 16 位）而不是随机数：
+   *   - 同一张图在两个商品里各出现一次 → 只存一份（磁盘省一份，前台也不用下两次）
+   *   - 反复导入同一份 CSV → 不会每次都多出一份文件
+   *   - 内容哈希天然不含用户提供的任何字符（路径穿越无从谈起）
+   *
+   * 已经存在就直接复用（不重写、不重复处理）。
+   */
   await fs.mkdir(UPLOAD_DIR, { recursive: true })
-  const baseName = `imported_${Date.now()}_${crypto.randomUUID().slice(0, 8)}${ext}`
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 16)
+  const baseName = `imported_${hash}${ext}`
   const target = path.join(UPLOAD_DIR, baseName)
-  await fs.writeFile(target, buffer)
+  const alreadyThere = await fs.stat(target).catch(() => null)
+  if (!alreadyThere) {
+    await fs.writeFile(target, buffer)
+  }
 
   // 4) 压缩 + 生成变体（失败不阻断 —— 图已经落盘了，只是没瘦身）
   let processed = null
+  /**
+   * 已经处理过（同一张图之前导入过）→ 直接复用，连压缩都不用再跑。
+   * 主图名固定是 <原名去扩展名>.webp（imageProcessor 的命名规则），
+   * 所以只需要看这个文件在不在。
+   */
+  const processedName = `imported_${hash}.webp`
+  const processedPath = path.join(UPLOAD_DIR, processedName)
+  if (await fs.stat(processedPath).catch(() => null)) {
+    // 之前已处理过：原图（.png）可能早就被清掉了，这里也不能删
+    await fs.unlink(target).catch(() => {})
+    const bytes2 = (await fs.stat(processedPath).catch(() => null))?.size ?? buffer.length
+    return {
+      url: `/uploads/products/${processedName}`,
+      filename: processedName,
+      contentType: contentType || type,
+      bytes: bytes2,
+      variants: {
+        thumb: `/uploads/products/imported_${hash}_thumb.webp`,
+        mid: `/uploads/products/imported_${hash}_mid.webp`
+      }
+    }
+  }
+
   try {
     processed = await processImageFile(target)
   } catch (e) {
@@ -64,7 +100,8 @@ export async function downloadAndStoreImage (rawUrl, options = {}) {
   const mainName = processed?.main || baseName
   const finalPath = path.join(UPLOAD_DIR, mainName)
   // 变体处理可能把主图换成 .webp；把原图删掉（避免留两份）
-  if (mainName !== baseName) {
+  // ⚠️ 但如果这张图之前就存在（原图是复用的），**不能删** —— 会把别人的图删了
+  if (mainName !== baseName && !alreadyThere) {
     await fs.unlink(target).catch(() => {})
   }
   const bytes = (await fs.stat(finalPath).catch(() => null))?.size ?? buffer.length

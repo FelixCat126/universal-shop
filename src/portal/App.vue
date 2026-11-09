@@ -23,7 +23,7 @@
     </div>
     <!-- 需要设置密码：横幅提示（不打断当前流程） -->
     <div
-      v-if="userStore.mustResetPassword && route.path !== '/profile'"
+      v-if="userStore.mustResetPassword"
       class="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex flex-wrap items-center gap-2 justify-between"
       role="alert"
     >

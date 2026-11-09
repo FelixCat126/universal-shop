@@ -453,7 +453,7 @@ export default {
 
   // 个人中心
   profile: {
-    passwordChangeNotice: '你的账号还在用系统生成的临时密码，建议现在就设置一个只有你知道的密码。',
+    passwordChangeNotice: '你的账号还在用系统生成的临时密码，建议现在就设置一个只有你知道的密码（点右边按钮即可）。',
     defaultNickname: '用户',
     phoneNotSet: '未设置手机号',
     registerTime: '注册时间',

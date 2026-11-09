@@ -944,7 +944,11 @@ export const ROUTE_SCHEMAS = {
     request: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['users', 'orders', 'partners'], description: '导出类型' },
+        type: {
+          type: 'string',
+          enum: ['users', 'orders', 'partner_orders', 'products', 'partners', 'categories'],
+          description: '导出类型'
+        },
         params: { type: 'object', description: '导出筛选条件' },
         format: { type: 'string', enum: ['xlsx', 'csv'], description: '导出格式（默认 xlsx）' }
       },

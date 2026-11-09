@@ -4889,7 +4889,10 @@
                     "enum": [
                       "users",
                       "orders",
-                      "partners"
+                      "partner_orders",
+                      "products",
+                      "partners",
+                      "categories"
                     ],
                     "description": "导出类型"
                   },
