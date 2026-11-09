@@ -25,6 +25,8 @@ import Product from '../models/Product.js'
 import ProductCategory from '../models/ProductCategory.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { parseCsvTable, normalizeCsvHeaders } from '../utils/csvTable.js'
+import { resolveSafeUrl } from '../utils/remoteImageFetcher.js'
+import { downloadAndStoreImage } from './remoteImageService.js'
 
 /** 一次导入最多多少行 —— 防止一个误传的几 MB 文件把服务拖垮 */
 export const MAX_IMPORT_ROWS = 500
@@ -125,7 +127,9 @@ export function validateRow (cells, categoryMap) {
 
   values.name_th = cells.name_th == null ? '' : String(cells.name_th).trim().slice(0, 200)
   values.description = cells.description == null ? '' : String(cells.description).trim().slice(0, 2000)
-  values.image = cells.image == null ? '' : String(cells.image).trim().slice(0, 500)
+  const rawImage = cells.image == null ? '' : String(cells.image).trim().slice(0, 500)
+  values.image = rawImage
+  values.image_is_remote = /^https?:\/\//i.test(rawImage)
 
   // category
   const catName = cells.category == null ? '' : String(cells.category).trim()
@@ -194,6 +198,16 @@ export async function previewProductCsv (buffer) {
 
   for (const row of rows) {
     const { values, errors } = validateRow(row.cells, categoryMap)
+
+    // SSRF pre-check for remote images: resolve + IP judgement only, no download.
+    // Doing it in preview keeps the DB untouched before we reject an unsafe URL.
+    if (values.image_is_remote) {
+      try {
+        await resolveSafeUrl(values.image)
+      } catch (e) {
+        errors.push(`image URL unusable: ${e.message}`)
+      }
+    }
     // 同一个 id 在文件里出现多次 → 后面的判为错误（否则后者会覆盖前者，静默丢数据）
     if (values.id != null) {
       if (seenIds.has(values.id)) {
@@ -297,6 +311,20 @@ export async function importProductCsv (buffer) {
       continue
     }
     try {
+      // Remote image: download + store locally, then use the local path.
+      // A failed download fails THIS row only (with the reason reported) --
+      // other rows still import.
+      let imageValue = values.image || null
+      if (values.image_is_remote) {
+        try {
+          const stored = await downloadAndStoreImage(values.image)
+          imageValue = stored.url
+        } catch (e) {
+          failed.push({ rowNumber: row.rowNumber, name: values.name, reason: `image download failed: ${e.message}` })
+          continue
+        }
+      }
+
       if (values.id != null) {
         const [affected] = await Product.update(
           {
@@ -307,7 +335,7 @@ export async function importProductCsv (buffer) {
             price: values.price,
             stock: values.stock,
             points: values.points,
-            image: values.image || null
+            image: imageValue
           },
           { where: { id: values.id } }
         )
@@ -325,7 +353,7 @@ export async function importProductCsv (buffer) {
           price: values.price,
           stock: values.stock,
           points: values.points,
-          image: values.image || null,
+          image: imageValue,
           status: 'active'
         })
         created.push({ rowNumber: row.rowNumber, id: product.id, name: values.name })

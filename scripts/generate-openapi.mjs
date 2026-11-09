@@ -87,15 +87,27 @@ for (const route of routes) {
   const requestBody = registered?.request
     ? {
         required: true,
-        content: { 'application/json': { schema: registered.request } }
+        content: registered?.requestContent || { 'application/json': { schema: registered.request } }
       }
     : undefined
 
+  /**
+   * 查询参数：登记了才写进文档。
+   * 不登记 = 文档里看不到这个接口能传什么参数 —— 比"乱猜"好，但确实缺信息。
+   */
+  const queryParams = (registered?.query || []).map(q => ({
+    name: q.name,
+    in: 'query',
+    required: Boolean(q.required),
+    schema: q.schema || { type: 'string' },
+    ...(q.description ? { description: q.description } : {})
+  }))
+
   // 响应体：200 用登记的 schema；错误响应统一是错误信封
   const okResponse = {
-    description: '成功',
+    description: registered?.responseDescription || '成功',
     content: registered?.response
-      ? { 'application/json': { schema: registered.response } }
+      ? { [registered?.produces || 'application/json']: { schema: registered.response } }
       : undefined
   }
   if (!okResponse.content) delete okResponse.content
@@ -104,7 +116,7 @@ for (const route of routes) {
   paths[oaPath][route.method.toLowerCase()] = {
     summary: SUMMARIES[key] || `${route.method} ${route.fullPath}`,
     tags: [tagOf(route.fullPath)],
-    parameters: params,
+    parameters: [...params, ...queryParams],
     ...(requestBody ? { requestBody } : {}),
     responses: {
       200: okResponse,

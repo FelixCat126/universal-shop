@@ -21,6 +21,22 @@
         {{ t('common.reload') }}
       </button>
     </div>
+    <!-- 需要设置密码：横幅提示（不打断当前流程） -->
+    <div
+      v-if="userStore.mustResetPassword && route.path !== '/profile'"
+      class="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex flex-wrap items-center gap-2 justify-between"
+      role="alert"
+    >
+      <span class="text-sm text-amber-900">{{ t('profile.passwordChangeNotice') }}</span>
+      <button
+        type="button"
+        class="px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700"
+        @click="goSetPassword"
+      >
+        {{ t('profile.changePassword') }}
+      </button>
+    </div>
+
     <!-- 顶部导航栏（滚动时 backdrop-blur 渐变） -->
     <header
       class="bg-white/85 backdrop-blur-md border-b sticky top-0 z-40 transition-shadow duration-300"
@@ -295,6 +311,27 @@ watch(() => userStore.isLoggedIn, async (newValue, oldValue) => {
     }
   }
 })
+
+/**
+ * 首次登录必须改密 → 直接把人送到改密弹窗。
+ *
+ * 账号来源：游客自动注册、运营批量导入客户 —— 密码都是系统随机生成的，
+ * 用户自己都不知道。不引导他改密，他就一直用着一个自己都不知道的密码。
+ * 标志位 must_reset_password 一直存在，但**前端从来没读过它**。
+ */
+/**
+ * 需要改密 → 顶部横幅提示 + 一个按钮。
+ *
+ * 为什么**不自动跳转**：
+ *   登录后往往紧接着有应用自己的导航（游客下单完 → /profile?tab=orders 看订单）。
+ *   自动跳转会跟它**抢路由**，把用户从"刚下的订单"拽走 ——
+ *   那个 E2E 就是这么被我的自动跳转打断的（实测：下单后被带到改密页）。
+ *   横幅不打断任何流程，安全提示也不丢（账号的密码是系统随机生成的，
+ *   运营和用户都不知道；不设的话这个账号等于没有密码保护）。
+ */
+const goSetPassword = () => {
+  router.push({ path: '/profile', query: { tab: 'profile', force: 'password' } })
+}
 
 /**
  * 切换账号：登录用户 id 变化（而不是登出再登录）时，

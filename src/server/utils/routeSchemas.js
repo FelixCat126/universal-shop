@@ -409,10 +409,16 @@ export const ROUTE_SCHEMAS = {
   'GET /api/product-categories': { response: envArray('ProductCategory') },
   'GET /api/admin/product-categories': { response: envArray('ProductCategory') },
   'GET /api/products/export.csv': {
-    response: {
-      type: 'string',
-      description: 'CSV 文件内容（含 BOM，Excel 打开中文不乱码）'
-    }
+    query: [
+      {
+        name: 'format',
+        schema: { type: 'string', enum: ['csv', 'xlsx'] },
+        description: '导出格式（默认 csv）'
+      }
+    ],
+    produces: 'text/csv',
+    responseDescription: 'CSV 文件内容（含 BOM，Excel 打开中文不乱码）',
+    response: { type: 'string', description: 'CSV 文件内容' }
   },
   'POST /api/products/import': {
     request: {
@@ -765,7 +771,9 @@ export const ROUTE_SCHEMAS = {
 
   /* ---------------- 合作方 CSV 批量导入/导出 ---------------- */
   'GET /api/admin/partners/export.csv': {
-    response: { type: 'string', description: '合作方名单 CSV（含 BOM）' }
+    produces: 'text/csv',
+    responseDescription: '合作方名单 CSV（含 BOM）',
+    response: { type: 'string', description: '合作方名单 CSV' }
   },
   'POST /api/admin/partners/import': {
     request: {
@@ -868,6 +876,59 @@ export const ROUTE_SCHEMAS = {
     response: env('PartnerOrder')
   },
 
+  /* ---------------- 用户 CSV 批量导入/导出 ---------------- */
+  'GET /api/admin/users/export.csv': {
+    produces: 'text/csv',
+    responseDescription: '用户名单 CSV（含 BOM）',
+    response: { type: 'string', description: '用户名单 CSV' }
+  },
+  'POST /api/admin/users/import': {
+    request: {
+      type: 'object',
+      description: 'multipart/form-data：file（CSV 文件）+ dry_run（1 = 只预览不落库）',
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'CSV 文件（第一行是表头；**不要写密码**）' },
+        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' }
+      },
+      required: ['file']
+    },
+    response: envelopeSchema({
+      type: 'object',
+      properties: {
+        totalRows: { type: 'integer' },
+        validCount: { type: 'integer' },
+        invalidCount: { type: 'integer' },
+        createCount: { type: 'integer' },
+        updateCount: { type: 'integer' },
+        invalid: {
+          type: 'array',
+          description: '有问题的行（逐行给出原因）',
+          items: {
+            type: 'object',
+            properties: {
+              rowNumber: { type: 'integer' },
+              nickname: { type: 'string' },
+              errors: { type: 'array', items: { type: 'string' } }
+            }
+          }
+        },
+        valid: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              rowNumber: { type: 'integer' },
+              action: { type: 'string', enum: ['create', 'update'] },
+              nickname: { type: 'string' },
+              phone: { type: 'string' },
+              email: { type: 'string' }
+            }
+          }
+        }
+      }
+    }, '导入预览 / 导入结果')
+  },
+
   /* ---------------- 用户管理 ---------------- */
   'PUT /api/admin/users/:id/status': {
     request: {
@@ -883,8 +944,9 @@ export const ROUTE_SCHEMAS = {
     request: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['users', 'orders'], description: '导出类型' },
-        params: { type: 'object', description: '导出筛选条件' }
+        type: { type: 'string', enum: ['users', 'orders', 'partners'], description: '导出类型' },
+        params: { type: 'object', description: '导出筛选条件' },
+        format: { type: 'string', enum: ['xlsx', 'csv'], description: '导出格式（默认 xlsx）' }
       },
       required: ['type']
     },
@@ -901,7 +963,16 @@ export const ROUTE_SCHEMAS = {
     response: { type: 'string', description: '合作方订单导出文件' }
   },
   'GET /api/admin/export/users': {
-    response: { type: 'string', description: '用户导出文件' }
+    query: [
+      {
+        name: 'format',
+        schema: { type: 'string', enum: ['csv', 'xlsx'] },
+        description: '导出格式：csv 给财务对账/ERP 导入，xlsx 给人看'
+      }
+    ],
+    produces: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    responseDescription: '用户导出文件',
+    response: { type: 'string', description: '用户导出文件（xlsx 或 csv）' }
   },
 
   /* ---------------- 日志与监控 ---------------- */
@@ -1331,7 +1402,16 @@ export const ROUTE_SCHEMAS = {
     response: env('Administrator')
   },
   'GET /api/admin/export/orders': {
-    response: { type: 'string', description: '订单导出文件' }
+    query: [
+      {
+        name: 'format',
+        schema: { type: 'string', enum: ['csv', 'xlsx'] },
+        description: '导出格式：csv 给财务对账/ERP 导入，xlsx 给人看'
+      }
+    ],
+    produces: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    responseDescription: '订单导出文件',
+    response: { type: 'string', description: '订单导出文件（xlsx 或 csv）' }
   },
 
   /* ---------------- 系统 ---------------- */

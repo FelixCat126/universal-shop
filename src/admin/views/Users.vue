@@ -50,7 +50,26 @@
         <el-icon><Download /></el-icon>
         {{ t('users.exportUsers') }}
       </el-button>
+      <!-- CSV 批量导入客户（运营手上有一份客户名单要变成账号） -->
+      <el-button @click="openCsvImport">
+        <el-icon><Upload /></el-icon>
+        {{ t('csv.importTitle') }}
+      </el-button>
+      <el-button @click="exportCsv">
+        <el-icon><Download /></el-icon>
+        {{ t('csv.exportTitle') }}
+      </el-button>
     </div>
+
+    <!-- CSV 导入对话框 -->
+    <CsvImportDialog
+      ref="csvImportRef"
+      type="users"
+      subject-key="nickname"
+      :hint="t('users.csvHint')"
+      :valid-columns="userCsvColumns"
+      @imported="loadUsers"
+    />
 
     <!-- 异步导出任务（大数据量走后台生成，避免请求超时） -->
     <ExportTaskDialog
@@ -358,11 +377,13 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
-import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar, Loading, Location, ArrowDown } from '@element-plus/icons-vue'
+import { Search, Refresh, Download, User, Plus, TrendCharts, Calendar, Loading, Location, ArrowDown, Upload } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { userAPI } from '../api/users.js'
 import CountryFlag from '../components/CountryFlag.vue'
+import CsvImportDialog from '../components/CsvImportDialog.vue'
+import api from '../api/index.js'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
@@ -464,6 +485,36 @@ const monthRegistrations = computed(() => {
 })
 
 // 加载用户列表
+/* ---------------- CSV 批量导入 / 导出 ---------------- */
+
+const csvImportRef = ref(null)
+const openCsvImport = () => {
+  csvImportRef.value?.open()
+}
+
+/** 预览表里"可导入行"显示的列（与后端 CSV 列一致） */
+const userCsvColumns = [
+  { key: 'nickname', label: t('users.nickname'), minWidth: 120 },
+  { key: 'phone', label: t('users.phone'), width: 130 },
+  { key: 'email', label: t('users.email'), minWidth: 160 }
+]
+
+/** 导出用户为 CSV（财务/运营核对名单用） */
+const exportCsv = async () => {
+  try {
+    const res = await api.get('/admin/users/export.csv', { responseType: 'blob' })
+    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `users-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || t('common.error'))
+  }
+}
+
 const loadUsers = async () => {
   try {
     isLoading.value = true

@@ -456,6 +456,7 @@ export default {
 
   // 个人中心
   profile: {
+    passwordChangeNotice: 'Your account still uses a system-generated temporary password. Set your own password so only you know it.',
     defaultNickname: 'User',
     phoneNotSet: 'Phone not set',
     registerTime: 'Registration Time',

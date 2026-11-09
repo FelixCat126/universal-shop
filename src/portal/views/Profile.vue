@@ -940,6 +940,26 @@ watch(
   { immediate: true }
 )
 
+/**
+ * ?force=password —— 强制打开改密弹窗。
+ *
+ * 用于「首次登录必须改密」的账号（游客自动注册 / 批量导入的客户）：
+ * 用户的密码是系统随机生成的，自己根本不知道 —— 不强制改密，
+ * 他会一直用着一个自己都不知道的密码（而且这个密码在数据库里是明文可读的哈希，
+ * 拿到数据库就能登录）。
+ */
+watch(
+  () => route.query.force,
+  (forceParam) => {
+    if (String(forceParam) === 'password') {
+      // 只开弹窗，**不动 tab** —— tab 由 URL 的 ?tab= 决定
+      // （游客下单完会带着 tab=orders 过来，强行切走会打断"看订单"）
+      openPasswordModal()
+    }
+  },
+  { immediate: true }
+)
+
 // 地址模态框状态
 const showAddressModal = ref(false)
 const editingAddress = ref(null)

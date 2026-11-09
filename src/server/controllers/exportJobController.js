@@ -32,12 +32,13 @@ class ExportJobController {
   static async createJob (req, res) {
     try {
       const { type } = req.body || {}
-      const allowed = { users: 'users', orders: 'orders' }
+      // partner_orders：批发对账（一次几百单，异步导出比同步更合适）
+      const allowed = { users: 'users', orders: 'orders', partner_orders: 'partner_orders' }
       const normalized = allowed[type]
       if (!normalized) {
         return res.status(400).json({
           success: false,
-          message: '不支持的导出类型（可选：users / orders）',
+          message: '不支持的导出类型（可选：users / orders / partner_orders）',
           code: 'INVALID_EXPORT_TYPE'
         })
       }
@@ -273,6 +274,7 @@ function sanitizeParams (body = {}) {
   const allowed = [
     'status', 'keyword', 'email', 'phone', 'referral_code',
     'startDate', 'endDate', 'from', 'to',
+    'partner_keyword',
     // 导出格式：xlsx（默认）/ csv（财务对账、ERP 导入、体积小）
     'format'
   ]

@@ -5,6 +5,9 @@ import { Op } from 'sequelize'
 import ExportJob from '../models/ExportJob.js'
 import Order from '../models/Order.js'
 import OrderItem from '../models/OrderItem.js'
+import Partner from '../models/Partner.js'
+import PartnerOrder from '../models/PartnerOrder.js'
+import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import Product from '../models/Product.js'
 import User from '../models/User.js'
 import UserCoupon from '../models/UserCoupon.js'
@@ -55,6 +58,11 @@ const ORDER_EXPORT_HEADERS = [
 ]
 const USER_EXPORT_HEADERS = [
   'ID', '用户名', '昵称', '邮箱', '手机号', '推荐码', '被推荐码', '注册时间', '更新时间'
+]
+const PARTNER_ORDER_EXPORT_HEADERS = [
+  '订单号', '合作方登录名', '合作方名称', '状态', '收货人', '收货电话', '送货地址',
+  '订单总额THB', '商品ID', '商品快照名', '数量', '合作方折扣快照',
+  '零售价等价THB', '单价THB', '行小计THB', '下单时间'
 ]
 
 function ensureDir () {
@@ -228,6 +236,29 @@ function buildOrderFilter (params = {}) {
   return where
 }
 
+/**
+ * 合作方订单的筛选条件（与直接导出 /api/admin/partner-orders/export 的口径一致）。
+ */
+function buildPartnerOrderFilter (params = {}) {
+  const where = {}
+  if (params.status) {
+    where.status = String(params.status)
+  }
+  if (params.startDate && params.endDate) {
+    where.created_at = { [Op.between]: [params.startDate, params.endDate] }
+  }
+  if (params.partner_keyword) {
+    const like = likeContains(params.partner_keyword)
+    where.partner = {
+      [Op.or]: [
+        { login: { [Op.like]: like } },
+        { display_name: { [Op.like]: like } }
+      ]
+    }
+  }
+  return where
+}
+
 function buildUserFilter (params = {}) {
   const where = {}
   if (params.email) {
@@ -250,9 +281,92 @@ function buildUserFilter (params = {}) {
   return where
 }
 
+/**
+ * 导出合作方订单（批发对账）。
+ *
+ * 按**订单行**展开（一行一个商品），和直接导出的口径一致 ——
+ * 财务对账看的是"哪个合作方、买了哪个商品、多少件、多少钱"。
+ */
+async function exportPartnerOrdersTo (job) {
+  const { exporter, fileName } = await makeExporter(job, {
+    sheetName: '合作方订货',
+    headers: PARTNER_ORDER_EXPORT_HEADERS,
+    widths: [22, 16, 18, 12, 14, 18, 30, 14, 10, 26, 8, 12, 14, 12, 14, 20],
+    baseName: '合作方订货'
+  })
+  const target = path.join(EXPORT_DIR, fileName)
+  await ensureDir()
+
+  const filter = buildPartnerOrderFilter(job.params)
+  let written = 0
+  let cursor = 0
+  const first = await PartnerOrder.findOne({ attributes: ['id'], where: filter, order: [['id', 'DESC']] })
+  // 游标要取最大 id + 1，否则最新一条会被漏掉
+  cursor = first ? first.id + 1 : 0
+
+  while (written < EXPORT_ROW_LIMIT) {
+    const size = Math.min(BATCH_SIZE, EXPORT_ROW_LIMIT - written)
+    const batch = await PartnerOrder.findAll({
+      where: { ...filter, id: { [Op.lt]: cursor } },
+      order: [['id', 'DESC']],
+      limit: size,
+      include: [
+        { model: Partner, as: 'partner', attributes: ['login', 'display_name'], required: false },
+        { model: PartnerOrderItem, as: 'items' }
+      ]
+    })
+    if (batch.length === 0) break
+    for (const order of batch) {
+      const oj = order.toJSON()
+      const partnerLogin = sanitizeCell(oj.partner?.login ?? '')
+      const partnerName = sanitizeCell(oj.partner?.display_name ?? '')
+      const items = oj.items || []
+      if (items.length === 0) {
+        await exporter.addRow([
+          sanitizeCell(oj.order_no || ''), partnerLogin, partnerName,
+          sanitizeCell(oj.status || ''), sanitizeCell(oj.contact_name || ''),
+          sanitizeCell(oj.contact_phone || ''), sanitizeCell(oj.delivery_address || ''),
+          oj.total_amount_thb != null ? Number(oj.total_amount_thb).toFixed(2) : '',
+          '', '', '', '', '', '', '', '',
+          oj.created_at ? new Date(oj.created_at).toISOString() : ''
+        ])
+        written++
+        continue
+      }
+      for (const it of items) {
+        await exporter.addRow([
+          sanitizeCell(oj.order_no || ''),
+          partnerLogin,
+          partnerName,
+          sanitizeCell(oj.status || ''),
+          sanitizeCell(oj.contact_name || ''),
+          sanitizeCell(oj.contact_phone || ''),
+          sanitizeCell((oj.delivery_address ?? '').replace(/\n/g, ' ')),
+          oj.total_amount_thb != null ? Number(oj.total_amount_thb).toFixed(2) : '',
+          it.product_id,
+          sanitizeCell(it.product_name_snapshot || ''),
+          it.quantity,
+          it.partner_discount_percent_snapshot != null ? Number(it.partner_discount_percent_snapshot).toFixed(2) : '',
+          it.base_unit_thb != null ? Number(it.base_unit_thb).toFixed(2) : '',
+          it.unit_price_thb != null ? Number(it.unit_price_thb).toFixed(2) : '',
+          it.line_total_thb != null ? Number(it.line_total_thb).toFixed(2) : '',
+          oj.created_at ? new Date(oj.created_at).toISOString() : ''
+        ])
+        written++
+      }
+    }
+    cursor = batch[batch.length - 1].id
+    if (batch.length < size) break
+  }
+
+  const { size } = await exporter.writeToFile(target)
+  return { fileName, filePath: target, fileSize: size, rowCount: written }
+}
+
 const RUNNERS = {
   users: exportUsersTo,
-  orders: exportOrdersTo
+  orders: exportOrdersTo,
+  partner_orders: exportPartnerOrdersTo
 }
 
 /** 创建导出任务 */

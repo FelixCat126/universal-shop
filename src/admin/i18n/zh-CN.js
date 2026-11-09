@@ -533,6 +533,7 @@ export default {
 
   // 用户管理页面
   users: {
+    csvHint: 'CSV 第一行必须是表头，支持的列：id / nickname / username / email / phone / country_code / referral_code / is_active。带 id 的行会更新对应用户，不带 id 的行会新建。⚠️ **不要在 CSV 里写密码**：系统会生成随机初始密码（导入结果里显示一次，请线下告知用户），用户首次登录会被要求改密。',
     title: '用户管理',
     description: '管理所有注册用户，支持搜索和筛选',
     email: '邮箱',
@@ -724,6 +725,7 @@ export default {
     tip: '建议先「导出 CSV」拿到当前数据作为模板，在 Excel 里改完再导回来。',
   },
   products: {
+    csvHint: 'CSV 第一行必须是表头，支持的列：id / name / name_th / category / price / stock / points / description / image。带 id 的行会更新对应商品，不带 id 的行会新建。image 列可以填远程图片地址（http/https），系统会下载并转存到本地；指向内网的地址会在预览阶段被拦下。',
     bulkActivate: '批量上架',
     bulkDeactivate: '批量下架',
     bulkSelected: '已选 {count} 个商品',

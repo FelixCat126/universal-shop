@@ -25,6 +25,18 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('user', JSON.stringify(userData))
   }
 
+  /**
+   * 这个账号是否"必须先改密码"。
+   *
+   * 两种来源：
+   *   - 游客自动注册（系统生成的随机密码，用户自己都不知道）
+   *   - 运营批量导入客户（初始密码由系统生成，运营也不该经手）
+   *
+   * 之前标志位一直存在（must_reset_password），但前端**从来没用过** ——
+   * 用户就一直用着一个自己都不知道的密码。
+   */
+  const mustResetPassword = computed(() => user.value?.must_reset_password === true)
+
   // 清除认证信息
   const clearAuth = () => {
     user.value = null
@@ -186,6 +198,7 @@ export const useUserStore = defineStore('user', () => {
     // 计算属性
     isAuthenticated,
     isLoggedIn,
+    mustResetPassword,
     userInfo,
     isAdmin,
     

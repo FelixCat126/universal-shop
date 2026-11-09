@@ -4888,13 +4888,22 @@
                     "type": "string",
                     "enum": [
                       "users",
-                      "orders"
+                      "orders",
+                      "partners"
                     ],
                     "description": "导出类型"
                   },
                   "params": {
                     "type": "object",
                     "description": "导出筛选条件"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "xlsx",
+                      "csv"
+                    ],
+                    "description": "导出格式（默认 xlsx）"
                   }
                 },
                 "required": [
@@ -5133,15 +5142,29 @@
         "tags": [
           "导出任务"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "xlsx"
+              ]
+            },
+            "description": "导出格式：csv 给财务对账/ERP 导入，xlsx 给人看"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "订单导出文件",
             "content": {
-              "application/json": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
                 "schema": {
                   "type": "string",
-                  "description": "订单导出文件"
+                  "description": "订单导出文件（xlsx 或 csv）"
                 }
               }
             }
@@ -5197,15 +5220,29 @@
         "tags": [
           "导出任务"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "xlsx"
+              ]
+            },
+            "description": "导出格式：csv 给财务对账/ERP 导入，xlsx 给人看"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "用户导出文件",
             "content": {
-              "application/json": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
                 "schema": {
                   "type": "string",
-                  "description": "用户导出文件"
+                  "description": "用户导出文件（xlsx 或 csv）"
                 }
               }
             }
@@ -7040,12 +7077,12 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "合作方名单 CSV（含 BOM）",
             "content": {
-              "application/json": {
+              "text/csv": {
                 "schema": {
                   "type": "string",
-                  "description": "合作方名单 CSV（含 BOM）"
+                  "description": "合作方名单 CSV"
                 }
               }
             }
@@ -8866,6 +8903,249 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/Address"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/users/export.csv": {
+      "get": {
+        "summary": "GET /api/admin/users/export.csv",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "用户名单 CSV（含 BOM）",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "description": "用户名单 CSV"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/users/import": {
+      "post": {
+        "summary": "POST /api/admin/users/import",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "multipart/form-data：file（CSV 文件）+ dry_run（1 = 只预览不落库）",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV 文件（第一行是表头；**不要写密码**）"
+                  },
+                  "dry_run": {
+                    "type": "string",
+                    "enum": [
+                      "1",
+                      "false"
+                    ],
+                    "description": "1 = 只校验预览，false = 真正导入"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "导入预览 / 导入结果",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "totalRows": {
+                          "type": "integer"
+                        },
+                        "validCount": {
+                          "type": "integer"
+                        },
+                        "invalidCount": {
+                          "type": "integer"
+                        },
+                        "createCount": {
+                          "type": "integer"
+                        },
+                        "updateCount": {
+                          "type": "integer"
+                        },
+                        "invalid": {
+                          "type": "array",
+                          "description": "有问题的行（逐行给出原因）",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "rowNumber": {
+                                "type": "integer"
+                              },
+                              "nickname": {
+                                "type": "string"
+                              },
+                              "errors": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "valid": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "rowNumber": {
+                                "type": "integer"
+                              },
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "create",
+                                  "update"
+                                ]
+                              },
+                              "nickname": {
+                                "type": "string"
+                              },
+                              "phone": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
                       }
                     }
                   },
@@ -14662,15 +14942,29 @@
         "tags": [
           "商品"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "xlsx"
+              ]
+            },
+            "description": "导出格式（默认 csv）"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "CSV 文件内容（含 BOM，Excel 打开中文不乱码）",
             "content": {
-              "application/json": {
+              "text/csv": {
                 "schema": {
                   "type": "string",
-                  "description": "CSV 文件内容（含 BOM，Excel 打开中文不乱码）"
+                  "description": "CSV 文件内容"
                 }
               }
             }

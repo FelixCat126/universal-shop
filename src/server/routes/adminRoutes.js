@@ -10,6 +10,7 @@ import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
 import ProductCategoryController from '../controllers/productCategoryController.js'
 import PartnerAdminController from '../controllers/partnerAdminController.js'
 import PartnerCsvController from '../controllers/partnerCsvController.js'
+import UserCsvController from '../controllers/userCsvController.js'
 import { csvUpload } from '../controllers/productCsvController.js'
 import PromotionController from '../controllers/promotionController.js'
 import CouponAdminController from '../controllers/couponAdminController.js'
@@ -79,6 +80,23 @@ router.get('/partner-orders', requirePermission('partners'), PartnerAdminControl
 router.put('/partner-orders/:id/status', requirePermission('partners'), logOperation('update_partner_order_status', 'partner_order'), PartnerAdminController.updatePartnerOrderStatus)
 
 // 管理员用户路由（需要users权限）
+/**
+ * CSV 批量导入用户：**必须排在 GET /:id 之前** ——
+ * 否则 "/export.csv" 会被 "/:id" 抢先匹配，id 解析失败变成 400。
+ *
+ * 导入的账号走"邀请流程"：系统生成随机初始密码（只在导入结果里显示一次），
+ * 账号标记 must_reset_password=true，用户首次登录被强制改密 ——
+ * 密码永远不进 CSV，也永远不经运营的手。
+ */
+router.get('/users/export.csv', requirePermission('users'), UserCsvController.exportUsers)
+router.post(
+  '/users/import',
+  requirePermission('users'),
+  writeLimiter,
+  logOperation('import_users_csv', 'user'),
+  csvUpload.single('file'),
+  UserCsvController.importUsers
+)
 router.get('/users', requirePermission('users'), UserController.getAllUsers)
 router.put('/users/:id/status', requirePermission('users'), logOperation('update_user_status', 'user'), UserController.updateUserStatus)
 router.get('/users/:userId/addresses', requirePermission('users'), AddressController.getAdminUserAddresses)

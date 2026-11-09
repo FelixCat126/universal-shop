@@ -176,6 +176,27 @@ describe('CSV 预览与导入', () => {
 })
 
 describe('CSV 导出', () => {
+  it('PC-13 远程图片指向内网 → 预览就拦下来（SSRF 预检）', async () => {
+    // 预览阶段就会解析 + 判定 IP —— 不等导入时才拦（那时已经写了一半）
+    const preview = await previewProductCsv(csv([
+      'name,price,category,image',
+      '内网图商品,10,测试分类,http://127.0.0.1:9999/secret.png',
+      '云元数据商品,10,测试分类,http://169.254.169.254/latest/meta-data/'
+    ].join('\n')))
+    expect(preview.validCount).toBe(0)
+    expect(preview.invalidCount).toBe(2)
+    expect(preview.invalid[0].errors.join('')).toMatch(/image URL unusable/)
+  })
+
+  it('PC-14 本地路径的图片不受影响（不下载、不拦）', async () => {
+    const preview = await previewProductCsv(csv([
+      'name,price,category,image',
+      '本地图商品,10,测试分类,/uploads/products/existing.png'
+    ].join('\n')))
+    expect(preview.validCount).toBe(1)
+    expect(preview.valid[0].name).toBe('本地图商品')
+  })
+
   it('PC-12 导出含 id，可原样导回（往返一致）', async () => {
     const { Product } = TestDatabase.getSequelize().models
     const p = await Product.create(TestDataFactory.createProduct({

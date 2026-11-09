@@ -29,6 +29,11 @@
         <el-form-item>
           <el-button type="primary" @click="search">{{ t('partnerOrdersMgmt.search') }}</el-button>
           <el-button @click="resetFilters">{{ t('partnerOrdersMgmt.reset') }}</el-button>
+          <!-- 格式：xlsx 给人看；csv 给财务对账/ERP 导入（批发一次几百单，csv 又小又快） -->
+          <el-select v-model="exportFormat" style="width: 130px">
+            <el-option :label="t('exportTasks.formatXlsx')" value="xlsx" />
+            <el-option :label="t('exportTasks.formatCsv')" value="csv" />
+          </el-select>
           <el-button type="success" :loading="exporting" @click="exportXlsx">{{ t('partnerOrdersMgmt.export') }}</el-button>
         </el-form-item>
       </el-form>
@@ -152,6 +157,8 @@ function isTerminalStatus (status) {
 
 const loading = ref(false)
 const exporting = ref(false)
+/** 导出格式：xlsx（默认）/ csv（财务对账） */
+const exportFormat = ref('xlsx')
 const orders = ref([])
 const filters = reactive({
   partner_keyword: '',
@@ -230,6 +237,7 @@ async function exportXlsx () {
       q.set('from', filters.from)
       q.set('to', filters.to)
     }
+    if (exportFormat.value === 'csv') q.set('format', 'csv')
     const url = `${config.buildApiUrl('/api/admin/partner-orders/export')}?${q.toString()}`
     const res = await fetch(url, {
       headers: {
@@ -243,7 +251,8 @@ async function exportXlsx () {
     const blob = await res.blob()
     const link = document.createElement('a')
     link.href = window.URL.createObjectURL(blob)
-    link.download = `partner_orders_${new Date().toISOString().slice(0, 10)}.xlsx`
+    const ext = exportFormat.value === 'csv' ? 'csv' : 'xlsx'
+    link.download = `partner_orders_${new Date().toISOString().slice(0, 10)}.${ext}`
     link.click()
     window.URL.revokeObjectURL(link.href)
   } catch {

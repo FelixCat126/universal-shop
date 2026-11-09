@@ -8,6 +8,7 @@ import { parsePartnerAccountKind } from '../constants/partnerAccountKind.js'
 import XLSX from '../utils/excelWorkbook.js'
 import { logger } from '../utils/logger.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
+import { csvCell } from '../utils/csvExporter.js'
 import { parseId } from '../utils/params.js'
 import { likeContains } from '../utils/likeSearch.js'
 
@@ -383,13 +384,39 @@ class PartnerAdminController {
         }
       }
 
+      /**
+       * 格式：xlsx（默认，给人看）/ csv（财务对账、ERP 导入，体积小得多）。
+       *
+       * 批发对账是**成批**的（一次几百单、上万行），xlsx 在这个量级又慢又大，
+       * 而财务的工具链要的是 CSV —— 所以两种都得给。
+       */
+      const wantCsv = String(req.query.format || '').toLowerCase() === 'csv'
+      const day = new Date().toISOString().split('T')[0]
+
+      if (wantCsv) {
+        const headers = flat.length ? Object.keys(flat[0]) : []
+        const lines = [headers.map(csvCell).join(',')]
+        for (const row of flat) {
+          lines.push(headers.map(h => csvCell(row[h])).join(','))
+        }
+        if (ordersTruncated) {
+          lines.push(csvCell(`数据量超过上限，仅导出前 ${EXPORT_ROW_LIMIT} 行`))
+        }
+        // BOM：Excel 打开中文不乱码
+        const csv = '﻿' + lines.join('\r\n')
+        const fn = `合作方订货_${day}.csv`
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fn)}`)
+        return res.send(csv)
+      }
+
       const workbook = XLSX.utils.book_new()
       const sheet = XLSX.utils.json_to_sheet(flat.length ? flat : [{}])
       if (ordersTruncated) appendTruncationNote(sheet)
       XLSX.utils.book_append_sheet(workbook, sheet, 'partner_orders')
 
       const buffer = await XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
-      const fn = `合作方订货_${new Date().toISOString().split('T')[0]}.xlsx`
+      const fn = `合作方订货_${day}.xlsx`
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fn)}`)

@@ -532,6 +532,7 @@ export default {
 
   // User management
   users: {
+    csvHint: 'The first row must be a header. Supported columns: id / nickname / username / email / phone / country_code / referral_code / is_active. Rows with an id update that user; rows without an id create a new one. Do NOT put passwords in the CSV: the system generates a random initial password (shown once in the import result — share it with the user offline) and the user must change it on first login.',
     title: 'User Management',
     description: 'Manage all registered users with search and filter support',
     email: 'Email',
@@ -723,6 +724,7 @@ export default {
     tip: 'Tip: export the CSV first to get your current data as a template, edit in Excel, then import it back.',
   },
   products: {
+    csvHint: 'The first row must be a header. Supported columns: id / name / name_th / category / price / stock / points / description / image. Rows with an id update that product; rows without an id create a new one. The image column accepts a remote image URL (http/https) which is downloaded and stored locally; URLs pointing at internal addresses are rejected during preview.',
     bulkActivate: 'Activate',
     bulkDeactivate: 'Deactivate',
     bulkSelected: '{count} product(s) selected',
