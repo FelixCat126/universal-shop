@@ -38,6 +38,26 @@ async function attachCsv (page, content) {
   })
 }
 
+/**
+ * 清理：把刚导入的合作方删掉。
+ *
+ * 走**接口**而不是点界面：新导入的合作方排在列表**最后**（按 id 升序），
+ * 可能根本不在第一页 —— 点界面的话还得翻页或搜索。
+ */
+async function deleteImported (page, request, login) {
+  const deleted = await page.evaluate(async (loginToDelete) => {
+    const token = localStorage.getItem('admin_token')
+    const headers = { Authorization: 'Bearer ' + token }
+    const list = await (await fetch('/api/admin/partners', { headers })).json()
+    const rows = list.data || []
+    const target = rows.find(r => r.login === loginToDelete)
+    if (!target) return { ok: false, found: false }
+    const res = await fetch(`/api/admin/partners/${target.id}`, { method: 'DELETE', headers })
+    return { ok: res.ok, status: res.status, id: target.id }
+  }, login)
+  expect(deleted.ok, `删除失败：${JSON.stringify(deleted)}`).toBe(true)
+}
+
 /** 打开合作方页并打开导入对话框 */
 async function openImport (page) {
   await loginAdmin(page)
@@ -71,6 +91,40 @@ test.describe('管理端 合作方 CSV 批量导入', () => {
     await page.getByRole('button', { name: /^预览$/ }).click()
     await expect(page.locator('.csv-error')).toContainText(/登录名/, { timeout: 20_000 })
     await expect(page.getByRole('button', { name: /确认导入/ })).toBeDisabled()
+  })
+
+  test('PC-4 跳过错误行模式：坏的行被跳过，好的行照常导入', async ({ page, request }) => {
+    await openImport(page)
+
+    const good = `e2e_skip_ok_${Date.now()}`
+    await attachCsv(page, [
+      'login,display_name,account_kind,discount_percent',
+      `${good},好店铺,dealer,10`,
+      'e2e_bad_login!,坏店铺,dealer,10'
+    ].join('\n'))
+
+    // 切到「跳过错误行」模式
+    // ⚠️ Element Plus 的 radio-button 把真正的 <input> 藏起来了（display:none），
+    // 直接点 input 会超时 —— 要点可见的标签文字。
+    await page.locator('.el-radio-button__inner', { hasText: '跳过错误行' }).click()
+
+    await page.getByRole('button', { name: /^预览$/ }).click()
+    await expect(page.locator('.csv-summary')).toContainText(/可导入/, { timeout: 20_000 })
+
+    // 有问题的行被列出来了
+    await expect(page.locator('.csv-error')).toContainText(/登录名/, { timeout: 20_000 })
+
+    // 但导入按钮**可用**（skip 模式不因错误行禁用）
+    await expect(page.getByRole('button', { name: /确认导入/ })).toBeEnabled()
+
+    await page.getByRole('button', { name: /确认导入/ }).click()
+    await expect(page.locator('.el-message--success')).toBeVisible({ timeout: 20_000 })
+
+    // 好行导进去了
+    await expect(page.getByText(good).first()).toBeVisible({ timeout: 20_000 })
+
+    // 清理（自己造的数据自己清）
+    await deleteImported(page, request, good)
   })
 
   test('PC-3 全部合法 → 确认导入 → 列表里出现新合作方', async ({ page, request }) => {

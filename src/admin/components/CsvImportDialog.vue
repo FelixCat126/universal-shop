@@ -104,10 +104,16 @@
       <el-button v-if="!preview" :disabled="!file" :loading="previewing" @click="doPreview">
         {{ previewing ? t('csv.previewing') : t('csv.preview') }}
       </el-button>
+      <!--
+        禁用条件要**看模式**：
+        strict 模式下有错误行就不能导（整批会失败）；
+        skip 模式下错误行会被跳过 —— 这正是这个模式存在的意义，
+        还按 strict 的规则禁用按钮，就等于"跳过错误行"这个模式根本没法用。
+      -->
       <el-button
         v-else
         type="primary"
-        :disabled="preview.invalidCount > 0 || preview.validCount === 0"
+        :disabled="(importMode === 'strict' && preview.invalidCount > 0) || preview.validCount === 0"
         :loading="importing"
         @click="doImport"
       >
