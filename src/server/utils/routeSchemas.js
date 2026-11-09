@@ -251,6 +251,59 @@ export const ROUTE_SCHEMAS = {
   },
   'GET /api/product-categories': { response: envArray('ProductCategory') },
   'GET /api/admin/product-categories': { response: envArray('ProductCategory') },
+  'GET /api/products/export.csv': {
+    response: {
+      type: 'string',
+      description: 'CSV 文件内容（含 BOM，Excel 打开中文不乱码）'
+    }
+  },
+  'POST /api/products/import': {
+    request: {
+      type: 'object',
+      description: 'multipart/form-data：file（CSV 文件）+ dry_run（1 = 只预览不落库）',
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'CSV 文件（第一行是表头）' },
+        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' }
+      },
+      required: ['file']
+    },
+    response: envelopeSchema({
+      type: 'object',
+      properties: {
+        totalRows: { type: 'integer', description: 'CSV 数据行数' },
+        validCount: { type: 'integer', description: '可导入的行数' },
+        invalidCount: { type: 'integer', description: '有问题的行数' },
+        createCount: { type: 'integer', description: '将新建的行数' },
+        updateCount: { type: 'integer', description: '将更新的行数' },
+        invalid: {
+          type: 'array',
+          description: '有问题的行（逐行给出原因）',
+          items: {
+            type: 'object',
+            properties: {
+              rowNumber: { type: 'integer', description: 'CSV 里的行号（含表头，从 2 开始）' },
+              name: { type: 'string' },
+              errors: { type: 'array', items: { type: 'string' }, description: '问题原因' }
+            }
+          }
+        },
+        valid: {
+          type: 'array',
+          description: '可导入的行',
+          items: {
+            type: 'object',
+            properties: {
+              rowNumber: { type: 'integer' },
+              action: { type: 'string', enum: ['create', 'update'] },
+              name: { type: 'string' },
+              price: { type: 'number' },
+              stock: { type: 'integer' }
+            }
+          }
+        }
+      }
+    }, '导入预览 / 导入结果')
+  },
 
   /* ---------------- 订单 ---------------- */
   'GET /api/orders': {

@@ -69,7 +69,19 @@
         <el-icon><Plus /></el-icon>
         {{ t('products.addProduct') }}
       </el-button>
+      <!-- CSV 批量导入：运营录商品 / 批量改价的主路径 -->
+      <el-button @click="openCsvImport">
+        <el-icon><Upload /></el-icon>
+        {{ t('products.csvImport') }}
+      </el-button>
+      <el-button @click="exportCsv">
+        <el-icon><Download /></el-icon>
+        {{ t('products.csvExport') }}
+      </el-button>
     </div>
+
+    <!-- CSV 导入对话框 -->
+    <ProductCsvImportDialog ref="csvImportRef" @imported="loadProducts" />
 
     <div class="table-section">
       <el-card>
@@ -462,9 +474,10 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
-import { Plus, Search, Refresh, Loading, Picture, Delete, Edit, ArrowDown } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Loading, Picture, Delete, Edit, ArrowDown, Upload, Download } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { productAPI } from '../api/products.js'
+import ProductCsvImportDialog from '../components/ProductCsvImportDialog.vue'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 export default {
@@ -476,7 +489,13 @@ export default {
     Loading,
     Picture,
     Delete,
-    Edit
+    Edit,
+    Upload,
+    Download,
+    // ⚠️ 这个文件用的是普通 <script>（不是 <script setup>）——
+    // 导入的组件**必须**在这里注册，否则模板里会被当成未知元素，
+    // ref 拿到的是 DOM 元素而不是组件实例（→ "open is not a function"）
+    ProductCsvImportDialog
   },
   setup() {
     const { t } = useI18n()
@@ -933,6 +952,35 @@ export default {
       await bulkUpdate('delete')
     }
 
+    /* ---------------- CSV 批量导入 / 导出 ---------------- */
+
+    /** CSV 导入对话框 */
+    const csvImportRef = ref(null)
+    const openCsvImport = () => {
+      csvImportRef.value?.open()
+    }
+
+    /**
+     * 导出 CSV。
+     *
+     * 用 blob 下载（服务端返回的是文件不是 JSON）——
+     * 导出后可以在 Excel 里改，再从「导入 CSV」导回来（带 id 的行 = 更新）。
+     */
+    const exportCsv = async () => {
+      try {
+        const res = await productAPI.exportCsv()
+        const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `products-${new Date().toISOString().slice(0, 10)}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+      } catch (e) {
+        ElMessage.error(e?.response?.data?.message || t('common.error'))
+      }
+    }
+
     /** 正在切换上架状态的商品（避免连点） */
     const statusToggling = ref(new Set())
 
@@ -1108,7 +1156,11 @@ export default {
       bulkDelete,
       productTableRef,
       loadProducts,
-      loadCategoryOptions
+      loadCategoryOptions,
+      // CSV 批量导入 / 导出
+      csvImportRef,
+      openCsvImport,
+      exportCsv
     }
   }
 }

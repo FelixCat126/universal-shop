@@ -95,6 +95,28 @@ export const productAPI = {
   // 调整库存
   adjustStock(id, data) {
     return api.post(`/products/${id}/stock`, data)
+  },
+
+  /**
+   * CSV 批量导入（先预览，确认后再真正导入）。
+   * @param {File} file CSV 文件
+   * @param {boolean} dryRun true = 只校验不落库
+   */
+  importCsv(file, dryRun = true) {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('dry_run', dryRun ? '1' : 'false')
+    return api.post('/products/import', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+
+  /**
+   * 导出当前商品为 CSV。
+   * 用 blob 下载（不是普通 axios 的 json）—— 服务端返回的是文件不是 JSON。
+   */
+  exportCsv() {
+    return api.get('/products/export.csv', { responseType: 'blob' })
   }
 }
 

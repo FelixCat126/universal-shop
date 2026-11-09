@@ -18,7 +18,9 @@ async function openCheckout (page) {
   await expect(page.getByText('E2E 测试商品').first()).toBeVisible()
   await page.getByText('E2E 测试商品').first().click()
   await expect(page).toHaveURL(/\/products\/\d+/)
-  await page.getByRole('button', { name: '立即购买' }).click()
+  // 用 data-testid 精确定位**主商品**的按钮：
+  // 详情页底部还有「相关推荐」，每个推荐也带一个同名按钮 → 按名字找会命中多个
+  await page.getByTestId('product-buy-now').click()
   await expect(page).toHaveURL(/\/checkout/)
 }
 
