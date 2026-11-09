@@ -13,6 +13,7 @@ import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { logger } from '../utils/logger.js'
+import { invalidateResetFlagCache } from '../middlewares/passwordChangeGuard.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { likeContains } from '../utils/likeSearch.js'
 
@@ -269,6 +270,8 @@ class UserController {
       user.password = next
       user.must_reset_password = false
       await user.save()
+      // 改密标记立刻失效（守卫有 5s 缓存，不清的话用户改完密码仍被拦）
+      await invalidateResetFlagCache(userId)
       /**
        * token_version 原子自增：读-改-写在并发下会丢更新
        * （并发改密 + 登出都读到 tv=0 → 都写 tv=1），

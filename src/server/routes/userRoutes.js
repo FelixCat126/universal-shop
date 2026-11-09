@@ -6,6 +6,7 @@ import { loginLimiter, enumerationLimiter, writeLimiter, passwordResetLimiter } 
 import PasswordResetController from '../controllers/passwordResetController.js'
 import { validate, registerSchema, loginSchema, profileUpdateSchema } from '../middlewares/validate.js'
 import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
+import { requirePasswordChange } from '../middlewares/passwordChangeGuard.js'
 
 const router = express.Router()
 
@@ -27,14 +28,20 @@ router.post('/forgot-password', passwordResetLimiter, PasswordResetController.fo
 router.post('/reset-password', passwordResetLimiter, PasswordResetController.resetPassword)
 
 // 需要认证的路由
+/**
+ * 强制改密守卫挂在 authenticateToken 之后：
+ * 初始密码是系统随机生成的（游客自动注册 / 批量导入客户），
+ * 用户自己都不知道 —— 不强制改密，这个账号等于没有密码保护。
+ * 只放行"改密 / 看自己资料 / 登出"，其余操作一律 403（PASSWORD_CHANGE_REQUIRED）。
+ */
 router.get('/verify', authenticateToken, UserController.verifyToken)
 router.get('/profile/metrics', authenticateToken, UserController.getProfileMetrics)
 router.get('/profile', authenticateToken, UserController.getCurrentUser)
-router.put('/profile', writeLimiter, authenticateToken, validate({ body: profileUpdateSchema }), UserController.updateProfile)
+router.put('/profile', writeLimiter, authenticateToken, requirePasswordChange, validate({ body: profileUpdateSchema }), UserController.updateProfile)
 // 改密挂 writeLimiter：防会话被盗后在线爆破旧密码（限流在控制器前；测试环境 no-op）
 router.put('/profile/password', writeLimiter, authenticateToken, UserController.changePassword)
 router.post('/logout', authenticateToken, UserController.logout)
-router.post('/me/delete', writeLimiter, authenticateToken, UserController.deleteAccount)
+router.post('/me/delete', writeLimiter, authenticateToken, requirePasswordChange, UserController.deleteAccount)
 router.get('/points/balance', authenticateToken, PointsController.getBalance)
 router.get('/points/transactions', authenticateToken, PointsController.listTransactions)
 

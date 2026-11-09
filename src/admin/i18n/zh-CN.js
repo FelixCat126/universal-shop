@@ -701,6 +701,10 @@ export default {
 
   // 产品管理页面
   csv: {
+    modeStrict: '严格（有问题就整批不导入）',
+    modeSkip: '跳过错误行',
+    modeStrictHint: '只要有一行有问题，整批都不会写入 —— 不会出现"导了一半"的糊涂账。',
+    modeSkipHint: '有问题的行会被跳过并逐条回报，其余行正常导入。',
     exportTitle: '导出 CSV',
     importTitle: 'CSV 批量导入',
     subject: '主体',

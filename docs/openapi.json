@@ -7162,6 +7162,14 @@
                       "false"
                     ],
                     "description": "1 = 只校验预览，false = 真正导入"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "strict",
+                      "skip"
+                    ],
+                    "description": "strict = 有问题整批不落库（默认）；skip = 跳过有问题的行并逐条回报"
                   }
                 },
                 "required": [
@@ -9053,6 +9061,14 @@
                       "false"
                     ],
                     "description": "1 = 只校验预览，false = 真正导入"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "strict",
+                      "skip"
+                    ],
+                    "description": "strict = 有问题整批不落库（默认）；skip = 跳过有问题的行并逐条回报"
                   }
                 },
                 "required": [
@@ -15044,6 +15060,14 @@
                       "false"
                     ],
                     "description": "1 = 只校验预览，false = 真正导入"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "strict",
+                      "skip"
+                    ],
+                    "description": "strict = 有问题整批不落库（默认）；skip = 跳过有问题的行并逐条回报"
                   }
                 },
                 "required": [

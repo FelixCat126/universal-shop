@@ -325,9 +325,10 @@ export async function previewUserCsv (buffer) {
  * 新建时：生成随机初始密码 + must_reset_password = true（用户首次登录必须改密）
  * 更新时：**不动密码**（改密码是用户自己的事，运营不该碰）
  */
-export async function importUserCsv (buffer) {
+export async function importUserCsv (buffer, options = {}) {
+  const mode = normalizeImportMode(options.mode)
   const preview = await previewUserCsv(buffer)
-  if (preview.invalidCount > 0) {
+  if (preview.invalidCount > 0 && mode === 'strict') {
     throw Object.assign(
       new Error(`有 ${preview.invalidCount} 行存在问题，未导入任何数据。请修正后重试`),
       { status: 400, preview }
@@ -402,13 +403,17 @@ export async function importUserCsv (buffer) {
     }
   }
 
+  const skipped = mode === 'skip' ? preview.invalid : []
   return {
+    mode,
     createdCount: created.length,
     updatedCount: updated.length,
-    failedCount: failed.length,
+    failedCount: failed.length + skipped.length,
     created,
     updated,
-    failed
+    failed,
+    // skip 模式下"有问题被跳过"的行（strict 模式下这里恒为空）
+    skipped
   }
 }
 
@@ -435,4 +440,16 @@ export async function exportUsersCsv () {
     }).join(','))
   }
   return '﻿' + lines.join('\r\n')
+}
+
+/**
+ * 导入模式：
+ *   strict（默认）—— 有一行有问题就整批不落库
+ *   skip —— 跳过有问题的行，导入其余的，问题行逐条回报
+ */
+export const IMPORT_MODES = ['strict', 'skip']
+
+export function normalizeImportMode (mode) {
+  const m = String(mode || 'strict').toLowerCase()
+  return IMPORT_MODES.includes(m) ? m : 'strict'
 }

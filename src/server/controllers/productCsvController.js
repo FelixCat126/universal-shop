@@ -77,7 +77,7 @@ export default class ProductCsvController {
         })
       }
 
-      const result = await importProductCsv(req.file.buffer)
+      const result = await importProductCsv(req.file.buffer, { mode: req.body?.mode })
       /**
        * 写完必须清缓存：公开的商品列表/详情有 20s 缓存，
        * 不清的话运营导完立刻去看前台还是旧商品 —— 会以为"导入没生效"。
@@ -88,10 +88,12 @@ export default class ProductCsvController {
         updated: result.updatedCount,
         failed: result.failedCount
       })
+      const skippedCount = result.skipped?.length || 0
       return res.json({
         success: true,
         message: `导入完成：新建 ${result.createdCount} 个，更新 ${result.updatedCount} 个` +
-          (result.failedCount > 0 ? `，失败 ${result.failedCount} 个` : ''),
+          (skippedCount > 0 ? `，跳过 ${skippedCount} 行` : '') +
+          (result.failed.length > 0 ? `，失败 ${result.failed.length} 行` : ''),
         data: result
       })
     } catch (e) {

@@ -700,6 +700,10 @@ export default {
 
   // Product management
   csv: {
+    modeStrict: 'Strict (all or nothing)',
+    modeSkip: 'Skip bad rows',
+    modeStrictHint: 'If any row has a problem, nothing is written — no half-imported batches.',
+    modeSkipHint: 'Rows with problems are skipped and reported; the rest import normally.',
     exportTitle: 'Export CSV',
     importTitle: 'CSV bulk import',
     subject: 'Subject',

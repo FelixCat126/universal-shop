@@ -218,6 +218,7 @@ const onScroll = () => {
 
 // 卸载时清理
 onUnmounted(() => {
+  window.removeEventListener('app:password-change-required', onPasswordChangeRequired)
   window.removeEventListener('scroll', onScroll)
 })
 
@@ -320,6 +321,15 @@ watch(() => userStore.isLoggedIn, async (newValue, oldValue) => {
  * 标志位 must_reset_password 一直存在，但**前端从来没读过它**。
  */
 /**
+ * 服务端在账号级操作上返回 PASSWORD_CHANGE_REQUIRED → 直接把改密弹窗叫出来。
+ * （横幅只是提示；真正被拦住的时候要把用户送到能解决的地方。）
+ */
+const onPasswordChangeRequired = () => {
+  if (route.query.force === 'password') return
+  router.push({ path: '/profile', query: { tab: 'profile', force: 'password' } })
+}
+
+/**
  * 需要改密 → 顶部横幅提示 + 一个按钮。
  *
  * 为什么**不自动跳转**：
@@ -350,6 +360,7 @@ watch(() => userStore.user?.id, async (newId, oldId) => {
 
 // 初始化
 onMounted(async () => {
+  window.addEventListener('app:password-change-required', onPasswordChangeRequired)
   // 顶栏滚动监听
   window.addEventListener('scroll', onScroll, { passive: true })
 

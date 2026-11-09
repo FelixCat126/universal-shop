@@ -197,6 +197,45 @@ describe('CSV 导出', () => {
     expect(preview.valid[0].name).toBe('本地图商品')
   })
 
+  it('PC-15 导入模式 strict：有问题整批不落库', async () => {
+    const { Product } = TestDatabase.getSequelize().models
+    const before = await Product.count()
+    await expect(importProductCsv(csv([
+      'name,price,category',
+      '好商品,10,测试分类',
+      '坏商品,abc,测试分类'
+    ].join('\n')), { mode: 'strict' })).rejects.toThrow(/存在问题/)
+    expect(await Product.count()).toBe(before)
+  })
+
+  it('PC-16 导入模式 skip：跳过错误行，其余正常导入', async () => {
+    const { Product } = TestDatabase.getSequelize().models
+    const before = await Product.count()
+
+    const result = await importProductCsv(csv([
+      'name,price,category',
+      '好商品A,10,测试分类',
+      '坏商品,abc,测试分类',
+      '好商品B,20,测试分类'
+    ].join('\n')), { mode: 'skip' })
+
+    expect(result.mode).toBe('skip')
+    expect(result.createdCount).toBe(2)
+    expect(result.skipped).toHaveLength(1)
+    expect(result.skipped[0].errors.join('')).toMatch(/价格/)
+    expect(await Product.count()).toBe(before + 2)
+  })
+
+  it('PC-17 导入模式非法 → 回落 strict（更安全的默认）', async () => {
+    const { Product } = TestDatabase.getSequelize().models
+    const before = await Product.count()
+    await expect(importProductCsv(csv([
+      'name,price,category',
+      '坏商品,abc,测试分类'
+    ].join('\n')), { mode: 'whatever' })).rejects.toThrow(/存在问题/)
+    expect(await Product.count()).toBe(before)
+  })
+
   it('PC-12 导出含 id，可原样导回（往返一致）', async () => {
     const { Product } = TestDatabase.getSequelize().models
     const p = await Product.create(TestDataFactory.createProduct({

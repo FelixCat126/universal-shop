@@ -104,6 +104,18 @@ api.interceptors.response.use(
       }
         
       case 403:
+        /**
+         * 「必须先改密码」：服务端在**账号级操作**上拦住了（改资料/注销/售后/确认支付）。
+         * 这里把用户直接送到改密弹窗 —— 而不是只弹一句"没有权限访问"，
+         * 让用户自己猜该去哪改。
+         */
+        if (data?.code === 'PASSWORD_CHANGE_REQUIRED') {
+          try {
+            window.dispatchEvent(new CustomEvent('app:password-change-required'))
+          } catch (e) { /* 事件派发失败不影响主流程 */ }
+          console.warn('需要先修改密码')
+          break
+        }
         console.error('没有权限访问')
         break
         

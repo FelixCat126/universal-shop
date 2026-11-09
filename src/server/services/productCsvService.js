@@ -282,9 +282,10 @@ export async function previewProductCsv (buffer) {
  * 逐行独立处理：某一行失败（并发改动、DB 报错）不影响其它行，
  * 失败原因逐行回报 —— 与预览的报告口径一致。
  */
-export async function importProductCsv (buffer) {
+export async function importProductCsv (buffer, options = {}) {
+  const mode = normalizeImportMode(options.mode)
   const preview = await previewProductCsv(buffer)
-  if (preview.invalidCount > 0) {
+  if (preview.invalidCount > 0 && mode === 'strict') {
     // 有问题的行 → 整批不落库。
     // 半截导入比不导入更糟：运营会以为全导进去了。
     throw Object.assign(
@@ -363,13 +364,17 @@ export async function importProductCsv (buffer) {
     }
   }
 
+  const skipped = mode === 'skip' ? preview.invalid : []
   return {
+    mode,
     createdCount: created.length,
     updatedCount: updated.length,
-    failedCount: failed.length,
+    failedCount: failed.length + skipped.length,
     created,
     updated,
-    failed
+    failed,
+    // skip 模式下"有问题被跳过"的行（strict 模式下这里恒为空）
+    skipped
   }
 }
 
@@ -420,4 +425,19 @@ export function csvEscape (value) {
     return '"' + s.replace(/"/g, '""') + '"'
   }
   return s
+}
+
+/**
+ * 导入模式：
+ *   strict（默认）—— 有任何一行有问题就**整批不落库**。
+ *     半截导入比不导入更糟：运营会以为全导进去了。
+ *   skip —— 跳过有问题的行，导入其余的，问题行逐条回报。
+ *     适合"500 行的表里只有 3 行写错了"：不用为了 3 行去改 500 行。
+ */
+export const IMPORT_MODES = ['strict', 'skip']
+
+/** 归一导入模式（非法值回落 strict —— 严格是更安全的默认） */
+export function normalizeImportMode (mode) {
+  const m = String(mode || 'strict').toLowerCase()
+  return IMPORT_MODES.includes(m) ? m : 'strict'
 }

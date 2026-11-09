@@ -426,7 +426,12 @@ export const ROUTE_SCHEMAS = {
       description: 'multipart/form-data：file（CSV 文件）+ dry_run（1 = 只预览不落库）',
       properties: {
         file: { type: 'string', format: 'binary', description: 'CSV 文件（第一行是表头）' },
-        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' }
+        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' },
+        mode: {
+          type: 'string',
+          enum: ['strict', 'skip'],
+          description: 'strict = 有问题整批不落库（默认）；skip = 跳过有问题的行并逐条回报'
+        }
       },
       required: ['file']
     },
@@ -781,7 +786,12 @@ export const ROUTE_SCHEMAS = {
       description: 'multipart/form-data：file（CSV 文件）+ dry_run（1 = 只预览不落库）',
       properties: {
         file: { type: 'string', format: 'binary', description: 'CSV 文件（第一行是表头）' },
-        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' }
+        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' },
+        mode: {
+          type: 'string',
+          enum: ['strict', 'skip'],
+          description: 'strict = 有问题整批不落库（默认）；skip = 跳过有问题的行并逐条回报'
+        }
       },
       required: ['file']
     },
@@ -888,7 +898,12 @@ export const ROUTE_SCHEMAS = {
       description: 'multipart/form-data：file（CSV 文件）+ dry_run（1 = 只预览不落库）',
       properties: {
         file: { type: 'string', format: 'binary', description: 'CSV 文件（第一行是表头；**不要写密码**）' },
-        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' }
+        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' },
+        mode: {
+          type: 'string',
+          enum: ['strict', 'skip'],
+          description: 'strict = 有问题整批不落库（默认）；skip = 跳过有问题的行并逐条回报'
+        }
       },
       required: ['file']
     },

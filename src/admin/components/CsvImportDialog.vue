@@ -30,6 +30,13 @@
       </div>
 
       <p class="csv-hint">{{ hint }}</p>
+
+      <!-- 导入模式：严格（全有或全无）/ 跳过错误行 -->
+      <el-radio-group v-model="importMode" size="small" class="csv-mode">
+        <el-radio-button value="strict">{{ t('csv.modeStrict') }}</el-radio-button>
+        <el-radio-button value="skip">{{ t('csv.modeSkip') }}</el-radio-button>
+      </el-radio-group>
+      <p class="csv-mode-hint">{{ importMode === 'strict' ? t('csv.modeStrictHint') : t('csv.modeSkipHint') }}</p>
     </div>
 
     <!-- 步骤 2：预览结果 -->
@@ -111,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { Upload } from '@element-plus/icons-vue'
@@ -139,6 +146,12 @@ const props = defineProps({
 const visible = ref(false)
 const file = ref(null)
 const preview = ref(null)
+/**
+ * 导入模式：
+ *   strict（默认）—— 有一行有问题就整批不落库
+ *   skip —— 跳过有问题的行，导入其余的，问题行逐条回报
+ */
+const importMode = ref('strict')
 const previewing = ref(false)
 const importing = ref(false)
 const uploadRef = ref(null)
@@ -176,6 +189,11 @@ const onFileChange = (uploadFile) => {
   preview.value = null // 换了文件，旧预览作废
 }
 
+// 切了导入模式：strict 与 skip 的判定不同，旧预览作废（避免按旧模式的结论去导入）
+watch(importMode, () => {
+  preview.value = null
+})
+
 const onExceed = () => {
   ElMessage.warning(t('csv.replaceFile'))
 }
@@ -188,6 +206,7 @@ const doPreview = async () => {
     const fd = new FormData()
     fd.append('file', file.value)
     fd.append('dry_run', '1')
+    fd.append('mode', importMode.value)
     const res = await api.post(endpoint.value, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -216,6 +235,7 @@ const doImport = async () => {
     const fd = new FormData()
     fd.append('file', file.value)
     fd.append('dry_run', 'false')
+    fd.append('mode', importMode.value)
     const res = await api.post(endpoint.value, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -264,6 +284,16 @@ defineExpose({ open })
 }
 
 .csv-filename--empty {
+  color: #909399;
+}
+
+.csv-mode {
+  margin-top: 8px;
+}
+
+.csv-mode-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
   color: #909399;
 }
 

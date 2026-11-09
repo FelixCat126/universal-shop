@@ -45,16 +45,18 @@ export default class UserCsvController {
         })
       }
 
-      const result = await importUserCsv(req.file.buffer)
+      const result = await importUserCsv(req.file.buffer, { mode: req.body?.mode })
       logger.info('CSV 导入用户完成', {
         created: result.createdCount,
         updated: result.updatedCount,
         failed: result.failedCount
       })
+      const skippedCount = result.skipped?.length || 0
       return res.json({
         success: true,
         message: `导入完成：新建 ${result.createdCount} 个，更新 ${result.updatedCount} 个` +
-          (result.failedCount > 0 ? `，失败 ${result.failedCount} 个` : ''),
+          (skippedCount > 0 ? `，跳过 ${skippedCount} 行` : '') +
+          (result.failed.length > 0 ? `，失败 ${result.failed.length} 行` : ''),
         data: result
       })
     } catch (e) {
