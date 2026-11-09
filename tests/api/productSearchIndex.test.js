@@ -17,6 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { TestDatabase } from '../setup/test-database.js'
 import migration from '@server/migrations/004_product_search_trgm_index.js'
+import aliasMigration from '@server/migrations/005_product_alias_trgm_index.js'
 
 let sequelize
 
@@ -43,11 +44,13 @@ async function explain (sql) {
 beforeAll(async () => {
   sequelize = TestDatabase.getSequelize()
   await runMigration()
+  await aliasMigration.up(sequelize.getQueryInterface(), sequelize)
 })
 
 afterAll(async () => {
   // 索引留着不影响别的测试（sync 不删索引），
   // 但为保持测试库干净，这里把它删掉
+  await sequelize.query('DROP INDEX IF EXISTS idx_product_alias_trgm').catch(() => {})
   await sequelize.query('DROP INDEX IF EXISTS idx_product_name_th_trgm').catch(() => {})
   await sequelize.query('DROP INDEX IF EXISTS idx_product_name_trgm').catch(() => {})
 })
@@ -88,6 +91,17 @@ describe('商品搜索 trigram 索引', () => {
       const plan = await explain(`SELECT * FROM products WHERE name LIKE '%\\%%' ESCAPE '\\'`)
       // 允许规划器给出 Bitmap Index Scan 或 Index Scan —— 两者都说明用上了索引
       expect(plan).toMatch(/idx_product_name_trgm/)
+    } finally {
+      await sequelize.query('SET enable_seqscan = on')
+    }
+  })
+
+  it('PS-4b 别名也有 trigram 索引（别名参与搜索）', async () => {
+    expect(await indexExists('idx_product_alias_trgm')).toBe(true)
+    await sequelize.query('SET enable_seqscan = off')
+    try {
+      const plan = await explain(`SELECT * FROM products WHERE alias LIKE '%口头叫法%'`)
+      expect(plan).toMatch(/idx_product_alias_trgm/)
     } finally {
       await sequelize.query('SET enable_seqscan = on')
     }

@@ -15,7 +15,18 @@ import { logger } from '../utils/logger.js'
  * 测试环境旁路：测试库 beforeEach 清库，缓存会跨用例泄漏计数。
  */
 const comprehensiveCache = new LRUCache({ max: 50, ttl: 15_000 })
-const isTestEnv = process.env.NODE_ENV === 'test'
+/**
+ * 总览统计的进程内短缓存（TTL 15s）—— 与 comprehensive 同一套取舍。
+ *
+ * 实测（5 万订单）：4 条聚合并发跑完约 5ms；10 万级订单约 10ms。
+ * 也就是说"扫描"本身暂时不是瓶颈，**但每次请求都扫一遍是浪费** ——
+ * 面板刷新、多个运营同时开着后台，都会重复扫同一批数据。
+ * 15s 的缓存把重复扫描摊薄掉；订单/用户写入后不主动清，
+ * 最长 15s 读到旧值 —— 统计面板场景可接受（/comprehensive 一直是这么做的）。
+ */
+const overviewCache = new LRUCache({ max: 20, ttl: 15_000 })
+/** 测试环境默认旁路缓存；设 STATS_CACHE_ENABLED=1 可强制打开 */
+const isTestEnv = process.env.NODE_ENV === 'test' && process.env.STATS_CACHE_ENABLED !== '1'
 
 /**
  * 趋势统计按"服务器本地时区"的自然日分桶，SQL 与 JS 两侧口径必须一致：
@@ -48,6 +59,14 @@ class StatisticsController {
   // 获取统计总览数据
   static async getOverviewStats(req, res) {
     try {
+      // 命中短缓存就直接返回（省掉 4 条全表聚合）
+      if (!isTestEnv) {
+        const cached = overviewCache.get('overview')
+        if (cached) {
+          return res.json({ success: true, data: cached })
+        }
+      }
+
       // 获取近七天活跃用户数（近七天内有登录记录的）
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -76,15 +95,15 @@ class StatisticsController {
       ])
       const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
 
-      res.json({
-        success: true,
-        data: {
-          totalOrders,
-          totalAmount: totalAmount.toFixed(2),
-          totalUsers,
-          activeUsers
-        }
-      })
+      const data = {
+        totalOrders,
+        totalAmount: totalAmount.toFixed(2),
+        totalUsers,
+        activeUsers
+      }
+      if (!isTestEnv) overviewCache.set('overview', data)
+
+      res.json({ success: true, data })
     } catch (error) {
       logger.error('获取统计总览失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({

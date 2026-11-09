@@ -50,11 +50,19 @@ class ProductController {
         }
       }
 
-      // 名称搜索（支持中文和泰文）
+      /**
+       * 名称搜索：中文名 / 泰文名 / **别名**。
+       *
+       * 别名之前不参与搜索 —— 但运营是可以给商品填别名的（管理端有"产品别名"字段），
+       * 填了别名客户却搜不到，等于白填（别名最常见的用途就是记客户口头叫法、
+       * 拼音、其它语言的叫法）。
+       */
       if (name) {
+        const like = { [Op.like]: likeContains(name) }
         where[Op.or] = [
-          { name: { [Op.like]: likeContains(name) } },
-          { name_th: { [Op.like]: likeContains(name) } }
+          { name: like },
+          { name_th: like },
+          { alias: like }
         ]
       }
 
