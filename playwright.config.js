@@ -27,7 +27,22 @@ export default defineConfig({
   webServer: {
     command: 'node tests/e2e/start-test-server.mjs',
     url: 'http://127.0.0.1:3000/api/health',
-    reuseExistingServer: !process.env.CI,
+    /**
+     * **不复用**已存在的服务。
+     *
+     * 之前是 `reuseExistingServer: !process.env.CI`（本地复用，省一次启动）。
+     * 但 E2E 服务在**启动时**会清库（clearAllData）—— 复用旧服务就等于
+     * **不清库**：上一轮跑剩下的数据（多出来的合作方、订单、库存变动）
+     * 会留到下一轮，表现为"某个用例偶发失败"（比如列表里多了一行，
+     * 定位器命中多个元素）。
+     *
+     * 而且旧进程一旦残留（跑崩了、被 kill 了），它会一直占着 3000 端口，
+     * 新服务起不来 —— 排查起来非常费时间。
+     *
+     * 现在每轮都起新服务：数据是干净的，端口占用也会**立刻报错**而不是
+     * 悄悄用着旧数据。慢几秒，换来确定性。
+     */
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       NODE_ENV: 'test',

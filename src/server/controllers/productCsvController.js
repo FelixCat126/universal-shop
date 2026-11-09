@@ -18,8 +18,11 @@ import { clearResponseCache } from '../utils/responseCache.js'
  * CSV 用**内存存储**：不落盘。
  * 落盘的话，临时文件在异常路径上会残留（要另外写清理逻辑），
  * 而且导入的是"文本"，没有落盘的必要 —— 直接读进内存解析。
+ *
+ * 内存存储有个硬上限（MAX_CSV_BYTES），超出 multer 自己会返回 413/400 ——
+ * 这正是我们要的：不让一个误传的大文件把内存吃满。
  */
-const upload = multer({
+export const csvUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_CSV_BYTES, files: 1 },
   fileFilter: (req, file, cb) => {
@@ -115,5 +118,5 @@ export default class ProductCsvController {
   }
 
   /** 导出处理中间件（路由层用） */
-  static uploadCsv = upload.single('file')
+  static uploadCsv = csvUpload.single('file')
 }

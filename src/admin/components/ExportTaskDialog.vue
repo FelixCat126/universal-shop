@@ -9,9 +9,14 @@
   >
     <!-- 提交栏 -->
     <div class="export-task-submit">
-      <el-select v-model="type" style="width: 200px">
+      <el-select v-model="type" style="width: 180px">
         <el-option :label="t('exportTasks.typeUsers')" value="users" />
         <el-option :label="t('exportTasks.typeOrders')" value="orders" />
+      </el-select>
+      <!-- 格式：xlsx 带样式给人看；csv 给财务对账 / ERP 导入（体积小得多） -->
+      <el-select v-model="format" style="width: 170px">
+        <el-option :label="t('exportTasks.formatXlsx')" value="xlsx" />
+        <el-option :label="t('exportTasks.formatCsv')" value="csv" />
       </el-select>
       <el-button type="primary" :loading="submitting" @click="submit">
         <el-icon><Download /></el-icon>
@@ -142,6 +147,8 @@ const emit = defineEmits(['update:modelValue'])
 const { t } = useI18n()
 
 const type = ref(props.defaultType)
+/** 导出格式：xlsx（带样式，给人看）/ csv（财务对账、ERP 导入，体积小得多） */
+const format = ref('xlsx')
 const jobs = ref([])
 const loading = ref(false)
 const submitting = ref(false)
@@ -257,7 +264,7 @@ onUnmounted(stopPolling)
 async function submit () {
   submitting.value = true
   try {
-    const res = await createExportJob(type.value, { ...props.params })
+    const res = await createExportJob(type.value, { ...props.params, format: format.value })
     const job = res?.data?.data?.job
     if (res?.data?.data?.reused) {
       notice.value = t('exportTasks.reusedNotice')

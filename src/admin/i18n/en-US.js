@@ -159,7 +159,8 @@ export default {
     delete: 'Delete',
     confirmDelete: 'Delete this partner account? They will no longer be able to log in.',
     deleteOk: 'Deleted',
-    deleteFailed: 'Delete failed'
+    deleteFailed: 'Delete failed',
+    csvHint: 'The first row must be a header. Supported columns: id / login / display_name / account_kind / discount_percent / is_active. Rows with an id update that partner; rows without an id create a new one. A random initial password is generated for new accounts (shown once in the import result — share it with the partner offline; they can change it after logging in).',
   },
 
   partnerOrdersMgmt: {
@@ -697,6 +698,30 @@ export default {
   },
 
   // Product management
+  csv: {
+    exportTitle: 'Export CSV',
+    importTitle: 'CSV bulk import',
+    subject: 'Subject',
+    chooseFile: 'Choose CSV file',
+    replaceFile: 'Replace file',
+    noFile: 'No file selected',
+    preview: 'Preview',
+    previewing: 'Parsing…',
+    doImport: 'Import now',
+    importing: 'Importing…',
+    summary: '{total} row(s): {valid} importable ({create} new / {update} updated), {invalid} with problems',
+    allOk: 'All rows are valid — ready to import',
+    hasProblems: '{count} row(s) have problems; fix them before importing (nothing was written)',
+    row: 'Row',
+    action: 'Action',
+    actionCreate: 'Create',
+    actionUpdate: 'Update',
+    invalidRows: 'Rows with problems',
+    noProblems: 'No rows with problems',
+    done: 'Imported: {create} created, {update} updated',
+    template: 'Download template',
+    tip: 'Tip: export the CSV first to get your current data as a template, edit in Excel, then import it back.',
+  },
   products: {
     bulkActivate: 'Activate',
     bulkDeactivate: 'Deactivate',
@@ -704,27 +729,27 @@ export default {
     bulkDeleteConfirm: 'Delete the {count} selected product(s)? They can still be restored from the deleted list.',
     csvImport: 'Import CSV',
     csvExport: 'Export CSV',
-    csvImportTitle: 'Bulk import products',
-    csvHint: 'The first row must be a header. Supported columns: id / name / name_th / category / price / stock / points / description / image. Rows with an id update that product; rows without an id create a new one.',
-    csvChooseFile: 'Choose CSV file',
-    csvReplaceFile: 'Replace file',
-    csvNoFile: 'No file selected',
-    csvPreview: 'Preview',
-    csvPreviewing: 'Parsing…',
-    csvDoImport: 'Import now',
-    csvImporting: 'Importing…',
-    csvPreviewSummary: '{total} row(s): {valid} importable ({create} new / {update} updated), {invalid} with problems',
-    csvAllOk: 'All rows are valid — ready to import',
-    csvHasProblems: '{count} row(s) have problems; fix them before importing (nothing was written)',
-    csvRow: 'Row',
-    csvAction: 'Action',
-    csvActionCreate: 'Create',
-    csvActionUpdate: 'Update',
-    csvInvalidRows: 'Rows with problems',
-    csvNoProblems: 'No rows with problems',
-    csvDone: 'Imported: {create} created, {update} updated',
-    csvTemplate: 'Download template',
-    csvDialogTip: 'Tip: export the CSV first to get your current products as a template, edit in Excel, then import it back.',
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     title: 'Product Management',
     description: 'Manage all product information, inventory and status',
     addProduct: 'Add Product',
@@ -828,7 +853,8 @@ export default {
     discount: {
       label: 'Discount',
       placeholder: 'Discount percentage'
-    }
+    },
+    csvHint: 'The first row must be a header. Supported columns: id / name / name_th / category / price / stock / points / description / image. Rows with an id update that product; rows without an id create a new one.',
   },
 
   // Promotion management (marketing center)
@@ -1053,6 +1079,8 @@ export default {
 
   // Async export jobs
   exportTasks: {
+    formatXlsx: 'Excel (.xlsx)',
+    formatCsv: 'CSV (accounting/import)',
     title: 'Export Jobs',
     typeUsers: 'User Data',
     typeOrders: 'Order Data',

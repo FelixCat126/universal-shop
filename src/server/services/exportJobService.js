@@ -9,6 +9,7 @@ import Product from '../models/Product.js'
 import User from '../models/User.js'
 import UserCoupon from '../models/UserCoupon.js'
 import { createStreamingExport } from '../utils/excelWorkbook.js'
+import { createStreamingCsvExport } from '../utils/csvExporter.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { likeContains } from '../utils/likeSearch.js'
 import { logger } from '../utils/logger.js'
@@ -61,16 +62,43 @@ function ensureDir () {
 }
 
 /** 导出订单（分批 keyset 游标） */
-async function exportOrdersTo (job) {
-  const fileName = `订单数据_${new Date().toISOString().split('T')[0]}_${job.id}.xlsx`
-  const target = path.join(EXPORT_DIR, fileName)
-  await ensureDir()
+/**
+ * 导出格式：xlsx（给人看/带样式）| csv（给财务对账、ERP 导入、体积小）
+ * 两者共用同一套 addRow 接口，上层业务代码不用分叉。
+ */
+function exportFormatOf (job) {
+  const fmt = String(job?.params?.format || 'xlsx').toLowerCase()
+  return fmt === 'csv' ? 'csv' : 'xlsx'
+}
 
-  const exporter = await createStreamingExport({
+/**
+ * 按格式创建导出器 + 文件名。
+ * @returns {Promise<{exporter: object, fileName: string}>}
+ */
+async function makeExporter (job, { sheetName, headers, widths, baseName }) {
+  const fmt = exportFormatOf(job)
+  const day = new Date().toISOString().split('T')[0]
+  if (fmt === 'csv') {
+    return {
+      exporter: await createStreamingCsvExport({ headers }),
+      fileName: `${baseName}_${day}_${job.id}.csv`
+    }
+  }
+  return {
+    exporter: await createStreamingExport({ sheetName, headers, widths }),
+    fileName: `${baseName}_${day}_${job.id}.xlsx`
+  }
+}
+
+async function exportOrdersTo (job) {
+  const { exporter, fileName } = await makeExporter(job, {
     sheetName: '订单列表',
     headers: ORDER_EXPORT_HEADERS,
-    widths: [22, 14, 16, 18, 34, 28, 10, 16, 14, 20]
+    widths: [22, 14, 16, 18, 34, 28, 10, 16, 14, 20],
+    baseName: '订单数据'
   })
+  const target = path.join(EXPORT_DIR, fileName)
+  await ensureDir()
 
   let written = 0
   let cursor = 0
@@ -126,15 +154,14 @@ async function exportOrdersTo (job) {
 
 /** 导出用户 */
 async function exportUsersTo (job) {
-  const fileName = `用户数据_${new Date().toISOString().split('T')[0]}_${job.id}.xlsx`
-  const target = path.join(EXPORT_DIR, fileName)
-  await ensureDir()
-
-  const exporter = await createStreamingExport({
+  const { exporter, fileName } = await makeExporter(job, {
     sheetName: '用户列表',
     headers: USER_EXPORT_HEADERS,
-    widths: [8, 20, 15, 25, 15, 12, 12, 20, 20]
+    widths: [8, 20, 16, 24, 18, 16, 16, 20, 20],
+    baseName: '用户数据'
   })
+  const target = path.join(EXPORT_DIR, fileName)
+  await ensureDir()
 
   const ATTRS = ['id', 'username', 'nickname', 'email', 'phone', 'referral_code', 'referred_by_code', 'created_at', 'updated_at']
   let written = 0

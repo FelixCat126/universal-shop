@@ -4,11 +4,13 @@ import UserController from '../controllers/userController.js'
 import AdministratorController from '../controllers/administratorController.js'
 import AddressController from '../controllers/addressController.js'
 import { authenticateAdmin, requirePermission, requireSuperAdmin, logOperation } from '../middlewares/adminAuthMiddleware.js'
-import { loginLimiter, exportLimiter } from '../middlewares/security.js'
+import { loginLimiter, exportLimiter, writeLimiter } from '../middlewares/security.js'
 import { requireCaptchaAfterFailures } from '../middlewares/loginGuard.js'
 
 import ProductCategoryController from '../controllers/productCategoryController.js'
 import PartnerAdminController from '../controllers/partnerAdminController.js'
+import PartnerCsvController from '../controllers/partnerCsvController.js'
+import { csvUpload } from '../controllers/productCsvController.js'
 import PromotionController from '../controllers/promotionController.js'
 import CouponAdminController from '../controllers/couponAdminController.js'
 import BundleAdminController from '../controllers/bundleAdminController.js'
@@ -54,6 +56,19 @@ router.get('/after-sales', requirePermission('orders'), AfterSaleController.list
 router.put('/after-sales/:id/status', requirePermission('orders'), logOperation('review_after_sale', 'after_sale'), AfterSaleController.review)
 
 // 合作方（批发）与普通用户菜单隔离：独立 permission partners
+/**
+ * CSV 批量导入合作方：**必须排在 GET /:id 之前** ——
+ * 否则 "/export.csv" 会被 "/:id" 抢先匹配，id 解析失败变成 400。
+ */
+router.get('/partners/export.csv', requirePermission('partners'), PartnerCsvController.exportPartners)
+router.post(
+  '/partners/import',
+  requirePermission('partners'),
+  writeLimiter,
+  logOperation('import_partners_csv', 'partner'),
+  csvUpload.single('file'),
+  PartnerCsvController.importPartners
+)
 router.get('/partners', requirePermission('partners'), PartnerAdminController.listPartners)
 router.post('/partners', requirePermission('partners'), logOperation('create_partner', 'partner'), PartnerAdminController.createPartner)
 router.put('/partners/:id', requirePermission('partners'), logOperation('update_partner', 'partner'), PartnerAdminController.updatePartner)

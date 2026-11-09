@@ -21,11 +21,10 @@
  * 解析用 ExcelJS（已在依赖里，且是项目里导出 xlsx 用的同一个库）：
  * 引号里的逗号/换行、BOM、CRLF 都由它处理 —— 这些手写解析器最容易出错。
  */
-import ExcelJS from 'exceljs'
-import { Readable } from 'node:stream'
 import Product from '../models/Product.js'
 import ProductCategory from '../models/ProductCategory.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
+import { parseCsvTable, normalizeCsvHeaders } from '../utils/csvTable.js'
 
 /** 一次导入最多多少行 —— 防止一个误传的几 MB 文件把服务拖垮 */
 export const MAX_IMPORT_ROWS = 500
@@ -71,122 +70,29 @@ const MAX_STOCK = 100000000
 const MAX_POINTS = 1000000
 
 /**
- * 表头归一：把表头映射到标准列名。
- *
- * 注意 map 的值是 `{ col, header }` 而不是表头字符串 ——
- * ExcelJS 的 `getCell('name')` 会把 'name' 当成**列字母**去找列
- * （'id' 甚至不是合法列名 → "Invalid column letter: id"），
- * 必须用**列号**去取值。
- *
- * @param {Array<{col: number, header: unknown}>} entries 表头单元格（col 是 1-based 列号）
- * @returns {{map: Record<string, {col: number, header: string}>, unknown: string[]}}
+ * 表头归一（复用通用实现）。
+ * @see utils/csvTable.js normalizeCsvHeaders
  */
 export function normalizeHeaders (entries) {
-  const map = {}
-  const unknown = []
-  for (const entry of entries) {
-    const col = entry?.col
-    const raw = entry?.header
-    if (!col) continue
-    const h = String(raw ?? '').trim().toLowerCase()
-    if (!h) continue
-    let matched = null
-    for (const [canonical, aliases] of Object.entries(HEADER_ALIASES)) {
-      if (aliases.some(a => a.toLowerCase() === h)) {
-        matched = canonical
-        break
-      }
-    }
-    if (matched) {
-      // 同一个标准列出现两次 → 以第一次为准（后面的忽略）
-      if (!(matched in map)) map[matched] = { col, header: String(raw) }
-    } else {
-      unknown.push(String(raw))
-    }
-  }
-  return { map, unknown }
+  return normalizeCsvHeaders(entries, HEADER_ALIASES)
 }
 
 /**
- * 解析 CSV 文本 → 行数组（不含表头）。
+ * 解析商品 CSV 文本 → 行数组（不含表头）。
+ *
+ * 解析本身走通用实现（utils/csvTable.js）—— 商品与合作方共用同一套，
+ * 各写一遍必然漂移（表头别名、ExcelJS 的坑、引号处理）。
+ *
  * @param {Buffer} buffer
  * @returns {Promise<{headers: string[], rows: Array<{rowNumber: number, cells: Record<string, any>}>}>}
  */
 export async function parseProductCsv (buffer) {
-  if (!buffer || buffer.length === 0) {
-    throw Object.assign(new Error('文件为空'), { status: 400 })
-  }
-  if (buffer.length > MAX_CSV_BYTES) {
-    throw Object.assign(new Error(`文件过大（上限 ${Math.round(MAX_CSV_BYTES / 1024 / 1024)}MB）`), { status: 400 })
-  }
-
-  const workbook = new ExcelJS.Workbook()
-  try {
-    await workbook.csv.read(Readable.from([buffer]))
-  } catch (e) {
-    throw Object.assign(new Error(`CSV 解析失败：${e.message}`), { status: 400 })
-  }
-
-  const sheet = workbook.worksheets[0]
-  if (!sheet || sheet.rowCount < 1) {
-    throw Object.assign(new Error('CSV 里没有数据'), { status: 400 })
-  }
-
-  // 表头行：收集每个表头单元格的**列号**（ExcelJS 的列号是 1-based）
-  const headerRow = sheet.getRow(1)
-  const headerEntries = []
-  const rawHeaders = []
-  headerRow.eachCell({ includeEmpty: true }, (cell, col) => {
-    headerEntries.push({ col, header: cell.value })
-    rawHeaders[col] = cell.value
+  return parseCsvTable(buffer, {
+    aliases: HEADER_ALIASES,
+    required: REQUIRED_COLUMNS,
+    maxRows: MAX_IMPORT_ROWS,
+    maxBytes: MAX_CSV_BYTES
   })
-
-  const { map, unknown } = normalizeHeaders(headerEntries)
-  const missing = REQUIRED_COLUMNS.filter(c => !(c in map))
-  if (missing.length > 0) {
-    const names = { name: 'name', price: 'price' }
-    throw Object.assign(
-      new Error(`CSV 缺少必填列：${missing.map(m => names[m] || m).join('、')}`),
-      { status: 400, missing, unknownHeaders: unknown }
-    )
-  }
-
-  const rows = []
-  const total = sheet.rowCount - 1
-  if (total > MAX_IMPORT_ROWS) {
-    throw Object.assign(
-      new Error(`一次最多导入 ${MAX_IMPORT_ROWS} 行（当前 ${total} 行）`),
-      { status: 400 }
-    )
-  }
-
-  for (let r = 2; r <= sheet.rowCount; r++) {
-    const row = sheet.getRow(r)
-    const cells = {}
-    let hasValue = false
-    for (const [canonical, { col }] of Object.entries(map)) {
-      let value = null
-      if (col) {
-        const cell = row.getCell(col)
-        value = cell.value
-        // ExcelJS 的富文本/公式/超链接对象 → 取文本
-        if (value && typeof value === 'object') {
-          if (value.text != null) value = value.text
-          else if (value.result != null) value = value.result
-          else if (Array.isArray(value.richText)) value = value.richText.map(t => t.text).join('')
-          else if (value.hyperlink != null) value = value.hyperlink
-          else value = null
-        }
-      }
-      if (value !== null && value !== undefined && String(value).trim() !== '') hasValue = true
-      cells[canonical] = value
-    }
-    // 整行都是空 → 跳过（Excel 里常见的空行）
-    if (!hasValue) continue
-    rows.push({ rowNumber: r, cells })
-  }
-
-  return { headers: rawHeaders, unknownHeaders: unknown, rows }
 }
 
 /**

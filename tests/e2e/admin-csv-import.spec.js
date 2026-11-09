@@ -23,8 +23,13 @@ async function loginAdmin (page) {
 }
 
 /** 在文件选择框里塞一个 CSV（内存文件，不落盘） */
+/**
+ * ⚠️ 必须限定在**可见的对话框**里：页面上不止一个 file input
+ * （管理端还有其它上传入口），`.first()` 可能选中别的那个 ——
+ * 于是本该上传的文件没进去，导进去的是**上一次残留的内容**。
+ */
 async function attachCsv (page, content) {
-  await page.locator('input[type="file"]').first().setInputFiles({
+  await page.locator('.el-dialog:visible input[type="file"]').setInputFiles({
     name: 'products.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from('﻿' + content, 'utf8')
@@ -47,7 +52,7 @@ async function deleteImportedProduct (page, name) {
   await search.fill(name)
   await page.keyboard.press('Enter')
 
-  const row = page.locator('.el-table__row').filter({ hasText: name }).first()
+  const row = page.locator('.el-table__row:visible').filter({ hasText: name }).first()
   await row.getByRole('button', { name: /操作/ }).click()
   // 商品的"删除"在 UI 上叫「下架」（软删：从公开列表里隐藏，数据还在）
   await page.getByText('下架', { exact: true }).first().click()
@@ -115,12 +120,16 @@ test.describe('管理端 CSV 批量导入', () => {
     await expect(page.locator('.csv-summary')).toContainText(/可导入/, { timeout: 20_000 })
 
     await page.getByRole('button', { name: /确认导入/ }).click()
-    await expect(page.locator('.el-message--success')).toBeVisible({ timeout: 20_000 })
+    // 用"对话框关闭"作为成功信号（预览那步的 success toast 还没消失，会骗过断言）
+    await expect(page.locator('.el-dialog:visible')).toHaveCount(0, { timeout: 30_000 })
 
     // 导入后列表里能找到
+    // ⚠️ 必须用 `.el-table__row:visible` —— Element Plus 的固定列会渲染**隐藏的副本表**，
+    // getByText 会命中隐藏副本里的那个（"expected visible, received hidden"，但数据其实是对的）
     await page.getByPlaceholder('搜索产品名称').first().fill(name)
     await page.keyboard.press('Enter')
-    await expect(page.getByText(name).first()).toBeVisible({ timeout: 20_000 })
+    const row = page.locator('.el-table__row:visible').filter({ hasText: name }).first()
+    await expect(row).toBeVisible({ timeout: 20_000 })
 
     // 清理：自己造的数据自己清（见文件头的说明）
     await deleteImportedProduct(page, name)

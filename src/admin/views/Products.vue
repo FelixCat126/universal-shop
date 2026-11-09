@@ -81,7 +81,14 @@
     </div>
 
     <!-- CSV 导入对话框 -->
-    <ProductCsvImportDialog ref="csvImportRef" @imported="loadProducts" />
+    <CsvImportDialog
+      ref="csvImportRef"
+      type="products"
+      subject-key="name"
+      :hint="t('products.csvHint')"
+      :valid-columns="productCsvColumns"
+      @imported="loadProducts"
+    />
 
     <div class="table-section">
       <el-card>
@@ -477,7 +484,7 @@ import 'element-plus/es/components/message-box/style/css'
 import { Plus, Search, Refresh, Loading, Picture, Delete, Edit, ArrowDown, Upload, Download } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { productAPI } from '../api/products.js'
-import ProductCsvImportDialog from '../components/ProductCsvImportDialog.vue'
+import CsvImportDialog from '../components/CsvImportDialog.vue'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 
 export default {
@@ -495,7 +502,7 @@ export default {
     // ⚠️ 这个文件用的是普通 <script>（不是 <script setup>）——
     // 导入的组件**必须**在这里注册，否则模板里会被当成未知元素，
     // ref 拿到的是 DOM 元素而不是组件实例（→ "open is not a function"）
-    ProductCsvImportDialog
+    CsvImportDialog
   },
   setup() {
     const { t } = useI18n()
@@ -956,6 +963,14 @@ export default {
 
     /** CSV 导入对话框 */
     const csvImportRef = ref(null)
+
+    /** 预览表里"可导入行"显示的列（与后端 CSV 列一致） */
+    const productCsvColumns = [
+      { key: 'name', label: t('products.name'), minWidth: 140 },
+      { key: 'category_name', label: t('products.category'), width: 120 },
+      { key: 'price', label: t('products.price'), width: 100 },
+      { key: 'stock', label: t('products.stock'), width: 90 }
+    ]
     const openCsvImport = () => {
       csvImportRef.value?.open()
     }
@@ -1160,7 +1175,8 @@ export default {
       // CSV 批量导入 / 导出
       csvImportRef,
       openCsvImport,
-      exportCsv
+      exportCsv,
+      productCsvColumns
     }
   }
 }

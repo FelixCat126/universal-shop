@@ -1,4 +1,5 @@
 import XLSX, { createStreamingExport } from '../utils/excelWorkbook.js'
+import { createStreamingCsvExport } from '../utils/csvExporter.js'
 import { Op } from 'sequelize'
 import User from '../models/User.js'
 import Order from '../models/Order.js'
@@ -112,6 +113,38 @@ const ORDER_EXPORT_WIDTHS = [
   22,
 ]
 
+/**
+ * 导出格式：xlsx（默认）/ csv（财务对账、ERP 导入、体积小）。
+ * 两种格式的导出器接口一致（addRow / writeTo），上层代码不用分叉。
+ */
+function requestedFormat (req) {
+  const fmt = String(req.query?.format || req.query?.fmt || 'xlsx').toLowerCase()
+  return fmt === 'csv' ? 'csv' : 'xlsx'
+}
+
+/** 按格式创建导出器 */
+async function makeExporter (req, { sheetName, headers, widths }) {
+  if (requestedFormat(req) === 'csv') {
+    return createStreamingCsvExport({ headers })
+  }
+  return createStreamingExport({ sheetName, headers, widths })
+}
+
+/** 按格式设置下载响应头 */
+function setDownloadHeaders (res, req, baseName) {
+  const isCsv = requestedFormat(req) === 'csv'
+  const day = new Date().toISOString().split('T')[0]
+  const filename = `${baseName}_${day}.${isCsv ? 'csv' : 'xlsx'}`
+  res.setHeader(
+    'Content-Type',
+    isCsv
+      ? 'text/csv; charset=utf-8'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  )
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`)
+  res.setHeader('Cache-Control', 'no-store')
+}
+
 class ExportController {
   // 导出用户数据
   static async exportUsers(req, res) {
@@ -141,16 +174,13 @@ class ExportController {
       const usersTruncated = totalRows > EXPORT_ROW_LIMIT
 
       // 设置响应头（流式：先设头，再 pipe）
-      const filename = `用户数据_${new Date().toISOString().split('T')[0]}.xlsx`
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`)
-      res.setHeader('Cache-Control', 'no-store')
+      setDownloadHeaders(res, req, '用户数据')
 
       /**
        * 流式写出：逐行 addRow 直接 pipe 到响应，
        * 峰值内存与总行数无关（原实现是 O(行数×列数)）。
        */
-      const exporter = await createStreamingExport({
+      const exporter = await makeExporter(req, {
         sheetName: '用户列表',
         headers: ['ID', '用户名', '昵称', '邮箱', '手机号', '推荐码', '被推荐码', '注册时间', '更新时间'],
         widths: [8, 20, 15, 25, 15, 12, 12, 20, 20]
@@ -399,16 +429,13 @@ class ExportController {
       }
 
       // 设置响应头（流式：先设头，再 pipe）
-      const filename = `订单数据_${new Date().toISOString().split('T')[0]}.xlsx`
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`)
-      res.setHeader('Cache-Control', 'no-store')
+      setDownloadHeaders(res, req, '订单数据')
 
       /**
        * 流式写出：分批查 → 逐行 addRow → 直接 pipe 到响应。
        * 峰值内存与总单数无关（原实现要同时持有 5 份数据副本）。
        */
-      const exporter = await createStreamingExport({
+      const exporter = await makeExporter(req, {
         sheetName: '订单列表',
         headers: ORDER_EXPORT_HEADERS,
         widths: ORDER_EXPORT_WIDTHS

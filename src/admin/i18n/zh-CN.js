@@ -161,7 +161,8 @@ export default {
     delete: '删除',
     confirmDelete: '确认删除该合作方账号？删除后其将无法登录。',
     deleteOk: '已删除',
-    deleteFailed: '删除失败'
+    deleteFailed: '删除失败',
+    csvHint: 'CSV 第一行必须是表头，支持的列：id / login / display_name / account_kind / discount_percent / is_active。带 id 的行会更新对应合作方，不带 id 的行会新建。新建时会生成随机初始密码（导入结果里显示一次，**请线下告知对方**，对方登录后可自行修改）。',
   },
 
   partnerOrdersMgmt: {
@@ -698,6 +699,30 @@ export default {
   },
 
   // 产品管理页面
+  csv: {
+    exportTitle: '导出 CSV',
+    importTitle: 'CSV 批量导入',
+    subject: '主体',
+    chooseFile: '选择 CSV 文件',
+    replaceFile: '重新选择',
+    noFile: '还没有选择文件',
+    preview: '预览',
+    previewing: '正在解析…',
+    doImport: '确认导入',
+    importing: '正在导入…',
+    summary: '共 {total} 行：可导入 {valid} 行（新建 {create} / 更新 {update}），有问题 {invalid} 行',
+    allOk: '全部行都没问题，可以导入',
+    hasProblems: '有 {count} 行存在问题，修正后才能导入（本次未写入任何数据）',
+    row: '行',
+    action: '动作',
+    actionCreate: '新建',
+    actionUpdate: '更新',
+    invalidRows: '有问题的行',
+    noProblems: '没有有问题的行',
+    done: '导入完成：新建 {create} 个，更新 {update} 个',
+    template: '下载模板',
+    tip: '建议先「导出 CSV」拿到当前数据作为模板，在 Excel 里改完再导回来。',
+  },
   products: {
     bulkActivate: '批量上架',
     bulkDeactivate: '批量下架',
@@ -705,27 +730,27 @@ export default {
     bulkDeleteConfirm: '确定删除选中的 {count} 个商品吗？删除后仍可从「已删除」里恢复。',
     csvImport: '导入 CSV',
     csvExport: '导出 CSV',
-    csvImportTitle: '批量导入商品',
-    csvHint: 'CSV 第一行必须是表头，支持的列：id / name / name_th / category / price / stock / points / description / image。带 id 的行会更新对应商品，不带 id 的行会新建。',
-    csvChooseFile: '选择 CSV 文件',
-    csvReplaceFile: '重新选择',
-    csvNoFile: '还没有选择文件',
-    csvPreview: '预览',
-    csvPreviewing: '正在解析…',
-    csvDoImport: '确认导入',
-    csvImporting: '正在导入…',
-    csvPreviewSummary: '共 {total} 行：可导入 {valid} 行（新建 {create} / 更新 {update}），有问题 {invalid} 行',
-    csvAllOk: '全部行都没问题，可以导入',
-    csvHasProblems: '有 {count} 行存在问题，修正后才能导入（本次未写入任何数据）',
-    csvRow: '行',
-    csvAction: '动作',
-    csvActionCreate: '新建',
-    csvActionUpdate: '更新',
-    csvInvalidRows: '有问题的行',
-    csvNoProblems: '没有有问题的行',
-    csvDone: '导入完成：新建 {create} 个，更新 {update} 个',
-    csvTemplate: '下载模板',
-    csvDialogTip: '建议先「导出 CSV」拿到当前商品作为模板，在 Excel 里改完再导回来。',
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     title: '产品管理',
     description: '管理所有产品信息、库存和状态',
     addProduct: '添加产品',
@@ -829,7 +854,8 @@ export default {
     discount: {
       label: '折扣',
       placeholder: '折扣百分比'
-    }
+    },
+    csvHint: 'CSV 第一行必须是表头，支持的列：id / name / name_th / category / price / stock / points / description / image。带 id 的行会更新对应商品，不带 id 的行会新建。',
   },
 
   // 促销管理页面（营销中心）
@@ -1054,6 +1080,8 @@ export default {
 
   // 异步导出任务
   exportTasks: {
+    formatXlsx: 'Excel (.xlsx)',
+    formatCsv: 'CSV（对账/导入）',
     title: '导出任务',
     typeUsers: '用户数据',
     typeOrders: '订单数据',

@@ -3,7 +3,20 @@
     <el-card class="toolbar-card">
       <el-button type="primary" @click="openCreate">{{ t('partnersMgmt.create') }}</el-button>
       <el-button @click="load">{{ t('partnersMgmt.refresh') }}</el-button>
+      <!-- CSV 批量导入/导出：合作方开户是成批的，一个一个填既慢又容易填错 -->
+      <el-button @click="openCsvImport">{{ t('csv.importTitle') }}</el-button>
+      <el-button @click="exportCsv">{{ t('csv.exportTitle') }}</el-button>
     </el-card>
+
+    <!-- CSV 导入对话框 -->
+    <CsvImportDialog
+      ref="csvImportRef"
+      type="partners"
+      subject-key="login"
+      :hint="t('partnersMgmt.csvHint')"
+      :valid-columns="partnerCsvColumns"
+      @imported="load"
+    />
 
     <el-card style="margin-top: 16px">
       <el-table v-loading="loading" :data="rows" stripe border style="width: 100%">
@@ -111,6 +124,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import { useAdminStore } from '../stores/admin.js'
+import CsvImportDialog from '../components/CsvImportDialog.vue'
+import api from '../api/index.js'
 
 const { t } = useI18n()
 const adminStore = useAdminStore()
@@ -119,6 +134,37 @@ const loading = ref(false)
 const saving = ref(false)
 const pwdSaving = ref(false)
 const rows = ref([])
+
+/* ---------------- CSV 批量导入 / 导出 ---------------- */
+
+const csvImportRef = ref(null)
+const openCsvImport = () => {
+  csvImportRef.value?.open()
+}
+
+/** 预览表里"可导入行"显示的列（与后端 CSV 列一致） */
+const partnerCsvColumns = [
+  { key: 'login', label: t('partnersMgmt.login'), minWidth: 130 },
+  { key: 'display_name', label: t('partnersMgmt.displayName'), minWidth: 130 },
+  { key: 'account_kind', label: t('partnersMgmt.accountKind'), width: 100 },
+  { key: 'discount_percent', label: t('partnersMgmt.discountPercent'), width: 110 }
+]
+
+/** 导出合作方为 CSV（财务/运营核对名单用） */
+const exportCsv = async () => {
+  try {
+    const res = await api.get('/admin/partners/export.csv', { responseType: 'blob' })
+    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `partners-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || t('common.error'))
+  }
+}
 
 const createVisible = ref(false)
 const editVisible = ref(false)

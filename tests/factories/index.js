@@ -2,6 +2,9 @@ import { faker } from '@faker-js/faker'
 import bcrypt from 'bcrypt'
 
 export class TestDataFactory {
+  /** 订单号自增序号（保证同一毫秒内生成的 order_no 也不重复） */
+  static _orderSeq = 0
+
   // 用户数据工厂
   static async createUser(overrides = {}) {
     const timestamp = Date.now()
@@ -60,10 +63,19 @@ export class TestDataFactory {
   // 订单数据工厂
   static createOrder(userId, overrides = {}) {
     const timestamp = Date.now()
-    
+    /**
+     * order_no 必须**真正唯一**：只用时间戳不够 ——
+     * 同一毫秒内建两单就会撞 orders_order_no_key 唯一索引，
+     * 表现为「某个测试偶发失败」（跑一次过一次、跑一次挂一次）。
+     * 这个坑真实出现过，根因就在这里。
+     * 时间戳 + 进程内自增序号 + 随机尾巴：同毫秒内也不会撞。
+     */
+    TestDataFactory._orderSeq = (TestDataFactory._orderSeq + 1) % 100000
+    const uniqueSuffix = `${String(TestDataFactory._orderSeq).padStart(5, '0')}${Math.floor(Math.random() * 1000)}`
+
     const defaultData = {
       user_id: userId,
-      order_no: `TEST${timestamp}`,
+      order_no: `TEST${timestamp}${uniqueSuffix}`,
       contact_name: faker.person.fullName(),
       contact_phone: '13800138001',
       delivery_address: faker.location.streetAddress(),

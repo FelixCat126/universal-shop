@@ -162,7 +162,14 @@ class ExportJobController {
           code: 'EXPORT_FILE_EXPIRED'
         })
       }
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      // Content-Type 按文件扩展名给：CSV 下载成 xlsx 的 MIME 会让浏览器/工具认错格式
+      const isCsv = String(job.file_name || '').toLowerCase().endsWith('.csv')
+      res.setHeader(
+        'Content-Type',
+        isCsv
+          ? 'text/csv; charset=utf-8'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      )
       res.setHeader(
         'Content-Disposition',
         `attachment; filename*=UTF-8''${encodeURIComponent(job.file_name || 'export.xlsx')}`
@@ -265,7 +272,9 @@ function sameParams (a = {}, b = {}) {
 function sanitizeParams (body = {}) {
   const allowed = [
     'status', 'keyword', 'email', 'phone', 'referral_code',
-    'startDate', 'endDate', 'from', 'to'
+    'startDate', 'endDate', 'from', 'to',
+    // 导出格式：xlsx（默认）/ csv（财务对账、ERP 导入、体积小）
+    'format'
   ]
   const out = {}
   for (const k of allowed) {

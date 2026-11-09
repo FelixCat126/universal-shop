@@ -161,7 +161,8 @@ export default {
     delete: 'ลบ',
     confirmDelete: 'ยืนยันลบบัญชีคู่ค้านี้? บัญชีจะไม่สามารถเข้าระบบได้อีก',
     deleteOk: 'ลบแล้ว',
-    deleteFailed: 'ลบไม่สำเร็จ'
+    deleteFailed: 'ลบไม่สำเร็จ',
+    csvHint: 'แถวแรกต้องเป็นชื่อคอลัมน์ รองรับ: id / login / display_name / account_kind / discount_percent / is_active แถวที่มี id จะอัปเดตพาร์ทเนอร์นั้น แถวที่ไม่มี id จะสร้างใหม่ ระบบจะสร้างรหัสผ่านเริ่มต้นแบบสุ่ม (แสดงครั้งเดียวในผลลัพธ์ — กรุณาส่งให้คู่ค้าโดยตรง คู่ค้าเปลี่ยนเองได้หลังเข้าสู่ระบบ)',
   },
 
   partnerOrdersMgmt: {
@@ -699,6 +700,30 @@ export default {
   },
 
   // 产品管理页面
+  csv: {
+    exportTitle: 'ส่งออก CSV',
+    importTitle: 'นำเข้า CSV เป็นชุด',
+    subject: 'รายการ',
+    chooseFile: 'เลือกไฟล์ CSV',
+    replaceFile: 'เลือกใหม่',
+    noFile: 'ยังไม่ได้เลือกไฟล์',
+    preview: 'ดูตัวอย่าง',
+    previewing: 'กำลังอ่าน…',
+    doImport: 'ยืนยันนำเข้า',
+    importing: 'กำลังนำเข้า…',
+    summary: '{total} แถว: นำเข้าได้ {valid} แถว (ใหม่ {create} / อัปเดต {update}) มีปัญหา {invalid} แถว',
+    allOk: 'ทุกแถวถูกต้อง พร้อมนำเข้า',
+    hasProblems: 'มี {count} แถวที่มีปัญหา กรุณาแก้ไขก่อนนำเข้า (ยังไม่ได้เขียนข้อมูลใด ๆ)',
+    row: 'แถว',
+    action: 'การกระทำ',
+    actionCreate: 'สร้างใหม่',
+    actionUpdate: 'อัปเดต',
+    invalidRows: 'แถวที่มีปัญหา',
+    noProblems: 'ไม่มีแถวที่มีปัญหา',
+    done: 'นำเข้าแล้ว: สร้างใหม่ {create} รายการ อัปเดต {update} รายการ',
+    template: 'ดาวน์โหลดแม่แบบ',
+    tip: 'แนะนำให้กด「ส่งออก CSV」เพื่อดูข้อมูลปัจจุบันเป็นแม่แบบ แก้ไขใน Excel แล้วนำเข้ากลับมา',
+  },
   products: {
     bulkActivate: 'เปิดขายทั้งหมด',
     bulkDeactivate: 'ปิดขายทั้งหมด',
@@ -706,27 +731,27 @@ export default {
     bulkDeleteConfirm: 'ลบสินค้าที่เลือก {count} รายการใช่หรือไม่? ยังกู้คืนได้จากรายการที่ลบไป',
     csvImport: 'นำเข้า CSV',
     csvExport: 'ส่งออก CSV',
-    csvImportTitle: 'นำเข้าสินค้าเป็นชุด',
-    csvHint: 'แถวแรกต้องเป็นชื่อคอลัมน์ รองรับ: id / name / name_th / category / price / stock / points / description / image แถวที่มี id จะอัปเดตสินค้านั้น แถวที่ไม่มี id จะสร้างสินค้าใหม่',
-    csvChooseFile: 'เลือกไฟล์ CSV',
-    csvReplaceFile: 'เลือกใหม่',
-    csvNoFile: 'ยังไม่ได้เลือกไฟล์',
-    csvPreview: 'ดูตัวอย่าง',
-    csvPreviewing: 'กำลังอ่าน…',
-    csvDoImport: 'ยืนยันนำเข้า',
-    csvImporting: 'กำลังนำเข้า…',
-    csvPreviewSummary: '{total} แถว: นำเข้าได้ {valid} แถว (ใหม่ {create} / อัปเดต {update}) มีปัญหา {invalid} แถว',
-    csvAllOk: 'ทุกแถวถูกต้อง พร้อมนำเข้า',
-    csvHasProblems: 'มี {count} แถวที่มีปัญหา กรุณาแก้ไขก่อนนำเข้า (ยังไม่ได้เขียนข้อมูลใด ๆ)',
-    csvRow: 'แถว',
-    csvAction: 'การกระทำ',
-    csvActionCreate: 'สร้างใหม่',
-    csvActionUpdate: 'อัปเดต',
-    csvInvalidRows: 'แถวที่มีปัญหา',
-    csvNoProblems: 'ไม่มีแถวที่มีปัญหา',
-    csvDone: 'นำเข้าแล้ว: สร้างใหม่ {create} รายการ อัปเดต {update} รายการ',
-    csvTemplate: 'ดาวน์โหลดแม่แบบ',
-    csvDialogTip: 'แนะนำให้กด「ส่งออก CSV」เพื่อดูสินค้าปัจจุบันเป็นแม่แบบ แก้ไขใน Excel แล้วนำเข้ากลับมา',
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     title: 'จัดการสินค้า',
     description: 'จัดการข้อมูลสินค้า คลังสินค้า และสถานะทั้งหมด',
     addProduct: 'เพิ่มสินค้า',
@@ -830,7 +855,8 @@ export default {
     discount: {
       label: 'ส่วนลด',
       placeholder: 'เปอร์เซ็นต์ส่วนลด'
-    }
+    },
+    csvHint: 'แถวแรกต้องเป็นชื่อคอลัมน์ รองรับ: id / name / name_th / category / price / stock / points / description / image แถวที่มี id จะอัปเดตสินค้านั้น แถวที่ไม่มี id จะสร้างสินค้าใหม่',
   },
 
   // 促销管理页面（营销中心）
@@ -1055,6 +1081,8 @@ export default {
 
   // Async export jobs
   exportTasks: {
+    formatXlsx: 'Excel (.xlsx)',
+    formatCsv: 'CSV (บัญชี/นำเข้า)',
     title: 'งานส่งออก',
     typeUsers: 'ข้อมูลผู้ใช้',
     typeOrders: 'ข้อมูลคำสั่งซื้อ',

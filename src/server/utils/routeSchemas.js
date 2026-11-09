@@ -763,6 +763,59 @@ export const ROUTE_SCHEMAS = {
   },
   'DELETE /api/admin/product-categories/:id': { response: ref('SuccessEnvelope') },
 
+  /* ---------------- 合作方 CSV 批量导入/导出 ---------------- */
+  'GET /api/admin/partners/export.csv': {
+    response: { type: 'string', description: '合作方名单 CSV（含 BOM）' }
+  },
+  'POST /api/admin/partners/import': {
+    request: {
+      type: 'object',
+      description: 'multipart/form-data：file（CSV 文件）+ dry_run（1 = 只预览不落库）',
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'CSV 文件（第一行是表头）' },
+        dry_run: { type: 'string', enum: ['1', 'false'], description: '1 = 只校验预览，false = 真正导入' }
+      },
+      required: ['file']
+    },
+    response: envelopeSchema({
+      type: 'object',
+      properties: {
+        totalRows: { type: 'integer', description: 'CSV 数据行数' },
+        validCount: { type: 'integer', description: '可导入的行数' },
+        invalidCount: { type: 'integer', description: '有问题的行数' },
+        createCount: { type: 'integer', description: '将新建的行数' },
+        updateCount: { type: 'integer', description: '将更新的行数' },
+        invalid: {
+          type: 'array',
+          description: '有问题的行（逐行给出原因）',
+          items: {
+            type: 'object',
+            properties: {
+              rowNumber: { type: 'integer', description: 'CSV 里的行号（含表头，从 2 开始）' },
+              login: { type: 'string' },
+              errors: { type: 'array', items: { type: 'string' }, description: '问题原因' }
+            }
+          }
+        },
+        valid: {
+          type: 'array',
+          description: '可导入的行',
+          items: {
+            type: 'object',
+            properties: {
+              rowNumber: { type: 'integer' },
+              action: { type: 'string', enum: ['create', 'update'] },
+              login: { type: 'string' },
+              display_name: { type: 'string' },
+              account_kind: { type: 'string', enum: ['dealer', 'agent'] },
+              discount_percent: { type: 'number' }
+            }
+          }
+        }
+      }
+    }, '导入预览 / 导入结果')
+  },
+
   /* ---------------- 合作方管理 ---------------- */
   'POST /api/admin/partners': {
     request: {

@@ -1,14 +1,14 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="t('products.csvImportTitle')"
+    :title="t('csv.importTitle')"
     width="min(920px, 94vw)"
     class="csv-import-dialog"
     :close-on-click-modal="false"
   >
     <!-- 步骤 1：选文件 -->
     <div class="csv-step">
-      <el-alert :title="t('products.csvDialogTip')" type="info" :closable="false" show-icon />
+      <el-alert :title="t('csv.tip')" type="info" :closable="false" show-icon />
 
       <div class="csv-picker">
         <el-upload
@@ -21,30 +21,30 @@
           :on-exceed="onExceed"
         >
           <el-button type="primary" :icon="Upload">
-            {{ file ? t('products.csvReplaceFile') : t('products.csvChooseFile') }}
+            {{ file ? t('csv.replaceFile') : t('csv.chooseFile') }}
           </el-button>
         </el-upload>
         <span v-if="file" class="csv-filename">{{ file.name }}</span>
-        <span v-else class="csv-filename csv-filename--empty">{{ t('products.csvNoFile') }}</span>
-        <el-button link type="primary" @click="downloadTemplate">{{ t('products.csvTemplate') }}</el-button>
+        <span v-else class="csv-filename csv-filename--empty">{{ t('csv.noFile') }}</span>
+        <el-button link type="primary" @click="downloadTemplate">{{ t('csv.template') }}</el-button>
       </div>
 
-      <p class="csv-hint">{{ t('products.csvHint') }}</p>
+      <p class="csv-hint">{{ hint }}</p>
     </div>
 
     <!-- 步骤 2：预览结果 -->
     <div v-if="preview" class="csv-preview">
       <el-alert
         :title="preview.invalidCount > 0
-          ? t('products.csvHasProblems', { count: preview.invalidCount })
-          : t('products.csvAllOk')"
+          ? t('csv.hasProblems', { count: preview.invalidCount })
+          : t('csv.allOk')"
         :type="preview.invalidCount > 0 ? 'warning' : 'success'"
         :closable="false"
         show-icon
       />
 
       <div class="csv-summary">
-        {{ t('products.csvPreviewSummary', {
+        {{ t('csv.summary', {
           total: preview.totalRows,
           valid: preview.validCount,
           create: preview.createCount,
@@ -55,10 +55,10 @@
 
       <!-- 有问题的行：逐行列出原因（运营要能对着 Excel 找） -->
       <div v-if="preview.invalidCount > 0" class="csv-section">
-        <h4 class="csv-section__title">{{ t('products.csvInvalidRows') }}</h4>
+        <h4 class="csv-section__title">{{ t('csv.invalidRows') }}</h4>
         <el-table :data="preview.invalid" size="small" border max-height="220">
-          <el-table-column prop="rowNumber" :label="t('products.csvRow')" width="70" align="center" />
-          <el-table-column prop="name" :label="t('products.name')" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="rowNumber" :label="t('csv.row')" width="70" align="center" />
+          <el-table-column :prop="subjectKey" :label="t('csv.subject')" min-width="140" show-overflow-tooltip />
           <el-table-column :label="t('common.error')" min-width="240">
             <template #default="scope">
               <span class="csv-error">{{ scope.row.errors.join('；') }}</span>
@@ -70,18 +70,24 @@
       <!-- 可导入的行 -->
       <div v-if="preview.validCount > 0" class="csv-section">
         <el-table :data="preview.valid" size="small" border max-height="260">
-          <el-table-column prop="rowNumber" :label="t('products.csvRow')" width="70" align="center" />
-          <el-table-column :label="t('products.csvAction')" width="90" align="center">
+          <el-table-column prop="rowNumber" :label="t('csv.row')" width="70" align="center" />
+          <el-table-column :label="t('csv.action')" width="90" align="center">
             <template #default="scope">
               <el-tag :type="scope.row.action === 'create' ? 'success' : 'warning'" size="small">
-                {{ scope.row.action === 'create' ? t('products.csvActionCreate') : t('products.csvActionUpdate') }}
+                {{ scope.row.action === 'create' ? t('csv.actionCreate') : t('csv.actionUpdate') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="name" :label="t('products.name')" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="category_name" :label="t('products.category')" width="120" show-overflow-tooltip />
-          <el-table-column prop="price" :label="t('products.price')" width="100" align="right" />
-          <el-table-column prop="stock" :label="t('products.stock')" width="90" align="right" />
+          <el-table-column
+            v-for="col in validColumns"
+            :key="col.key"
+            :prop="col.key"
+            :label="col.label"
+            :width="col.width"
+            :min-width="col.minWidth"
+            align="right"
+            show-overflow-tooltip
+          />
         </el-table>
       </div>
     </div>
@@ -89,7 +95,7 @@
     <template #footer>
       <el-button @click="visible = false">{{ t('common.cancel') }}</el-button>
       <el-button v-if="!preview" :disabled="!file" :loading="previewing" @click="doPreview">
-        {{ previewing ? t('products.csvPreviewing') : t('products.csvPreview') }}
+        {{ previewing ? t('csv.previewing') : t('csv.preview') }}
       </el-button>
       <el-button
         v-else
@@ -98,7 +104,7 @@
         :loading="importing"
         @click="doImport"
       >
-        {{ importing ? t('products.csvImporting') : t('products.csvDoImport') }}
+        {{ importing ? t('csv.importing') : t('csv.doImport') }}
       </el-button>
     </template>
   </el-dialog>
@@ -110,10 +116,25 @@ import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { Upload } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
-import { productAPI } from '../api/products.js'
+import api from '../api/index.js'
 
 const { t } = useI18n()
 const emit = defineEmits(['imported'])
+
+const props = defineProps({
+  /**
+   * 导入类型：决定调哪个接口、显示哪些列。
+   *   products —— 商品（/products/import）
+   *   partners —— 合作方（/admin/partners/import）
+   */
+  type: { type: String, default: 'products' },
+  /** 预览表里"可导入行"的列 */
+  validColumns: { type: Array, default: () => [] },
+  /** 预览表里"有问题的行"的主体字段名（row.name / row.login） */
+  subjectKey: { type: String, default: 'name' },
+  /** 提示文案 */
+  hint: { type: String, default: '' }
+})
 
 const visible = ref(false)
 const file = ref(null)
@@ -121,6 +142,25 @@ const preview = ref(null)
 const previewing = ref(false)
 const importing = ref(false)
 const uploadRef = ref(null)
+
+/** 导入接口路径 */
+const endpoint = computed(() =>
+  props.type === 'partners' ? '/admin/partners/import' : '/products/import'
+)
+
+/** 模板的表头 + 一行示例 */
+const template = computed(() => {
+  if (props.type === 'partners') {
+    return {
+      header: 'id,login,display_name,account_kind,discount_percent,is_active',
+      sample: ',shop_example,示例店铺,dealer,10,true'
+    }
+  }
+  return {
+    header: 'id,name,name_th,category,price,stock,points,description,image',
+    sample: ',示例商品,ตัวอย่าง,电子烟,100,50,0,这是一个示例,/uploads/products/example.png'
+  }
+})
 
 /** 打开对话框（每次都重置状态，避免上一次的预览残留） */
 const open = () => {
@@ -137,7 +177,7 @@ const onFileChange = (uploadFile) => {
 }
 
 const onExceed = () => {
-  ElMessage.warning(t('products.csvReplaceFile'))
+  ElMessage.warning(t('csv.replaceFile'))
 }
 
 /** 预览：只校验不落库 */
@@ -145,7 +185,12 @@ const doPreview = async () => {
   if (!file.value || previewing.value) return
   previewing.value = true
   try {
-    const res = await productAPI.importCsv(file.value, true)
+    const fd = new FormData()
+    fd.append('file', file.value)
+    fd.append('dry_run', '1')
+    const res = await api.post(endpoint.value, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
     if (res?.data?.success) {
       preview.value = res.data.data
       if (res.data.data.invalidCount === 0) {
@@ -168,12 +213,16 @@ const doImport = async () => {
   if (!file.value || importing.value) return
   importing.value = true
   try {
-    const res = await productAPI.importCsv(file.value, false)
+    const fd = new FormData()
+    fd.append('file', file.value)
+    fd.append('dry_run', 'false')
+    const res = await api.post(endpoint.value, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
     if (res?.data?.success) {
-      ElMessage.success(res.data.message || t('products.csvDone', { create: 0, update: 0 }))
+      ElMessage.success(res.data.message || t('common.success'))
       visible.value = false
-      // 通知父页面刷新列表
-      emit('imported')
+      emit('imported', res.data.data)
     } else {
       ElMessage.error(res?.data?.message || t('common.error'))
     }
@@ -186,14 +235,13 @@ const doImport = async () => {
 
 /** 下载空白模板（含表头 + 一行示例） */
 const downloadTemplate = () => {
-  const header = 'id,name,name_th,category,price,stock,points,description,image'
-  const sample = ',示例商品,ตัวอย่าง,电子烟,100,50,0,这是一个示例,/uploads/products/example.png'
+  const { header, sample } = template.value
   // BOM：Excel 打开中文不乱码
   const blob = new Blob(['﻿' + header + '\r\n' + sample], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'products-template.csv'
+  a.download = props.type === 'partners' ? 'partners-template.csv' : 'products-template.csv'
   a.click()
   URL.revokeObjectURL(url)
 }
