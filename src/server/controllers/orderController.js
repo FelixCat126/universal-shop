@@ -1,5 +1,4 @@
 import { Op } from 'sequelize'
-import { LRUCache } from 'lru-cache'
 import Order from '../models/Order.js'
 import OrderItem from '../models/OrderItem.js'
 import OrderPromotion from '../models/OrderPromotion.js'
@@ -27,31 +26,17 @@ import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
+import * as statsCache from '../utils/statsCache.js'
 import { parseId } from '../utils/params.js'
 
 /** 金额统一舍入到分：消除浮点误差，保证 Σ(行价×数量) 与订单总额严格一致 */
 const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
 
 /**
- * 订单列表「统计卡片」的短缓存（TTL 15s）。
- *
- * 统计（总营收 / 今日营收 / 已完成数）是**全表聚合** —— SUM + FILTER 要扫全部命中行。
- * 实测 5 万订单约 5ms、10 万级约 10ms：扫描本身暂时还不是瓶颈，
- * 但**每次刷新都重扫一遍**是浪费（运营反复刷新同一筛选条件、
- * 几个运营同时开着后台，都会重复扫同一批数据）。
- *
- * 键 = 筛选条件（不含分页），所以换筛选条件会各算各的。
- * 取舍：订单写入后不主动清缓存，最长 15s 读到旧值 ——
- * 统计卡片场景可接受（与 statisticsController 的 comprehensive 缓存同一套取舍）。
- *
- * 测试环境旁路：测试库每个用例前清库，缓存会跨用例泄漏旧计数。
+ * 订单列表「统计卡片」的短缓存 —— 见 utils/statsCache.js。
+ * 写时失效挂在模型层（订单任何写入立刻清），不用在控制器里手写。
  */
-const orderStatsCache = new LRUCache({ max: 100, ttl: 15_000 })
-/**
- * 测试环境默认旁路缓存（测试库每个用例前清库，缓存会跨用例泄漏旧计数）。
- * 设 STATS_CACHE_ENABLED=1 可强制打开 —— 用例要能验证缓存本身的行为。
- */
-const isTestEnv = process.env.NODE_ENV === 'test' && process.env.STATS_CACHE_ENABLED !== '1'
+const { getCachedOrderStats, setCachedOrderStats } = statsCache
 
 // 订单状态合法值（与 exportController 的标签映射保持一致）
 const ORDER_STATUS_VALUES = ['pending', 'paid', 'shipping', 'shipped', 'delivered', 'completed', 'cancelled']
@@ -1455,7 +1440,7 @@ class OrderController {
       const statsCacheKey = JSON.stringify([
         status || '', keyword || '', startDate || '', endDate || ''
       ])
-      const cachedStats = isTestEnv ? null : orderStatsCache.get(statsCacheKey)
+      const cachedStats = getCachedOrderStats(statsCacheKey)
 
       const statsPromise = cachedStats
         ? Promise.resolve(cachedStats)
@@ -1489,7 +1474,7 @@ class OrderController {
           totalAmount: toFiniteNumber(statsRow?.totalAmount),
           todayAmount: toFiniteNumber(statsRow?.todayAmount)
         }
-        if (!isTestEnv) orderStatsCache.set(statsCacheKey, result)
+        setCachedOrderStats(statsCacheKey, result)
         return result
       })()
 

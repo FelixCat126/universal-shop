@@ -1,6 +1,7 @@
 import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
 import User from './User.js'
+import { registerModelStatsInvalidation } from '../utils/statsCache.js'
 
 const Order = sequelize.define('Order', {
   id: {
@@ -194,5 +195,14 @@ const Order = sequelize.define('Order', {
 
 // 建立关联关系
 Order.belongsTo(User, { foreignKey: 'user_id', as: 'user' })
+
+/**
+ * 统计缓存的写时失效挂在本模型上。
+ *
+ * 必须挂在**模型文件自己**里：应用与控制器是直接 import 单个模型的
+ * （`import Order from '../models/Order.js'`），集中注册在 models/index.js
+ * 的话生产环境根本不会加载那个文件 → hook 从没注册过 → 缓存永远不清。
+ */
+registerModelStatsInvalidation(Order)
 
 export default Order

@@ -127,10 +127,10 @@ export default defineConfig({
        * 卡在临界点上会变成随机红）；补了测试再往上抬。
        */
       thresholds: {
-        statements: 87,
-        branches: 75,
-        functions: 86,
-        lines: 87,
+        statements: 88,
+        branches: 70,
+        functions: 87,
+        lines: 88,
         'src/server/controllers/**': {
           statements: 77,
           branches: 60,

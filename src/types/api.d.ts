@@ -287,6 +287,275 @@ export interface SystemConfig {
 }
 
 /**
+ * 管理员账号
+ */
+export interface Administrator {
+  id?: number
+  username: string
+  email?: string | null
+  role: "super_admin" | "admin" | "operator"
+  real_name?: string | null
+  phone?: string | null
+  is_active: boolean
+  last_login_at?: string | null
+  token_version: number
+  created_by?: number | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 售后申请
+ */
+export interface AfterSale {
+  id?: number
+  order_id: number
+  user_id: number
+  type: "refund" | "return"
+  reason: string
+  status: "pending" | "approved" | "rejected" | "received"
+  admin_note?: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 管理员操作日志
+ */
+export interface OperationLog {
+  id?: number
+  admin_id: number
+  admin_username: string
+  action: string
+  resource: string
+  resource_id?: string | null
+  description: string
+  old_data?: Record<string, unknown> | null
+  new_data?: Record<string, unknown> | null
+  ip_address?: string | null
+  user_agent?: string | null
+  created_at: string
+}
+
+/**
+ * 合作方收货地址
+ */
+export interface PartnerAddress {
+  id?: number
+  partner_id: number
+  recipient_name: string
+  phone: string
+  phone_country_code: string
+  province?: string | null
+  city?: string | null
+  district?: string | null
+  postal_code?: string | null
+  detail: string
+  label?: string | null
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 合作方订单行
+ */
+export interface PartnerOrderItem {
+  id?: number
+  partner_order_id: number
+  product_id: number
+  quantity: number
+  base_unit_thb: number
+  unit_price_thb: number
+  line_total_thb: number
+  partner_discount_percent_snapshot: number
+  product_name_snapshot?: string | null
+  product_image_snapshot?: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 合作方订单（含订单行）
+ */
+export interface PartnerOrderWithItems extends PartnerOrder {
+  items?: PartnerOrderItem[]
+}
+
+/**
+ * 积分流水
+ */
+export interface PointTransaction {
+  id?: number
+  user_id: number
+  order_id?: number | null
+  type: string
+  delta: number
+  balance_after: number
+  note?: string | null
+  created_at: string
+}
+
+/**
+ * 用户持有的抵扣券
+ */
+export interface UserCoupon {
+  id?: number
+  template_id: number
+  user_id: number
+  code: string
+  status: string
+  used_by_order_id?: number | null
+  expire_at?: string | null
+  used_at?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * 用户积分余额
+ */
+export interface UserPointBalance {
+  user_id?: number | null
+  balance: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 行政区划
+ */
+export interface AdministrativeRegion {
+  id?: number
+  country_code: string
+  parent_id?: number | null
+  level: number
+  name_local: string
+  name_alias: string
+  postal_code?: string | null
+  sort_order?: number
+  is_active?: number
+  created_at?: string
+  updated_at?: string
+}
+
+/**
+ * 用户注册请求体
+ */
+export interface UserRegisterRequest {
+  nickname: string
+  country_code?: "+86" | "+66" | "+60"
+  phone: string
+  email?: string
+  password: string
+  referral_code?: string
+}
+
+/**
+ * 登录请求体（phone 需与 country_code 配对；也可只给 email）
+ */
+export interface UserLoginRequest {
+  country_code?: "+86" | "+66" | "+60"
+  phone?: string
+  email?: string
+  password: string
+}
+
+/**
+ * 修改个人资料请求体
+ */
+export interface UserProfileRequest {
+  nickname?: string
+  email?: string
+  avatar_url?: string
+}
+
+/**
+ * 修改密码请求体
+ */
+export interface ChangePasswordRequest {
+  old_password: string
+  new_password: string
+}
+
+/**
+ * 注销账号请求体（需校验密码）
+ */
+export interface DeleteAccountRequest {
+  password: string
+}
+
+/**
+ * 发起密码重置
+ */
+export interface ForgotPasswordRequest {
+  email?: string
+  phone?: string
+  country_code?: "+86" | "+66" | "+60"
+}
+
+/**
+ * 用重置令牌设置新密码
+ */
+export interface ResetPasswordRequest {
+  token: string
+  password: string
+}
+
+/**
+ * 登录成功
+ */
+export interface AuthTokenEnvelope {
+  success: boolean
+  message: string
+  code?: string
+  data?: {
+    token?: string
+    user?: User
+  }
+}
+
+/**
+ * 个人中心指标
+ */
+export interface ProfileMetricsEnvelope {
+  success: boolean
+  message: string
+  code?: string
+  data?: {
+    orderCount?: number
+    totalSpent?: string
+    couponCount?: number
+    points?: number
+  }
+}
+
+/**
+ * 推荐码信息
+ */
+export interface ReferralInfoEnvelope {
+  success: boolean
+  message: string
+  code?: string
+  data?: {
+    username?: string
+    referral_code?: string
+  }
+}
+
+/**
+ * 手机号是否存在
+ */
+export interface PhoneExistsEnvelope {
+  success: boolean
+  message: string
+  code?: string
+  data?: {
+    exists?: boolean
+  }
+}
+
+/**
  * 新建/编辑商品的请求体
  */
 export interface ProductCreateRequest {

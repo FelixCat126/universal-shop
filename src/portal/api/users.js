@@ -1,5 +1,18 @@
 /**
  * @typedef {import('../../types/api').User} User
+ * @typedef {import('../../types/api').UserPointBalance} UserPointBalance
+ * @typedef {import('../../types/api').PointTransaction} PointTransaction
+ * @typedef {import('../../types/api').UserRegisterRequest} UserRegisterRequest
+ * @typedef {import('../../types/api').UserLoginRequest} UserLoginRequest
+ * @typedef {import('../../types/api').UserProfileRequest} UserProfileRequest
+ * @typedef {import('../../types/api').ChangePasswordRequest} ChangePasswordRequest
+ * @typedef {import('../../types/api').DeleteAccountRequest} DeleteAccountRequest
+ * @typedef {import('../../types/api').ForgotPasswordRequest} ForgotPasswordRequest
+ * @typedef {import('../../types/api').ResetPasswordRequest} ResetPasswordRequest
+ * @typedef {import('../../types/api').AuthTokenEnvelope} AuthTokenEnvelope
+ * @typedef {import('../../types/api').ProfileMetricsEnvelope} ProfileMetricsEnvelope
+ * @typedef {import('../../types/api').ReferralInfoEnvelope} ReferralInfoEnvelope
+ * @typedef {import('../../types/api').PhoneExistsEnvelope} PhoneExistsEnvelope
  */
 import axios from 'axios'
 import { useUserStore } from '../stores/user.js'

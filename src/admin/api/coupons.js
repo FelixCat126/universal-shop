@@ -1,5 +1,6 @@
 /**
  * @typedef {import('../../types/api').CouponTemplate} CouponTemplate
+ * @typedef {import('../../types/api').UserCoupon} UserCoupon
  */
 import api from './index.js'
 

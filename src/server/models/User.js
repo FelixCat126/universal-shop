@@ -1,6 +1,7 @@
 import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
 import bcrypt from 'bcrypt'
+import { registerModelStatsInvalidation } from '../utils/statsCache.js'
 
 const User = sequelize.define('User', {
   id: {
@@ -251,5 +252,14 @@ User.prototype.toSafeJSON = function() {
   const { password, ...safeData } = this.toJSON()
   return safeData
 }
+
+/**
+ * 统计缓存的写时失效挂在本模型上。
+ *
+ * 必须挂在**模型文件自己**里：应用与控制器是直接 import 单个模型的
+ * （`import Order from '../models/Order.js'`），集中注册在 models/index.js
+ * 的话生产环境根本不会加载那个文件 → hook 从没注册过 → 缓存永远不清。
+ */
+registerModelStatsInvalidation(User)
 
 export default User

@@ -38,6 +38,7 @@ import { logger } from '../utils/logger.js'
 // 注意：关联关系已在各个模型文件中定义，无需重复定义
 logger.info('✅ 所有数据库模型已导入')
 
+
 // 导出所有模型
 export {
   sequelize,

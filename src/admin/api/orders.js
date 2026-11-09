@@ -4,6 +4,7 @@ import api from './index.js'
  * @typedef {import('../../types/api').Order} Order
  * @typedef {import('../../types/api').OrderDetail} OrderDetail
  * @typedef {import('../../types/api').OrderBulkStatusRequest} OrderBulkStatusRequest
+ * @typedef {import('../../types/api').OrderStatusRequest} OrderStatusRequest
  */
 
 /**

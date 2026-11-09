@@ -1,6 +1,9 @@
 /**
  * @typedef {import('../../types/api').Partner} Partner
  * @typedef {import('../../types/api').PartnerOrder} PartnerOrder
+ * @typedef {import('../../types/api').PartnerAddress} PartnerAddress
+ * @typedef {import('../../types/api').PartnerOrderItem} PartnerOrderItem
+ * @typedef {import('../../types/api').PartnerOrderWithItems} PartnerOrderWithItems
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
