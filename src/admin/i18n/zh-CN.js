@@ -533,6 +533,12 @@ export default {
 
   // 用户管理页面
   users: {
+    resetPassword: '重置密码',
+    resetPasswordTitle: '重置客户密码',
+    resetPasswordConfirm: '确定要给「{name}」重置密码吗？客户的旧会话会全部失效，首次登录需自行改密。',
+    resetPasswordHint: '请把这个临时密码**线下告知**客户（电话/当面/IM），不要发在群里或邮件里。',
+    resetPasswordNote: '临时密码只显示这一次；客户首次登录后会被要求设置自己的密码。',
+    copyPassword: '复制',
     csvHint: 'CSV 第一行必须是表头，支持的列：id / nickname / username / email / phone / country_code / referral_code / is_active。带 id 的行会更新对应用户，不带 id 的行会新建。⚠️ **不要在 CSV 里写密码**：系统会生成随机初始密码（导入结果里显示一次，请线下告知用户），用户首次登录会被要求改密。',
     title: '用户管理',
     description: '管理所有注册用户，支持搜索和筛选',

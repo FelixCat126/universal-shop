@@ -226,6 +226,9 @@
                     <el-dropdown-item command="toggle" divided :disabled="scope.row.updating">
                       {{ scope.row.is_active ? t('users.ban') : t('users.unban') }}
                     </el-dropdown-item>
+                    <el-dropdown-item command="resetPassword" divided :disabled="!scope.row.is_active">
+                      {{ t('users.resetPassword') }}
+                    </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -367,6 +370,28 @@
         >
           {{ t('users.viewOrders') }}
         </el-button>
+      </template>
+    </el-dialog>
+    <!-- 重置密码结果：临时密码只在这里显示一次 -->
+    <el-dialog
+      v-model="resetDialogVisible"
+      :title="t('users.resetPasswordTitle')"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+      <el-alert
+        :title="t('users.resetPasswordHint')"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <div class="reset-password-value">
+        <code>{{ resetPasswordValue }}</code>
+        <el-button size="small" @click="copyResetPassword">{{ t('users.copyPassword') }}</el-button>
+      </div>
+      <p class="reset-password-note">{{ t('users.resetPasswordNote') }}</p>
+      <template #footer>
+        <el-button type="primary" @click="resetDialogVisible = false">{{ t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -591,6 +616,49 @@ const handleUserAction = (command, row) => {
   if (command === 'detail') return viewUserDetail(row)
   if (command === 'orders') return goUserOrders(row)
   if (command === 'toggle') return toggleUserStatus(row)
+  if (command === 'resetPassword') return resetUserPassword(row)
+}
+
+/**
+ * 管理端辅助重置客户密码。
+ *
+ * 客户忘记密码时的自助重置依赖短信通道（线上没配 → 永远回不来），
+ * 这里补上运营侧的兜底：临时密码 + 首次登录强制改密。
+ */
+const resetDialogVisible = ref(false)
+const resetPasswordValue = ref('')
+
+const resetUserPassword = async (user) => {
+  try {
+    await ElMessageBox.confirm(
+      t('users.resetPasswordConfirm', { name: user.nickname || user.username || user.id }),
+      t('users.resetPasswordTitle'),
+      { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') }
+    )
+  } catch {
+    return
+  }
+
+  try {
+    const res = await userAPI.resetPassword(user.id)
+    if (res?.data?.success) {
+      resetPasswordValue.value = res.data.data.temporaryPassword
+      resetDialogVisible.value = true
+    } else {
+      ElMessage.error(res?.data?.message || t('common.error'))
+    }
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || t('common.error'))
+  }
+}
+
+const copyResetPassword = async () => {
+  try {
+    await navigator.clipboard.writeText(resetPasswordValue.value)
+    ElMessage.success(t('common.copySuccess'))
+  } catch {
+    ElMessage.error(t('common.error'))
+  }
 }
 
 // 查看用户详情

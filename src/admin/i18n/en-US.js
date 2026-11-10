@@ -532,6 +532,12 @@ export default {
 
   // User management
   users: {
+    resetPassword: 'Reset password',
+    resetPasswordTitle: 'Reset customer password',
+    resetPasswordConfirm: 'Reset the password for "{name}"? Their existing sessions will be revoked and they must set a new password on first login.',
+    resetPasswordHint: 'Share this temporary password **offline** with the customer (phone / in person / IM). Do not post it in groups or email.',
+    resetPasswordNote: 'The temporary password is shown only once; the customer must set their own password on first login.',
+    copyPassword: 'Copy',
     csvHint: 'The first row must be a header. Supported columns: id / nickname / username / email / phone / country_code / referral_code / is_active. Rows with an id update that user; rows without an id create a new one. Do NOT put passwords in the CSV: the system generates a random initial password (shown once in the import result — share it with the user offline) and the user must change it on first login.',
     title: 'User Management',
     description: 'Manage all registered users with search and filter support',

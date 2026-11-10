@@ -13,6 +13,9 @@ import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { logger } from '../utils/logger.js'
+import { parseId } from '../utils/params.js'
+import { invalidateAuthCache } from '../middlewares/authMiddleware.js'
+import { generateTemporaryPassword } from '../utils/temporaryPassword.js'
 import { invalidateResetFlagCache } from '../middlewares/passwordChangeGuard.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { likeContains } from '../utils/likeSearch.js'
@@ -434,6 +437,82 @@ class UserController {
   }
 
   // 获取用户列表（管理端）
+  /**
+   * 管理端辅助重置客户密码。
+   *
+   * 为什么需要：客户忘记密码时的自助重置依赖**短信通道**
+   * （SMS_WEBHOOK_URL），而线上没配短信 → forgot-password 直接返回 503。
+   * 结果就是：客户忘了密码，**永远回不来**，运营还帮不上（原来只有
+   * 管理员账号能重置密码，客户账号没有这条路径）。
+   *
+   * 这里补上运营侧的兜底：生成一个随机临时密码 + 标记"必须改密"，
+   * 临时密码**只在这里显示一次**，运营线下告知客户，客户登录后被强制改密。
+   * 同时递增 token_version → 客户原有的会话全部失效（防止密码泄露后旧会话还在用）。
+   */
+  static async resetUserPassword (req, res) {
+    try {
+      const id = parseId(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, message: '无效的用户 ID' })
+      }
+
+      const user = await User.findByPk(id)
+      if (!user) {
+        return res.status(404).json({ success: false, message: '用户不存在' })
+      }
+      if (user.is_active === false) {
+        return res.status(400).json({ success: false, message: '该账号已被禁用，无法重置密码' })
+      }
+
+      const temporaryPassword = generateTemporaryPassword()
+      /**
+       * 静态 User.update() **不触发**模型的 beforeUpdate 钩子 ——
+       * 密码必须自己哈希后再写，否则存进去的是明文，登录时比对不上。
+       */
+      const bcrypt = (await import('bcrypt')).default
+      const hashedPassword = await bcrypt.hash(temporaryPassword, 10)
+
+      await User.update(
+        {
+          password: hashedPassword,
+          // 首次登录必须改密 —— 临时密码是运营告知的，不该长期有效
+          must_reset_password: true,
+          // 旧会话全部失效（密码重置的标准做法）
+          token_version: sequelize.literal('token_version + 1')
+        },
+        { where: { id } }
+      )
+
+      // 认证状态缓存要失效（否则旧 token 还能用一小会儿）
+      await invalidateAuthCache(id)
+
+      // 审计写失败不影响主流程（logAdmin 返回 promise，同步抛错与异步拒绝都要兜住）
+      try {
+        await AuditLog.logAdmin({
+          admin: req.admin,
+          event: 'user.password.reset',
+          resource: 'user',
+          resourceId: id,
+          req
+        })
+      } catch (_) { /* ignore audit failure */ }
+
+      logger.info('管理端重置用户密码', { userId: id, admin: req.admin?.username })
+
+      return res.json({
+        success: true,
+        message: '临时密码已生成，请线下告知用户（用户首次登录后需自行修改）',
+        data: {
+          temporaryPassword,
+          mustChangePassword: true
+        }
+      })
+    } catch (error) {
+      logger.error('管理端重置用户密码失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '重置密码失败' })
+    }
+  }
+
   static async getAllUsers(req, res) {
     try {
       const {

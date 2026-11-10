@@ -139,5 +139,26 @@ await Product.create(TestDataFactory.createProduct({
   }
 }
 
+/**
+ * 管理端辅助重置客户密码的 E2E 用的账号。
+ *
+ * 故意带 must_reset_password=true（客户忘记密码、运营帮忙重置的场景）。
+ */
+{
+  const { User } = TestDatabase.getSequelize().models
+  for (const [i, phone] of [1, '812349998', 2, '812349997'].reduce((a, c, i, arr) => i % 2 ? a : [...a, [arr[i], arr[i+1]]], [])) {
+    await User.create({
+      username: `e2e_reset_customer_${i}`,
+      email: `e2e_reset_${i}@example.com`,
+      password: 'E2eReset#2026',
+      nickname: `待重置客户${i}`,
+      country_code: '+66',
+      phone,
+      is_active: true,
+      must_reset_password: true
+    })
+  }
+}
+
 const { startServer } = await import('../../src/server/app.js')
 await startServer()

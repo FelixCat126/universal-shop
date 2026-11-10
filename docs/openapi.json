@@ -8760,6 +8760,122 @@
         "x-generated-from": "express-route-table"
       }
     },
+    "/api/admin/users/{id}/password": {
+      "put": {
+        "summary": "PUT /api/admin/users/:id/password",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "重置客户密码（运营辅助找回路径）。客户忘记密码时的自助重置依赖短信通道（线上没配），这条是兜底。",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "重置成功",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "temporaryPassword": {
+                          "type": "string",
+                          "description": "随机临时密码（只显示一次，请线下告知客户）"
+                        },
+                        "mustChangePassword": {
+                          "type": "boolean",
+                          "description": "客户首次登录后必须改密"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
     "/api/admin/users/{id}/status": {
       "put": {
         "summary": "PUT /api/admin/users/:id/status",

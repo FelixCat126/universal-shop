@@ -16,8 +16,8 @@
  */
 import Partner from '../models/Partner.js'
 import { parseCsvTable } from '../utils/csvTable.js'
+import { generateTemporaryPassword } from '../utils/temporaryPassword.js'
 import { csvCell } from '../utils/csvExporter.js'
-import crypto from 'node:crypto'
 
 /** 一次最多导入多少行 */
 export const MAX_IMPORT_ROWS = 500
@@ -63,24 +63,6 @@ export async function parsePartnerCsv (buffer) {
   })
 }
 
-/** 生成随机初始密码（运营线下告知对方；不写在 CSV 里） */
-function generateInitialPassword () {
-  // 12 位，大小写 + 数字 + 特殊字符；去掉容易看错的字符（0/O/1/l/I）
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
-  const lower = 'abcdefghijkmnopqrstuvwxyz'
-  const digits = '23456789'
-  const special = '!@#$%&*'
-  const all = upper + lower + digits + special
-  const pick = (set) => set[crypto.randomInt(set.length)]
-  const chars = [pick(upper), pick(lower), pick(digits), pick(special)]
-  while (chars.length < 12) chars.push(pick(all))
-  // Fisher-Yates 洗牌（避免"首位必是大写"这种可猜模式）
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(i + 1)
-    ;[chars[i], chars[j]] = [chars[j], chars[i]]
-  }
-  return chars.join('')
-}
 
 /**
  * 校验一行
@@ -302,7 +284,7 @@ export async function importPartnerCsv (buffer, options = {}) {
           updated.push({ rowNumber: row.rowNumber, id: values.id, login: values.login })
         }
       } else {
-        const initialPassword = generateInitialPassword()
+        const initialPassword = generateTemporaryPassword()
         const partner = await Partner.create({
           login: values.login,
           password: initialPassword,

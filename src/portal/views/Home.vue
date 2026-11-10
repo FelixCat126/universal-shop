@@ -534,7 +534,10 @@ const showMessage = ref(false)
 const message = ref('')
 const messageType = ref('success')
 
-// 当前语言（从全局状态获取，暂时硬编码）
+/**
+ * 当前语言：跟随全局 locale（见下方 watch(..., { immediate: true })）。
+ * 默认值只是**首次加载瞬间**的占位 —— watch 会立即用真实 locale 覆盖。
+ */
 const currentLanguage = ref('zh-CN')
 
 // 获取当前语言的值

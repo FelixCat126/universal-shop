@@ -19,6 +19,15 @@ export const userAPI = {
   // 获取用户地址列表（管理端）
   getUserAddresses: (userId) => {
     return api.get(`/admin/users/${userId}/addresses`)
+  },
+
+  /**
+   * 管理端辅助重置客户密码。
+   * 客户忘记密码时的自助重置依赖短信通道（线上没配 → 永远回不来），
+   * 这里补上运营侧的兜底：临时密码 + 首次登录强制改密。
+   */
+  resetPassword: (userId) => {
+    return api.put(`/admin/users/${userId}/password`)
   }
 }
 

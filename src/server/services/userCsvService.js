@@ -23,6 +23,7 @@
 import crypto from 'node:crypto'
 import User from '../models/User.js'
 import { parseCsvTable } from '../utils/csvTable.js'
+import { generateTemporaryPassword } from '../utils/temporaryPassword.js'
 import { csvCell } from '../utils/csvExporter.js'
 
 /** 一次最多导入多少行 */
@@ -77,21 +78,6 @@ export async function parseUserCsv (buffer) {
  * 生成随机初始密码（12 位，大小写 + 数字 + 特殊字符；去掉易混字符）。
  * 去掉 0/O/1/l/I 是因为这密码要**口头/线下**告知，运营照着敲很容易敲错。
  */
-export function generateInitialPassword () {
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
-  const lower = 'abcdefghijkmnopqrstuvwxyz'
-  const digits = '23456789'
-  const special = '!@#$%&*'
-  const all = upper + lower + digits + special
-  const pick = (set) => set[crypto.randomInt(set.length)]
-  const chars = [pick(upper), pick(lower), pick(digits), pick(special)]
-  while (chars.length < 12) chars.push(pick(all))
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(i + 1)
-    ;[chars[i], chars[j]] = [chars[j], chars[i]]
-  }
-  return chars.join('')
-}
 
 /**
  * 国家区号归一：接受 "+86" 与 "86" 两种写法。
@@ -374,7 +360,7 @@ export async function importUserCsv (buffer, options = {}) {
           updated.push({ rowNumber: row.rowNumber, id: values.id, nickname: values.nickname })
         }
       } else {
-        const initialPassword = generateInitialPassword()
+        const initialPassword = generateTemporaryPassword()
         // 用户名不给就按**系统既有约定**生成（与注册路径一致：country_code+phone）
         const username = values.username || `${values.country_code}${values.phone}`
         const user = await User.create({

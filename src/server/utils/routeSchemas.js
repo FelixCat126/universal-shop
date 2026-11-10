@@ -886,6 +886,28 @@ export const ROUTE_SCHEMAS = {
     response: env('PartnerOrder')
   },
 
+  /* ---------------- 用户管理：重置密码 ---------------- */
+  'PUT /api/admin/users/:id/password': {
+    request: {
+      type: 'object',
+      description: '重置客户密码（运营辅助找回路径）。客户忘记密码时的自助重置依赖短信通道（线上没配），这条是兜底。',
+      properties: {}
+    },
+    response: envelopeSchema({
+      type: 'object',
+      properties: {
+        temporaryPassword: {
+          type: 'string',
+          description: '随机临时密码（只显示一次，请线下告知客户）'
+        },
+        mustChangePassword: {
+          type: 'boolean',
+          description: '客户首次登录后必须改密'
+        }
+      }
+    }, '重置成功')
+  },
+
   /* ---------------- 用户 CSV 批量导入/导出 ---------------- */
   'GET /api/admin/users/export.csv': {
     produces: 'text/csv',

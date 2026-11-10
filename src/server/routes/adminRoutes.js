@@ -97,6 +97,27 @@ router.post(
   csvUpload.single('file'),
   UserCsvController.importUsers
 )
+/**
+ * 管理端辅助重置客户密码。
+ *
+ * 为什么需要：客户忘记密码时的自助重置依赖**短信通道**（SMS_WEBHOOK_URL），
+ * 线上没配短信 → forgot-password 直接返回 503。结果就是：客户忘了密码，
+ * **永远回不来**，运营还帮不上（原来只有管理员账号能重置密码，客户账号没有这条路径）。
+ *
+ * 补上运营侧的兜底：生成随机临时密码 + 标记"必须改密"，
+ * 临时密码**只在这里显示一次**，运营线下告知客户，客户首次登录被强制改密。
+ */
+/**
+ * 重置密码是**账号级高危操作**（会顶掉客户的所有会话），
+ * 比普通"改资料"更严：只允许 super_admin / admin ——
+ * operator 能查/改用户，但不该能重置客户的密码。
+ */
+const requireUserAdmin = (req, res, next) => {
+  const role = req.admin?.role
+  if (role === 'super_admin' || role === 'admin') return next()
+  return res.status(403).json({ success: false, message: '需要管理员权限（操作员不能重置客户密码）' })
+}
+router.put('/users/:id/password', requirePermission('users'), requireUserAdmin, logOperation('reset_user_password', 'user'), UserController.resetUserPassword)
 router.get('/users', requirePermission('users'), UserController.getAllUsers)
 router.put('/users/:id/status', requirePermission('users'), logOperation('update_user_status', 'user'), UserController.updateUserStatus)
 router.get('/users/:userId/addresses', requirePermission('users'), AddressController.getAdminUserAddresses)

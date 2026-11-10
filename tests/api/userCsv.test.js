@@ -24,9 +24,9 @@ import { TestHelpers } from '../helpers/test-helpers.js'
 import {
   previewUserCsv,
   importUserCsv,
-  exportUsersCsv,
-  generateInitialPassword
+  exportUsersCsv
 } from '@server/services/userCsvService.js'
+import { generateTemporaryPassword } from '@server/utils/temporaryPassword.js'
 
 const csv = (s) => Buffer.from('﻿' + s, 'utf8')
 
@@ -240,7 +240,7 @@ describe('用户 CSV 导入', () => {
 
   it('UC-13 随机初始密码：长度与字符集', () => {
     for (let i = 0; i < 20; i++) {
-      const pwd = generateInitialPassword()
+      const pwd = generateTemporaryPassword()
       expect(pwd.length).toBe(12)
       expect(pwd).toMatch(/[A-Z]/)
       expect(pwd).toMatch(/[a-z]/)
