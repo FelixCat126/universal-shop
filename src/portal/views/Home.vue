@@ -428,6 +428,18 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+/**
+ * v-motion 指令**按需引入**（不全局注册 → 动画库只跟着本页的 chunk 走）。
+ *
+ * 两个坑：
+ * 1) 模板里写的是 `v-motion`，Vue 会把 setup 里的 `vMotion` 绑定解析成该指令
+ * 2) `MotionDirective` 导出的是**工厂函数**（插件内部是
+ *    `app.directive('motion', directive())`）—— 必须**调用一次**拿到指令对象。
+ *    直接把它当指令对象用，指令没有任何钩子 → 动画**静默失效**
+ *    （页面照常渲染，测试也照样过，只有专门断言动画才抓得到）。
+ */
+import { MotionDirective } from '@vueuse/motion'
+const vMotion = MotionDirective()
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../stores/cart.js'

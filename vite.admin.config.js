@@ -47,7 +47,18 @@ export default defineConfig({
   },
   build: {
     outDir: '../../dist/admin',
-    emptyOutDir: false,
+    /**
+     * 清空**自己这个**目录。
+     *
+     * 之前是 false（没写原因），结果每次构建的**旧 chunk 都留在磁盘上**：
+     * dist/portal 一度堆到 4.5MB（当前构建其实只有约 800KB），
+     * 多出来的 3.7MB 会被打进部署包、也会一直躺在服务器上（每部署一次多一批）。
+     *
+     * 三个端的 outDir 各自独立（dist/portal、dist/admin、dist/partner），
+     * 所以清空一个不影响另两个 —— 可以放心开。
+     * Vite 对"outDir 在 root 之外"默认**不**清，必须显式写 true。
+     */
+    emptyOutDir: true,
     rollupOptions: {
       output: {
         /**

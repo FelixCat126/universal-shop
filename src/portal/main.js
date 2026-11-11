@@ -1,6 +1,5 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { MotionPlugin } from '@vueuse/motion'
 import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
@@ -21,8 +20,15 @@ app.use(i18n)
 // 使用路由
 app.use(router)
 
-// 使用动画（弹簧/视差/手势）
-app.use(MotionPlugin)
+/**
+ * 动画指令**按需注册**，不装全局插件。
+ *
+ * @vueuse/motion 有 325KB 源码（比 vue 本身还大），全局注册会让**每个页面**都背上它 ——
+ * 而实际只有 Home 与商品详情两个页面用到 v-motion。
+ * 改成在这两个组件里局部 import（`import { vMotion } from '@vueuse/motion'`，
+ * Vue 会把 setup 里的 vMotion 解析成模板里的 v-motion），
+ * 动画库就跟着那两个路由的 chunk 走 —— 登录/购物车/结算/个人中心都不再为它买单。
+ */
 registerMotionParallax(app)
 
 /**
