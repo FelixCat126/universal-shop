@@ -96,6 +96,8 @@ export default {
     qrCodeSaveTip: 'Tip: right-click the QR code to save/download.'
   },
   orders: {
+    statusLabel: 'Filter by status',
+    statusAll: 'All statuses',
     reorder: 'Order again',
     reordering: 'Working...',
     reorderDone: 'Added {added} item(s), skipped {skipped}',

@@ -96,6 +96,8 @@ export default {
     qrCodeSaveTip: '提示：右键点击二维码可保存下载'
   },
   orders: {
+    statusLabel: '按状态筛选',
+    statusAll: '全部状态',
     reorder: '再来一单',
     reordering: '处理中...',
     reorderDone: '已加入 {added} 种商品，未加入 {skipped} 种',

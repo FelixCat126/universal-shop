@@ -538,6 +538,7 @@ import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import { Search, Refresh, Download, TrendCharts, SuccessFilled, Coin, Calendar, Document, User, Location, ShoppingBag, ChatLineRound, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
+import { useAutoRefresh } from '../composables/useAutoRefresh.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
@@ -1084,6 +1085,20 @@ const orderLineImageSrc = (item) => {
 const onOrderLineImageError = (event) => {
   event.target.src = orderLineImgFallback
 }
+
+/**
+ * 自动刷新订单列表（30s）。
+ *
+ * 为什么需要：商家把订单页开着等人下单时，**新订单不会自己出现** ——
+ * 必须手动刷新才看得到。晚回客户一句"我下单了怎么没人理"，就是真金白银的损失。
+ *
+ * 刷新的是"同一屏"（保留当前页码与筛选条件），不是跳回第一页。
+ */
+useAutoRefresh(loadOrders, {
+  intervalMs: 30_000,
+  // 正在操作详情弹窗时不刷新（改状态/填单号时被顶掉会很难受）
+  shouldRefresh: () => !showDetailModal.value
+})
 
 // 组件挂载时加载数据
 onMounted(() => {

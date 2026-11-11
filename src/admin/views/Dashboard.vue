@@ -114,6 +114,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAutoRefresh } from '../composables/useAutoRefresh.js'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { TrendCharts, Coin, User, UserFilled, Refresh } from '@element-plus/icons-vue'
@@ -291,6 +292,16 @@ const loadStatistics = async () => {
 }
 
 // 组件挂载时加载数据
+/**
+ * 面板自动刷新（60s）。
+ *
+ * 面板上有"今日营收""今日订单"—— 开着面板等人下单时，这些数字不会自己变，
+ * 商家看到的是**十分钟前的营业额**，容易误判（"今天怎么一单都没有"）。
+ *
+ * 比订单页慢（数字没有订单列表那么急）。
+ */
+useAutoRefresh(loadStatistics, { intervalMs: 60_000 })
+
 onMounted(() => {
   loadStatistics()
 })

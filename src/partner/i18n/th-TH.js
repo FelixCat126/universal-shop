@@ -96,6 +96,8 @@ export default {
     qrCodeSaveTip: 'เคล็ดลับ: คลิกขวาที่คิวอาร์เพื่อบันทึก/ดาวน์โหลด'
   },
   orders: {
+    statusLabel: 'กรองตามสถานะ',
+    statusAll: 'ทุกสถานะ',
     reorder: 'สั่งซื้ออีกครั้ง',
     reordering: 'กำลังดำเนินการ...',
     reorderDone: 'เพิ่ม {added} รายการ ข้าม {skipped} รายการ',

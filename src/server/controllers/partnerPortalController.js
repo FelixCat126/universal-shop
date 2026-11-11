@@ -55,6 +55,11 @@ function isOrderNoUniqueConflict (err) {
 
 const ALLOW_PARTNER_PHONE_CC = new Set(['+86', '+66', '+60'])
 
+/** 合作方订单的全部合法状态（与管理端状态机保持一致） */
+const PARTNER_ORDER_STATUSES = new Set([
+  'pending_payment', 'submitted', 'processing', 'shipped', 'settled', 'cancelled'
+])
+
 function normalizePartnerPhoneCc (v) {
   const s = v != null ? String(v).trim() : ''
   return ALLOW_PARTNER_PHONE_CC.has(s) ? s : '+66'
@@ -671,6 +676,24 @@ class PartnerPortalController {
       const where = {
         partner_id: req.partner.id,
         created_at: { [Op.between]: [start, end] }
+      }
+
+      /**
+       * 按状态筛选。
+       *
+       * 为什么需要：合作方界面只对 pending_payment 的单显示"确认支付"按钮，
+       * 而订单列表默认是近三个月 —— 订单一多，要找到那几笔待付款的单
+       * 只能一页页翻。筛选是最直接的解法。
+       */
+      const statusRaw = req.query.status != null ? String(req.query.status).trim() : ''
+      if (statusRaw) {
+        if (!PARTNER_ORDER_STATUSES.has(statusRaw)) {
+          return res.status(400).json({
+            success: false,
+            message: `无效的订单状态（可选：${[...PARTNER_ORDER_STATUSES].join(' / ')}）`
+          })
+        }
+        where.status = statusRaw
       }
 
       const { count, rows } = await PartnerOrder.findAndCountAll({

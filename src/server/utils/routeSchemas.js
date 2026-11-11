@@ -538,7 +538,23 @@ export const ROUTE_SCHEMAS = {
   'GET /api/admin/bundles': { response: pagedList('Bundle') },
 
   /* ---------------- 合作方 ---------------- */
-  'GET /api/partner/orders': { response: pagedList('PartnerOrderWithItems') },
+  'GET /api/partner/orders': {
+    query: [
+      {
+        name: 'status',
+        schema: {
+          type: 'string',
+          enum: ['pending_payment', 'submitted', 'processing', 'shipped', 'settled', 'cancelled']
+        },
+        description: '按订单状态筛选'
+      },
+      { name: 'from', schema: { type: 'string' }, description: '开始日期 YYYY-MM-DD' },
+      { name: 'to', schema: { type: 'string' }, description: '结束日期 YYYY-MM-DD' },
+      { name: 'page', schema: { type: 'integer' } },
+      { name: 'pageSize', schema: { type: 'integer' } }
+    ],
+    response: pagedList('PartnerOrderWithItems')
+  },
   'GET /api/partner/orders/:id': { response: env('PartnerOrderWithItems') },
   'GET /api/admin/partners': { response: envArray('Partner') },
 

@@ -36,6 +36,21 @@
             class="w-full max-w-full min-w-0 rounded-lg border border-gray-200 min-h-[44px] px-2 sm:px-3 text-base touch-manipulation box-border"
           />
         </div>
+        <div class="min-w-0 flex-[1_1_0%]">
+          <label class="block text-[11px] text-gray-500 mb-1 truncate">{{ t('orders.statusLabel') }}</label>
+          <select
+            v-model="filterStatus"
+            :aria-label="t('orders.statusLabel')"
+            class="w-full max-w-full min-w-0 rounded-lg border border-gray-200 min-h-[44px] px-2 sm:px-3 text-base touch-manipulation box-border bg-white"
+          >
+            <option value="">{{ t('orders.statusAll') }}</option>
+            <option
+              v-for="st in PARTNER_STATUSES"
+              :key="st"
+              :value="st"
+            >{{ t(`orders.status.${st}`) }}</option>
+          </select>
+        </div>
         <button
           type="button"
           class="shrink-0 touch-manipulation min-h-[44px] px-3 sm:px-4 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap"
@@ -250,6 +265,9 @@ const page = ref(1)
 const total = ref(0)
 const filterFrom = ref('')
 const filterTo = ref('')
+/** 状态筛选（合作方订单的全部合法状态） */
+const filterStatus = ref('')
+const PARTNER_STATUSES = ['pending_payment', 'submitted', 'processing', 'shipped', 'settled', 'cancelled']
 const sentinelRef = ref(null)
 
 const payModalOpen = ref(false)
@@ -427,6 +445,7 @@ async function fetchOrders (append) {
   const reqFrom = filterFrom.value
   const reqTo = filterTo.value
   const reqPage = page.value
+  const reqStatus = filterStatus.value
 
   try {
     const q = new URLSearchParams({
@@ -435,6 +454,7 @@ async function fetchOrders (append) {
       from: reqFrom,
       to: reqTo
     })
+    if (reqStatus) q.set('status', reqStatus)
     const res = await partnerStore.api(`/orders?${q}`)
     const json = await res.json()
     if (!json.success) {
@@ -448,6 +468,7 @@ async function fetchOrders (append) {
     // 过期响应直接丢弃：既防止旧结果覆盖新筛选，也防止旧页被追加到新列表
     if (reqSeq !== orderLoadSeq) return
     if (filterFrom.value !== reqFrom || filterTo.value !== reqTo) return
+    if (filterStatus.value !== reqStatus) return
     const list = json.data.orders || []
     total.value = json.data.pagination?.total ?? 0
     if (append) rows.value = rows.value.concat(list)
