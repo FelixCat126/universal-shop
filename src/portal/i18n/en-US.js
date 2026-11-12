@@ -267,6 +267,7 @@ export default {
 
   // 订单
   order: {
+    accountReusedHint: 'Order created. This phone number already had an account — sign in with {phone} and your initial password to view it.',
     reorder: 'Buy again',
     reordering: 'Working...',
     reorderDone: 'Added {added} item(s) to your cart',
@@ -605,7 +606,9 @@ export default {
   checkout: {
     promotionDiscount: 'Promotion discount',
     gift: 'Gift',
-    giftTag: 'Gift'
+    giftTag: 'Gift',
+    quoteFailed: 'Could not load the discount quote. Please refresh and retry.',
+    quoteFailedHint: 'The quote could not be loaded — the amount above is a local estimate; the final order amount is what counts.'
   },
 
   // Fixed bundle deals

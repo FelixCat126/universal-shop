@@ -485,6 +485,16 @@ async function load () {
       _qty: moqU(p)
     }))
     total.value = json.data.pagination?.total ?? 0
+  } catch (err) {
+    /**
+     * 之前这里**没有 catch**：partnerStore.api() 用 fetch，网络异常时
+     * promise 会 reject → 异常逃逸成 unhandled rejection
+     * （app.config.errorHandler 只接 Vue 生命周期错误，接不住这个）。
+     * 结果：列表纹丝不动、连转圈都没有、**没有任何提示** ——
+     * 运营会以为是自己筛选条件写错了，反复点搜索。
+     */
+    console.error('[partner] 加载商品失败:', err)
+    toast.error(t('common.error') || '加载失败')
   } finally {
     if (seq === productLoadSeq) loading.value = false
   }

@@ -46,7 +46,9 @@ const HEADER_ALIASES = {
   login: ['login', '登录名', '登录账号', '账号', '用户名'],
   display_name: ['display_name', 'displayname', '名称', '商家名称', '客户名称'],
   account_kind: ['account_kind', 'accountkind', '账号类别', '类型', '客户类型'],
-  discount_percent: ['discount_percent', 'discountpercent', '折扣', '折扣百分比'],
+  // '折扣%' —— 异步导出任务的表头，之前别名表里没有 →
+  // 该列不被识别 → values.discount_percent 缺省 0 → **合作方折扣被写成 0**
+  discount_percent: ['discount_percent', 'discountpercent', '折扣', '折扣百分比', '折扣%', '折扣（%）'],
   is_active: ['is_active', 'isactive', '启用', '状态', '是否启用']
 }
 
@@ -249,15 +251,31 @@ export async function importPartnerCsv (buffer, options = {}) {
     throw Object.assign(new Error('没有可导入的数据行'), { status: 400, preview })
   }
 
-  const { rows } = await parsePartnerCsv(buffer)
+  const { rows, columns } = await parsePartnerCsv(buffer)
   const existing = await Partner.findAll({ attributes: ['id'] })
   const existingIds = new Set(existing.map(p => p.id))
+
+  /**
+   * 文件里实际出现过的列 —— 更新时只写这些列。
+   * 缺省值（dealer / 0 / true）只在"运营真的要改成这个值"时才是意图，
+   * 不能因为 CSV 里没这一列就把库里的现值抹掉
+   * （之前删掉 is_active 列导回 → **被停用的合作方被重新启用**、折扣被清零）。
+   */
+  const present = new Set(columns)
+
+  /**
+   * 预览判定为"有问题"的行 —— skip 模式下必须真的跳过。
+   * 之前这些行照样落库（同一 id 在文件里重复 → 后者覆盖前者），
+   * 报告却说"已跳过"，既覆盖了数据又报告成跳过。
+   */
+  const invalidRows = new Set(preview.invalid.map(r => r.rowNumber))
 
   const created = []
   const updated = []
   const failed = []
 
   for (const row of rows) {
+    if (invalidRows.has(row.rowNumber)) continue
     const { values, errors } = validatePartnerRow(row.cells, null)
     if (errors.length > 0) {
       failed.push({ rowNumber: row.rowNumber, login: values.login, reason: errors.join('；') })
@@ -269,13 +287,14 @@ export async function importPartnerCsv (buffer, options = {}) {
           failed.push({ rowNumber: row.rowNumber, login: values.login, reason: `id ${values.id} 的合作方不存在` })
           continue
         }
+        const patch = {}
+        if (present.has('display_name')) patch.display_name = values.display_name
+        if (present.has('account_kind')) patch.account_kind = values.account_kind
+        if (present.has('discount_percent')) patch.discount_percent = values.discount_percent
+        if (present.has('is_active')) patch.is_active = values.is_active
+
         const [affected] = await Partner.update(
-          {
-            display_name: values.display_name,
-            account_kind: values.account_kind,
-            discount_percent: values.discount_percent,
-            is_active: values.is_active
-          },
+          patch,
           { where: { id: values.id } }
         )
         if (!affected) {

@@ -265,6 +265,7 @@ export default {
 
   // 订单
   order: {
+    accountReusedHint: '订单已创建。该手机号之前已建过账号，请用手机号 {phone} 和初始密码登录查看订单。',
     reorder: '再来一单',
     reordering: '处理中...',
     reorderDone: '已把 {added} 件商品加入购物车',
@@ -601,7 +602,9 @@ export default {
   checkout: {
     promotionDiscount: '满减优惠',
     gift: '赠品',
-    giftTag: '赠品'
+    giftTag: '赠品',
+    quoteFailed: '优惠报价获取失败，请刷新重试',
+    quoteFailedHint: '报价未获取成功，上方金额为本地估算，实际以订单金额为准。'
   },
 
   // 组合套餐（固定组合包）

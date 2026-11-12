@@ -589,8 +589,21 @@ class SystemConfigController {
         const deleted = await SystemConfig.deleteConfig('home_banner')
         logger.info('✅ 数据库配置删除结果:', deleted)
       } catch (dbError) {
-        logger.warn('删除数据库配置失败:', dbError.message)
-        // 即使数据库删除失败，也返回成功，因为可能配置本来就不存在
+        /**
+         * ⚠️ 这里必须**报错**，不能吞掉。
+         *
+         * deleteConfig 只在"配置本来就不存在"时返回 false（不抛），
+         * 抛出来的一定是**真错误**（DB 断开/超时/锁冲突）。
+         *
+         * 之前吞掉并返回 success:true → 管理员看到"删除成功"，
+         * 实际 首页长图 **还在对外展示**（收款二维码尤其要命），
+         * 管理员反复点也没用，而且界面上没有任何错误提示。
+         */
+        logger.error('删除数据库配置失败', { key: 'home_banner', err: dbError.message })
+        return res.status(500).json({
+          success: false,
+          message: '删除失败：数据库写入未成功，请重试'
+        })
       }
       
       res.json({
@@ -599,11 +612,10 @@ class SystemConfigController {
       })
     } catch (error) {
       logger.error('删除首页长图失败', { err: error?.message, stack: error?.stack })
-      // 即使出现异常，也尝试返回成功，因为删除操作的目标是清除配置
-      res.json({
-        success: true,
-        message: '首页长图删除完成',
-        warning: '删除过程中出现警告，但操作已完成'
+      // 异常就是失败：不能报"删除完成" —— 配置可能还在，首页横幅继续对外展示
+      res.status(500).json({
+        success: false,
+        message: '删除失败，请重试'
       })
     }
   }
@@ -631,8 +643,21 @@ class SystemConfigController {
         const deleted = await SystemConfig.deleteConfig('payment_qrcode')
         logger.info('✅ 数据库配置删除结果:', deleted)
       } catch (dbError) {
-        logger.warn('删除数据库配置失败:', dbError.message)
-        // 即使数据库删除失败，也返回成功，因为可能配置本来就不存在
+        /**
+         * ⚠️ 这里必须**报错**，不能吞掉。
+         *
+         * deleteConfig 只在"配置本来就不存在"时返回 false（不抛），
+         * 抛出来的一定是**真错误**（DB 断开/超时/锁冲突）。
+         *
+         * 之前吞掉并返回 success:true → 管理员看到"删除成功"，
+         * 实际 支付二维码 **还在对外展示**（收款二维码尤其要命），
+         * 管理员反复点也没用，而且界面上没有任何错误提示。
+         */
+        logger.error('删除数据库配置失败', { key: 'payment_qrcode', err: dbError.message })
+        return res.status(500).json({
+          success: false,
+          message: '删除失败：数据库写入未成功，请重试'
+        })
       }
       
       res.json({
@@ -641,11 +666,10 @@ class SystemConfigController {
       })
     } catch (error) {
       logger.error('删除支付二维码失败', { err: error?.message, stack: error?.stack })
-      // 即使出现异常，也尝试返回成功，因为删除操作的目标是清除配置
-      res.json({
-        success: true,
-        message: '支付二维码删除完成',
-        warning: '删除过程中出现警告，但操作已完成'
+      // 异常就是失败：不能报"删除完成" —— 配置可能还在，收款二维码继续对外展示
+      res.status(500).json({
+        success: false,
+        message: '删除失败，请重试'
       })
     }
   }

@@ -128,7 +128,7 @@ export default defineConfig({
        */
       thresholds: {
         statements: 89,
-        branches: 76,
+        branches: 77,
         functions: 89,
         lines: 89,
         'src/server/controllers/**': {

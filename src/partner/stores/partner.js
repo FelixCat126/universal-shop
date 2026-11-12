@@ -169,12 +169,29 @@ export const usePartnerStore = defineStore('partner', () => {
     cart.value = cart.value.filter((c) => c.product_id !== productId)
   }
 
+  /**
+   * 改清单行的数量（MOQ 起订量 / 步长约束）。
+   *
+   * ⚠️ 非法值必须**回写**回去。
+   * 输入框是 v-model 直接绑在 line.quantity 上的，用户改完的瞬间
+   * 非法值已经进了 store —— 之前这里只 return 不回写，于是：
+   *   1) 侧栏「预估合计」按非法数量算（金额显示错）；
+   *   2) 点「提交订单」把非法数量发给后端 → 400 起订量错误，
+   *      用户填了半天白填，而且报错文案和前端提示对不上。
+   * 所以校验不通过时把数量**拉回最近的合法值**（起订量），
+   * 界面与提交内容始终一致。
+   */
   function updateCartQty (line, quantity) {
     const u = Math.max(1, Number(line.moq_unit) || 50)
     const m = Math.max(1, Number(line.moq_multiplier) || 1)
     const q = Math.floor(Number(quantity))
+    if (!Number.isFinite(q) || q < 1) {
+      line.quantity = u
+      return { ok: false, message: `数量无效，已重置为 ${u}` }
+    }
     if (q < u || (q - u) % m !== 0) {
-      return { ok: false, message: `须 ≥ ${u} 且步长 ${m}` }
+      line.quantity = u
+      return { ok: false, message: `须 ≥ ${u} 且步长 ${m}，已重置为 ${u}` }
     }
     line.quantity = q
     return { ok: true }

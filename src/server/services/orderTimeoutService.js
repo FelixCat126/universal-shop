@@ -160,7 +160,9 @@ async function sweepPartnerPendingPaymentOrders (cutoff) {
             if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue
             await Product.update(
               { stock: sequelize.literal(`stock + ${qty}`) },
-              { where: { id: item.product_id }, transaction }
+              // paranoid:false —— Product 是软删模型，默认过滤会让已软删商品的库存静默丢失
+              // （UPDATE 影响 0 行且**不报错**，库存就永久少扣了）
+              { where: { id: item.product_id }, transaction, paranoid: false }
             )
           }
 

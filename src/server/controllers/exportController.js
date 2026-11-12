@@ -148,8 +148,19 @@ function setDownloadHeaders (res, req, baseName) {
 class ExportController {
   // 导出用户数据
   static async exportUsers(req, res) {
+    /**
+     * ⚠️ slotAcquired 标记：只有**真的拿到槽位**才在 finally 里释放。
+     *
+     * acquireExportSlot() 排队超时会 **throw**（429）—— 那种情况下
+     * 这个请求从未占用过槽位，但原来的 finally 无条件 releaseExportSlot()
+     * → 计数被"漏减"，并发闸越用越松（实测：超时 1 次后，
+     * 真实跑着 2 个导出、闸门却显示 1 个）。
+     * 单次导出峰值堆 400-670MB，闸门失效 = OOM。
+     */
+    let slotAcquired = false
     try {
       await acquireExportSlot()
+      slotAcquired = true
       /**
        * 分批查询 + 逐行写出（内存 O(批次) 而非 O(总行数)）。
        * keyset 分页（按 id 游标）而非 OFFSET —— OFFSET 在深页会越来越慢，
@@ -238,14 +249,25 @@ class ExportController {
         code: 'INTERNAL_SERVER_ERROR'
       })
     } finally {
-      releaseExportSlot()
+      if (slotAcquired) releaseExportSlot()
     }
   }
 
   // 导出订单数据
   static async exportOrders(req, res) {
+    /**
+     * ⚠️ slotAcquired 标记：只有**真的拿到槽位**才在 finally 里释放。
+     *
+     * acquireExportSlot() 排队超时会 **throw**（429）—— 那种情况下
+     * 这个请求从未占用过槽位，但原来的 finally 无条件 releaseExportSlot()
+     * → 计数被"漏减"，并发闸越用越松（实测：超时 1 次后，
+     * 真实跑着 2 个导出、闸门却显示 1 个）。
+     * 单次导出峰值堆 400-670MB，闸门失效 = OOM。
+     */
+    let slotAcquired = false
     try {
       await acquireExportSlot()
+      slotAcquired = true
       /**
        * 分批查询（keyset 游标）+ 逐行写出。
        * 原实现一次性 findAll 5 万订单并带 items 关联 —— 峰值内存是
@@ -485,7 +507,7 @@ class ExportController {
         code: 'INTERNAL_SERVER_ERROR'
       })
     } finally {
-      releaseExportSlot()
+      if (slotAcquired) releaseExportSlot()
     }
   }
 }

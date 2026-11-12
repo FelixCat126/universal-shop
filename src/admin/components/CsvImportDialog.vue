@@ -139,6 +139,7 @@ const props = defineProps({
    * 导入类型：决定调哪个接口、显示哪些列。
    *   products —— 商品（/products/import）
    *   partners —— 合作方（/admin/partners/import）
+   *   users    —— 用户（/admin/users/import）
    */
   type: { type: String, default: 'products' },
   /** 预览表里"可导入行"的列 */
@@ -162,10 +163,20 @@ const previewing = ref(false)
 const importing = ref(false)
 const uploadRef = ref(null)
 
-/** 导入接口路径 */
-const endpoint = computed(() =>
-  props.type === 'partners' ? '/admin/partners/import' : '/products/import'
-)
+/**
+ * 导入接口路径。
+ *
+ * ⚠️ 三种类型必须**逐个列出来** —— 之前只分 partners / 其它，
+ * 于是 `type="users"` 落到了商品接口 `/products/import`：
+ * 用户 CSV 没有 name/price 列 → 必然 400「CSV 缺少必填列」，
+ * 用户批量导入**完全不可用**；更糟的是若 CSV 里碰巧有 name/price 两列，
+ * 用户数据会被当成商品写进商品表。
+ */
+const endpoint = computed(() => {
+  if (props.type === 'partners') return '/admin/partners/import'
+  if (props.type === 'users') return '/admin/users/import'
+  return '/products/import'
+})
 
 /** 模板的表头 + 一行示例 */
 const template = computed(() => {
@@ -173,6 +184,12 @@ const template = computed(() => {
     return {
       header: 'id,login,display_name,account_kind,discount_percent,is_active',
       sample: ',shop_example,示例店铺,dealer,10,true'
+    }
+  }
+  if (props.type === 'users') {
+    return {
+      header: 'id,nickname,username,email,phone,country_code,referral_code,is_active',
+      sample: ',示例用户,,user@example.com,812345678,+66,,true'
     }
   }
   return {

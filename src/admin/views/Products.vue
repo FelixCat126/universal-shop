@@ -120,7 +120,7 @@
 
       <el-table
         ref="productTableRef"
-        :data="filteredProducts" 
+        :data="filteredProducts"
         style="width: 100%"
         v-loading="loading"
         row-key="id"
@@ -131,7 +131,8 @@
         :row-class-name="tableRowClassName"
         @selection-change="onSelectionChange"
       >
-        <el-table-column type="selection" width="46" :selectable="row => !isDelisted(row)" />
+        <!-- reserve-selection：刷新列表时保住勾选（同订单页的理由） -->
+        <el-table-column type="selection" width="46" reserve-selection :selectable="row => !isDelisted(row)" />
         <el-table-column prop="id" label="ID" width="60" />
 
         <el-table-column :label="t('products.image.productImage')" width="80" align="center">

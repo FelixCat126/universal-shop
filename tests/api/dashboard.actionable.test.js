@@ -105,9 +105,11 @@ describe('面板今日待办', () => {
     yesterday.setDate(yesterday.getDate() - 1)
     yesterday.setHours(10, 0, 0, 0)
 
-    await mkOrder({ created_at: yesterday, total_amount_thb: 500 })
-    await mkOrder({ total_amount_thb: 30 })
-    await mkOrder({ total_amount_thb: 20 })
+    // ⚠️ 状态必须是**已成交**（shipping/completed…）：
+    // 「营收」的口径是钱到账了才算，未付款（pending）与已取消（cancelled）不算。
+    await mkOrder({ created_at: yesterday, total_amount_thb: 500, status: 'shipping' })
+    await mkOrder({ total_amount_thb: 30, status: 'shipping' })
+    await mkOrder({ total_amount_thb: 20, status: 'shipping' })
 
     const res = await request(app).get('/api/admin/statistics/overview')
       .set('Authorization', `Bearer ${token}`)

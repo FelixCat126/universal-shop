@@ -15,6 +15,31 @@ import { hasPermissionByRole } from '../models/Administrator.js'
  * req.admin 是中间件构造的普通对象，没有模型实例的 hasPermission 方法，
  * 因此用按角色的判定函数。
  */
+/**
+ * 导出类型 → 所需的权限资源。
+ *
+ * 与同步导出的 requirePermission **同一口径**：
+ *   /admin/orders/export        → orders
+ *   /admin/partners/export.csv  → partners
+ *   /admin/partner-orders/export→ partners
+ *   /admin/users/export.csv     → users
+ *
+ * ⚠️ 之前这里写的是 `type === 'users' ? 'users' : 'orders'` ——
+ * 也就是 partners / partner_orders / products / categories **全都按 orders 判权**。
+ * operator 角色有 orders、没有 partners → 能提交合作方导出任务，
+ * 拿到**全量合作方名单（登录名/折扣/类别）与合作方订单（收货人/电话/地址）**。
+ * 下载时那一处更糟：非 users/orders 的类型算出 perm = null，
+ * `if (perm && ...)` 直接短路 → **下载时完全不复核权限**。
+ */
+const EXPORT_TYPE_PERMISSION = {
+  users: 'users',
+  orders: 'orders',
+  partners: 'partners',
+  partner_orders: 'partners',
+  products: 'products',
+  categories: 'products'
+}
+
 function adminHasPermission (admin, resource) {
   if (!admin?.role) return false
   return hasPermissionByRole(admin.role, resource)
@@ -52,7 +77,7 @@ class ExportJobController {
       // 权限校验：导出的数据范围必须与管理员权限一致。
       // req.admin 上没有权限判定函数（那是模型实例的方法），
       // 这里按角色查权限表，与 requirePermission 中间件同一口径。
-      const perm = normalized === 'users' ? 'users' : 'orders'
+      const perm = EXPORT_TYPE_PERMISSION[normalized]
       if (!adminHasPermission(req.admin, perm)) {
         return res.status(403).json({
           success: false,
@@ -145,8 +170,10 @@ class ExportJobController {
       }
       // 类型权限复核：管理员角色可能在建任务后被降级，
       // 此时不应还能下载该类型数据
-      const perm = job.type === 'users' ? 'users' : job.type === 'orders' ? 'orders' : null
-      if (perm && !adminHasPermission(req.admin, perm)) {
+      const perm = EXPORT_TYPE_PERMISSION[job.type]
+      // ⚠️ 未知类型一律拒绝（fail closed）——
+      // 之前的 `if (perm && ...)` 在 perm 为空时直接短路，等于不复核。
+      if (!perm || !adminHasPermission(req.admin, perm)) {
         return res.status(403).json({
           success: false,
           message: '权限不足，无法下载该类型数据',

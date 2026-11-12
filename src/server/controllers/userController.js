@@ -9,6 +9,7 @@ import Order from '../models/Order.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import * as pointsService from '../services/pointsService.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
+import { NON_REVENUE_STATUSES } from '../constants/revenueStatus.js'
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { grantRegisterGiftCoupons } from '../services/couponService.js'
@@ -1056,10 +1057,17 @@ class UserController {
       }
 
       const order_count = await Order.count({ where: { user_id: userId } })
+      /**
+       * 累计消费：只算**真实成交**的订单（与订单列表、面板同一口径）。
+       * 未付款（pending）与已取消（cancelled）的单不算消费 ——
+       * 否则用户取消一单，顶部「累计消费」不降、下面订单区的合计却降了，
+       * 同一页两个数字对不上。
+       */
       const spentRaw = await Order.sum('total_amount_thb', {
         where: {
           user_id: userId,
-          payment_method: { [Op.ne]: 'points' }
+          payment_method: { [Op.ne]: 'points' },
+          status: { [Op.notIn]: NON_REVENUE_STATUSES }
         }
       })
       const spent_thb = spentRaw != null && spentRaw !== ''

@@ -6,6 +6,7 @@ import Order from '../models/Order.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
 import * as statsCache from '../utils/statsCache.js'
+import { NON_REVENUE_STATUSES, revenueWhere } from '../constants/revenueStatus.js'
 
 /**
  * 综合统计进程内短缓存（TTL 15s）：
@@ -254,11 +255,12 @@ class StatisticsController {
     const [totalOrders, totalAmountResult, totalUsers, activeUsers, todayStats, actionable] = await Promise.all([
       // 总订单数
       Order.count(),
-      // 总金额数
+      // 总金额数（只算**真实成交**：未付款/已取消的单不算营收）
       Order.findOne({
         attributes: [
           [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
-        ]
+        ],
+        where: revenueWhere(Op)
       }),
       // 总用户数
       User.count(),
@@ -275,7 +277,16 @@ class StatisticsController {
       Order.findOne({
         attributes: [
           [sequelize.fn('COUNT', sequelize.col('id')), 'orders'],
-          [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'amount']
+          // 今日营收只算真实成交的；今日订单数仍是全部下单（没付的单也是单）
+          // → 用 PG 的 FILTER 子句把两个口径拆开，不能靠 where 过滤（会把订单数也滤掉）
+          [
+            // ⚠️ 必须用 literal 而不是 fn：fn 会把整串当**函数名**加引号
+            // （fn("SUM(x) FILTER(...)") → "SUM(x) FILTER(...)" → SQL 语法错误 500）
+            sequelize.literal(
+              `SUM(COALESCE(total_amount_thb, total_amount)) FILTER (WHERE status NOT IN (${NON_REVENUE_STATUSES.map((x) => sequelize.escape(x)).join(', ')}))`
+            ),
+            'amount'
+          ]
         ],
         where: { created_at: { [Op.gte]: todayStart } },
         raw: true

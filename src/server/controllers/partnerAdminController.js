@@ -323,7 +323,9 @@ class PartnerAdminController {
           if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue
           await Product.update(
             { stock: sequelize.literal(`stock + ${qty}`) },
-            { where: { id: item.product_id }, transaction }
+            // paranoid:false —— Product 是软删模型，默认过滤会让已软删商品的库存静默丢失
+            // （零售路径 orderController 的同一动作早就加了，这里与超时清扫一起补上）
+            { where: { id: item.product_id }, transaction, paranoid: false }
           )
         }
       }

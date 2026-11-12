@@ -324,14 +324,25 @@ export async function importUserCsv (buffer, options = {}) {
     throw Object.assign(new Error('没有可导入的数据行'), { status: 400, preview })
   }
 
-  const { rows } = await parseUserCsv(buffer)
+  const { rows, columns } = await parseUserCsv(buffer)
   const existing = await loadExisting()
+
+  /**
+   * 文件里实际出现过的列 —— 更新时只写这些列。
+   * 之前缺省值被当成"运营要清空"：删掉 is_active 列导回 →
+   * **被停用的用户被重新启用**；删掉 email 列 → 邮箱被清空。
+   */
+  const present = new Set(columns)
+
+  /** 预览判定为"有问题"的行 —— skip 模式下必须真的跳过 */
+  const invalidRows = new Set(preview.invalid.map(r => r.rowNumber))
 
   const created = []
   const updated = []
   const failed = []
 
   for (const row of rows) {
+    if (invalidRows.has(row.rowNumber)) continue
     const { values, errors } = validateUserRow(row.cells, existing)
     if (errors.length > 0) {
       failed.push({ rowNumber: row.rowNumber, nickname: values.nickname, reason: errors.join('；') })
@@ -343,15 +354,17 @@ export async function importUserCsv (buffer, options = {}) {
           failed.push({ rowNumber: row.rowNumber, nickname: values.nickname, reason: `id ${values.id} 的用户不存在` })
           continue
         }
+        // 只写 CSV 里**出现过**的列 —— 缺省值不等于"运营要清空这一列"
+        const patch = {}
+        if (present.has('nickname')) patch.nickname = values.nickname
+        if (present.has('email')) patch.email = values.email
+        if (present.has('phone')) patch.phone = values.phone
+        if (present.has('country_code')) patch.country_code = values.country_code
+        if (present.has('referral_code')) patch.referral_code = values.referral_code
+        if (present.has('is_active')) patch.is_active = values.is_active
+
         const [affected] = await User.update(
-          {
-            nickname: values.nickname,
-            email: values.email,
-            phone: values.phone,
-            country_code: values.country_code,
-            referral_code: values.referral_code,
-            is_active: values.is_active
-          },
+          patch,
           { where: { id: values.id } }
         )
         if (!affected) {

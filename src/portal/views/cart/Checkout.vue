@@ -579,6 +579,10 @@
                   <span class="text-lg font-semibold text-gray-900 shrink-0 whitespace-nowrap">{{ t('order.total') }}</span>
                   <span class="text-xl font-bold text-blue-600 whitespace-nowrap tabular-nums shrink-0">{{ portalCurrency.formatThb(summaryPayable.toFixed(2)) }}</span>
                 </div>
+                <!-- 报价失败：上面的金额只是本地估算，必须说清楚 -->
+                <p v-if="quoteFailed" class="mt-2 text-xs text-red-600 text-right leading-relaxed">
+                  {{ t('checkout.quoteFailedHint') }}
+                </p>
               </div>
             </div>
 
@@ -1063,6 +1067,9 @@ const summaryPayable = computed(() => {
   return totalAmount.value
 })
 
+/** 报价是否失败（失败时页面显示的金额只是本地估算，不是最终价） */
+const quoteFailed = ref(false)
+
 const fetchQuote = async () => {
   const seq = ++quoteSeq
   // 积分支付全额积分抵扣，不参与满减报价
@@ -1090,6 +1097,7 @@ const fetchQuote = async () => {
   try {
     const res = await api.post('/orders/quote', body)
     if (seq !== quoteSeq) return // 已有更新的报价请求，丢弃过期响应
+    if (res.data?.success) quoteFailed.value = false
     quote.value = res.data?.success ? res.data.data : null
   } catch (error) {
     if (seq !== quoteSeq) return
@@ -1099,7 +1107,21 @@ const fetchQuote = async () => {
       const msg = error.response?.data?.message
       clearSelectedCoupon()
       if (msg) showMessage(msg, 'error')
+      quoteFailed.value = false
+      return
     }
+    /**
+     * ⚠️ 报价失败**不能静默**。
+     *
+     * 静默的后果：quote 为空 → summaryPayable 回退到本地合计（**不含满减、不含券**）
+     * → 页面上显示的是一个"看起来像最终价"的数字，
+     * 而服务端下单时按满减后的金额扣 → **页面价 ≠ 订单实收**，
+     * 用户按页面价付款、实收少了/多了，事后才发现 → 投诉、退款、对账扯皮。
+     *
+     * 所以：明确提示"报价未获取成功"，并在总计区标出"以实际下单金额为准"。
+     */
+    quoteFailed.value = true
+    showMessage(t('checkout.quoteFailed'), 'error')
   }
 }
 
@@ -1499,6 +1521,19 @@ const submitOrder = async () => {
             router.push({ path: '/profile', query: { tab: 'orders' } })
           }
         }, 500))
+      } else if (payload.accountReused) {
+        /**
+         * 账号是**复用**的（同一手机号之前已建过账号）→ 服务端**不会**给 token
+         * （任何知道这个手机号的人都能触发复用，发 token 等于交出账号会话）。
+         * 订单已经创建成功，这里引导用户用自己的手机号 + 初始密码登录查看。
+         */
+        showMessage(
+          t('order.accountReusedHint', { phone: payload.user?.phone || '' }),
+          'info'
+        )
+        trackTimer(setTimeout(() => {
+          if (router.currentRoute.value.name === 'Checkout') router.push('/login')
+        }, 2000))
       } else if (!userStore.isLoggedIn) {
         showMessage('自动注册失败，请手动注册后再下单', 'error')
         trackTimer(setTimeout(() => {

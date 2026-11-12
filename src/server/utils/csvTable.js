@@ -63,7 +63,7 @@ export function normalizeCsvHeaders (entries, aliases) {
  * @param {string[]} options.required 必填的标准列
  * @param {number} [options.maxRows]
  * @param {number} [options.maxBytes]
- * @returns {Promise<{headers: string[], unknownHeaders: string[], rows: Array<{rowNumber: number, cells: Record<string, any>}>}>}
+ * @returns {Promise<{headers: string[], columns: string[], unknownHeaders: string[], rows: Array<{rowNumber: number, cells: Record<string, any>}>}>}
  */
 export async function parseCsvTable (buffer, options) {
   const {
@@ -85,7 +85,25 @@ export async function parseCsvTable (buffer, options) {
 
   const workbook = new ExcelJS.Workbook()
   try {
-    await workbook.csv.read(Readable.from([buffer]))
+    await workbook.csv.read(Readable.from([buffer]), {
+      /**
+       * **不做类型推断**，一律按原始文本读。
+       *
+       * ExcelJS 的默认 map 会：
+       *   1. `Number(datum)` 优先 → "+66812345678" 变成 66812345678（**加号丢了**），
+       *      "0812345678" 变成 812345678（**前导零丢了**）
+       *      → 手机号变成另一个号、用户名与系统约定（country_code+phone）对不上、
+       *        推荐码被改写 → 推荐关系与积分归属全错；
+       *   2. 再用 dayjs 严格解析 YYYY-MM-DD 等格式 → 变成 **Date 对象**，
+       *      而下面读 cell.value 时 Date 落进兜底分支被**置成 null**
+       *      → 商品描述/名称若是日期样式，更新时会被静默清空。
+       *
+       * CSV 是文本格式：运营在 Excel 里看到的原样，导入后就该是原样。
+       * 数值型字段（price/stock/discount）由各自的 service 显式 Number() 转换，
+       * 不需要靠解析器猜。
+       */
+      map: (value) => (value === '' ? null : value)
+    })
   } catch (e) {
     throw Object.assign(new Error(`CSV 解析失败：${e.message}`), { status: 400 })
   }
@@ -152,6 +170,14 @@ export async function parseCsvTable (buffer, options) {
 
   return {
     headers: headers.filter(Boolean),
+    /**
+     * 文件里**实际出现过**的标准列名。
+     *
+     * 更新分支靠它判断"这一列该不该写回去"：
+     * CSV 里没有的列 = 运营没打算改 = 不能用缺省值覆盖库里的现值
+     * （否则删掉 stock 列导回，所有商品库存被清零）。
+     */
+    columns: Object.keys(map),
     unknownHeaders: unknown,
     rows
   }

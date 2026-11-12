@@ -59,7 +59,9 @@ const HEADER_ALIASES = {
   name: ['name', '名称', '商品名', '商品名称', '品名'],
   name_th: ['name_th', 'nameth', '泰文名', '泰语名称', 'thai name'],
   category: ['category', '分类', '类别', '商品分类'],
-  price: ['price', '价格', '售价', '单价'],
+  // '售价THB' —— 异步导出任务用的就是这个表头，之前别名表里没有 →
+  // 运营把导出的文件改一改再导回，会报「CSV 缺少必填列：price」
+  price: ['price', '价格', '售价', '单价', '售价THB', '售价(THB)', '售价（THB）'],
   stock: ['stock', '库存', '数量'],
   points: ['points', '积分', '抵扣积分'],
   description: ['description', '描述', '说明', '简介'],
@@ -298,14 +300,37 @@ export async function importProductCsv (buffer, options = {}) {
   }
 
   // 重新解析一次拿到完整 values（预览里为了精简只留了摘要）
-  const { rows } = await parseProductCsv(buffer)
+  const { rows, columns } = await parseProductCsv(buffer)
   const categoryMap = await loadCategoryMap()
+
+  /**
+   * 文件里**实际出现过**的列 —— 更新时只写这些列。
+   *
+   * 之前更新分支无条件写全部业务列，而"列缺失"和"列存在但为空"在校验阶段
+   * 都退化成同一个缺省值 → 运营把 CSV 里的 stock 列删掉再导回，
+   * **所有商品库存被写成 0**；合作方的停用状态、折扣也会被缺省值抹掉。
+   * 运营没打算改的列，就不该被覆盖。
+   */
+  const present = new Set(columns)
+
+  /**
+   * 预览判定为"有问题"的行号 —— skip 模式下**必须真的跳过**。
+   *
+   * 之前预览把"同一个 id 在文件里出现多次"的行标成 invalid 并报告为"跳过"，
+   * 但落库循环只跑行级校验、照旧执行 update → **后者把前者静默覆盖了**，
+   * 报告却说"已跳过"。同一批行既被说成跳过、又被写进库。
+   */
+  const invalidRows = new Set(preview.invalid.map(r => r.rowNumber))
 
   const created = []
   const updated = []
   const failed = []
 
   for (const row of rows) {
+    if (invalidRows.has(row.rowNumber)) {
+      // 已经在 preview.invalid 里报告过（skipped），不再重复计入 failed
+      continue
+    }
     const { values, errors } = validateRow(row.cells, categoryMap)
     if (errors.length > 0) {
       failed.push({ rowNumber: row.rowNumber, name: values.name, reason: errors.join('；') })
@@ -316,7 +341,9 @@ export async function importProductCsv (buffer, options = {}) {
       // A failed download fails THIS row only (with the reason reported) --
       // other rows still import.
       let imageValue = values.image || null
-      if (values.image_is_remote) {
+      // 只在文件里真的有 image 列时才去下载远程图 ——
+      // 否则每次更新都会白跑一次网络请求（还可能失败把整行拖成 failed）
+      if (present.has('image') && values.image_is_remote) {
         try {
           const stored = await downloadAndStoreImage(values.image)
           imageValue = stored.url
@@ -327,17 +354,22 @@ export async function importProductCsv (buffer, options = {}) {
       }
 
       if (values.id != null) {
+        /**
+         * 只写 CSV 里**出现过**的列 —— 缺省值不能当成"运营要清空这一列"。
+         * （name/price 是必填列，一定在文件里；其余列按文件实际内容决定。）
+         */
+        const patch = {}
+        if (present.has('name')) patch.name = values.name
+        if (present.has('name_th')) patch.name_th = values.name_th || null
+        if (present.has('description')) patch.description = values.description || null
+        if (present.has('category')) patch.category_id = values.category_id
+        if (present.has('price')) patch.price = values.price
+        if (present.has('stock')) patch.stock = values.stock
+        if (present.has('points')) patch.points = values.points
+        if (present.has('image')) patch.image = imageValue
+
         const [affected] = await Product.update(
-          {
-            name: values.name,
-            name_th: values.name_th || null,
-            description: values.description || null,
-            category_id: values.category_id,
-            price: values.price,
-            stock: values.stock,
-            points: values.points,
-            image: imageValue
-          },
+          patch,
           { where: { id: values.id } }
         )
         if (!affected) {

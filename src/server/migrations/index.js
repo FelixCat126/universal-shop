@@ -106,7 +106,18 @@ export async function runMigrations ({ sequelize, dir = __dirname, dryRun = fals
       continue
     }
     try {
-      await migration.up(sequelize.getQueryInterface(), sequelize)
+      /**
+       * up() 可以返回 'skipped' 表示"这次没做成"（例如缺少 pg_trgm 扩展权限）。
+       *
+       * ⚠️ 这种情况下**不能**写 schema_migrations 记录 ——
+       * 记了等于"已完成"，下次启动直接跳过，**永远不再重试**，
+       * 索引就一直缺失（搜索退化成全表扫）而且没有任何补救路径。
+       */
+      const outcome = await migration.up(sequelize.getQueryInterface(), sequelize)
+      if (outcome === 'skipped') {
+        result.skipped.push(migration.name)
+        continue
+      }
       await sequelize.query(
         `INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?) ON CONFLICT (name) DO NOTHING`,
         { replacements: [migration.name] }

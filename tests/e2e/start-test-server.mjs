@@ -34,6 +34,24 @@ await Product.create(TestDataFactory.createProduct({
 }))
 
 /**
+ * 第二个商品：专供「商品详情页点相关推荐会换内容」这条 E2E 用。
+ *
+ * 相关推荐是**同分类的其它在售商品** —— 只有一个商品时这个区域是空的，
+ * 测不到"点了推荐但页面没换"这个坑（Vue Router 复用组件实例）。
+ * 分类与上面那个 E2E 测试商品相同。
+ */
+await Product.create(TestDataFactory.createProduct({
+  name: 'E2E 推荐商品',
+  name_th: 'E2E Related Product',
+  description: '用于验证商品详情页切换',
+  category_id: baseline.categories.food.id,
+  price: 200,
+  stock: 500,
+  points: 0,
+  status: 'active'
+}))
+
+/**
  * 管理端 / 合作方的登录账号（仅测试库，与生产无关）。
  *
  * 管理端：验证「登录 → 提交导出任务 → 轮询 → 下载」这条链路。

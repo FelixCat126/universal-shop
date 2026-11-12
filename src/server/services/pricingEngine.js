@@ -34,6 +34,47 @@ import { logger } from '../utils/logger.js'
 /** 金额统一舍入到分：+Number.EPSILON 消除 0.5 分位的浮点误差（如 1.005*100=100.499…） */
 const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
 
+/**
+ * 按权重把一个金额精确分摊到多行上（**整数分 + 最大余数法**）。
+ *
+ * 为什么不用"逐行 round2 + 尾差补给最大行"：
+ *   逐行取整的误差会**累积**。4 行 × 9.99、优惠 0.02 时：
+ *     逐行 share = round2(0.02 × 9.99 / 39.96) = round2(0.005) = 0.01
+ *     Σshare = 0.04 > 0.02 → 尾差 -0.02 → 最大行变 -0.01（**负数**）
+ *   行数为 N 时误差最坏到 ±0.005×N，优惠额越小越容易触发。
+ *
+ * 整数分摊保证：
+ *   - Σ分摊 **精确等于** amount（不多摊、不少摊）
+ *   - 每份 ≥ 0
+ *   - 每份 ≤ 该行自己的权重对应额（amount ≤ Σ权重 时成立）
+ *
+ * @param {number} amount 要分摊的金额
+ * @param {number[]} weights 各行的权重（通常是行小计）
+ * @returns {number[]} 与 weights 等长的分摊金额数组
+ */
+export function allocateAmountByWeights (amount, weights) {
+  const totalCents = Math.round(Number(amount) * 100)
+  const ws = weights.map(w => Math.max(0, Number(w) || 0))
+  const sum = ws.reduce((s, w) => s + w, 0)
+  if (!(totalCents > 0) || !(sum > 0)) return ws.map(() => 0)
+
+  const raw = ws.map(w => (totalCents * w) / sum)
+  const cents = raw.map(r => Math.floor(r))
+  let rest = totalCents - cents.reduce((s, v) => s + v, 0)
+
+  // 最大余数法：余数最大的先多得 1 分（平级按索引，保证结果确定）
+  const order = raw
+    .map((r, i) => ({ i, frac: r - Math.floor(r) }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i)
+  for (const o of order) {
+    if (rest <= 0) break
+    cents[o.i] += 1
+    rest -= 1
+  }
+
+  return cents.map(c => c / 100)
+}
+
 /** 组合包展开行数量上限（组件配比 × 组合包数量，配比上限 999、组合包数量上限 5000） */
 const MAX_BUNDLE_LINE_QTY = 5000 * 999
 
@@ -462,19 +503,23 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
         amount: best.off
       })
 
-      // 行分摊：按 eligible 行 line_total 占比 round2；尾差补给金额最大的行；范围外行为 0
-      let allocatedSum = 0
-      let maxLine = null
-      for (const line of best.eligibleLines) {
-        const share = round2(best.off * line.line_total / best.eligible)
-        line.discount_allocated = share
-        allocatedSum = round2(allocatedSum + share)
-        if (!maxLine || line.line_total > maxLine.line_total) maxLine = line
-      }
-      const tail = round2(best.off - allocatedSum)
-      if (tail !== 0 && maxLine) {
-        maxLine.discount_allocated = round2(maxLine.discount_allocated + tail)
-      }
+      /**
+       * 行分摊：按 eligible 行 line_total 占比分摊（整数分，最大余数法）。
+       *
+       * ⚠️ 之前是"逐行 round2 + 尾差补给最大行"，**没有下界保护** ——
+       * 逐行取整误差累积起来会超过优惠额本身，尾差为负时把最大行压成负数
+       * （该行 line_payable > line_total，比原价还贵），而且 Σ行分摊 > 优惠总额
+       * → 订单总额与明细之和对不上（少收钱）。
+       * 券层早就有 `if (adjusted < 0) adjusted = 0` 的保护，满减层漏了。
+       */
+      const eligibleLines = best.eligibleLines
+      const shares = allocateAmountByWeights(
+        best.off,
+        eligibleLines.map(l => l.line_total)
+      )
+      eligibleLines.forEach((line, i) => {
+        line.discount_allocated = shares[i]
+      })
     }
   }
 

@@ -27,7 +27,7 @@ export default {
     const schema = ext?.[0]?.schema_name
     if (!schema) {
       console.warn('⚠️  pg_trgm 扩展不可用，跳过 alias 索引（别名搜索会走全表扫描）')
-      return
+      return 'skipped'
     }
     const opclass = `"${schema}".gin_trgm_ops`
 

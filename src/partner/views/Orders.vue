@@ -430,6 +430,10 @@ function setupIo () {
  */
 let orderLoadSeq = 0
 
+/**
+ * @returns {Promise<boolean>} 本页是否**成功**取回。
+ * 调用方据此回滚页码 —— 失败时页码必须退回去，否则那一页永远看不到。
+ */
 async function fetchOrders (append) {
   if (!filterFrom.value || !filterTo.value) {
     const d = defaultUtcRangeStrings()
@@ -463,22 +467,24 @@ async function fetchOrders (append) {
         rows.value = []
         total.value = 0
       }
-      return
+      return false
     }
     // 过期响应直接丢弃：既防止旧结果覆盖新筛选，也防止旧页被追加到新列表
-    if (reqSeq !== orderLoadSeq) return
-    if (filterFrom.value !== reqFrom || filterTo.value !== reqTo) return
-    if (filterStatus.value !== reqStatus) return
+    if (reqSeq !== orderLoadSeq) return false
+    if (filterFrom.value !== reqFrom || filterTo.value !== reqTo) return false
+    if (filterStatus.value !== reqStatus) return false
     const list = json.data.orders || []
     total.value = json.data.pagination?.total ?? 0
     if (append) rows.value = rows.value.concat(list)
     else rows.value = list
+    return true
   } catch {
     toast.error(t('common.error'))
     if (!append) {
       rows.value = []
       total.value = 0
     }
+    return false
   } finally {
     if (append) loadingMore.value = false
     else loading.value = false
@@ -497,7 +503,13 @@ async function loadFirstPage () {
 async function loadNextPage () {
   if (!hasMore.value || loading.value || loadingMore.value) return
   page.value += 1
-  await fetchOrders(true)
+  /**
+   * 失败必须**回滚页码**。
+   * 之前页码只加不回退：网络抖动一次 → 页码停在 2 → 下次滚动直接取第 3 页
+   * → **第 2 页的订单永久缺失**（再也不会补回来，列表看起来少了单）。
+   */
+  const ok = await fetchOrders(true)
+  if (!ok) page.value -= 1
   await nextTick()
   await fillShortViewport()
 }
@@ -511,7 +523,11 @@ async function fillShortViewport () {
     const r = el.getBoundingClientRect()
     if (r.top > window.innerHeight + 200) break
     page.value += 1
-    await fetchOrders(true)
+    const ok = await fetchOrders(true)
+    if (!ok) {
+      page.value -= 1
+      break
+    }
     await nextTick()
   }
 }

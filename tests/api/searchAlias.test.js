@@ -86,7 +86,9 @@ describe('统计短缓存', () => {
     expect(all.status).toBe(200)
     expect(all.body.data.stats.total).toBe(3)
     expect(all.body.data.stats.completed).toBe(2)
-    expect(Number(all.body.data.stats.totalAmount)).toBe(700)
+    // 「总金额」只算**真实成交**（已取消的不算营收）→ 100 + 200 = 300
+    // 订单总数 3 仍然含已取消的单（确实下过单）
+    expect(Number(all.body.data.stats.totalAmount)).toBe(300)
 
     // 换筛选条件 → 统计必须跟着变（缓存键要含筛选条件）
     const done = await request(app).get('/api/admin/orders?status=completed')

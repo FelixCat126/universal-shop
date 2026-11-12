@@ -187,11 +187,19 @@ function buildQuery () {
   return q.toString()
 }
 
+/**
+ * 请求序号守卫：改筛选后立刻点分页会并发发起多个请求，
+ * 旧响应后到会覆盖新结果 → 表格内容与分页器页码对不上。
+ */
+let partnerOrderLoadSeq = 0
+
 async function loadOrders () {
+  const seq = ++partnerOrderLoadSeq
   loading.value = true
   try {
     const res = await adminStore.apiRequest(`/api/admin/partner-orders?${buildQuery()}`)
     const json = await res.json()
+    if (seq !== partnerOrderLoadSeq) return   // 已有更新的请求在途，丢弃过期响应
     if (json.success) {
       orders.value = json.data.orders || []
       pagination.total = json.data.pagination?.total ?? 0
@@ -202,7 +210,7 @@ async function loadOrders () {
   } catch {
     ElMessage.error(t('partnerOrdersMgmt.loadFailed'))
   } finally {
-    loading.value = false
+    if (seq === partnerOrderLoadSeq) loading.value = false
   }
 }
 

@@ -32,7 +32,7 @@ export default {
       await sequelize.query('CREATE EXTENSION IF NOT EXISTS pg_trgm')
     } catch (e) {
       console.warn('⚠️  无法启用 pg_trgm（权限不足？），商品搜索将退回全表扫描：', e.message)
-      return
+      return 'skipped'
     }
 
     /**

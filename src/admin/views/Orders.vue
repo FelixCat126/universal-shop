@@ -36,9 +36,16 @@
           </el-form-item>
           
           <el-form-item :label="t('orders.startDate')">
+            <!--
+              ⚠️ 必须带 value-format。
+              不带的话 v-model 拿到的是 **Date 对象**，经 URLSearchParams 会变成
+              "Thu Nov 12 2026 00:00:00 GMT+0800 (China Standard Time)" 这种串，
+              后端直接 500（PG 认不了 "GMT+0800" 这个时区名）。
+            -->
             <el-date-picker
               v-model="filters.startDate"
               type="date"
+              value-format="YYYY-MM-DD"
               :placeholder="t('orders.selectStartDate')"
               style="width: 150px"
               @change="applyFilters"
@@ -49,6 +56,7 @@
             <el-date-picker
               v-model="filters.endDate"
               type="date"
+              value-format="YYYY-MM-DD"
               :placeholder="t('orders.selectEndDate')"
               style="width: 150px"
               @change="applyFilters"
@@ -187,7 +195,13 @@
             class="order-table"
             @selection-change="onSelectionChange"
           >
-        <el-table-column type="selection" width="46" />
+        <!--
+          ⚠️ reserve-selection 必须开。
+          不开的话，30 秒自动刷新会用新数组替换 orders → Element Plus 判定
+          "数据实例变了" → clearSelection() 把勾选**静默清空**，
+          运营勾好一��单准备批量改状态，等 30 秒勾就没了（还以为是系统抽风）。
+        -->
+        <el-table-column type="selection" width="46" reserve-selection />
         <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="140" align="center">
           <template #default="scope">
             <div class="order-no">{{ scope.row.order_no }}</div>
@@ -906,8 +920,19 @@ const deleteOrder = async (orderId) => {
   }
 }
 
+/**
+ * 详情请求序号守卫。
+ *
+ * 列表的 loadOrders 有序号守卫，详情这里以前没有 ——
+ * 慢网络下点 A 单的「查看详情」再点 B 单，A 的响应后到 →
+ * 弹窗标题显示的是 **A**（用户预期是 B）→ 运营在弹窗底部改状态/填物流单号，
+ * **改的是 A 单**。相邻行误改订单状态是真实资损。
+ */
+let detailLoadSeq = 0
+
 // 查看订单详情
 const viewOrderDetail = async (order) => {
+  const seq = ++detailLoadSeq
   showDetailModal.value = true
   selectedOrder.value = null
   detailLoading.value = true
@@ -921,6 +946,7 @@ const viewOrderDetail = async (order) => {
     } catch {
       data = {}
     }
+    if (seq !== detailLoadSeq) return   // 已有更新的详情请求在途，丢弃过期响应
     if (!response.ok || !data.success) {
       ElMessage.error((data && data.message) ? data.message : t('orders.messages.detailLoadFailed'))
       showDetailModal.value = false
@@ -930,10 +956,12 @@ const viewOrderDetail = async (order) => {
     fillFulfillForm(data.data)
   } catch (error) {
     console.error('加载订单详情失败:', error)
-    ElMessage.error(t('orders.messages.detailLoadFailed'))
-    showDetailModal.value = false
+    if (seq === detailLoadSeq) {
+      ElMessage.error(t('orders.messages.detailLoadFailed'))
+      showDetailModal.value = false
+    }
   } finally {
-    detailLoading.value = false
+    if (seq === detailLoadSeq) detailLoading.value = false
   }
 }
 

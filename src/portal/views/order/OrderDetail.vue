@@ -278,7 +278,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi } from '../../api/orders.js'
@@ -509,6 +509,22 @@ const handleImageError = (event) => {
 onMounted(() => {
   loadOrderDetail()
 })
+
+/**
+ * 路由参数变了要重新加载。
+ *
+ * ⚠️ 同商品详情页：当前真正让页面换内容的是 App.vue 上
+ * `<component :is="Component" :key="route.path" />`（路径一变组件重建）。
+ * 这个 watch 是**双保险** —— 万一将来那个 key 被去掉，
+ * 浏览器前进/后退在两笔订单之间切换时就会停在上一笔订单
+ * （金额、状态全是旧的），而订单详情里能直接确认支付。
+ */
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) loadOrderDetail()
+  }
+)
 </script>
 
 <style scoped>

@@ -257,7 +257,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 /**
  * v-motion 指令**按需引入**（不全局注册 → 动画库只跟着本页的 chunk 走）。
  *
@@ -506,6 +506,28 @@ const handleImageLoad = (event) => {
 onMounted(() => {
   loadProduct()
 })
+
+/**
+ * 路由参数变了要重新加载。
+ *
+ * ⚠️ 说清楚：**当前真正让页面换内容的是 App.vue 上的
+ * `<component :is="Component" :key="route.path" />`** ——
+ * 路径一变组件就销毁重建，onMounted 照样触发。
+ *
+ * 那为什么还要这个 watch？Vue Router 4 在同一条路由记录、只是 param 不同
+ * 时**默认是复用组件实例**（不重建）；这里能重建完全依赖那个 key。
+ * 万一将来有人为了保留滚动位置去掉 key，这里就是最后一道防线：
+ * 否则会出现「地址栏变成 /products/2、页面还显示商品 1（旧的图/价/库存）」
+ * → 用户点「加入购物车」加进去的是**错的商品**。
+ *
+ * 行为层面的回归由 tests/e2e/portal-product-detail-switch.spec.js 守着。
+ */
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) loadProduct()
+  }
+)
 </script>
 
 <style scoped>

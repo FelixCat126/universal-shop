@@ -57,8 +57,17 @@ export async function invalidateResetFlagCache (userId) {
  * 默认拦 = 新功能上线即报错；默认放行 = 新功能默默绕过保护）。
  */
 const GUARDED = [
-  { method: 'PUT', pattern: /^\/api\/users\/profile$/ },
-  { method: 'POST', pattern: /^\/api\/users\/me\/delete$/ }
+  // ⚠️ **两套前缀都要匹配**。
+  //
+  // userRoutes 这个 router 被挂了**两处**（app.js）：
+  //   app.use('/api/users', userRoutes)
+  //   app.use('/api/auth',  userRoutes)   ← 有意的兼容别名（OpenAPI 里也声明了）
+  // 守卫按 req.originalUrl 精确匹配路径，之前只写 /api/users/... →
+  // 走 /api/auth/profile 就**绕过了强制改密**（能改邮箱/昵称）。
+  //
+  // 新增别名挂载点时，务必同步这里 —— 否则等于开了一个绕过口。
+  { method: 'PUT', pattern: /^\/api\/(users|auth)\/profile$/ },
+  { method: 'POST', pattern: /^\/api\/(users|auth)\/me\/delete$/ }
 ]
 
 /** 是否命中需要拦的路径 */

@@ -613,22 +613,31 @@ export async function processPendingExportJobs (limit = 5) {
   for (const job of jobs) {
     if (running >= MAX_CONCURRENT) break
     running++
-    /**
-     * 抢占式标记为 running，避免多实例重复执行。
-     *
-     * 注意 Sequelize 的 Model.update() 返回的是 **[影响行数]**（数组），
-     * 数组恒为真值 —— 早前写成 `if (!claimed)` 永远不成立，
-     * 于是「抢占失败」（任务已被另一个 worker 置为 running）也会继续往下跑，
-     * 同一个任务会被导出两次（文件写两遍、file_path 取决于谁最后写回）。
-     * 必须拆开数组看首元素。
-     */
-    const [affected] = await ExportJob.update(
-      { status: 'running', started_at: new Date() },
-      { where: { id: job.id, status: 'pending' } }
-    )
-    if (!affected) { running--; continue }
     try {
+      /**
+       * 抢占式标记为 running，避免多实例重复执行。
+       *
+       * 注意 Sequelize 的 Model.update() 返回的是 **[影响行数]**（数组），
+       * 数组恒为真值 —— 早前写成 `if (!claimed)` 永远不成立，
+       * 于是「抢占失败」（任务已被另一个 worker 置为 running）也会继续往下跑，
+       * 同一个任务会被导出两次（文件写两遍、file_path 取决于谁最后写回）。
+       * 必须拆开数组看首元素。
+       */
+      const [affected] = await ExportJob.update(
+        { status: 'running', started_at: new Date() },
+        { where: { id: job.id, status: 'pending' } }
+      )
+      if (!affected) continue
       await runExportJob(job)
+    } catch (err) {
+      /**
+       * 抢占那一句也可能抛错（连接池耗尽、DB 短暂不可用）。
+       * 之前异常直接冒泡到 worker 外层，**running 永远少减一次** ——
+       * 累计 MAX_CONCURRENT(2) 次之后 `running >= MAX_CONCURRENT` 恒成立，
+       * worker 每轮直接 break → **后台导出彻底停摆**，
+       * 管理员提交的任务永远停在 pending（回收逻辑只捞 running，救不了 pending）。
+       */
+      logger.error('导出任务抢占失败', { jobId: job.id, err: err?.message })
     } finally {
       running--
     }

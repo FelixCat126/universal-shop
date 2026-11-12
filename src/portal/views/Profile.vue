@@ -1425,6 +1425,19 @@ const loadProfileMetrics = async () => {
   }
 }
 
+/**
+ * 请求序号守卫 + 筛选快照校验。
+ *
+ * 之前 busy 标志是**分模式**的（加载更多用 loadingMoreOrders、重新加载用 loadingOrders），
+ * 两者互不排斥 → 「加载更多」（第 2 页，旧筛选）在途时改日期筛选并查询（第 1 页，新筛选），
+ * 两个请求并发；旧的第 2 页后到 → concat 到新筛选的第 1 页后面
+ * → 列表里出现**不属于当前筛选条件**的订单（用户会以为筛选没生效）。
+ */
+let ordersLoadSeq = 0
+
+/**
+ * @returns {Promise<boolean>} 本页是否成功取回（调用方据此回滚页码）
+ */
 const loadOrders = async ({ reset = false, append = false } = {}) => {
   const busy = append ? loadingMoreOrders : loadingOrders
   if (busy.value) return
@@ -1433,17 +1446,25 @@ const loadOrders = async ({ reset = false, append = false } = {}) => {
     if (!append) orders.value = []
   }
   busy.value = true
+  // 快照本次请求的页码与筛选条件，响应回来后校验一致才允许写入
+  const seq = ++ordersLoadSeq
+  const reqPage = ordersPage.value
+  const reqFrom = ordersDateFrom.value
+  const reqTo = ordersDateTo.value
   try {
     const response = await getUserOrders({
-      page: ordersPage.value,
+      page: reqPage,
       limit: ordersPageSize,
-      created_from: ordersDateFrom.value,
-      created_to: ordersDateTo.value
+      created_from: reqFrom,
+      created_to: reqTo
     })
+    // 过期响应直接丢弃：既防止旧结果覆盖新筛选，也防止旧页被追加到新列表
+    if (seq !== ordersLoadSeq) return false
+    if (ordersDateFrom.value !== reqFrom || ordersDateTo.value !== reqTo) return false
     if (!response.data?.success) {
       if (!append) orders.value = []
       showError(response.data?.message || t('profile.loadOrdersFailed'))
-      return
+      return false
     }
     const d = response.data.data
     const list = d.orders || []
@@ -1456,10 +1477,13 @@ const loadOrders = async ({ reset = false, append = false } = {}) => {
     }
     await nextTick()
     setupOrdersIntersection()
+    return true
   } catch (error) {
     console.error('加载订单失败:', error)
+    if (seq !== ordersLoadSeq) return false
     if (!append) orders.value = []
     showError(t('profile.loadOrdersFailed'))
+    return false
   } finally {
     busy.value = false
   }
@@ -1468,8 +1492,14 @@ const loadOrders = async ({ reset = false, append = false } = {}) => {
 const loadMoreOrders = async () => {
   if (loadingOrders.value || loadingMoreOrders.value) return
   if (!ordersHasMore.value) return
+  const prevPage = ordersPage.value
   ordersPage.value += 1
-  await loadOrders({ append: true })
+  const ok = await loadOrders({ append: true })
+  /**
+   * 失败时页码必须**回退** —— 否则网络抖动一次，页码停在 2，
+   * 下次滚动直接取第 3 页 → **第 2 页的订单永久缺失**（再也不会补回来）。
+   */
+  if (!ok) ordersPage.value = prevPage
 }
 
 const applyOrderFilters = () => {

@@ -26,6 +26,7 @@ import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
+import { NON_REVENUE_STATUSES } from '../constants/revenueStatus.js'
 import * as statsCache from '../utils/statsCache.js'
 import { parseId } from '../utils/params.js'
 
@@ -61,6 +62,51 @@ const RESTORE_ON_DELETE_STATUSES = ['pending', 'paid', 'shipping']
  * 命中量大时 PG 报 54000 too many arguments → 500。
  */
 const KEYWORD_USER_MATCH_LIMIT = 1000
+
+/**
+ * 组合包展开行的数量上限（与计价引擎 pricingEngine 的 MAX_BUNDLE_LINE_QTY 一致）。
+ *
+ * 展开行数量 = 组件配比 × 组合包数量，比单品行的 5000 大得多。
+ */
+const MAX_BUNDLE_LINE_QTY = 5000 * 999
+
+/**
+ * 防"白拿积分"漏洞的护栏。
+ *
+ * 本订单发出去的购物积分（earn_purchase 流水）如果**已经被用户花掉**
+ * （当前余额 < 已发积分），那么取消/删除订单时那笔积分收不回来 ——
+ * revokePurchasePoints 只能按 0 截断，等于用户白拿了一笔积分。
+ *
+ * 所以余额不足时**直接拒绝**这次取消/删除，提示先归还积分兑换订单。
+ *
+ * ⚠️ 取消、批量取消、删除三条路径都要过这道闸 ——
+ * 之前只有取消有，删除那条漏了：管理员删掉一笔"积分已被花掉"的订单，
+ * 用户就白嫖了（而且订单流水还被一起删掉，账更对不上）。
+ *
+ * @returns {Promise<{ok: boolean, message?: string}>}
+ */
+async function assertEarnedPointsNotSpent (order, transaction) {
+  const earnTxs = await PointTransaction.findAll({
+    where: { order_id: order.id, type: 'earn_purchase' },
+    transaction
+  })
+  const totalEarned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
+  if (totalEarned <= 0) return { ok: true }
+
+  const balanceRow = await UserPointBalance.findOne({
+    where: { user_id: order.user_id },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  })
+  const currentBalance = Number(balanceRow?.balance) || 0
+  if (currentBalance < totalEarned) {
+    return {
+      ok: false,
+      message: `该订单获得的 ${totalEarned} 积分已被使用（当前余额 ${currentBalance}），请先归还部分积分兑换订单后再取消`
+    }
+  }
+  return { ok: true }
+}
 
 /**
  * 订单取消/删除时的资源回补（必须在事务内调用，order.items 需已加载）：
@@ -210,7 +256,7 @@ function buildDiscountSnapshot (priced, orderItems = []) {
  * 订单详情（含 items + product）；游客单附带用户信息与 token；
  * deduplicated=true 标记本次为幂等命中、未新建订单
  */
-async function buildCreateOrderResponseData (orderId, { userId, isGuestOrder, deduplicated = false }) {
+async function buildCreateOrderResponseData (orderId, { userId, isGuestOrder, guestUserCreated = false, deduplicated = false }) {
   const createdOrder = await Order.findByPk(orderId, {
     include: [
       {
@@ -234,18 +280,42 @@ async function buildCreateOrderResponseData (orderId, { userId, isGuestOrder, de
 
   // 如果是游客下单，返回用户信息和token
   if (isGuestOrder) {
-    const jwt = (await import('jsonwebtoken')).default
-
     const user = await User.findByPk(userId)
-    const token = jwt.sign(
-      { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
-      JWT_SECRET,
-      { expiresIn: '7d', algorithm: 'HS256' }
-    )
 
-    responseData.user = user.toSafeJSON()
-    responseData.token = token
-    responseData.autoRegistered = true
+    /**
+     * ⚠️ 只有**新建**账号才签发 token。
+     *
+     * 复用既有账号（同一手机号再次下单 / 首单失败后重试）时**绝对不能发** ——
+     * 复用的判定条件只有"这个手机号已有一个系统随机密码、用户自己设过密码的账号"，
+     * 也就是说：**任何知道这个手机号的人都能触发复用**。
+     * 发 token 等于把该账号的会话交给一个只知道自己手机号（甚至后 8 位）的陌生人 ——
+     * 订单/地址/积分全可见，还能代其下单、确认支付、改邮箱。
+     *
+     * 复用时只回手机号（请求方自己填的，不构成新泄漏）+ 提示去登录。
+     */
+    if (guestUserCreated) {
+      const jwt = (await import('jsonwebtoken')).default
+      const token = jwt.sign(
+        { userId: user.id, username: user.username, type: 'user', tv: Number(user.token_version) || 0 },
+        JWT_SECRET,
+        { expiresIn: '7d', algorithm: 'HS256' }
+      )
+
+      responseData.user = user.toSafeJSON()
+      responseData.token = token
+      responseData.autoRegistered = true
+    } else {
+      /**
+       * 复用既有账号：**不发 token**。
+       * 只回手机号（请求方自己填的，不构成新泄漏），由用户自己登录查看订单。
+       */
+      responseData.user = {
+        id: user.id,
+        phone: user.phone,
+        country_code: user.country_code
+      }
+      responseData.accountReused = true
+    }
   }
 
   return responseData
@@ -412,7 +482,7 @@ class OrderController {
           where: { user_id: userId, client_order_key: clientOrderKey }
         })
         if (existingOrder) {
-          const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, deduplicated: true })
+          const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, guestUserCreated, deduplicated: true })
           AuditLog.logUser({
             user: req.user || (isGuestOrder ? { id: userId } : null),
             event: 'order.create.deduplicated',
@@ -499,10 +569,19 @@ class OrderController {
         }
 
         const qty = parseInt(row.quantity, 10)
-        if (!Number.isInteger(qty) || qty < 1 || qty > 5000) {
+        /**
+         * 数量上限按「单品行」与「组合包展开行」区分 —— 与计价引擎同一口径。
+         *
+         * 组合包展开行的数量 = 组件配比 × 组合包数量（配比 3、买 1667 个 → 展开 5001）。
+         * 引擎早就放开了（MAX_BUNDLE_LINE_QTY），控制器这里还卡着 1-5000 →
+         * **合法的组合包订单被 400 拒掉**（配比 ≥ 51 的组合包从 UI 买不了）。
+         */
+        const isBundleLine = !!(row.engineLine && row.engineLine.bundle_id != null)
+        const qtyLimit = isBundleLine ? MAX_BUNDLE_LINE_QTY : 5000
+        if (!Number.isInteger(qty) || qty < 1 || qty > qtyLimit) {
           return res.status(400).json({
             success: false,
-            message: `商品 ${product.name} 数量无效（需为 1-5000 的整数）`
+            message: `商品 ${product.name} 数量无效（需为 1-${qtyLimit} 的整数）`
           })
         }
 
@@ -888,6 +967,17 @@ class OrderController {
           }
 
           await transaction.commit()
+          /**
+           * 扣库存成功后**立刻**失效商品列表缓存（放在提交之后）。
+           *
+           * 商品/组合包列表有 15-20s 的响应缓存，之前只有商品写路径
+           * （改价/改库存/上下架）会清，下单扣库存这条**没清** ——
+           * 顾客下单后立刻刷新商品页，仍看到"有货"，
+           * 点进去下单却被"库存不足"拒（体验上像系统前后不一致）。
+           *
+           * 放在提交之后：事务回滚时不该清（库存没扣，缓存里的旧值是对的）。
+           */
+          await clearResponseCache().catch(() => {})
           return { ok: true, orderId: order.id, totalAmount: order.total_amount }
         } catch (e) {
           // 死锁等其余错误回滚后上抛：40P01/40001 由 withDeadlockRetry 重建事务重跑，其余原样透出
@@ -909,7 +999,7 @@ class OrderController {
           where: { user_id: userId, client_order_key: clientOrderKey }
         })
         if (existingOrder) {
-          const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, deduplicated: true })
+          const responseData = await buildCreateOrderResponseData(existingOrder.id, { userId, isGuestOrder, guestUserCreated, deduplicated: true })
           AuditLog.logUser({
             user: req.user || (isGuestOrder ? { id: userId } : null),
             event: 'order.create.deduplicated',
@@ -932,7 +1022,7 @@ class OrderController {
       }
 
       // 返回创建的订单信息（含订单项；游客单附带账号与 token）
-      const responseData = await buildCreateOrderResponseData(result.orderId, { userId, isGuestOrder })
+      const responseData = await buildCreateOrderResponseData(result.orderId, { userId, isGuestOrder, guestUserCreated })
 
       /**
        * 注册赠券：游客自动注册建号时发放，但**必须等订单真正创建成功**。
@@ -1410,15 +1500,23 @@ class OrderController {
         })
       }
 
-      const where = {}
+      let where = {}
       if (statusList.length > 0) {
         where.status = { [Op.in]: statusList }
       }
-      if (startDate && endDate) {
-        where.created_at = {
-          [Op.between]: [startDate, endDate]
-        }
-      }
+      /**
+       * 日期筛选走 applyCreatedBetween（本地日历日 + 非法日期安全忽略）。
+       *
+       * 之前是 `Op.between: [startDate, endDate]` 裸传：
+       *   1. 前端 el-date-picker 若没带 value-format，v-model 是 **Date 对象**，
+       *      经 URLSearchParams 变成 "Thu Nov 12 2026 00:00:00 GMT+0800 (China Standard Time)"
+       *      → PG 直接报 `time zone "gmt+0800" not recognized` → 500；
+       *   2. 裸字符串被 PG 当作 **UTC 00:00**，而面板统计用本地日界
+       *      → 同一笔单在两个页面落在不同的"那一天"；
+       *   3. 非法日期没有任何校验 → 传什么崩什么。
+       * applyCreatedBetween 三条一起解决。
+       */
+      where = applyCreatedBetween(where, { start_date: startDate, end_date: endDate })
       if (keyword) {
         // 转义 LIKE 通配符 + 限长，避免 keyword=% 把精确筛选放大成全表匹配
         const like = likeContains(keyword)
@@ -1481,10 +1579,19 @@ class OrderController {
           ? `status IN (${statusList.map((s) => sequelize.escape(s)).join(', ')})`
           : null
         const todayLit = sequelize.escape(todayStart)
-        const totalAmountFilter = statusSql ? ` FILTER (WHERE ${statusSql})` : ''
+        /**
+         * 金额统计口径：
+         *   - **有**状态筛选 → 尊重筛选（筛 pending 就看 pending 的金额）
+         *   - **无**状态筛选 → 只算真实成交（排除 pending/cancelled）
+         *
+         * 之前无筛选时不过滤状态 → 「总金额数 / 今日营收」把没付的钱和已取消的单
+         * 都算进去 → 面板上的营收虚高，和订单列表的「累计消费」对不上。
+         */
+        const revenueSql = statusSql || `status NOT IN (${NON_REVENUE_STATUSES.map((s) => sequelize.escape(s)).join(', ')})`
+        const totalAmountFilter = ` FILTER (WHERE ${revenueSql})`
         const todayAmountFilter = statusSql
           ? ` FILTER (WHERE created_at >= ${todayLit} AND ${statusSql})`
-          : ` FILTER (WHERE created_at >= ${todayLit})`
+          : ` FILTER (WHERE created_at >= ${todayLit} AND ${revenueSql})`
         const [statsRow] = await Order.findAll({
           attributes: [
             [sequelize.literal(`COUNT(*) FILTER (WHERE status = 'completed')`), 'completed'],
@@ -1773,26 +1880,10 @@ class OrderController {
              * 余额 <  earn 时 revoke 截断，相当于部分积分被"免费花掉"。
              * 直接拦截：余额不足时不允许取消，提示用户先归还部分积分兑换订单。
              */
-            const earnTxs = await PointTransaction.findAll({
-              where: { order_id: order.id, type: 'earn_purchase' },
-              transaction
-            })
-            const totalEarned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
-            if (totalEarned > 0) {
-              const balanceRow = await UserPointBalance.findOne({
-                where: { user_id: order.user_id },
-                transaction,
-                lock: transaction.LOCK.UPDATE
-              })
-              const currentBalance = Number(balanceRow?.balance) || 0
-              if (currentBalance < totalEarned) {
-                await transaction.rollback()
-                return {
-                  ok: false,
-                  status: 400,
-                  message: `该订单获得的 ${totalEarned} 积分已被使用（当前余额 ${currentBalance}），请先归还部分积分兑换订单后再取消`
-                }
-              }
+            const guard = await assertEarnedPointsNotSpent(order, transaction)
+            if (!guard.ok) {
+              await transaction.rollback()
+              return { ok: false, status: 400, message: guard.message }
             }
 
             order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
@@ -1900,6 +1991,16 @@ class OrderController {
            * cancelled 在状态变更为取消时已回补过，不在此重复回补
            */
           if (RESTORE_ON_DELETE_STATUSES.includes(order.status)) {
+            /**
+             * 与取消路径同一道闸：积分已被花掉的订单不许删，
+             * 否则 revokePurchasePoints 只能按 0 截断 → 用户白拿积分，
+             * 而且下面的 PointTransaction.destroy 会把这笔流水的账一起抹掉。
+             */
+            const guard = await assertEarnedPointsNotSpent(order, transaction)
+            if (!guard.ok) {
+              await transaction.rollback()
+              return { ok: false, status: 400, message: guard.message }
+            }
             await restoreOrderResources(order, transaction)
           }
 
@@ -1965,7 +2066,7 @@ class OrderController {
     try {
       const { status, startDate, endDate } = req.query
 
-      const where = {}
+      let where = {}
       if (status) {
         // 与列表接口一致：支持逗号分隔的多个状态
         const statusList = String(status)
@@ -1976,11 +2077,8 @@ class OrderController {
           where.status = { [Op.in]: statusList }
         }
       }
-      if (startDate && endDate) {
-        where.created_at = {
-          [Op.between]: [startDate, endDate]
-        }
-      }
+      // 同列表：日期走 applyCreatedBetween，导出与列表口径一致（见 getAllOrders 处的说明）
+      where = applyCreatedBetween(where, { start_date: startDate, end_date: endDate })
 
       const orders = await Order.findAll({
         where,

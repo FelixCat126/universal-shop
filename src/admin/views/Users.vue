@@ -540,7 +540,15 @@ const exportCsv = async () => {
   }
 }
 
+/**
+ * 请求序号守卫：连续点「下一页」会并发发起多个请求，
+ * 慢的那个后到会覆盖快的 → **表格内容和分页器页码对不上**
+ * （运营以为漏了数据），导出/改状态还会作用在错的行上。
+ */
+let userLoadSeq = 0
+
 const loadUsers = async () => {
+  const seq = ++userLoadSeq
   try {
     isLoading.value = true
     
@@ -553,7 +561,8 @@ const loadUsers = async () => {
     }
     
     const response = await userAPI.getAllUsers(params)
-    
+    if (seq !== userLoadSeq) return   // 已有更新的请求在途，丢弃过期响应
+
     if (response.data.success) {
       userList.value = response.data.data.users
       totalUsers.value = response.data.data.pagination.total
@@ -574,7 +583,7 @@ const loadUsers = async () => {
     console.error('加载用户数据失败:', error)
     ElMessage.error(t('users.messages.loadFailed') + ': ' + (error.response?.data?.message || error.message))
   } finally {
-    isLoading.value = false
+    if (seq === userLoadSeq) isLoading.value = false
   }
 }
 

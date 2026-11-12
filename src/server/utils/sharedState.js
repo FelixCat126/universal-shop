@@ -153,11 +153,27 @@ class MemoryStore {
     return true
   }
 
+  /**
+   * 原子自增。
+   *
+   * ⚠️ 必须**全程同步**：Map 是进程内的，写入之间不能有 await ——
+   * 一旦在读和写之间让出事件循环，两个并发调用会读到同一个旧值，
+   * 各 +1 后写回同一个数 → **丢更新**（实测 5 个并发 increment 最终只到 1）。
+   *
+   * 这个计数是**限流的依据**（登录失败次数、游客下单次数），
+   * 丢更新等于限流形同虚设：密码爆破可以并行发，永远触发不了验证码阈值。
+   *
+   * RedisStore 用 Lua 做同样的原子语义，两个后端行为必须一致。
+   */
   async increment (key, ttlMs) {
-    const current = Number(await this.get(key) || 0) + 1
+    const k = this.key(key)
+    const existing = this.map.get(k)
+    // 已过期视为 0（与 get 的过期语义一致）
+    const alive = existing && (!existing.expiresAt || existing.expiresAt > Date.now())
+    const current = Number(alive ? JSON.parse(existing.value) : 0) + 1
     // increment 不重置 TTL（与 express-rate-limit 语义一致）
-    const existing = this.map.get(this.key(key))
-    this.map.set(this.key(key), {
+    this._evictIfNeeded()
+    this.map.set(k, {
       value: JSON.stringify(current),
       expiresAt: existing?.expiresAt || (ttlMs > 0 ? Date.now() + ttlMs : null)
     })
