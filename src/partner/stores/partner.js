@@ -188,6 +188,11 @@ export const usePartnerStore = defineStore('partner', () => {
     login,
     logout,
     api,
+    /**
+     * 换 token —— 改密后服务端会发新的（token_version 自增 → 旧 token 立即失效），
+     * 必须对外暴露，否则改密成功后当前会话会自己把自己踢下线。
+     */
+    setToken,
     addToCart,
     removeFromCart,
     updateCartQty,

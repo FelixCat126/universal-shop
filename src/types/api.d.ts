@@ -226,6 +226,7 @@ export interface Partner {
   is_active: boolean
   last_login_at?: string | null
   token_version: number
+  must_reset_password: boolean
   created_at: string
   updated_at: string
 }

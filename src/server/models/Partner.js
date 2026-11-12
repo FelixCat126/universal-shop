@@ -57,6 +57,12 @@ const Partner = sequelize.define('Partner', {
     allowNull: false,
     defaultValue: 0,
     comment: '令牌版本：重置密码时递增，旧 JWT 立即失效'
+  },
+  must_reset_password: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: '首次登录必须改密（CSV 批量导入 / 管理端重置密码后置位）'
   }
 }, {
   tableName: 'partners',

@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { csvCell } from '../utils/csvExporter.js'
 import { parseId } from '../utils/params.js'
+import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { likeContains } from '../utils/likeSearch.js'
 
 // 单次导出行数安全上限（与 exportController 口径一致）；超出截断并在文件末尾追加说明行
@@ -85,8 +86,17 @@ class PartnerAdminController {
       const is_active = req.body.is_active !== false
       const account_kind = parsePartnerAccountKind(req.body.account_kind)
 
-      if (login.length < 2 || !password || password.length < 6) {
-        return res.status(400).json({ success: false, message: '登录名不少于2字符，密码不少于6字符' })
+      if (login.length < 2 || !password) {
+        return res.status(400).json({ success: false, message: '登录名不少于2字符，且必须设置密码' })
+      }
+
+      /**
+       * 密码强度与用户侧同一把尺子（≥8 位 + 字母 + 数字）。
+       * 批发账号往往多人共用，弱密码的代价更大。
+       */
+      const policy = assertPasswordPolicy(password)
+      if (!policy.ok) {
+        return res.status(400).json({ success: false, message: policy.message })
       }
 
       if (!Number.isFinite(discount_percent)) {
@@ -102,7 +112,9 @@ class PartnerAdminController {
         display_name: display_name || null,
         account_kind,
         discount_percent: Math.min(100, Math.max(0, discount_percent)),
-        is_active
+        is_active,
+        // 管理员设的是"初始口令"，合作方首次登录必须改成自己的
+        must_reset_password: true
       })
 
       return res.status(201).json({ success: true, data: row.toSafeJSON() })
@@ -149,16 +161,33 @@ class PartnerAdminController {
       const id = parseId(req.params.id)
       if (!id) return res.status(400).json({ success: false, message: '无效的 ID' })
       const pwd = req.body.password != null ? String(req.body.password) : ''
-      if (pwd.length < 6) {
-        return res.status(400).json({ success: false, message: '新密码不少于6字符' })
+      /**
+       * 密码强度与用户侧**同一把尺子**（assertPasswordPolicy）：
+       * 至少 8 位 + 含字母 + 含数字。
+       * 之前这里只要求 6 个字符，"123456" 就能当批发账号的密码 —— 太松了。
+       */
+      const policy = assertPasswordPolicy(pwd)
+      if (!policy.ok) {
+        return res.status(400).json({ success: false, message: policy.message })
       }
 
       const row = await Partner.findByPk(id)
       if (!row) return res.status(404).json({ success: false, message: '不存在' })
 
       row.password = pwd
-      row.token_version = (Number(row.token_version) || 0) + 1
+      // 重置出来的密码是"临时口令"，合作方首次登录必须自己改
+      row.must_reset_password = true
       await row.save()
+
+      /**
+       * token_version **原子**自增：读-改-写在并发下会丢更新
+       * （两个运营同时重置同一个账号 → 都读到 tv=0 → 都写 tv=1 → 旧 token 没被作废）。
+       */
+      await Partner.update(
+        { token_version: sequelize.literal('token_version + 1') },
+        { where: { id } }
+      )
+
       return res.json({ success: true, message: '密码已重置' })
     } catch (e) {
       logger.error('PartnerAdminController.resetPartnerPassword', { err: e?.message, stack: e?.stack })

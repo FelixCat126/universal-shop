@@ -25,6 +25,11 @@ const router = createRouter({
       name: 'PartnerOrders',
       component: () => import('./views/Orders.vue')
     },
+    {
+      path: '/password',
+      name: 'PartnerPassword',
+      component: () => import('./views/Password.vue')
+    },
     { path: '/', redirect: '/shop' },
     {
       // 不带 meta.public：未登录访问未知路径仍由守卫跳登录，已登录才显示 404
@@ -101,6 +106,14 @@ router.beforeEach((to, from, next) => {
   }
   if (to.name === 'PartnerLogin' && store.token) {
     next('/shop')
+    return
+  }
+  /**
+   * 强制改密：账号是运营用初始口令建的（CSV 批量导入 / 管理端重置），
+   * 在换成自己的密码之前只能停在改密页 —— 服务端也会拦，这里是前端的第一道。
+   */
+  if (store.token && store.profile?.must_reset_password && to.name !== 'PartnerPassword') {
+    next({ path: '/password' })
     return
   }
   next()

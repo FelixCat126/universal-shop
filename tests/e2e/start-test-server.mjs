@@ -62,6 +62,32 @@ await Product.create(TestDataFactory.createProduct({
     detail: 'E2E Test Road 123, Bangkok',
     is_default: true
   })
+
+  /**
+   * 强制改密的合作方账号（CSV 批量导入 / 管理端重置密码后的状态）。
+   *
+   * 单独建一个账号，不动 e2e_partner —— 否则会影响到别的合作方 E2E。
+   */
+  await Partner.create({
+    login: 'e2e_partner_temp',
+    password: 'E2eTemp#2026',
+    display_name: 'E2E 初始密码合作方',
+    is_active: true,
+    must_reset_password: true
+  })
+
+  /**
+   * 另一个普通合作方账号：给"自助改密" E2E 用。
+   *
+   * 改密 E2E 会**真的改掉密码**，所以必须用独立的账号 ——
+   * 改 e2e_partner 会让后面的合作方 E2E 全部登不上（它们的密码是固定的）。
+   */
+  await Partner.create({
+    login: 'e2e_partner_pwd',
+    password: 'E2ePwd#2026',
+    display_name: 'E2E 改密合作方',
+    is_active: true
+  })
 }
 
 /**

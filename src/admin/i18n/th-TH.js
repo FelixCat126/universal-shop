@@ -146,13 +146,13 @@ export default {
     lastLogin: 'เข้าระบบล่าสุด',
     resetPwd: 'รีเซ็ตรหัสผ่าน',
     edit: 'แก้ไข',
-    pwdPlaceholder: 'รหัสใหม่อย่างน้อย 6 ตัว',
+    pwdPlaceholder: 'อย่างน้อย 8 ตัว พร้อมตัวอักษรและตัวเลข',
     createTitle: 'สร้างบัญชีคู่ค้า',
     editTitle: 'แก้ไขคู่ค้า',
     loginPlaceholder: '2–64 ตัว',
     displayNamePlaceholder: 'ไม่บังคับ',
     password: 'รหัสผ่านเริ่มต้น',
-    passwordHint: 'อย่างน้อย 6 ตัว',
+    passwordHint: 'อย่างน้อย 8 ตัว พร้อมตัวอักษรและตัวเลข',
     save: 'บันทึก',
     loadFailed: 'โหลดไม่สำเร็จ',
     createOk: 'สร้างแล้ว',
@@ -305,7 +305,18 @@ export default {
     orderAmount: 'มูลค่าคำสั่งซื้อ',
     orderAmountUnit: 'มูลค่าคำสั่งซื้อ (บาท)',
     newUsers: 'ผู้ใช้ใหม่',
-    loadDataFailed: 'โหลดข้อมูลล้มเหลว'
+    loadDataFailed: 'โหลดข้อมูลล้มเหลว',
+    // สิ่งที่ต้องทำวันนี้
+    todayTodo: 'สิ่งที่ต้องทำวันนี้',
+    todayTodoHint: 'งานที่ต้องจัดการวันนี้ — คลิกเพื่อไปที่รายการ',
+    todayOrders: 'คำสั่งซื้อวันนี้',
+    todayAmount: 'รายได้วันนี้',
+    pendingShipment: 'รอจัดส่ง',
+    pendingPayment: 'รอชำระเงิน',
+    lowStock: 'สต็อกต่ำ',
+    outOfStock: 'สินค้าหมด',
+    goHandle: 'ไปจัดการ',
+    allTime: 'ยอดรวมทั้งหมด'
   },
 
   // 系统配置页面

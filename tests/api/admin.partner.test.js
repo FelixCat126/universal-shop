@@ -40,7 +40,7 @@ describe('P3.admin.partner', () => {
     const { token } = await adminCtx()
     const res = await request(app).post('/api/admin/partners')
       .set('Authorization', `Bearer ${token}`)
-      .send({ login: 'newpartner001', password: 'pwd1234', display_name: 'X', discount_percent: 25 })
+      .send({ login: 'newpartner001', password: 'pwd12345', display_name: 'X', discount_percent: 25 })
     expect(res.status).toBe(201)
     expect(res.body.data.login).toBe('newpartner001')
   })
@@ -53,7 +53,7 @@ describe('P3.admin.partner', () => {
 
     const res = await request(app).post('/api/admin/partners')
       .set('Authorization', `Bearer ${token}`)
-      .send({ login: existing.login, password: 'pwd1234' })
+      .send({ login: existing.login, password: 'pwd12345' })
     expect(res.status).toBe(400)
     expect(res.body.message).toMatch(/已存在/)
   })

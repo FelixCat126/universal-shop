@@ -1390,9 +1390,29 @@ class OrderController {
       // 分页参数统一 clamp：该端点页大小参数名为 limit，上限 100
       const { page, limit, offset } = resolvePagination(req.query, { pageSizeKey: 'limit', maxPageSize: 100 })
 
+      /**
+       * 状态筛选支持**逗号分隔的多个值**（status=paid,shipping）。
+       *
+       * 为什么需要：面板上"待发货"的待办数统计的是 paid + shipping 两个状态，
+       * 点进去如果只能看单个状态，**列表条数和卡上数字对不上** ——
+       * 用户会以为系统漏单。多选是唯一能让两边口径一致的做法。
+       */
+      const statusList = String(status || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const invalidStatus = statusList.find((s) => !ORDER_STATUS_VALUES.includes(s))
+      if (invalidStatus) {
+        return res.status(400).json({
+          success: false,
+          message: `无效的订单状态：${invalidStatus}（合法值：${ORDER_STATUS_VALUES.join('/')}）`,
+          code: 'INVALID_STATUS'
+        })
+      }
+
       const where = {}
-      if (status) {
-        where.status = status
+      if (statusList.length > 0) {
+        where.status = { [Op.in]: statusList }
       }
       if (startDate && endDate) {
         where.created_at = {
@@ -1438,7 +1458,7 @@ class OrderController {
        * 不同筛选各算各的。
        */
       const statsCacheKey = JSON.stringify([
-        status || '', keyword || '', startDate || '', endDate || ''
+        statusList.join(','), keyword || '', startDate || '', endDate || ''
       ])
       const cachedStats = getCachedOrderStats(statsCacheKey)
 
@@ -1453,11 +1473,17 @@ class OrderController {
         todayStart.setHours(0, 0, 0, 0)
         const statsWhere = { ...where }
         delete statsWhere.status
-        const statusLit = status ? sequelize.escape(String(status)) : null
+        /**
+         * 状态条件转成 SQL 片段。
+         * 单值走 `status = 'x'`；多值走 `status IN ('x','y')`（值均经 escape 转义，防注入）。
+         */
+        const statusSql = statusList.length > 0
+          ? `status IN (${statusList.map((s) => sequelize.escape(s)).join(', ')})`
+          : null
         const todayLit = sequelize.escape(todayStart)
-        const totalAmountFilter = statusLit ? ` FILTER (WHERE status = ${statusLit})` : ''
-        const todayAmountFilter = statusLit
-          ? ` FILTER (WHERE created_at >= ${todayLit} AND status = ${statusLit})`
+        const totalAmountFilter = statusSql ? ` FILTER (WHERE ${statusSql})` : ''
+        const todayAmountFilter = statusSql
+          ? ` FILTER (WHERE created_at >= ${todayLit} AND ${statusSql})`
           : ` FILTER (WHERE created_at >= ${todayLit})`
         const [statsRow] = await Order.findAll({
           attributes: [
@@ -1941,7 +1967,14 @@ class OrderController {
 
       const where = {}
       if (status) {
-        where.status = status
+        // 与列表接口一致：支持逗号分隔的多个状态
+        const statusList = String(status)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+        if (statusList.length > 0) {
+          where.status = { [Op.in]: statusList }
+        }
       }
       if (startDate && endDate) {
         where.created_at = {

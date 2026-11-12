@@ -132,10 +132,10 @@ export default defineConfig({
         functions: 89,
         lines: 89,
         'src/server/controllers/**': {
-          statements: 82,
-          branches: 66,
-          functions: 94,
-          lines: 82
+          statements: 83,
+          branches: 68,
+          functions: 96,
+          lines: 83
         },
         'src/server/models/**': {
           statements: 97,

@@ -72,6 +72,13 @@
             >
               {{ t('nav.addresses') }}
             </router-link>
+            <router-link
+              to="/password"
+              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              active-class="!bg-primary-100 !text-primary-700 hover:!bg-primary-100"
+            >
+              {{ t('nav.password') }}
+            </router-link>
           </nav>
           <button
             type="button"
@@ -120,6 +127,14 @@
             @click="closeNavMenu"
           >
             {{ t('nav.addresses') }}
+          </router-link>
+          <router-link
+            to="/password"
+            class="flex w-full items-center rounded-lg px-3 py-3 text-base font-medium text-gray-800 hover:bg-gray-50 touch-manipulation"
+            active-class="!bg-primary-50 !text-primary-800 font-semibold"
+            @click="closeNavMenu"
+          >
+            {{ t('nav.password') }}
           </router-link>
           <div class="my-2 border-t border-gray-100" />
           <button

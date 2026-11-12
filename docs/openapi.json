@@ -939,6 +939,10 @@
             "type": "integer",
             "description": "令牌版本：重置密码时递增，旧 JWT 立即失效"
           },
+          "must_reset_password": {
+            "type": "boolean",
+            "description": "首次登录必须改密（CSV 批量导入 / 管理端重置密码后置位）"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -955,6 +959,7 @@
           "discount_percent",
           "is_active",
           "token_version",
+          "must_reset_password",
           "created_at",
           "updated_at"
         ]
@@ -13399,6 +13404,121 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/Partner"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/partner/me/password": {
+      "put": {
+        "summary": "PUT /api/partner/me/password",
+        "tags": [
+          "合作方"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current_password": {
+                    "type": "string",
+                    "description": "当前密码"
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "description": "新密码（≥8 位，含字母与数字）"
+                  }
+                },
+                "required": [
+                  "current_password",
+                  "new_password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "改密成功",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string",
+                          "description": "新令牌（token_version 已自增，旧令牌失效）"
+                        }
+                      }
                     }
                   },
                   "required": [

@@ -57,4 +57,47 @@ describe('VA.admin.Dashboard', () => {
     expect(content).toContain("'--ui-stagger-index': 2")
     expect(content).toContain("'--ui-stagger-index': 3")
   })
+
+  it('AD-6 今日待办分组 + 六个待办卡都在', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const content = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/admin/views/Dashboard.vue'),
+      'utf-8'
+    )
+    // 分组标题
+    expect(content).toContain("t('dashboard.todayTodo')")
+    // 六个待办卡
+    for (const key of [
+      'dashboard.todayOrders',
+      'dashboard.todayAmount',
+      'dashboard.pendingShipment',
+      'dashboard.pendingPayment',
+      'dashboard.lowStock',
+      'dashboard.outOfStock'
+    ]) {
+      expect(content, `面板缺少待办卡 ${key}`).toContain(`t('${key}')`)
+    }
+    // 累计卡片挪到下面，stagger 4~9 是新的待办卡
+    for (const i of [4, 5, 6, 7, 8, 9]) {
+      expect(content).toContain(`'--ui-stagger-index': ${i}`)
+    }
+  })
+
+  it('AD-7 待办卡可点击并深链到已筛好的列表', async () => {
+    const fs = await import('fs')
+    const path = await import('path')
+    const content = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/admin/views/Dashboard.vue'),
+      'utf-8'
+    )
+    // 深链目标
+    expect(content).toContain("router.push({ name: 'Orders', query: { status: statuses.join(',') } })")
+    expect(content).toContain("router.push({ name: 'Products', query: { stockStatus } })")
+    // 待发货 = paid + shipping（口径要和后端统计一致）
+    expect(content).toContain("goOrders(['paid', 'shipping'])")
+    // 待办卡要点得了（键盘可达）
+    expect(content).toContain('stats-card--action')
+    expect(content).toContain('@keydown.enter.prevent')
+  })
 })

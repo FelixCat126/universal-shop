@@ -483,6 +483,7 @@ import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import { Plus, Search, Refresh, Loading, Picture, Delete, Edit, ArrowDown, Upload, Download } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { productAPI } from '../api/products.js'
 import CsvImportDialog from '../components/CsvImportDialog.vue'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
@@ -506,7 +507,8 @@ export default {
   },
   setup() {
     const { t } = useI18n()
-    
+    const route = useRoute()
+
     // 默认图片（与门户端保持一致）
     const defaultImage = 'data:image/svg+xml,%3Csvg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg"%3E%3Crect width="400" height="400" fill="%23F3F4F6"/%3E%3Cpath d="M120 140c0-8.284 6.716-15 15-15h130c8.284 0 15 6.716 15 15v120c0 8.284-6.716 15-15 15H135c-8.284 0-15-6.716-15-15V140z" fill="%23D1D5DB"/%3E%3Ccircle cx="160" cy="170" r="15" fill="%23909090"/%3E%3Cpath d="M120 230l40-50 40 25 60-70 80 95V140H120v90z" fill="%23909090"/%3E%3Ctext x="200" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="%23666"%E6%97%A0%E5%9B%BE%E7%89%87%3C/text%3E%3C/svg%3E'
 
@@ -1109,6 +1111,18 @@ export default {
     })
 
     onMounted(async () => {
+      /**
+       * 深链：面板上的"低库存 / 缺货"卡片点进来时带着 ?stockStatus=low|out，
+       * 这里把它还原成筛选框的选中项 —— 落地即筛好，不用再手动点一遍下拉框。
+       *
+       * 只认合法值（normal/low/out），别的（比如手敲的乱码）直接忽略，
+       * 免得拼出一个查不到东西的筛选条件。
+       */
+      const qs = route.query.stockStatus
+      const value = String(Array.isArray(qs) ? qs[0] : qs || '')
+      if (['normal', 'low', 'out'].includes(value)) {
+        searchForm.stockStatus = value
+      }
       await loadCategoryOptions()
       await loadProducts()
     })

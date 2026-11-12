@@ -23,6 +23,7 @@ import {
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { logger } from '../utils/logger.js'
+import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { parseId } from '../utils/params.js'
 import { likeContains } from '../utils/likeSearch.js'
 
@@ -184,6 +185,99 @@ class PartnerPortalController {
     } catch (e) {
       logger.error('PartnerPortalController.me', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '获取信息失败' })
+    }
+  }
+
+  /**
+   * PUT /api/partner/me/password —— 合作方自助改密
+   *
+   * 为什么必须有这个接口：
+   *   - CSV 批量导入的账号拿到的是**系统生成的随机初始密码**（运营线下告知）
+   *   - 门户里没有改密入口，接口也没有 → 那个临时密码会**一直有效**
+   *     （谁拿到都能下单，等于把账号交出去了）
+   *
+   * 改密成功后：
+   *   - must_reset_password 清零（强制改密标记消失）
+   *   - token_version + 1 → **其它设备上的旧会话立即失效**（改密的标配）
+   *   - 给当前会话发一个新的 token（否则自己会被踢下线，体验很差）
+   */
+  static async changeMyPassword (req, res) {
+    try {
+      const partnerId = req.partner?.id
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: '未登录' })
+      }
+
+      const currentPassword = req.body?.current_password != null ? String(req.body.current_password) : ''
+      const newPassword = req.body?.new_password != null ? String(req.body.new_password) : ''
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ success: false, message: '请输入当前密码和新密码' })
+      }
+
+      const policy = assertPasswordPolicy(newPassword)
+      if (!policy.ok) {
+        return res.status(400).json({ success: false, message: policy.message })
+      }
+
+      const partner = await Partner.findByPk(partnerId)
+      if (!partner) {
+        return res.status(404).json({ success: false, message: '账号不存在' })
+      }
+
+      const ok = await partner.validatePassword(currentPassword)
+      if (!ok) {
+        return res.status(400).json({ success: false, message: '当前密码不正确' })
+      }
+
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ success: false, message: '新密码不能与当前密码相同' })
+      }
+
+      /**
+       * 模型钩子会哈希（beforeUpdate：密码不是 $2 开头才哈希），
+       * 这里**不能**用静态 update() —— 静态更新不触发实例钩子，密码会存成明文。
+       */
+      partner.password = newPassword
+      partner.must_reset_password = false
+      await partner.save()
+
+      /**
+       * token_version 原子自增（读-改-写在并发下会丢更新）：
+       * 改密要作废其它设备上的旧会话，所以这里必须用 SQL 表达式。
+       */
+      await Partner.update(
+        { token_version: sequelize.literal('token_version + 1') },
+        { where: { id: partnerId } }
+      )
+      const fresh = await Partner.findByPk(partnerId)
+
+      // 给当前会话发新 token（否则改完自己就被踢下线）
+      const token = jwt.sign(
+        {
+          type: 'partner',
+          partnerId: fresh.id,
+          login: fresh.login,
+          tv: Number(fresh.token_version) || 0
+        },
+        JWT_PARTNER_SECRET,
+        { expiresIn: '14d', algorithm: 'HS256' }
+      )
+
+      AuditLog.logPartner({
+        partner,
+        event: 'partner.password.changed',
+        req
+      }).catch(() => {})
+
+      return res.json({
+        success: true,
+        message: '密码已修改',
+        data: { token }
+      })
+    } catch (e) {
+      logger.error('PartnerPortalController.changeMyPassword', { err: e?.message, stack: e?.stack })
+      return res.status(500).json({ success: false, message: '修改失败' })
     }
   }
 

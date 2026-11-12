@@ -146,13 +146,13 @@ export default {
     lastLogin: '最后登录',
     resetPwd: '重置密码',
     edit: '编辑',
-    pwdPlaceholder: '新密码不少于6字符',
+    pwdPlaceholder: '至少8位，含字母和数字',
     createTitle: '新建合作方账号',
     editTitle: '编辑合作方',
     loginPlaceholder: '2–64字符',
     displayNamePlaceholder: '可选',
     password: '初始密码',
-    passwordHint: '不少于6字符',
+    passwordHint: '至少8位，含字母和数字',
     save: '保存',
     loadFailed: '加载失败',
     createOk: '已创建',
@@ -304,7 +304,18 @@ export default {
     orderAmount: '订单金额',
     orderAmountUnit: '订单金额 (¥)',
     newUsers: '新用户',
-    loadDataFailed: '加载数据失败'
+    loadDataFailed: '加载数据失败',
+    // 今日待办
+    todayTodo: '今日待办',
+    todayTodoHint: '今天要处理的事，点一下直接进列表',
+    todayOrders: '今日订单数',
+    todayAmount: '今日营收',
+    pendingShipment: '待发货',
+    pendingPayment: '待支付',
+    lowStock: '低库存',
+    outOfStock: '缺货',
+    goHandle: '去处理',
+    allTime: '累计数据'
   },
 
   // 系统配置页面

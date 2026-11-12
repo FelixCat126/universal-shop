@@ -8,8 +8,11 @@
             <el-select
               v-model="filters.status"
               :placeholder="t('orders.selectStatus')"
+              multiple
+              collapse-tags
+              :max-collapse-tags="2"
               clearable
-              style="width: 150px"
+              style="width: 190px"
               @change="applyFilters"
             >
               <el-option :label="t('orders.statusOptions.completed')" value="completed" />
@@ -712,8 +715,10 @@ const applyBulkStatus = async () => {
 }
 
 // 筛选条件
+// status 是**数组**（多选）：面板上的"待发货"= paid + shipping 两个状态，
+// 单选时列表条数会和卡上数字对不上，用户以为漏单。
 const filters = reactive({
-  status: '',
+  status: [],
   keyword: '',
   startDate: '',
   endDate: ''
@@ -721,7 +726,7 @@ const filters = reactive({
 
 // 导出沿用当前列表的筛选条件，保证「导出的就是列表里看到的那批」
 const exportParams = computed(() => ({
-  status: filters.status || undefined,
+  status: filters.status.length ? filters.status.join(',') : undefined,
   keyword: filters.keyword || undefined,
   startDate: filters.startDate || undefined,
   endDate: filters.endDate || undefined
@@ -968,21 +973,34 @@ const handleCurrentChange = (page) => {
 }
 
 // 重置筛选条件
-const syncKeywordFromRoute = () => {
+const syncFiltersFromRoute = () => {
   const qk = route.query.keyword
   filters.keyword = qk != null && String(qk).trim() !== '' ? String(qk).trim() : ''
+
+  /**
+   * 深链状态：面板上的"待发货/待支付"卡片点了会带着 ?status=paid,shipping 跳过来，
+   * 这里把它还原成多选框里的选中项 —— 用户落地时看到的是**已经筛好的列表**，
+   * 不用再手动去下拉框里勾一遍。
+   */
+  const qs = route.query.status
+  const statusList = (Array.isArray(qs) ? qs.join(',') : String(qs || ''))
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  filters.status = statusList
 }
 
 const resetFilters = () => {
   Object.assign(filters, {
-    status: '',
+    status: [],
     keyword: '',
     startDate: '',
     endDate: ''
   })
   currentPage.value = 1
   pagination.page = 1
-  if (route.query.keyword != null && String(route.query.keyword).trim() !== '') {
+  const hasQuery = Object.keys(route.query).length > 0
+  if (hasQuery) {
     router.replace({ name: 'Orders', query: {} })
     return
   }
@@ -990,9 +1008,9 @@ const resetFilters = () => {
 }
 
 watch(
-  () => route.query.keyword,
+  () => [route.query.keyword, route.query.status],
   () => {
-    syncKeywordFromRoute()
+    syncFiltersFromRoute()
     currentPage.value = 1
     pagination.page = 1
     loadOrders()
@@ -1102,7 +1120,7 @@ useAutoRefresh(loadOrders, {
 
 // 组件挂载时加载数据
 onMounted(() => {
-  syncKeywordFromRoute()
+  syncFiltersFromRoute()
   loadOrders()
 })
 onUnmounted(() => {

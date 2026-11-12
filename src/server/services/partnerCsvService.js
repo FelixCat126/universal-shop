@@ -291,7 +291,9 @@ export async function importPartnerCsv (buffer, options = {}) {
           display_name: values.display_name,
           account_kind: values.account_kind,
           discount_percent: values.discount_percent,
-          is_active: values.is_active
+          is_active: values.is_active,
+          // 初始密码是运营线下告知的临时口令 —— 首次登录必须改密
+          must_reset_password: true
         })
         created.push({
           rowNumber: row.rowNumber,

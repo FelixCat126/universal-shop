@@ -61,40 +61,16 @@ class StatisticsController {
         return res.json({ success: true, data: cached })
       }
 
-      // 获取近七天活跃用户数（近七天内有登录记录的）
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-      // 四条聚合相互独立：并行执行，总耗时从串行求和降为单条最大
-      const [totalOrders, totalAmountResult, totalUsers, activeUsers] = await Promise.all([
-        // 总订单数
-        Order.count(),
-        // 总金额数
-        Order.findOne({
-          attributes: [
-            [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
-          ]
-        }),
-        // 总用户数
-        User.count(),
-        // 近七天活跃用户数
-        User.count({
-          where: {
-            last_login_at: {
-              [Op.gte]: sevenDaysAgo,
-              [Op.ne]: null
-            }
-          }
-        })
-      ])
-      const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
-
-      const data = {
-        totalOrders,
-        totalAmount: totalAmount.toFixed(2),
-        totalUsers,
-        activeUsers
-      }
+      /**
+       * 查询逻辑全部收在 getOverviewStatsData()（内部方法）里 ——
+       * /overview 与 /comprehensive 用的是同一套口径，
+       * 两处各写一份迟早会漂移（上次就漂了：一边有"今日营收"一边没有）。
+       *
+       * 注意用 StatisticsController.xxx 而不是 this.xxx：
+       * 路由把静态方法**脱钩**传进 Express（handler(req,res,next)），
+       * 这时 this 是 undefined → this.getOverviewStatsData() 直接抛 TypeError → 500。
+       */
+      const data = await StatisticsController.getOverviewStatsData()
       setCachedOverview(data)
 
       res.json({ success: true, data })
@@ -265,21 +241,28 @@ class StatisticsController {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
     /**
-     * 四个查询**并发**发出去，而不是一个算完再算下一个。
+     * 六组查询**并发**发出去，而不是一个算完再算下一个。
      *
-     * 之前是 4 个串行 await = 4 次「发查询 → 等结果 → 再发下一个」的往返；
-     * 数据库端的计算量没变，但**网络往返延迟 ×4**。
+     * 之前是串行 await = N 次「发查询 → 等结果 → 再发下一个」的往返；
+     * 数据库端的计算量没变，但**网络往返延迟 ×N**。
      * 面板每次打开都要跑一遍，往返延迟是用户直接感受到的（尤其跨机房时）。
-     * Promise.all 把 4 次往返压成 1 次。
+     * Promise.all 把 N 次往返压成 1 次。
      */
-    const [totalOrders, totalAmountResult, totalUsers, activeUsers] = await Promise.all([
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const [totalOrders, totalAmountResult, totalUsers, activeUsers, todayStats, actionable] = await Promise.all([
+      // 总订单数
       Order.count(),
+      // 总金额数
       Order.findOne({
         attributes: [
           [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
         ]
       }),
+      // 总用户数
       User.count(),
+      // 近七天活跃用户数
       User.count({
         where: {
           last_login_at: {
@@ -287,7 +270,33 @@ class StatisticsController {
             [Op.ne]: null
           }
         }
-      })
+      }),
+      // 今日订单数 + 今日营收
+      Order.findOne({
+        attributes: [
+          [sequelize.fn('COUNT', sequelize.col('id')), 'orders'],
+          [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'amount']
+        ],
+        where: { created_at: { [Op.gte]: todayStart } },
+        raw: true
+      }),
+      /**
+       * 待办数 —— 面板上最该盯的四个数字：
+       *   待发货：收了钱还没寄的（提醒发货）
+       *   待支付：下单没付的（跟进催付）
+       *   低库存：还剩一点货的（该补货了）
+       *   缺货：已经卖光了的（断货风险）
+       * 这几个对应"今天要干什么"，而累计营收只说明"过去发生了什么"。
+       *
+       * 口径必须和商品页的库存筛选**完全一致**（低库存=0<stock<=10，缺货=stock=0），
+       * 否则点进商品页看到的条数和面板上的数字对不上。
+       */
+      Promise.all([
+        Order.count({ where: { status: { [Op.in]: ['paid', 'shipping'] } } }),
+        Order.count({ where: { status: 'pending' } }),
+        Product.count({ where: { stock: { [Op.and]: [{ [Op.gt]: 0 }, { [Op.lte]: 10 }] } } }),
+        Product.count({ where: { stock: 0 } })
+      ])
     ])
 
     const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
@@ -296,7 +305,13 @@ class StatisticsController {
       totalOrders,
       totalAmount: totalAmount.toFixed(2),
       totalUsers,
-      activeUsers
+      activeUsers,
+      todayOrders: Number(todayStats?.orders || 0),
+      todayAmount: Number(todayStats?.amount || 0).toFixed(2),
+      pendingShipment: actionable[0],
+      pendingPayment: actionable[1],
+      lowStock: actionable[2],
+      outOfStock: actionable[3]
     }
   }
 

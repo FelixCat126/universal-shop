@@ -1259,6 +1259,22 @@ export const ROUTE_SCHEMAS = {
     }, '登录成功')
   },
   'GET /api/partner/me': { response: env('Partner') },
+  'PUT /api/partner/me/password': {
+    request: {
+      type: 'object',
+      properties: {
+        current_password: { type: 'string', description: '当前密码' },
+        new_password: { type: 'string', description: '新密码（≥8 位，含字母与数字）' }
+      },
+      required: ['current_password', 'new_password']
+    },
+    response: envelopeSchema({
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: '新令牌（token_version 已自增，旧令牌失效）' }
+      }
+    }, '改密成功')
+  },
   'GET /api/partner/products': {
     response: envelopeSchema({
       type: 'object',

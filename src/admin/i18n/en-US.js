@@ -144,13 +144,13 @@ export default {
     lastLogin: 'Last login',
     resetPwd: 'Reset password',
     edit: 'Edit',
-    pwdPlaceholder: 'New password (min 6 chars)',
+    pwdPlaceholder: 'Min 8 chars, with letter and number',
     createTitle: 'Create partner account',
     editTitle: 'Edit partner',
     loginPlaceholder: '2–64 chars',
     displayNamePlaceholder: 'Optional',
     password: 'Initial password',
-    passwordHint: 'At least 6 characters',
+    passwordHint: 'At least 8 chars, letter + number',
     save: 'Save',
     loadFailed: 'Load failed',
     createOk: 'Created',
@@ -303,7 +303,18 @@ export default {
     orderAmount: 'Order Amount',
     orderAmountUnit: 'Order Amount ($)',
     newUsers: 'New Users',
-    loadDataFailed: 'Failed to load data'
+    loadDataFailed: 'Failed to load data',
+    // Today's to-do
+    todayTodo: "Today's To-Do",
+    todayTodoHint: "What needs handling today — click to jump into the list",
+    todayOrders: "Today's Orders",
+    todayAmount: "Today's Revenue",
+    pendingShipment: 'Awaiting Shipment',
+    pendingPayment: 'Awaiting Payment',
+    lowStock: 'Low Stock',
+    outOfStock: 'Out of Stock',
+    goHandle: 'Handle',
+    allTime: 'All-Time Totals'
   },
 
   // System configuration

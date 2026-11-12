@@ -1,6 +1,7 @@
 import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
 import ProductCategory from './ProductCategory.js'
+import { registerModelStatsInvalidation } from '../utils/statsCache.js'
 
 const Product = sequelize.define('Product', {
   id: {
@@ -131,5 +132,14 @@ Product.belongsTo(ProductCategory, {
   foreignKey: 'category_id',
   as: 'productCategory'
 })
+
+/**
+ * 商品写入也让统计缓存失效。
+ *
+ * 面板上的"低库存 / 缺货"两个待办数是按 stock 统计的 ——
+ * 运营刚调完库存就刷新面板，数字必须立刻变，
+ * 否则会出现"卡上写着 3 个低库存，商品页里一个都没有"这种对不上的情况。
+ */
+registerModelStatsInvalidation(Product)
 
 export default Product
