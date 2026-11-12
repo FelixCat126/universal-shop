@@ -13,8 +13,7 @@
         <h2 class="section-title">{{ t('dashboard.todayTodo') }}</h2>
         <span class="section-hint">{{ t('dashboard.todayTodoHint') }}</span>
       </div>
-      <el-row :gutter="16">
-        <el-col :xs="12" :sm="8" :md="8" :lg="4">
+      <div class="todo-grid">
           <el-card class="stats-card admin-stagger" shadow="hover" :style="{ '--ui-stagger-index': 4 }">
             <div class="stats-content">
               <div class="stats-value">
@@ -26,19 +25,18 @@
               <el-icon size="32" color="#409EFF"><Calendar /></el-icon>
             </div>
           </el-card>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="8" :lg="4">
           <el-card class="stats-card admin-stagger" shadow="hover" :style="{ '--ui-stagger-index': 5 }">
             <div class="stats-content">
-              <div class="stats-value stats-value--amount">{{ t('common.currency') }}{{ overviewStats.todayAmount || '0.00' }}</div>
+              <div
+                class="stats-value stats-value--amount"
+                :title="`${t('common.currency')}${overviewStats.todayAmount || '0.00'}`"
+              >{{ t('common.currency') }}{{ overviewStats.todayAmount || '0.00' }}</div>
               <div class="stats-label">{{ t('dashboard.todayAmount') }}</div>
             </div>
             <div class="stats-icon">
               <el-icon size="32" color="#67C23A"><Coin /></el-icon>
             </div>
           </el-card>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="8" :lg="4">
           <el-card
             class="stats-card stats-card--action admin-stagger"
             shadow="hover"
@@ -65,8 +63,6 @@
               <el-icon size="32" color="#E6A23C"><Van /></el-icon>
             </div>
           </el-card>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="8" :lg="4">
           <el-card
             class="stats-card stats-card--action admin-stagger"
             shadow="hover"
@@ -93,8 +89,6 @@
               <el-icon size="32" color="#F56C6C"><Wallet /></el-icon>
             </div>
           </el-card>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="8" :lg="4">
           <el-card
             class="stats-card stats-card--action admin-stagger"
             shadow="hover"
@@ -121,8 +115,6 @@
               <el-icon size="32" color="#F56C6C"><Box /></el-icon>
             </div>
           </el-card>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="8" :lg="4">
           <el-card
             class="stats-card stats-card--action admin-stagger"
             shadow="hover"
@@ -149,8 +141,7 @@
               <el-icon size="32" color="#909399"><Warning /></el-icon>
             </div>
           </el-card>
-        </el-col>
-      </el-row>
+      </div>
     </section>
 
     <div class="stats-section">
@@ -174,7 +165,10 @@
         <el-col :xs="12" :sm="12" :md="6" :lg="6">
           <el-card class="stats-card admin-stagger" shadow="hover" :style="{ '--ui-stagger-index': 1 }">
             <div class="stats-content">
-              <div class="stats-value stats-value--amount">{{ t('common.currency') }}{{ overviewStats.totalAmount || '0.00' }}</div>
+              <div
+                class="stats-value stats-value--amount"
+                :title="`${t('common.currency')}${overviewStats.totalAmount || '0.00'}`"
+              >{{ t('common.currency') }}{{ overviewStats.totalAmount || '0.00' }}</div>
               <div class="stats-label">{{ t('dashboard.totalAmount') }}</div>
             </div>
             <div class="stats-icon">
@@ -499,6 +493,32 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
+/**
+ * 待办卡用 CSS grid 而不是 el-row/el-col。
+ *
+ * 为什么：el-col 的 span 只有 24 等分可用，六张卡挤在一行时每张只有 ~87px ——
+ * "低库存"三个字被挤成两行，"฿400.00" 直接撑出横向滚动条。
+ * grid 可以按**可用宽度**决定每行几张：宽屏 6 张一排，窄屏 3 张、2 张，
+ * 卡片宽度始终够放下数字和标签。
+ */
+.todo-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1440px) {
+  .todo-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .todo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .section-heading {
   display: flex;
   align-items: baseline;
@@ -559,7 +579,7 @@ onMounted(() => {
 
 /* 金额位数多，字号小一点免得溢出 */
 .stats-value--amount {
-  font-size: 24px;
+  font-size: 22px;
 }
 
 /* 极简高级风：stagger 入场（克制感） */
@@ -596,6 +616,8 @@ onMounted(() => {
 
 .stats-content {
   flex: 1;
+  /* flex 子项默认 min-width:auto → 内容比容器宽时会撑出滚动条 */
+  min-width: 0;
 }
 
 .stats-value {
@@ -604,6 +626,10 @@ onMounted(() => {
   color: #303133;
   line-height: 1;
   margin-bottom: 8px;
+  /* 金额位数多时不要把卡片撑出横向滚动条 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stats-label {
