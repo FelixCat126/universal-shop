@@ -310,7 +310,7 @@ export default {
     submitFailedRetry: 'การสั่งซื้อล้มเหลว กรุณาลองใหม่อีกครั้ง',
     total: 'รวมทั้งหมด',
     items: 'สินค้าในคำสั่งซื้อ',
-    linePointsRow: 'รายละ {points} แต้ม',
+    linePointsRow: 'รายการนี้ {points} แต้ม',
     linePointsSum: 'รวม {points} แต้ม',
     shippingInfo: 'ข้อมูลการจัดส่ง',
     guestOrderHint: 'คุณกำลังสั่งซื้อในฐานะผู้เยี่ยมชม กรุณากรอกข้อมูลการจัดส่ง ระบบจะสร้างบัญชีให้คุณโดยอัตโนมัติหลังสั่งซื้อ',

@@ -1027,13 +1027,24 @@ class PartnerPortalController {
       while (attempt < 3) {
         attempt++
         try {
-          await sequelize.query(
-            `UPDATE partner_addresses
-                SET is_default = (id = :targetId),
-                    updated_at = NOW()
-              WHERE partner_id = :partnerId`,
-            { replacements: { targetId: id, partnerId: partner_id } }
-          )
+          /**
+           * 先锁 Partner 父行 —— 与本组其它地址写路径（create/update/delete）
+           * 保持同一把锁，否则会与「更新地址」的两步写交错：
+           *   T1 updateAddress：把全部置 false → （窗口）→ save 目标 true
+           *   T2 setDefaultAddress：单条 UPDATE 把 Y 置 true
+           * T2 落在 T1 的两步之间 → 最终 **X 和 Y 都是默认地址**，
+           * 下单时默认取哪一条不确定 → 可能发错货。
+           */
+          await sequelize.transaction(async (transaction) => {
+            await Partner.findByPk(partner_id, { transaction, lock: transaction.LOCK.UPDATE })
+            await sequelize.query(
+              `UPDATE partner_addresses
+                  SET is_default = (id = :targetId),
+                      updated_at = NOW()
+                WHERE partner_id = :partnerId`,
+              { replacements: { targetId: id, partnerId: partner_id }, transaction }
+            )
+          })
           lastErr = null
           break
         } catch (e) {

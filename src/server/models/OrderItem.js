@@ -70,6 +70,11 @@ const OrderItem = sequelize.define('OrderItem', {
     defaultValue: 0,
     comment: '该行分摊的订单级促销优惠金额（THB 域；满减按行小计占比分摊，尾差归金额最大行）'
   },
+  line_total: {
+    type: DataTypes.DECIMAL(16, 2),
+    allowNull: true,
+    comment: '该行权威行小计（THB 域）。组合包按权重分摊时 price × quantity ≠ line_total（尾差除不尽），对账与展示以本列为准'
+  },
   is_gift: {
     type: DataTypes.BOOLEAN,
     allowNull: false,

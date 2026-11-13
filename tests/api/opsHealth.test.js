@@ -102,3 +102,30 @@ describe('PM2 配置', () => {
     }
   })
 })
+
+describe('慢接口聚合', () => {
+  it('GS-7 metrics 里能看到最慢接口（路径已归一化，不会因 id 爆炸）', async () => {
+    const { TestHelpers } = await import('../helpers/test-helpers.js')
+    const { Administrator } = (await import('@server/models/index.js')).default
+    const admin = await Administrator.create({
+      username: `gs_admin2_${Date.now()}`,
+      password: 'GsPwd#1234',
+      role: 'super_admin',
+      is_active: true
+    })
+    const token = TestHelpers.generateAdminToken(admin)
+
+    // 打几个不同 id 的订单详情（路径应归一化成同一条）
+    for (const id of [1, 2, 3]) {
+      await request(app).get(`/api/admin/orders/${id}`).set('Authorization', `Bearer ${token}`)
+    }
+
+    const res = await request(app).get('/api/admin/metrics').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    const rows = res.body.data.slowestPaths
+    expect(Array.isArray(rows)).toBe(true)
+    const orderRow = rows.find(r => r.path === '/api/admin/orders/:id')
+    expect(orderRow, `应聚合到 /api/admin/orders/:id，实际路径：${rows.map(r => r.path).join(',')}`).toBeTruthy()
+    expect(orderRow.requests).toBe(3)
+  })
+})

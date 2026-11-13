@@ -1,8 +1,9 @@
-import { Op } from 'sequelize'
+import { Op, fn, col, literal } from 'sequelize'
 import sequelize from '../config/database.js'
 import AuditLog from '../models/AuditLog.js'
 import OperationLog from '../models/OperationLog.js'
 import PointTransaction from '../models/PointTransaction.js'
+import UserPointBalance from '../models/UserPointBalance.js'
 import UserCoupon from '../models/UserCoupon.js'
 import Cart from '../models/Cart.js'
 import { cleanupExportJobs, cleanupExpiredExportFiles } from './exportJobService.js'
@@ -37,6 +38,47 @@ async function purgeInBatches (Model, where, batchSize, maxBatches = 200) {
   return total
 }
 
+/**
+ * 清理积分流水，并把**被删流水的净额**记到余额行的 archived_delta。
+ *
+ * 为什么必须记：
+ *   余额是用户资产（不能动），流水是为了控制表体积才清。
+ *   清完不记账 → 不变量「余额 = 流水累计」**永久不成立** → 每日体检一直报红，
+ *   真实问题被淹没；而且该用户的老订单取消时 earn_purchase 流水已没了 →
+ *   earned=0 → 已发的积分收不回来（白拿）。
+ *
+ * 记了之后：余额 = 剩余流水累计 + archived_delta，**永远精确成立**，
+ * 而用户的积分一分没少。
+ */
+async function purgePointTransactionsWithArchive ({ where, batchSize }) {
+  let total = 0
+  for (let i = 0; i < 200; i++) {
+    // 先把即将被删的流水按用户汇总净额
+    const sums = await PointTransaction.findAll({
+      where,
+      attributes: ['user_id', [fn('SUM', col('delta')), 'net']],
+      group: ['user_id'],
+      raw: true
+    })
+    if (!sums.length) break
+
+    // 记进余额行（不存在余额行的用户跳过 —— 余额为 0，归档净额无意义）
+    for (const row of sums) {
+      const net = Number(row.net) || 0
+      if (net === 0) continue
+      await UserPointBalance.update(
+        { archived_delta: literal(`COALESCE(archived_delta, 0) + ${net}`) },
+        { where: { user_id: row.user_id } }
+      )
+    }
+
+    const deleted = await PointTransaction.destroy({ where, limit: batchSize })
+    total += deleted
+    if (deleted < batchSize) break
+  }
+  return total
+}
+
 export async function cleanupRetentionData ({
   auditDays = 365,
   operationDays = 730,
@@ -56,7 +98,10 @@ export async function cleanupRetentionData ({
 
   const auditDeleted = await purgeInBatches(AuditLog, { created_at: { [Op.lt]: auditCutoff } }, batchSize)
   const operationDeleted = await purgeInBatches(OperationLog, { created_at: { [Op.lt]: operationCutoff } }, batchSize)
-  const pointDeleted = await purgeInBatches(PointTransaction, { created_at: { [Op.lt]: pointCutoff } }, batchSize)
+  const pointDeleted = await purgePointTransactionsWithArchive({
+    where: { created_at: { [Op.lt]: pointCutoff } },
+    batchSize
+  })
 
   /**
    * 券：只清理「已不可用」的券，未使用的券属于用户资产，绝不能删。

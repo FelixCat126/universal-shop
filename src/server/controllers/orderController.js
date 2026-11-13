@@ -94,10 +94,25 @@ async function assertEarnedPointsNotSpent (order, transaction) {
   const totalEarned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
   if (totalEarned <= 0) return { ok: true }
 
+  /**
+   * 这里**不加行锁**（普通读即可）。
+   *
+   * 理由是**全局加锁顺序**：
+   *   下单路径：锁 Product（扣库存）→ 锁 UserPointBalance（发积分）
+   *   取消路径：锁 Product（回补库存）→ 锁 UserPointBalance（收积分）
+   * 两边顺序一致才不会死锁。
+   *
+   * 之前这里对余额加了 FOR UPDATE → 取消路径变成"先锁余额、后锁产品"，
+   * 与下单路径**相反** → 下单持产品锁 + 取消持余额锁 同时发生时 40P01 死锁。
+   *
+   * 不加锁是否安全？余额的并发安全由 revokePurchasePoints 内部保证：
+   * 它自己 lockOrCreateBalance（FOR UPDATE）并按 min(余额, 数量) 截断 ——
+   * 不会超扣。这里只是**提前判断**，判错了最坏结果是"该拦的没拦住"，
+   * 而截断逻辑保证账仍然对得上。
+   */
   const balanceRow = await UserPointBalance.findOne({
     where: { user_id: order.user_id },
-    transaction,
-    lock: transaction.LOCK.UPDATE
+    transaction
   })
   const currentBalance = Number(balanceRow?.balance) || 0
   if (currentBalance < totalEarned) {
@@ -637,6 +652,12 @@ class OrderController {
           product_id: row.product_id,
           quantity: qty,
           price: actualPrice,
+          /**
+           * 权威行小计（THB 域）—— 组合包按权重分摊时，
+           * price × quantity ≠ line_total（除不尽的尾差会丢），
+           * 对账与订单详情展示都以本列为准。
+           */
+          line_total: itemTotal,
           original_price: product.price,
           discount: engineLine ? engineLine.discount : product.discount,
           product_name_zh: product.name,
@@ -658,6 +679,7 @@ class OrderController {
             product_id: gift.product_id,
             quantity: gift.quantity,
             price: 0,
+            line_total: 0,
             original_price: 0,
             discount: null,
             product_name_zh: gift.name,
@@ -1906,6 +1928,11 @@ class OrderController {
            * 履约信息：标记发货时记物流单号与发货时间；运营备注随时可改。
            * 之前只有状态没有运单信息 —— 客服查不到快递，仓库也没有交接凭据。
            */
+          /**
+           * 改之前的原状态 —— 必须在 order.update() **之前**取：
+           * update 会把内存里的 order.status 一起改成新值，取晚了就永远是新状态。
+           */
+          const previousStatus = order.status
           const patch = { status }
           if (tracking_number !== undefined) {
             const tn = tracking_number == null ? null : String(tracking_number).trim().slice(0, 64)
@@ -1922,6 +1949,36 @@ class OrderController {
             patch.shipped_at = new Date()
           }
           await order.update(patch, { transaction })
+
+          /**
+           * 「待支付 → 已支付/备货中」时补发购物积分。
+           *
+           * 背景：在线支付单的购物积分**只在** confirmOnlinePayment 里发。
+           * 而管理端把「待支付」直接改成「已支付/备货中」是常见操作
+           * （货到付款代收、线下转账到账）—— 状态已经是"钱收到了"，
+           * 但积分没发 → **客户白少拿积分**（1000 THB 少 10 分）。
+           *
+           * 条件为什么是 fromStatus === 'pending'：
+           *   - COD 单下单就是 shipping，不走这条路 ✓
+           *   - 在线单 confirm 过就是 shipping（fromStatus 不是 pending）→ 不会重复发 ✓
+           *   - 所以只有"从未确认过支付的在线单"会命中 ✓
+           *
+           * 幂等：先看有没有发过 earn_purchase 流水，发过就不重复发。
+           */
+          if (previousStatus === 'pending' && ['paid', 'shipping'].includes(status) && order.user_id) {
+            const alreadyEarned = await PointTransaction.count({
+              where: { order_id: order.id, type: 'earn_purchase' },
+              transaction
+            })
+            if (alreadyEarned === 0) {
+              const pointsEarnRate = await getPointsEarnRate()
+              const earnPoints = calcPointsEarn(Number(order.total_amount_thb) || 0, pointsEarnRate)
+              if (earnPoints > 0) {
+                await pointsService.grantPurchasePoints(order.user_id, order.id, earnPoints, { transaction })
+              }
+            }
+          }
+
           await transaction.commit()
           return { ok: true, orderId: order.id }
         } catch (e) {
@@ -2016,11 +2073,26 @@ class OrderController {
             await restoreOrderResources(order, transaction)
           }
 
-          // 先清理积分流水：order_id FK 为 ON DELETE SET NULL，直接删单会把流水 order_id 静默置 NULL、断审计链
-          await PointTransaction.destroy({
-            where: { order_id: id },
-            transaction
-          })
+          /**
+           * 清理积分流水 —— **只清"已回补过积分"的那些状态**。
+           *
+           * revokePurchasePoints 的语义是：余额减 n，**同时写一条 type='revoke_cancel' 的负流水**
+           * （原 earn_purchase 流水仍在）。所以：
+           *   - pending/paid/shipping：已回补 → earn(+50) 与 revoke(-50) 净值 0，
+           *     两条一起删掉，余额与流水仍一致 ✓
+           *   - 已发货/已完成/已取消：**没有**回补（或净额本就是 0），
+           *     余额里还含着这笔 earn_purchase → 把流水删了就是
+           *     「余额 ≠ 流水累计」→ 自家每日体检**永久报红**，
+           *     而且这笔积分的来源凭证凭空消失，事后无法对账。
+           *
+           * 保留流水即可（order_id 会被 FK 置 NULL），账实一致、凭证也还在。
+           */
+          if (RESTORE_ON_DELETE_STATUSES.includes(order.status)) {
+            await PointTransaction.destroy({
+              where: { order_id: id },
+              transaction
+            })
+          }
 
           // 清理订单促销快照：order_promotions 无 DB 级级联，随单硬删在此显式处理
           await OrderPromotion.destroy({

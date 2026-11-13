@@ -301,6 +301,10 @@ export const COMPONENT_SCHEMAS = {
       points: { type: 'integer', description: '可抵扣积分' },
       discount: { type: 'number', description: '折扣比例' },
       stock: { type: 'integer', description: '库存' },
+      stock_prev: {
+        type: 'integer',
+        description: '编辑时看到的库存原值。改库存时必须一起提交 —— 服务端按增量（stock = stock + 差值）改，避免把编辑期间并发下单扣掉的库存又写回去（超卖）'
+      },
       image: { type: 'string', description: '图片 URL' },
       status: enumSchema(['active', 'inactive'])
     },

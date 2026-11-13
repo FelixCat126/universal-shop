@@ -433,8 +433,22 @@ class ProductController {
         nextPrice = p
       }
 
-      // 库存：仅在传入时校验，0-100000000 的非负整数，拒绝小数与字符串拼接
-      let nextStock = product.stock
+      /**
+       * 库存：按**增量**改，不按绝对值写回。
+       *
+       * 之前是 `stock: nextStock`（绝对值）→ 运营打开编辑弹窗时 stock=10，
+       * 期间 3 笔订单各扣 1 件（DB 里已经是 7），运营只改了价格后保存
+       * （表单还带着陈旧的 10）→ **库存被写回 10，凭空多出 3 件可卖 → 直接超卖**。
+       *
+       * 现在：客户端同时提交 `stock_prev`（它看到的原值），
+       * 后端算 delta 并用 `stock = stock + delta` 原子自增 ——
+       * 语义是"在**当前**库存上加 N"，既符合运营意图，又不会吞掉并发扣减。
+       *
+       * 没带 stock_prev（老客户端 / 直接调接口）→ 拒绝改库存，
+       * 提示走「调整库存」接口（那个接口本来就是原子的）。
+       */
+      let stockDelta = 0
+      let touchStock = false
       if (stock !== undefined) {
         const s = (stock === null || stock === '') ? NaN : Number(stock)
         if (!Number.isInteger(s) || s < 0 || s > 100000000) {
@@ -443,7 +457,15 @@ class ProductController {
             message: '库存必须为 0-100000000 之间的整数'
           })
         }
-        nextStock = s
+        const prev = Number(req.body.stock_prev)
+        if (!Number.isInteger(prev) || prev < 0 || prev > 100000000) {
+          return res.status(400).json({
+            success: false,
+            message: '修改库存需要同时提交 stock_prev（编辑时看到的库存原值）；只想调库存请使用「调整库存」接口'
+          })
+        }
+        stockDelta = s - prev
+        touchStock = true
       }
 
       // 折扣：null/'' 表示清除折扣；否则必须是 0-100 的整数（在控制器层拦截，避免落到模型校验变 500）
@@ -487,7 +509,10 @@ class ProductController {
         description: description !== undefined ? description : product.description,
         category_id: nextCategoryId,
         price: nextPrice,
-        stock: nextStock,
+        // 库存走**原子增量**（delta 为 0 时不写，省一次无谓的写）
+        ...(touchStock && stockDelta !== 0
+          ? { stock: sequelize.literal(`stock + ${stockDelta}`) }
+          : {}),
         discount: nextDiscount,
         image: image !== undefined ? image : product.image,
         points: nextPoints,

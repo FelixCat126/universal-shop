@@ -128,3 +128,40 @@ describe('订单金额校验的口径', () => {
     expect(v).toContain('recent_order_total_matches_items')
   })
 })
+
+describe('积分归档与体检口径', () => {
+  it('DI-6 清理旧积分流水后，体检仍然通过（归档净额被记账）', async () => {
+    const { User, PointTransaction, UserPointBalance } = models()
+    const { cleanupRetentionData } = await import('@server/services/retentionService.js')
+
+    // 一个"很老"的用户：余额 100，流水 +100（created_at 已是两年前）
+    const old = new Date()
+    old.setFullYear(old.getFullYear() - 2)
+    const u = await User.create({
+      username: 'old_points_user', nickname: '老用户', phone: '812345099',
+      country_code: '+66', password: 'Abcd1234', is_active: true
+    })
+    await UserPointBalance.create({ user_id: u.id, balance: 100, total_earned: 100, total_spent: 0 })
+    await PointTransaction.create({
+      user_id: u.id, order_id: null, type: 'earn_purchase', delta: 100,
+      balance_after: 100, description: '很久以前的积分', created_at: old
+    })
+
+    // 跑清理（默认清 730 天前的流水）
+    await cleanupRetentionData({ pointDays: 730 })
+
+    // 流水应被清掉
+    expect(await PointTransaction.count({ where: { user_id: u.id } })).toBe(0)
+
+    // 余额一分不能少
+    const bal = await UserPointBalance.findOne({ where: { user_id: u.id } })
+    expect(Number(bal.balance), '清理流水不能动用户余额').toBe(100)
+    // 归档净额被记下来了
+    expect(Number(bal.archived_delta), '被清掉的流水净额应被记账').toBe(100)
+
+    // 体检必须仍然通过（否则每日体检永久报红）
+    const res = await checkDataInvariants({ sequelize: TestDatabase.getSequelize() })
+    const failed = res.filter(c => c.violations > 0).map(c => c.name)
+    expect(failed, `体检报红：${failed.join(',')}`).not.toContain('points_balance_matches_ledger')
+  })
+})

@@ -4,6 +4,7 @@ import ProductCategory from '../models/ProductCategory.js'
 import Bundle from '../models/Bundle.js'
 import BundleItem from '../models/BundleItem.js'
 import { Op } from 'sequelize'
+import sequelize from '../config/database.js'
 import { logger } from '../utils/logger.js'
 
 /** 组合包行组件 include（加购可售性校验与购物车组件摘要共用） */
@@ -230,26 +231,41 @@ class CartController {
         }
       }
 
-      // 更新数量（数值相加，quantityNum 已校验为整数）
-      const newQuantity = existingItem.quantity + quantityNum
-
-      // 再次检查库存
-      if (product.stock < newQuantity) {
+      /**
+       * 数量用**数据库自增**（SET quantity = quantity + n），不用读-改-写。
+       *
+       * 之前是 `existingItem.quantity + quantityNum` 再 update ——
+       * 并发下每个请求读到的都是同一个旧值，各写各的 → **丢更新**。
+       * 实测（并发黑盒）：10 个并发加购同一商品，购物车只剩 **4** 件
+       * → 用户狂点/多标签页加入，购物车少记 → 下单时买少了。
+       *
+       * 库存检查仍用旧值估算（偏保守，可能误拒但不会超卖 ——
+       * 真正的扣减在下单事务里用条件 UPDATE，库存是准的）。
+       */
+      const estimatedQuantity = existingItem.quantity + quantityNum
+      if (product.stock < estimatedQuantity) {
         return res.status(400).json({
           success: false,
           message: `库存不足，当前库存：${product.stock}，购物车已有：${existingItem.quantity}`
         })
       }
 
-      await existingItem.update({
-        quantity: newQuantity,
-        price: product.price // 更新价格为当前价格
-      })
+      // 原子自增：并发下每个请求各自 +1，不丢
+      await Cart.update(
+        {
+          quantity: sequelize.literal(`quantity + ${quantityNum}`),
+          price: product.price // 更新价格为当前价格
+        },
+        { where: { id: existingItem.id } }
+      )
+
+      // 读回最终数量（自增后需要给前端一个准确的值）
+      const freshItem = await Cart.findByPk(existingItem.id)
 
       res.json({
         success: true,
         message: '购物车已更新',
-        data: existingItem
+        data: freshItem || existingItem
       })
     } catch (error) {
       logger.error('添加到购物车失败', { err: error?.message, stack: error?.stack })
@@ -370,10 +386,15 @@ class CartController {
       })
     }
 
-    await existingItem.update({
-      quantity: newQuantity,
-      price: bundle.price // 更新价格为当前组合价
-    })
+    // 原子自增（与普通商品行同一处理）：读-改-写在并发下会丢更新
+    // —— 10 个并发加购同一组合包，购物车只记 1 套（而且 99 套上限被绕过）
+    await Cart.update(
+      {
+        quantity: sequelize.literal(`quantity + ${quantityNum}`),
+        price: bundle.price // 更新价格为当前组合价
+      },
+      { where: { id: existingItem.id } }
+    )
 
     return res.json({
       success: true,

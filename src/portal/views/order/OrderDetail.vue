@@ -165,8 +165,14 @@
               </h4>
               <div class="flex items-center justify-between mt-2">
                 <div class="text-xs sm:text-sm text-gray-500">
+                  <!--
+                    ⚠️ points_line_cost 是**行总额**（单价 × 数量），不是单价。
+                    之前当"每件"显示又乘了一次数量 → 3 件 × 10 分显示成"每件 30 积分 × 3 = 90"，
+                    而实际只扣 30 —— 顾客看到自己被扣了 3 倍积分。
+                    这里直接显示行总额，不带数量。
+                  -->
                   <template v-if="order.payment_method === 'points' && item.points_line_cost != null">
-                    {{ t('order.linePointsRow', { points: item.points_line_cost }) }} × {{ item.quantity }}
+                    {{ t('order.linePointsRow', { points: item.points_line_cost }) }}
                   </template>
                   <template v-else>
                     {{ t('cart.price') }}: {{ formatLineRecordedFromThb(order, item.price) }} × {{ item.quantity }}
@@ -174,10 +180,12 @@
                 </div>
                 <div class="text-sm sm:text-base font-bold text-gray-900">
                   <template v-if="order.payment_method === 'points' && item.points_line_cost != null">
-                    {{ t('order.linePointsSum', { points: Number(item.points_line_cost) * Number(item.quantity) }) }}
+                    {{ t('order.linePointsSum', { points: Number(item.points_line_cost) }) }}
                   </template>
                   <template v-else>
-                    {{ formatLineRecordedFromThb(order, item.price * item.quantity) }}
+                    <!-- 行金额用**权威行小计** line_total（组合包按权重分摊时
+                         price × quantity 会丢除不尽的尾差，与实收对不上） -->
+                    {{ formatLineRecordedFromThb(order, item.line_total ?? (item.price * item.quantity)) }}
                   </template>
                 </div>
               </div>

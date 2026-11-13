@@ -519,11 +519,11 @@
                   <div class="total-amount">
                     <template v-if="selectedOrder.payment_method === 'points'">
                       <div>{{ adminLinePointsLabel(item) }}</div>
-                      <div class="text-xs text-gray-500">{{ t('orders.priceThbRef', { v: (item.price * item.quantity).toFixed(2) }) }}</div>
+                      <div class="text-xs text-gray-500">{{ t('orders.priceThbRef', { v: lineTotalOf(item).toFixed(2) }) }}</div>
                     </template>
                     <template v-else>
-                      <div>{{ formatLineRecordedFromThb(selectedOrder, item.price * item.quantity) }}</div>
-                      <div class="text-xs text-gray-500">THB {{ (item.price * item.quantity).toFixed(2) }}</div>
+                      <div>{{ formatLineRecordedFromThb(selectedOrder, lineTotalOf(item)) }}</div>
+                      <div class="text-xs text-gray-500">THB {{ lineTotalOf(item).toFixed(2) }}</div>
                     </template>
                   </div>
                 </div>
@@ -1048,6 +1048,19 @@ watch(
 // 工具函数
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleString(locale.value)
+}
+
+/**
+ * 行金额：优先用**权威行小计** line_total。
+ *
+ * 组合包（bundle）订单的明细行是"按权重把组合价分摊到组件行"的，
+ * 单价 = round2(行小计 / 行数量) → 除不尽的尾差就丢了，
+ * "单价 × 数量"与实收对不上（实测能差十几泰铢）。有 line_total 就用它。
+ */
+const lineTotalOf = (item) => {
+  const lt = Number(item?.line_total)
+  if (Number.isFinite(lt)) return lt
+  return Number(item?.price || 0) * Number(item?.quantity || 0)
 }
 
 const getStatusText = (status) => {

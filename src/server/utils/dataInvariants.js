@@ -73,7 +73,9 @@ const CHECKS = [
       LEFT JOIN (
         SELECT user_id, SUM(delta) AS total FROM point_transactions GROUP BY user_id
       ) t ON t.user_id = b.user_id
-      WHERE b.balance <> COALESCE(t.total, 0)
+      -- archived_delta：被 retention 清理掉的流水净额（余额是用户资产，不能动）
+      -- 所以「余额 = 剩余流水累计 + 已归档净额」才是恒等式
+      WHERE b.balance <> COALESCE(t.total, 0) + COALESCE(b.archived_delta, 0)
     `
   },
   {
@@ -161,7 +163,8 @@ const CHECKS = [
       GROUP BY o.id, COALESCE(o.total_amount_thb, o.total_amount)
       HAVING ABS(
         COALESCE(o.total_amount_thb, o.total_amount)
-        - (COALESCE(SUM(i.price * i.quantity), 0) - COALESCE(SUM(COALESCE(i.discount_allocated, 0)), 0))
+        - (COALESCE(SUM(COALESCE(i.line_total, i.price * i.quantity)), 0)
+           - COALESCE(SUM(COALESCE(i.discount_allocated, 0)), 0))
       ) > 0.01
     `
   },

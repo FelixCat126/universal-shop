@@ -89,6 +89,7 @@ export interface OrderItem {
   product_name_th?: string | null
   points_line_cost?: number | null
   discount_allocated: number
+  line_total?: number | null
   is_gift: boolean
   bundle_id?: number | null
   created_at: string
@@ -419,6 +420,7 @@ export interface UserCoupon {
 export interface UserPointBalance {
   user_id?: number | null
   balance: number
+  archived_delta: number
   created_at: string
   updated_at: string
 }
@@ -568,6 +570,7 @@ export interface ProductCreateRequest {
   points?: number
   discount?: number
   stock?: number
+  stock_prev?: number
   image?: string
   status?: "active" | "inactive"
 }

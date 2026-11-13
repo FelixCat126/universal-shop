@@ -27,6 +27,7 @@ import request from 'supertest'
 import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestHelpers } from '../helpers/test-helpers.js'
+import { seedSystemConfigBaseline } from '../setup/test-baseline.js'
 
 const models = () => TestDatabase.getSequelize().models
 
@@ -241,5 +242,37 @@ describe('CSV 导入：不静默改坏数据', () => {
     expect(d.failedCount, `失败数被重复计数：${JSON.stringify(d)}`).toBe(1)
     expect(d.skipped.length).toBe(1)
     expect(d.failed.length).toBe(0)
+  })
+})
+
+describe('订单明细的权威行小计', () => {
+  it('LC-1 下单时落库 line_total（权威行小计），与实收口径一致', async () => {
+    const { TestHelpers } = await import('../helpers/test-helpers.js')
+    const { TestDataFactory } = await import('../factories/index.js')
+    await seedSystemConfigBaseline()
+    const { User, Product, ProductCategory, Order, OrderItem } = models()
+    const cat = await ProductCategory.create({ name: '行小计分类' })
+    const p = await Product.create({
+      name: '行小计商品', price: 30, stock: 100, category_id: cat.id, status: 'active'
+    })
+    const u = await User.create(await TestDataFactory.createUser({
+      country_code: '+86', phone: '13900003333'
+    }))
+    const token = TestHelpers.generateToken(u)
+
+    const res = await request(app).post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        contact_name: '行小计', contact_phone: '+8613900003333',
+        delivery_address: 'A', detail_address: 'B',
+        items: [{ product_id: p.id, quantity: 3 }],
+        payment_method: 'cod'
+      })
+    expect(res.status).toBe(201)
+
+    const item = await OrderItem.findOne({ where: { order_id: res.body.data.order.id } })
+    expect(item, '应落库权威行小计').toBeTruthy()
+    expect(Number(item.line_total)).toBe(90)      // 30 × 3
+    expect(Number(item.price) * Number(item.quantity)).toBe(90)
   })
 })

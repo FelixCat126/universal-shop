@@ -1,4 +1,5 @@
 import User from '../models/User.js'
+import sequelize from '../config/database.js'
 import { createPasswordResetOtp, consumePasswordResetOtp, getPasswordResetStatus } from '../services/passwordResetService.js'
 import { verifyCaptcha } from '../utils/captcha.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
@@ -91,8 +92,20 @@ class PasswordResetController {
       }
       user.password = String(newPassword)
       user.must_reset_password = false
-      user.token_version = (Number(user.token_version) || 0) + 1
       await user.save()
+
+      /**
+       * token_version **原子**自增：读-改-写会丢更新
+       * （两个并发重置都读到 tv=5、都写 tv=6 → 旧会话只失效了一轮，
+       *  中间窗口里签发的 tv=6 的 JWT 仍然有效）。
+       *
+       * 其余六处改密/登出路径都已经用 literal，这里跟上。
+       * 放在 user.save() 之后：save 只写改动过的字段，不会覆盖 token_version。
+       */
+      await User.update(
+        { token_version: sequelize.literal('token_version + 1') },
+        { where: { id: user.id } }
+      )
 
       const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
       await invalidateAuthCache(user.id)

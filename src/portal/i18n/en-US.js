@@ -310,7 +310,7 @@ export default {
     submitFailedRetry: 'Order submission failed, please try again',
     total: 'Order Total',
     items: 'Order Items',
-    linePointsRow: '{points} pts each',
+    linePointsRow: '{points} pts for this line',
     linePointsSum: '{points} pts total',
     shippingInfo: 'Shipping Information',
     guestOrderHint: 'You are placing an order as a guest. Please fill in the shipping information. An account will be automatically created for you after placing the order.',

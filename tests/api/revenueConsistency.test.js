@@ -115,3 +115,46 @@ describe('营收口径全站统一', () => {
     expect(Number(res.body.data.stats.totalAmount), '筛选 pending 时金额就是 pending 的').toBe(500)
   })
 })
+
+describe('管理端改状态时的积分口径', () => {
+  it('RV-6 待支付 → 已支付：补发购物积分（客户不能白少拿）', async () => {
+    const { User, Order, PointTransaction } = models()
+    const u = await User.create(await TestDataFactory.createUser({
+      country_code: '+86', phone: '13900004444'
+    }))
+    const order = await Order.create({
+      order_no: `RV6${Date.now()}`,
+      user_id: u.id,
+      total_amount: 1000, total_amount_thb: 1000,
+      currency_code: 'THB', payment_method: 'online', status: 'pending',
+      contact_name: 'X', contact_phone: '13800138000', delivery_address: 'A',
+      exchange_rate: 1
+    })
+
+    const before = await PointTransaction.count({
+      where: { order_id: order.id, type: 'earn_purchase' }
+    })
+    expect(before).toBe(0)
+
+    const res = await request(app)
+      .put(`/api/admin/orders/${order.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'shipping' })
+    expect(res.status).toBe(200)
+
+    const after = await PointTransaction.count({
+      where: { order_id: order.id, type: 'earn_purchase' }
+    })
+    expect(after, '状态改成"已收到钱"却没发积分 → 客户白少拿').toBe(1)
+
+    // 再改一次状态不应重复发
+    await request(app)
+      .put(`/api/admin/orders/${order.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'shipped' })
+    const again = await PointTransaction.count({
+      where: { order_id: order.id, type: 'earn_purchase' }
+    })
+    expect(again, '不应重复发积分').toBe(1)
+  })
+})

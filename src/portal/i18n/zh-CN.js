@@ -310,7 +310,7 @@ export default {
     submitFailedRetry: '订单提交失败，请重试',
     total: '订单总计',
     items: '订单商品',
-    linePointsRow: '每件 {points} 积分',
+    linePointsRow: '本行 {points} 积分',
     linePointsSum: '共 {points} 积分',
     shippingInfo: '收货信息',
     guestOrderHint: '您正在以游客身份下单，请填写收货信息。下单后系统将自动为您创建账户。',

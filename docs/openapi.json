@@ -397,6 +397,12 @@
             "multipleOf": 0.01,
             "description": "该行分摊的订单级促销优惠金额（THB 域；满减按行小计占比分摊，尾差归金额最大行）"
           },
+          "line_total": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "nullable": true,
+            "description": "该行权威行小计（THB 域）。组合包按权重分摊时 price × quantity ≠ line_total（尾差除不尽），对账与展示以本列为准"
+          },
           "is_gift": {
             "type": "boolean",
             "description": "是否赠品行（P3 买多赠一）：赠品行 price/original_price=0、不参与金额与分摊；取消/删除时照常回补库存"
@@ -1698,6 +1704,10 @@
             "type": "integer",
             "description": "当前可用积分"
           },
+          "archived_delta": {
+            "type": "integer",
+            "description": "已被 retention 清理掉的积分流水净额（按用户汇总）。余额 = 剩余流水累计 + 本值"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -1709,6 +1719,7 @@
         },
         "required": [
           "balance",
+          "archived_delta",
           "created_at",
           "updated_at"
         ]
@@ -2147,6 +2158,10 @@
           "stock": {
             "type": "integer",
             "description": "库存"
+          },
+          "stock_prev": {
+            "type": "integer",
+            "description": "编辑时看到的库存原值。改库存时必须一起提交 —— 服务端按增量（stock = stock + 差值）改，避免把编辑期间并发下单扣掉的库存又写回去（超卖）"
           },
           "image": {
             "type": "string",

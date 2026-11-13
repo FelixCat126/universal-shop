@@ -544,6 +544,9 @@ export default {
       price: 0,
       discount: null,
       stock: 0,
+      // 编辑时看到的库存原值 —— 提交时一起带上，后端按**增量**改库存，
+      // 避免把"编辑期间并发下单扣掉的库存"又写回去（超卖）
+      stock_prev: null,
       points: 0,
       image: '',
       imagePreview: '' // 用于预览显示
@@ -656,6 +659,8 @@ export default {
         ...product,
         category_id: product.category?.id ?? product.category_id,
         points: product.points != null ? Number(product.points) : 0,
+        // 记住弹窗打开时的库存原值（提交时带上 → 后端按增量改，不覆盖并发扣减）
+        stock_prev: product.stock,
         imagePreview: product.image || '' // 显示现有图片
       })
       showProductDialog.value = true
@@ -682,6 +687,7 @@ export default {
       productForm.price = 0
       productForm.discount = null
       productForm.stock = 0
+      productForm.stock_prev = null
       productForm.points = 0
       productForm.image = ''
       productForm.imagePreview = ''

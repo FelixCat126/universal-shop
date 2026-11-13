@@ -17,6 +17,12 @@ const UserPointBalance = sequelize.define('UserPointBalance', {
     allowNull: false,
     defaultValue: 0,
     comment: '当前可用积分'
+  },
+  archived_delta: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '已被 retention 清理掉的积分流水净额（按用户汇总）。余额 = 剩余流水累计 + 本值'
   }
 }, {
   tableName: 'user_point_balances',
