@@ -45,7 +45,17 @@ async function createOrderFor (user, product) {
 }
 
 describe('AfterSale', () => {
-  it('AS-1 仅退款：申请 → Admin 同意 → 订单取消 + 库存回补 + 申请状态 approved', async () => {
+  /**
+   * AS-1 仅退款：申请 → Admin 同意 → 订单取消 + **库存不回补** + 申请状态 approved
+   *
+   * ⚠️ 这里原来断言的是"库存回补"，那是**被固化下来的错误行为**：
+   * 「仅退款」的语义是客户**不退货**、只退钱；「退货退款」才是货回来才回补库存
+   * （同文件 AS-2 明确断言"approved 不回补、received 才回补"）。
+   *
+   * 之前仅退款也回补库存 → 客户手里还拿着那件货，库存却凭空多出一件
+   * → **同一件实物能被再卖一次**。
+   */
+  it('AS-1 仅退款：申请 → Admin 同意 → 订单取消 + 库存不回补 + 申请状态 approved', async () => {
     await seedSystemConfigBaseline()
     const user = await makeUser()
     const { Product, ProductCategory } = models()
@@ -71,7 +81,8 @@ describe('AfterSale', () => {
 
     const { Order } = models()
     expect((await Order.findByPk(order.id)).status).toBe('cancelled')
-    expect((await Product.findByPk(product.id)).stock).toBe(10)
+    // 仅退款：货没回来 → 库存不动（下单时扣掉的 2 件仍然是被占用的）
+    expect((await Product.findByPk(product.id)).stock).toBe(8)
   })
 
   it('AS-2 退货退款：approved 不回补，received 才回补', async () => {

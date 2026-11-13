@@ -43,14 +43,24 @@ const CHECKS = [
   {
     name: 'order_total_not_exceeding_items',
     title: '订单总额不能超过明细原价之和（不能多收钱）',
+    /**
+     * ⚠️ 必须用 `total_amount_thb`（泰铢）而不是 `total_amount`。
+     *
+     * `total_amount` 存的是**结算币种**金额（用户用人民币结算就是 CNY），
+     * 而 `order_items.price` 存的是**泰铢**单价 —— 两个量纲直接相减，
+     * 非泰铢订单会被误判成"多收了钱"。
+     *
+     * 生产实测：有一笔 CNY 订单 total_amount=1933.47（CNY），
+     * 明细之和 2762.10（THB），直接相减差 828 → 误报。
+     */
     sql: `
-      SELECT o.id AS id, o.total_amount AS total,
+      SELECT o.id AS id, COALESCE(o.total_amount_thb, o.total_amount) AS total,
              COALESCE(SUM(i.price * i.quantity), 0) AS items_total
       FROM orders o
       JOIN order_items i ON i.order_id = o.id
       WHERE COALESCE(i.is_gift, false) = false
-      GROUP BY o.id, o.total_amount
-      HAVING o.total_amount > COALESCE(SUM(i.price * i.quantity), 0) + 0.01
+      GROUP BY o.id, COALESCE(o.total_amount_thb, o.total_amount)
+      HAVING COALESCE(o.total_amount_thb, o.total_amount) > COALESCE(SUM(i.price * i.quantity), 0) + 0.01
     `
   },
   {
@@ -129,17 +139,30 @@ const CHECKS = [
   // ── 近期严格（新口径只对近期数据成立）──────────────────
   {
     name: 'recent_order_total_matches_items',
-    title: '近期订单：总额 = 明细之和（不含赠品行）',
+    title: '近期订单：总额 = 明细原价之和 − 分摊优惠（不含赠品行）',
     recent: true,
+    /**
+     * ⚠️ 两个口径必须对齐：
+     *   1. 用 `total_amount_thb`（泰铢）而不是 `total_amount`（**结算币种**）
+     *      —— 非泰铢结算的订单会被误判（生产实测有 CNY 单，差 828）
+     *   2. 明细侧要**减去 `discount_allocated`**（满减与抵扣券分摊到各行的优惠）
+     *      —— 用了满减的订单，应付 < 明细原价和，直接比必然对不上
+     *
+     * 正确式（生产 9 单实测全部成立，0 例外）：
+     *   total_amount_thb = SUM(price * quantity) - SUM(discount_allocated)
+     */
     sql: `
-      SELECT o.id AS id, o.total_amount AS total,
+      SELECT o.id AS id, COALESCE(o.total_amount_thb, o.total_amount) AS total,
              COALESCE(SUM(i.price * i.quantity), 0) AS items_total
       FROM orders o
       JOIN order_items i ON i.order_id = o.id
       WHERE COALESCE(i.is_gift, false) = false
         AND o.created_at >= NOW() - (:days || ' days')::interval
-      GROUP BY o.id, o.total_amount
-      HAVING ABS(o.total_amount - COALESCE(SUM(i.price * i.quantity), 0)) > 0.01
+      GROUP BY o.id, COALESCE(o.total_amount_thb, o.total_amount)
+      HAVING ABS(
+        COALESCE(o.total_amount_thb, o.total_amount)
+        - (COALESCE(SUM(i.price * i.quantity), 0) - COALESCE(SUM(COALESCE(i.discount_allocated, 0)), 0))
+      ) > 0.01
     `
   },
   {

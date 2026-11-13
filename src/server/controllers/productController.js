@@ -573,6 +573,12 @@ class ProductController {
       }
 
       if (action === 'delete') {
+        /**
+         * 批量删商品也要清购物车 —— 单条删除路径（deleteProduct）清了，
+         * 批量路径之前没清 → 顾客购物车里留着已删商品的行，
+         * 结算时前端显示"商品不可用"，改数量还会 500。
+         */
+        await Cart.destroy({ where: { product_id: { [Op.in]: idList } } })
         const affected = await Product.destroy({ where: { id: { [Op.in]: idList } } })
         await clearResponseCache()
         return res.json({
@@ -721,22 +727,37 @@ class ProductController {
       }
       const oldStock = product.stock
 
+      /**
+       * ⚠️ 必须带 `paranoid: false`。
+       *
+       * Product 是软删模型，Sequelize 的**静态** `Model.update()` 会自动追加
+       * `deleted_at IS NULL` → 对**已下架（软删）**的商品影响 0 行，
+       * 而接口照样返回 `success: true` + 旧库存值 —— 管理员以为改好了，
+       * 其实库存一个字没动（管理端 UI 对已下架行也显示「调整库存」菜单）。
+       *
+       * 实例级 `product.update()` 不过滤，所以同一个商品「编辑价格」生效、
+       * 「调整库存」不生效 —— 同一个页面两种行为，最难排查的那种不一致。
+       */
       let affected = 0
       if (type === 'set') {
-        ;[affected] = await Product.update({ stock: q }, { where: { id } })
+        ;[affected] = await Product.update({ stock: q }, { where: { id }, paranoid: false })
       } else if (type === 'add') {
         ;[affected] = await Product.update(
           { stock: sequelize.literal(`stock + ${q}`) },
-          { where: { id } }
+          { where: { id }, paranoid: false }
         )
       } else {
         ;[affected] = await Product.update(
           { stock: sequelize.literal(`stock - ${q}`) },
-          { where: { id, stock: { [Op.gte]: q } } }
+          { where: { id, stock: { [Op.gte]: q } }, paranoid: false }
         )
         if (!affected) {
           return res.status(400).json({ success: false, message: '库存不足，无法扣减' })
         }
+      }
+      if (!affected) {
+        // 兜底：影响 0 行一定是没改到（商品被并发删了之类），不能报成功
+        return res.status(404).json({ success: false, message: '产品不存在或已下架，库存未修改' })
       }
 
       const fresh = await Product.findByPk(id, { paranoid: !req.admin })

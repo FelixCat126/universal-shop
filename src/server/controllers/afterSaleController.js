@@ -186,7 +186,17 @@ class AfterSaleController {
         if (row.type === 'refund') {
           await assertPointsCanBeRevoked(order, transaction)
           order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
-          await restoreOrderResources(order, transaction)
+          /**
+           * ⚠️ 「仅退款」**不回补库存**。
+           *
+           * refund 的语义是"客户不退货、只退钱"（退货是 return，走确认收货那条路）。
+           * 之前这里调的是完整的 restoreOrderResources → **库存也加回去了** →
+           * 客户手里还拿着那件货，库存却凭空多出一件 → **同一件实物能被再卖一次**。
+           *
+           * 积分与抵扣券照常收回（订单确实没成交，钱要退、券要还），
+           * 只有库存不动。
+           */
+          await restoreOrderResources(order, transaction, { restoreStock: false })
           order.status = 'cancelled'
           await order.save({ transaction })
         }

@@ -463,6 +463,18 @@ class CartController {
         })
       }
 
+      /**
+       * 商品可能已被软删（管理端删除/批量删除只清了商品，没清购物车）。
+       * include 默认过滤软删行 → `cartItem.product` 为 null →
+       * 直接读 `.stock` 会抛 TypeError → 500（用户改个数量就崩）。
+       */
+      if (!cartItem.product) {
+        return res.status(400).json({
+          success: false,
+          message: '商品已下架，请从购物车中移除'
+        })
+      }
+
       // 检查库存
       if (cartItem.product.stock < quantityNum) {
         return res.status(400).json({

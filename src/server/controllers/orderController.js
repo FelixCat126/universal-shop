@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 import Order from '../models/Order.js'
 import OrderItem from '../models/OrderItem.js'
 import OrderPromotion from '../models/OrderPromotion.js'
+import AfterSale from '../models/AfterSale.js'
 import UserCoupon from '../models/UserCoupon.js'
 import CouponTemplate from '../models/CouponTemplate.js'
 import Product from '../models/Product.js'
@@ -117,8 +118,14 @@ async function assertEarnedPointsNotSpent (order, transaction) {
  *    一单可能有多条 earn_purchase 流水（补发/重复发放），findAll 汇总收回总量；
  *    余额不足按 0 截断并记 warn
  * 4) 该单核销的抵扣券释放回 unused（条件 UPDATE，幂等：重复回补匹配不到行即为 0 affected）
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.restoreStock=true] 是否回补**库存**。
+ *        「仅退款」（refund）必须传 false —— 客户没退货，货还在他手上，
+ *        回补库存等于同一件实物被再卖一次（库存凭空多出来）。
+ *        积分与券照常收（订单确实没成交，钱要退、券要还）。
  */
-export async function restoreOrderResources (order, transaction) {
+export async function restoreOrderResources (order, transaction, options = {}) {
   /**
    * 幂等护栏：订单已是 cancelled 说明资源此前已回补过，重复回补会让库存虚增、
    * 用户积分被多扣（售后审批叠加订单取消时会发生）。
@@ -140,6 +147,11 @@ export async function restoreOrderResources (order, transaction) {
   for (const item of sortedItems) {
     const qty = parseInt(item.quantity, 10)
     if (!Number.isInteger(qty) || qty <= 0) continue
+    if (options.restoreStock === false) {
+      // 仅退款：货没回来，不能回补库存（否则同一件实物会被再卖一次）
+      logger.info('仅退款不回补库存（货未退回）', { orderId: order.id, productId: item.product_id, qty })
+      continue
+    }
     await Product.update(
       { stock: sequelize.literal(`stock + ${qty}`) },
       // paranoid:false —— Product 是软删模型，默认过滤会让已软删商品的库存静默丢失
@@ -2010,8 +2022,20 @@ class OrderController {
             transaction
           })
 
-          // 清理订单促销快照：order_promotions 无 DB 级联，随单硬删在此显式处理
+          // 清理订单促销快照：order_promotions 无 DB 级级联，随单硬删在此显式处理
           await OrderPromotion.destroy({
+            where: { order_id: id },
+            transaction
+          })
+
+          /**
+           * 清理售后单：after_sales **没有外键**（表已存在，sync 不会再补 FK），
+           * 删单时必须显式清理 —— 否则售后行变成孤儿：
+           *   客户「我的售后」里出现 order: null 的记录；
+           *   管理员去审核一律 404（关联订单不存在），该售后**永远停在 pending**，
+           *   客户的退款结不掉。
+           */
+          await AfterSale.destroy({
             where: { order_id: id },
             transaction
           })
