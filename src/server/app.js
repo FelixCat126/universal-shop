@@ -241,11 +241,18 @@ if (process.env.NODE_ENV !== 'test') {
       // 测试环境整条链不执行；startOrderTimeoutSweeper 内部也有 NODE_ENV==='test' 双保险
       // try/catch 兜底：清扫器启动失败不影响 dbReadyState='ready'，避免 /api/health 误报 503
       try {
-        startOrderTimeoutSweeper()
-        startGuestAccountCleanup()
+        /**
+         * 记住后台任务的定时器句柄 —— 优雅停机时要把它们**停掉**。
+         * 否则旧进程在等在途请求的那 15 秒里，后台任务还在跑：
+         *   - 与新进程的清扫任务重叠（清扫本身靠行锁+状态复查保证幂等，
+         *     但导出 worker 可能正在写一半的文件 → 文件损坏）
+         *   - 部署期间做无用功
+         */
+        backgroundTimers.push(startOrderTimeoutSweeper())
+        backgroundTimers.push(startGuestAccountCleanup())
         // 异步导出任务 worker：扫描 pending 任务并后台生成文件
-        startExportJobWorker()
-        startRetentionCleanup()
+        backgroundTimers.push(startExportJobWorker())
+        backgroundTimers.push(startRetentionCleanup())
       } catch (err) {
         console.error('⚠️ 订单超时清扫器启动失败（不影响主服务）:', err.message)
       }
@@ -289,7 +296,7 @@ app.use('/api/security', securityRoutes)
 console.log('✅ API路由注册完成')
 
 // 健康检查（必须在API 404处理之前）
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   // 数据库未就绪时返回 503，供探活/负载均衡摘流，避免冷启动窗口请求打到未同步的表
   if (dbReadyState !== 'ready') {
     return res.status(503).json({
@@ -300,6 +307,29 @@ app.get('/api/health', (req, res) => {
       port: PORT
     })
   }
+
+  /**
+   * 运行期也探一下数据库。
+   *
+   * 之前这里只看**启动时**的 dbReadyState —— 进程起来之后数据库断了，
+   * 健康检查照样返回 200「服务器运行正常」。
+   * 作为就绪探针（readiness）会**一直误报**：负载均衡继续往这个
+   * 已经不能服务的实例上打流量，用户拿到的全是 500。
+   *
+   * SELECT 1 极轻（生产实测 <1ms），探活频率通常是几秒一次，开销可忽略。
+   */
+  try {
+    await sequelize.query('SELECT 1', { timeout: 2000 })
+  } catch (err) {
+    return res.status(503).json({
+      success: false,
+      ready: false,
+      message: '数据库连接不可用',
+      timestamp: new Date().toISOString(),
+      port: PORT
+    })
+  }
+
   res.json({
     success: true,
     ready: true,
@@ -482,6 +512,12 @@ app.use('*', notFoundHandler)
 app.use(errorHandler)
 
 // 启动服务器函数
+/** 后台任务的定时器句柄（优雅停机时统一停掉） */
+const backgroundTimers = []
+
+/** 优雅停机的最长等待时间（毫秒）—— 超过就强制退出 */
+const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 15000
+
 export async function startServer() {
   // 先等待数据库就绪；失败即退出（非零码），避免冷启动窗口内请求打到未同步的表返回 500
   try {
@@ -491,7 +527,7 @@ export async function startServer() {
     process.exit(1)
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('')
     console.log('🎉 Universal Shop 启动成功！')
     console.log('================================================')
@@ -515,6 +551,66 @@ export async function startServer() {
     console.log('💡 提示: 按 Ctrl+C 停止服务')
     console.log('')
   })
+
+  /**
+   * 优雅停机。
+   *
+   * 之前没有任何 SIGTERM 处理 → 部署时 pm2 stop 会**立刻**杀掉进程：
+   *   - 正在下单的请求被硬切断（事务未提交 → PG 回滚 ✓ 数据是安全的，
+   *     但客户端收到的是连接重置，它会以为"下单失败"而重试）；
+   *   - 正在跑的异步导出任务（要几十秒）被腰斩，任务永远停在 running；
+   *   - 正在写的日志/响应被截断。
+   *
+   * 现在：收到 SIGTERM/SIGINT → 停止接受新连接 → 等在途请求做完 → 退出。
+   * 超时（默认 15s）就强制退出，保证 PM2 的 kill_timeout 内一定结束。
+   */
+  const shutdown = (signal) => {
+    console.log(`\n收到 ${signal}，开始优雅停机（最多等 ${GRACEFUL_SHUTDOWN_TIMEOUT_MS}ms）...`)
+    // 先停后台任务：别在交接窗口里和新进程抢活干
+    for (const timer of backgroundTimers) {
+      if (timer && typeof timer.unref === 'function') clearInterval(timer)
+    }
+    backgroundTimers.length = 0
+    // 停止接受新连接；已有连接继续处理完
+    server.close(() => {
+      console.log('✅ 在途请求已处理完，进程退出')
+      process.exit(0)
+    })
+    // 兜底：超时强制退出
+    setTimeout(() => {
+      console.warn('⚠️ 优雅停机超时，强制退出')
+      process.exit(0)
+    }, GRACEFUL_SHUTDOWN_TIMEOUT_MS).unref()
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.on('SIGINT', () => shutdown('SIGINT'))
+
+  /**
+   * 未捕获异常 / 未处理的 Promise 拒绝。
+   *
+   * Node 默认会**终止进程**（uncaughtException 直接退出；
+   * unhandledRejection 在 Node 15+ 默认也是 throw → 退出）。
+   * 退出本身是对的（带病运行更糟），但必须**留下日志** ——
+   * 否则崩溃原因只留在 PM2 的输出里，排查时无从下手。
+   *
+   * 这里记完日志后主动退出：让 PM2 按既定策略重启，
+   * 而不是让进程处于"状态未知"的半死状态。
+   */
+  process.on('uncaughtException', (err) => {
+    logger.error('未捕获异常（进程即将退出）', { err: err?.message, stack: err?.stack })
+    console.error('未捕获异常:', err)
+    process.exit(1)
+  })
+  process.on('unhandledRejection', (reason) => {
+    logger.error('未处理的 Promise 拒绝（进程即将退出）', {
+      err: reason?.message || String(reason),
+      stack: reason?.stack
+    })
+    console.error('未处理的 Promise 拒绝:', reason)
+    process.exit(1)
+  })
+
+  return server
 }
 
 export default app

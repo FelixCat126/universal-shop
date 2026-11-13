@@ -64,6 +64,14 @@ module.exports = {
     autorestart: true,
     watch: false,
     max_memory_restart: '1G',
+    /**
+     * 优雅停机的等待上限（毫秒）。
+     *
+     * PM2 默认只等 **1.6 秒**就 SIGKILL —— 服务的优雅停机逻辑（等在途请求做完）
+     * 根本没机会跑完，等于白做。必须 ≥ 服务端的停机超时（app.js 的
+     * GRACEFUL_SHUTDOWN_TIMEOUT_MS = 15000），否则 PM2 会先一步把进程砍掉。
+     */
+    kill_timeout: 15000,
     env: {
       NODE_ENV: 'production',
       PORT: 3000

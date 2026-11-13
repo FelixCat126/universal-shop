@@ -236,7 +236,14 @@ echo "🚀 PM2 启动/重启..."
 export NODE_ENV=production
 if command -v pm2 >/dev/null 2>&1; then
   if pm2 describe universal-shop >/dev/null 2>&1; then
-    pm2 reload universal-shop --update-env
+    # 带配置文件 reload：PM2 才会**重新应用**配置（如 kill_timeout）。
+    # `pm2 reload universal-shop` 用的是 PM2 内存里的旧配置，
+    # 改了 ecosystem.config.js 不会生效（kill_timeout 之类）。
+    if [[ -f ecosystem.config.js ]]; then
+      pm2 reload ecosystem.config.js --update-env
+    else
+      pm2 reload universal-shop --update-env
+    fi
   elif [[ -f ecosystem.config.js ]]; then
     pm2 start ecosystem.config.js
   else
