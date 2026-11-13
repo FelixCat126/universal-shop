@@ -115,7 +115,7 @@
                   @click="decreaseQuantity"
                   :aria-label="t('product.decreaseQty')"
                   :disabled="quantity <= 1"
-                  class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <MinusIcon class="h-4 w-4" />
                 </button>
@@ -123,7 +123,7 @@
                 <button
                   @click="increaseQuantity"
                   :disabled="quantity >= product.stock"
-                  class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PlusIcon class="h-4 w-4" />
                 </button>

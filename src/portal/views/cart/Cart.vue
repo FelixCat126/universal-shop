@@ -92,7 +92,7 @@
                     @click="removeItem(item)"
                     :aria-label="t('cart.remove')"
                     :disabled="updating.has(item.id)"
-                    class="flex-shrink-0 text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
+                    class="flex-shrink-0 w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
                   >
                     <TrashIcon class="h-4 w-4" />
                   </button>
@@ -147,7 +147,7 @@
                           @click="decreaseQuantity(item)"
                           :aria-label="t('cart.decreaseQty')"
                           :disabled="item.quantity <= 1 || updating.has(item.id)"
-                          class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <MinusIcon class="h-4 w-4" />
                         </button>
@@ -159,7 +159,7 @@
                         <button
                           @click="increaseQuantity(item)"
                           :disabled="(bundleStock(item) != null && item.quantity >= bundleStock(item)) || updating.has(item.id)"
-                          class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <PlusIcon class="h-4 w-4" />
                         </button>
@@ -180,7 +180,7 @@
                       @click="decreaseQuantity(item)"
                       :aria-label="t('cart.decreaseQty')"
                       :disabled="item.quantity <= 1 || updating.has(item.id)"
-                      class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <MinusIcon class="h-4 w-4" />
                     </button>
@@ -192,7 +192,7 @@
                     <button
                       @click="increaseQuantity(item)"
                       :disabled="(bundleStock(item) != null && item.quantity >= bundleStock(item)) || updating.has(item.id)"
-                      class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <PlusIcon class="h-4 w-4" />
                     </button>
@@ -207,7 +207,7 @@
                       @click="removeItem(item)"
                       :aria-label="t('cart.remove')"
                       :disabled="updating.has(item.id)"
-                      class="text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
+                      class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
                     >
                       <TrashIcon class="h-4 w-4" />
                     </button>
@@ -219,7 +219,7 @@
                       @click="removeItem(item)"
                       :aria-label="t('cart.remove')"
                       :disabled="updating.has(item.id)"
-                      class="p-1 text-red-600 hover:text-red-700 disabled:opacity-50"
+                      class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-700 disabled:opacity-50"
                     >
                       <TrashIcon class="h-5 w-5" />
                     </button>
@@ -288,7 +288,7 @@
                       @click="decreaseQuantity(item)"
                       :aria-label="t('cart.decreaseQty')"
                       :disabled="item.quantity <= 1 || updating.has(item.id)"
-                      class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <MinusIcon class="h-4 w-4" />
                     </button>
@@ -300,7 +300,7 @@
                     <button
                       @click="increaseQuantity(item)"
                       :disabled="item.quantity >= item.product.stock || updating.has(item.id)"
-                      class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <PlusIcon class="h-4 w-4" />
                     </button>
@@ -315,7 +315,7 @@
                       @click="removeItem(item)"
                       :aria-label="t('cart.remove')"
                       :disabled="updating.has(item.id)"
-                      class="text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
+                      class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
                     >
                       <TrashIcon class="h-4 w-4" />
                     </button>
@@ -370,7 +370,7 @@
                         @click="removeItem(item)"
                         :aria-label="t('cart.remove')"
                         :disabled="updating.has(item.id)"
-                        class="p-1 text-red-600 hover:text-red-700 disabled:opacity-50"
+                        class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-700 disabled:opacity-50"
                       >
                         <TrashIcon class="h-5 w-5" />
                       </button>
@@ -386,7 +386,7 @@
                         @click="decreaseQuantity(item)"
                         :aria-label="t('cart.decreaseQty')"
                         :disabled="item.quantity <= 1 || updating.has(item.id)"
-                        class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <MinusIcon class="h-4 w-4" />
                       </button>
@@ -398,7 +398,7 @@
                       <button
                         @click="increaseQuantity(item)"
                         :disabled="item.quantity >= item.product.stock || updating.has(item.id)"
-                        class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center border border-gray-300 rounded-md text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <PlusIcon class="h-4 w-4" />
                       </button>
