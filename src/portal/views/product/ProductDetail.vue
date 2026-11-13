@@ -113,6 +113,7 @@
               <div class="flex items-center border border-gray-300 rounded-md">
                 <button
                   @click="decreaseQuantity"
+                  :aria-label="t('product.decreaseQty')"
                   :disabled="quantity <= 1"
                   class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

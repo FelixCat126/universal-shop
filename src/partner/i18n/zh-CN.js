@@ -219,6 +219,7 @@ export default {
     reload: '刷新页面',
     loading: '加载中',
     error: '操作失败',
+    close: '关闭',
     selectCountry: '区号'
   }
 }

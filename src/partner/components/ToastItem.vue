@@ -19,6 +19,7 @@
         class="shrink-0 p-1 rounded-full touch-manipulation"
         :class="closeButtonClasses"
         @click="$emit('close', toast.id)"
+        :aria-label="$t('common.close')"
       >
         <XMarkIcon class="w-4 h-4" />
       </button>

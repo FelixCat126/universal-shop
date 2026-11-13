@@ -72,6 +72,7 @@
                 type="button"
                 @click="showPassword = !showPassword"
                 class="absolute inset-y-0 right-0 pr-3 flex items-center transition-opacity hover:opacity-70"
+                :aria-label="showPassword ? t('user.hidePassword') : t('user.showPassword')"
               >
                 <EyeIcon v-if="!showPassword" class="h-5 w-5 text-gray-400" />
                 <EyeSlashIcon v-else class="h-5 w-5 text-gray-400" />

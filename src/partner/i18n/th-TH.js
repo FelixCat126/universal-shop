@@ -219,6 +219,7 @@ export default {
     reload: 'โหลดหน้าใหม่',
     loading: 'กำลังโหลด',
     error: 'เกิดข้อผิดพลาด',
+    close: 'ปิด',
     selectCountry: 'รหัสประเทศ'
   }
 }

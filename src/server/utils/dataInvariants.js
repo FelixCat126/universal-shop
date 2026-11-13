@@ -138,6 +138,94 @@ const CHECKS = [
     `
   },
 
+  // ── 引用完整性（孤儿行）─────────────────────────────────
+  //
+  // 以前这些检查只在我临时写的脚本里跑，**没进每日体检** ——
+  // 将来某次写入把关联行删了，要等客户投诉"我的退款结不掉"才会被发现。
+  //
+  // ⚠️ **哪些是"真检查"、哪些是"外键已保证的防御"**（实测生产库的 FK）：
+  //   NO ACTION（删父行会被 DB 拦住 → 孤儿不可能出现）：
+  //     order_items.order_id / order_items.product_id / orders.user_id
+  //     after_sales.order_id / user_coupons.* / partner_orders.partner_id
+  //     order_promotions.order_id / partner_order_items.* / bundle_items.*
+  //   SET NULL（删父行后关联列变 NULL —— **这是合法状态**，检查必须排除 NULL）：
+  //     carts.product_id / carts.user_id / carts.bundle_id
+  //     point_transactions.order_id / products.category_id
+  //   CASCADE（删父行时级联删掉子行 → 孤儿不可能）：
+  //     point_transactions.user_id / user_point_balances.user_id
+  //   **无外键**（唯一真能出现孤儿的）：
+  //     after_sales.user_id
+  {
+    name: 'order_item_order_exists',
+    title: '订单明细必须挂在存在的订单上（外键 NO ACTION 保证，本项为防御）',
+    sql: `SELECT i.id AS id, i.order_id AS order_id FROM order_items i
+          LEFT JOIN orders o ON o.id = i.order_id WHERE o.id IS NULL`
+  },
+  {
+    name: 'order_item_product_exists',
+    title: '订单明细必须挂在存在的商品上',
+    sql: `SELECT i.id AS id, i.product_id AS product_id FROM order_items i
+          LEFT JOIN products p ON p.id = i.product_id WHERE p.id IS NULL`
+  },
+  {
+    name: 'after_sale_order_exists',
+    title: '售后单必须挂在存在的订单上',
+    sql: `SELECT a.id AS id, a.order_id AS order_id FROM after_sales a
+          LEFT JOIN orders o ON o.id = a.order_id WHERE o.id IS NULL`
+  },
+  {
+    name: 'after_sale_user_exists',
+    // ⚠️ after_sales.user_id 是全库**唯一没有外键保护**的用户引用 →
+    // 这项是真能报出来的检查（其余引用项都是防御）
+    title: '售后单必须挂在存在的用户上（无外键保护，唯一真能报的一项）',
+    sql: `SELECT a.id AS id, a.user_id AS user_id FROM after_sales a
+          LEFT JOIN users u ON u.id = a.user_id WHERE a.user_id IS NOT NULL AND u.id IS NULL`
+  },
+  {
+    name: 'cart_product_exists',
+    // carts.product_id 是 SET NULL —— 商品被删后置 NULL 是**合法**的（该行等着被清理），
+    // 所以只检查"非 NULL 却指向不存在的商品"
+    title: '购物车行必须挂在存在的商品上（NULL = 商品已删，待清理）',
+    sql: `SELECT c.id AS id, c.product_id AS product_id FROM carts c
+          LEFT JOIN products p ON p.id = c.product_id
+          WHERE c.product_id IS NOT NULL AND p.id IS NULL`
+  },
+  {
+    name: 'user_coupon_template_exists',
+    title: '用户券必须挂在存在的券模板上',
+    sql: `SELECT uc.id AS id, uc.template_id AS template_id FROM user_coupons uc
+          LEFT JOIN coupon_templates ct ON ct.id = uc.template_id WHERE ct.id IS NULL`
+  },
+  {
+    name: 'point_transaction_user_exists',
+    title: '积分流水必须挂在存在的用户上',
+    sql: `SELECT pt.id AS id, pt.user_id AS user_id FROM point_transactions pt
+          LEFT JOIN users u ON u.id = pt.user_id WHERE u.id IS NULL`
+  },
+  {
+    name: 'order_user_exists',
+    title: '订单必须挂在存在的用户上',
+    sql: `SELECT o.id AS id, o.user_id AS user_id FROM orders o
+          LEFT JOIN users u ON u.id = o.user_id WHERE u.id IS NULL`
+  },
+  {
+    name: 'partner_order_partner_exists',
+    title: '合作方订单必须挂在存在的合作方上',
+    sql: `SELECT po.id AS id, po.partner_id AS partner_id FROM partner_orders po
+          LEFT JOIN partners p ON p.id = po.partner_id WHERE p.id IS NULL`
+  },
+  {
+    name: 'point_balance_not_negative',
+    title: '积分余额不能为负',
+    sql: `SELECT user_id AS id, balance FROM user_point_balances WHERE balance < 0`
+  },
+  {
+    name: 'used_coupon_has_order',
+    title: '已使用的券必须挂上订单',
+    sql: `SELECT id AS id, code AS code FROM user_coupons
+          WHERE status = 'used' AND used_by_order_id IS NULL`
+  },
+
   // ── 近期严格（新口径只对近期数据成立）──────────────────
   {
     name: 'recent_order_total_matches_items',

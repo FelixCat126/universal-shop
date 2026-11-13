@@ -219,6 +219,7 @@ export default {
     reload: 'Reload page',
     loading: 'Loading',
     error: 'Something went wrong',
+    close: 'Close',
     selectCountry: 'Dial code'
   }
 }

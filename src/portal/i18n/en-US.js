@@ -75,6 +75,8 @@ export default {
 
   // 用户相关
   user: {
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     username: 'Username',
     password: 'Password',
     email: 'Email',
@@ -158,6 +160,7 @@ export default {
 
   // 商品相关
   product: {
+    decreaseQty: 'Decrease quantity',
     relatedProducts: 'You may also like',
     title: 'Products',
     name: 'Product Name',
@@ -224,6 +227,7 @@ export default {
 
   // 购物车
   cart: {
+    decreaseQty: 'Decrease quantity',
     undo: 'Undo',
     title: 'Shopping Cart',
     empty: 'Cart is Empty',

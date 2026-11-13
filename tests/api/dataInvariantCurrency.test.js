@@ -165,3 +165,29 @@ describe('积分归档与体检口径', () => {
     expect(failed, `体检报红：${failed.join(',')}`).not.toContain('points_balance_matches_ledger')
   })
 })
+
+describe('引用完整性体检能真的发现孤儿', () => {
+  it('DI-7 造一个孤儿明细行 → 体检必须报出来', async () => {
+    const { AfterSale, User, Order } = models()
+    const u = await User.create({
+      username: 'orphan_holder', nickname: '孤儿宿主', phone: '812345099',
+      country_code: '+66', password: 'Abcd1234', is_active: true
+    })
+    const order = await Order.create({
+      order_no: 'DI7ORDER', user_id: u.id,
+      total_amount: 10, total_amount_thb: 10,
+      currency_code: 'THB', payment_method: 'cod', status: 'shipping',
+      contact_name: 'X', contact_phone: '13800138000', delivery_address: 'A',
+      exchange_rate: 1
+    })
+    // after_sales.user_id 是全库唯一**没有外键保护**的用户引用 → 能造出孤儿
+    await AfterSale.create({
+      order_id: order.id, user_id: 99999999, type: 'refund', status: 'pending',
+      reason: '孤儿测试', amount: 10
+    })
+
+    const res = await checkDataInvariants({ sequelize: TestDatabase.getSequelize() })
+    const failed = res.filter(c => c.violations > 0).map(c => c.name)
+    expect(failed, '孤儿售后单应被体检抓到').toContain('after_sale_user_exists')
+  })
+})

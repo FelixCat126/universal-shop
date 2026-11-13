@@ -74,6 +74,7 @@ export default {
 
   // 商品相关
   product: {
+    decreaseQty: '减少数量',
     relatedProducts: '相关推荐',
     insufficientStock: "库存不足，仅剩 {stock} 件",
     title: '商品',
@@ -140,6 +141,7 @@ export default {
 
   // 购物车
   cart: {
+    decreaseQty: '减少数量',
     undo: '撤销',
     addToCart: "加入购物车",
     continueShopping: "继续购物",
@@ -183,6 +185,8 @@ export default {
 
   // 用户相关
   user: {
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     login: '登录',
     register: '注册',
     logout: '退出',

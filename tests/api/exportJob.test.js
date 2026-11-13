@@ -181,7 +181,13 @@ describe('ExportJob.async', () => {
       l => l.route && l.route.path === '/jobs' && l.route.methods.get
     )
     expect(listLayer).toBeTruthy()
-    expect(listLayer.route.stack).toHaveLength(1)
+    // 列表**可以**挂权限门（requirePermission），但绝不能挂 exportLimiter ——
+    // 前端每 3 秒轮询一次，限流（10 次/分）会把轮询直接打断。
+    // 所以这里断言的是"没有限流器"，而不是"处理器数量必须是 1"。
+    const hasExportLimiter = listLayer.route.stack.some(
+      l => l.name === 'exportLimiter' || l.handle?.name === 'exportLimiter'
+    )
+    expect(hasExportLimiter, '任务列表不能挂导出限流器（会打断前端轮询）').toBe(false)
 
     // 对照：创建任务必须挂限流（它会真的去跑数据库导出）
     const createLayer = router.stack.find(

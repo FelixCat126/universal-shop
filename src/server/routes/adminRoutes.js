@@ -22,6 +22,22 @@ import { validate, promotionPayloadSchema, promotionStatusSchema, couponTemplate
 const router = express.Router()
 
 // 管理员登录：限流 + 失败次数过阈值时强制验证码，防暴力破解
+
+/**
+ * 管理员级收口（admin / super_admin）。
+ *
+ * 用于**资损级写操作**：订单退款审批、重置客户密码等 ——
+ * 这些不是"日常运营操作"，操作员（operator）不该有权做。
+ */
+const requireAdminOnly = (req, res, next) => {
+  const role = req.admin?.role
+  if (role === 'super_admin' || role === 'admin') return next()
+  return res.status(403).json({
+    success: false,
+    message: '需要管理员权限（操作员不能执行该操作）'
+  })
+}
+
 router.post('/login', loginLimiter, requireCaptchaAfterFailures(), AdministratorController.login)
 
 /**
@@ -54,7 +70,19 @@ router.post('/orders/bulk/status', requirePermission('orders'), logOperation('bu
 router.put('/orders/:id/status', requirePermission('orders'), logOperation('update_order_status', 'order'), OrderController.updateOrderStatus)
 router.delete('/orders/:id', requireSuperAdmin, logOperation('delete_order', 'order'), OrderController.deleteOrder)
 router.get('/after-sales', requirePermission('orders'), AfterSaleController.listAdmin)
-router.put('/after-sales/:id/status', requirePermission('orders'), logOperation('review_after_sale', 'after_sale'), AfterSaleController.review)
+/**
+ * 售后审批要收口到管理员（admin/super_admin）。
+ *
+ * 为什么：审批通过 = 订单取消 + 收积分 + 收券 + 回补库存 —— **资损级写操作**。
+ * 之前只挂 requirePermission('orders')，而 operator 恰好有 orders 权限
+ * → 操作员可以对**任意用户的在途订单**批退款。
+ *
+ * 与同文件「重置客户密码」的要求一致（那边已经用 requireUserAdmin 收口），
+ * 两边都是"账号/资金级高危操作"，不该一个收一个不收。
+ *
+ * 列表（GET）仍然对 operator 开放 —— 看售后是客服的日常工作。
+ */
+router.put('/after-sales/:id/status', requirePermission('orders'), requireAdminOnly, logOperation('review_after_sale', 'after_sale'), AfterSaleController.review)
 
 // 合作方（批发）与普通用户菜单隔离：独立 permission partners
 /**

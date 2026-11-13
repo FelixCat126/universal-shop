@@ -37,6 +37,7 @@
       <button
         @click="$emit('close', toast.id)"
         :class="['flex-shrink-0 p-1 rounded-full hover:bg-opacity-20 transition-colors', closeButtonClasses]"
+        :aria-label="$t('common.close')"
       >
         <XMarkIcon class="w-4 h-4" />
       </button>
