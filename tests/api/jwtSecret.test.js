@@ -9,8 +9,9 @@
  *   JS-1 有效 JWT_SECRET → 直接采用
  *   JS-2 生产环境缺失/过短/占位值 → 抛错（拒绝启动）
  *   JS-3 非生产环境无效 → 回退占位密钥（并告警）
- *   JS-4 无效的 JWT_ADMIN_SECRET：非生产 → 派生子密钥；生产 → 回退 JWT_SECRET
+ *   JS-4 无效的 JWT_ADMIN_SECRET：非生产 → 派生子密钥；生产 → 也派生独立子密钥
  *   JS-5 纯空白字符串按无效处理
+ *   JS-6 三把密钥在**任何**环境都互不相同（密钥域隔离）
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
@@ -74,7 +75,7 @@ describe('JWT 密钥解析', () => {
     warn.mockRestore()
   })
 
-  it('JS-4 无效的 JWT_ADMIN_SECRET：非生产派生子密钥、生产回退 JWT_SECRET', async () => {
+  it('JS-4 无效的 JWT_ADMIN_SECRET：非生产派生子密钥、生产也派生独立子密钥', async () => {
     process.env.JWT_SECRET = 'b'.repeat(40)
     process.env.JWT_ADMIN_SECRET = 'also-bad'
     delete process.env.NODE_ENV
@@ -85,11 +86,44 @@ describe('JWT 密钥解析', () => {
     expect(dev.JWT_ADMIN_SECRET).not.toBe('b'.repeat(40))
     expect(dev.JWT_ADMIN_SECRET.startsWith('b'.repeat(40))).toBe(true)
 
-    // 生产：回退到 JWT_SECRET 并告警（提醒独立配置）
+    // 生产：**同样派生独立子密钥**（旧实现直接回退到 JWT_SECRET ——
+    // 那会让"漏配一个环境变量"悄悄抹平管理端的密钥边界）
     process.env.NODE_ENV = 'production'
     vi.resetModules()
     const prod = await loadModule()
-    expect(prod.JWT_ADMIN_SECRET).toBe('b'.repeat(40))
+    expect(prod.JWT_ADMIN_SECRET).not.toBe('b'.repeat(40))
+    expect(prod.JWT_ADMIN_SECRET.length).toBe(64)
+    warn.mockRestore()
+  })
+
+  it('JS-6 三把密钥在**任何**环境都互不相同（密钥域隔离）', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    // 场景 A：显式配置但全部配成同一个值（复制粘贴失误）
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = 'c'.repeat(40)
+    process.env.JWT_ADMIN_SECRET = 'c'.repeat(40)
+    process.env.JWT_PARTNER_SECRET = 'c'.repeat(40)
+    vi.resetModules()
+    const bad = await loadModule()
+    // 显式配错时，如实报告"不隔离"（运维看得见），而不是悄悄说"没问题"
+    expect(bad.JWT_SECRET_ISOLATION.adminDistinctFromUser).toBe(false)
+    expect(bad.JWT_SECRET_ISOLATION.partnerDistinctFromUser).toBe(false)
+
+    // 场景 B：漏配 → 派生 → 边界依然成立
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = 'd'.repeat(40)
+    delete process.env.JWT_ADMIN_SECRET
+    delete process.env.JWT_PARTNER_SECRET
+    vi.resetModules()
+    const derived = await loadModule()
+    expect(derived.JWT_SECRET_ISOLATION.adminDistinctFromUser).toBe(true)
+    expect(derived.JWT_SECRET_ISOLATION.partnerDistinctFromUser).toBe(true)
+    expect(derived.JWT_SECRET_ISOLATION.adminDistinctFromPartner).toBe(true)
+    expect(derived.JWT_ADMIN_SECRET).not.toBe(derived.JWT_SECRET)
+    expect(derived.JWT_PARTNER_SECRET).not.toBe(derived.JWT_SECRET)
+    expect(derived.JWT_ADMIN_SECRET).not.toBe(derived.JWT_PARTNER_SECRET)
+
     warn.mockRestore()
   })
 

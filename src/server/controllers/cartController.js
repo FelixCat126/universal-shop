@@ -396,10 +396,19 @@ class CartController {
       { where: { id: existingItem.id } }
     )
 
+    /**
+     * 读回最终行再返回（与普通商品分支同一处理）。
+     *
+     * 原子自增后 **existingItem 仍是旧值**（它的 quantity 还是加购前的数字）。
+     * 直接把它返回出去 = 告诉前端"购物车里有 1 套"，而库里其实是 3 套 ——
+     * 用户在购物车页看到的数量是错的，刷新一下才变。
+     */
+    const freshItem = await Cart.findByPk(existingItem.id)
+
     return res.json({
       success: true,
       message: '购物车已更新',
-      data: existingItem
+      data: freshItem || existingItem
     })
   }
 

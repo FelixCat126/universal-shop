@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { isSharedStateDistributed } from '../utils/sharedState.js'
+import { JWT_SECRET_ISOLATION } from '../config/jwtSecret.js'
 import sequelize from '../config/database.js'
 
 /** 慢请求阈值（毫秒）—— 超过就算"慢" */
@@ -117,6 +118,15 @@ export function getRuntimeMetrics () {
      */
     databasePool: poolStatus(),
     sharedStateDistributed: isSharedStateDistributed(),
+    /**
+     * JWT 密钥域隔离状态（**只有布尔结论，不含任何密钥内容**）。
+     *
+     * 三把密钥若相同，用户/管理端/合作方的边界就只剩载荷里的 type 字段 ——
+     * 任一域的密钥单独泄露即可伪造其它域的令牌。
+     * 正常情况下三把都不同；出现 false 说明环境变量被配成了同一个值
+     * （复制粘贴失误），需要运维介入。
+     */
+    jwtSecretIsolation: JWT_SECRET_ISOLATION,
     node: process.version
   }
 }

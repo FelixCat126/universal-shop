@@ -1,12 +1,11 @@
-/** 与后端 assertPasswordPolicy 一致的门户校验（自助设置密码场景） */
-export const PASSWORD_MIN_LEN = 8
-
-/** @returns {null | 'short' | 'digit' | 'letter'} 空串用 null（由调用方提示必填） */
-export function describePasswordPolicyFailure (password) {
-  const s = String(password ?? '')
-  if (!s) return null
-  if (s.length < PASSWORD_MIN_LEN) return 'short'
-  if (!/[0-9]/.test(s)) return 'digit'
-  if (!/[A-Za-z]/.test(s)) return 'letter'
-  return null
-}
+/**
+ * 门户密码策略 —— 转发到共享层，保持既有 import 路径不变。
+ *
+ * 规则本体在 `src/utils/passwordPolicy.js`（与后端逐条对齐），
+ * 这里只做转发，避免同一套规则出现第二份副本。
+ */
+export {
+  PASSWORD_MIN_LEN,
+  describePasswordPolicyFailure,
+  meetsPasswordPolicy
+} from '../../utils/passwordPolicy.js'

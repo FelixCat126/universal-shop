@@ -448,7 +448,10 @@ export default {
     usernameLength: 'ชื่อผู้ใช้ต้องมี 2-50 ตัวอักษร',
     realNameLength: 'ชื่อจริงต้องมี 2-50 ตัวอักษร',
     emailFormat: 'รูปแบบอีเมลไม่ถูกต้อง',
-    passwordLength: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
+    passwordLength: 'อย่างน้อย 8 ตัวอักษร ต้องมีตัวเลขและตัวอักษร',
+    passwordMinLength: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร',
+    passwordNeedsDigit: 'รหัสผ่านต้องมีตัวเลขอย่างน้อยหนึ่งตัว',
+    passwordNeedsLetter: 'รหัสผ่านต้องมีตัวอักษรอย่างน้อยหนึ่งตัว',
     passwordMismatch: 'รหัสผ่านไม่ตรงกัน',
     messages: {
       loadFailed: 'โหลดรายการล้มเหลว',

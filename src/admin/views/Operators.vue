@@ -159,6 +159,7 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin.js'
+import { describePasswordPolicyFailure } from '../../utils/passwordPolicy.js'
 
 const adminStore = useAdminStore()
 
@@ -193,6 +194,22 @@ const formRef = ref()
 const passwordFormRef = ref()
 
 // 表单验证规则
+/**
+ * 密码校验用**共享层**的策略（src/utils/passwordPolicy.js），
+ * 与后端 assertPasswordPolicy 逐条对齐。
+ *
+ * 原来这里写死 `{ min: 6 }`，比后端松 —— 后端收紧后就会出现
+ * "前端校验过了、后端返回 400"的错位，用户完全不知道错在哪。
+ * 现在前后端同一把尺子、同一套提示文案。
+ */
+function passwordPolicyValidator (_rule, value, callback) {
+  const fail = describePasswordPolicyFailure(value)
+  if (fail === 'short') return callback(new Error(t('operators.passwordMinLength')))
+  if (fail === 'digit') return callback(new Error(t('operators.passwordNeedsDigit')))
+  if (fail === 'letter') return callback(new Error(t('operators.passwordNeedsLetter')))
+  return callback()
+}
+
 const rules = {
   username: [
     { required: true, message: () => t('operators.enterUsername'), trigger: 'blur' },
@@ -200,7 +217,7 @@ const rules = {
   ],
   password: [
     { required: true, message: () => t('operators.enterPassword'), trigger: 'blur' },
-    { min: 6, message: () => t('operators.passwordLength'), trigger: 'blur' }
+    { validator: passwordPolicyValidator, trigger: 'blur' }
   ],
   role: [
     { required: true, message: () => t('operators.selectRole'), trigger: 'change' }
@@ -210,7 +227,7 @@ const rules = {
 const passwordRules = {
   password: [
     { required: true, message: () => t('operators.enterPassword'), trigger: 'blur' },
-    { min: 6, message: () => t('operators.passwordLength'), trigger: 'blur' }
+    { validator: passwordPolicyValidator, trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: () => t('operators.enterConfirmPassword'), trigger: 'blur' },

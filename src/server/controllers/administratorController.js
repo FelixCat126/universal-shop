@@ -6,6 +6,7 @@ import AuditLog from '../models/AuditLog.js'
 import { JWT_ADMIN_SECRET } from '../config/jwtSecret.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { invalidateAdminAuthCache } from '../middlewares/adminAuthMiddleware.js'
+import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { likeContains } from '../utils/likeSearch.js'
@@ -171,6 +172,24 @@ class AdministratorController {
         return res.status(400).json({
           success: false,
           message: '用户名和密码为必填项'
+        })
+      }
+
+      /**
+       * 密码强度与用户侧/合作方侧**同一把尺子**（assertPasswordPolicy）。
+       *
+       * 管理端是权限最高的 realm：管理端令牌能看到全部订单、客户资料、
+       * 导出与经营统计。口令策略一旦比别处松，这里就成了全站最弱的一环 ——
+       * 而"所有设密入口同一把尺子"恰恰是 AT-7 已经断言过的性质。
+       *
+       * 只影响**新设**的密码；已存在账号的口令不受影响（登录不校验策略，
+       * 不存在把存量管理员锁在门外的风险）。
+       */
+      const policy = assertPasswordPolicy(password)
+      if (!policy.ok) {
+        return res.status(400).json({
+          success: false,
+          message: policy.message
         })
       }
 
@@ -377,10 +396,20 @@ class AdministratorController {
       const { password } = req.body
       const currentAdmin = req.admin
 
-      if (!password || password.length < 6) {
+      /**
+       * 密码强度与用户侧/合作方侧**同一把尺子**（assertPasswordPolicy）。
+       *
+       * 原来这里只校验"至少 6 个字符"—— `123456` 在管理端是能被暴力猜到的，
+       * 而管理端令牌能看全部订单、客户资料、导出与经营统计。
+       *
+       * 对比用户侧：管理员重置**客户**密码走的是"生成随机临时密码 + 强制首登改密"，
+       * 根本不允许调用方自带口令。这里允许自带，就该用同一把尺子。
+       */
+      const policy = assertPasswordPolicy(password)
+      if (!policy.ok) {
         return res.status(400).json({
           success: false,
-          message: '密码至少6个字符'
+          message: policy.message
         })
       }
 
@@ -491,15 +520,24 @@ class AdministratorController {
         })
       }
 
-      const presetPassword = process.env.INIT_ADMIN_PASSWORD && process.env.INIT_ADMIN_PASSWORD.length >= 8
-        ? String(process.env.INIT_ADMIN_PASSWORD)
-        : null
+      /**
+       * 初始超级管理员口令：与所有其它设密入口**同一把尺子**。
+       *
+       * 原来这里只要求"≥8 字符"，比 assertPasswordPolicy 宽（后者还要数字+字母）。
+       * 这是全站第一个被创建的管理员账号 —— 它的强度决定了整条管理链的起点。
+       */
+      const presetRaw = process.env.INIT_ADMIN_PASSWORD ? String(process.env.INIT_ADMIN_PASSWORD) : ''
+      const presetPolicy = presetRaw ? assertPasswordPolicy(presetRaw) : { ok: false, message: '未设置' }
+      const presetPassword = presetPolicy.ok ? presetRaw : null
       if (!presetPassword && process.env.NODE_ENV === 'production') {
         return res.status(400).json({
           success: false,
-          message: '生产环境必须通过 INIT_ADMIN_PASSWORD 设置初始密码（≥8 字符）'
+          message: presetRaw
+            ? `生产环境初始密码强度不足：${presetPolicy.message}`
+            : '生产环境必须通过 INIT_ADMIN_PASSWORD 设置初始密码（至少8位，含数字与英文字母）'
         })
       }
+      // 开发环境兜底：'admin123' 恰好满足统一策略（8 位 + 数字 + 字母）
       const finalPassword = presetPassword || 'admin123'
 
       const superAdmin = await Administrator.create({

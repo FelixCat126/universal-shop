@@ -85,6 +85,7 @@ import { ref, reactive, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { usePartnerStore } from '../stores/partner.js'
+import { describePasswordPolicyFailure } from '../../utils/passwordPolicy.js'
 import { useToast } from '../composables/useToast.js'
 
 const { t } = useI18n()
@@ -102,12 +103,18 @@ const error = ref('')
  */
 const forced = computed(() => !!store.profile?.must_reset_password)
 
-/** 与服务端 assertPasswordPolicy 同一把尺子（≥8 位 + 字母 + 数字） */
+/**
+ * 与服务端 assertPasswordPolicy 同一把尺子（≥8 位 + 字母 + 数字）。
+ *
+ * 规则本体来自共享层 `src/utils/passwordPolicy.js` —— 以前这里自己抄了一份
+ * 正则，服务端一改就会出现"前端过了后端拒"。现在只有一份实现。
+ */
 function checkPolicy (pwd) {
   if (!pwd) return t('password.errRequired')
-  if (pwd.length < 8) return t('password.errLength')
-  if (!/[0-9]/.test(pwd)) return t('password.errDigit')
-  if (!/[A-Za-z]/.test(pwd)) return t('password.errLetter')
+  const fail = describePasswordPolicyFailure(pwd)
+  if (fail === 'short') return t('password.errLength')
+  if (fail === 'digit') return t('password.errDigit')
+  if (fail === 'letter') return t('password.errLetter')
   return ''
 }
 

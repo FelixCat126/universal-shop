@@ -28,6 +28,7 @@
     "test:api": "vitest --run tests/api",
     "test:vue": "vitest --run --config vitest.vue.config.js",
     "test:all": "npm run test:integration && npm run test:api && npm run test:vue",
+    "test:regression": "npm run test:integration && npm run test:api && npm run test:vue",
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --config vitest.coverage.config.js --coverage",
     "test:watch": "vitest --watch",

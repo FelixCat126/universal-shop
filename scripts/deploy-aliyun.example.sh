@@ -45,6 +45,27 @@ fi
 REMOTE="${DEPLOY_USER}@${DEPLOY_HOST}"
 TGZ_BASENAME="$(basename "${TGZ}")"
 
+# ===========================================
+# 回归门禁（默认开启）
+# ===========================================
+#
+# 为什么要它：曾经有真 bug 的用例一直好好地躺在 tests/integration 里，
+# 但回归只跑了 tests/api + tests/vue —— **测了但没跑 = 没测**。
+# 少跑一套测试，等于把那一套里的真 bug 直接放行到生产。
+#
+# 确实需要跳过时：DEPLOY_SKIP_TESTS=1 bash scripts/deploy-aliyun.sh
+if [[ "${DEPLOY_SKIP_TESTS:-0}" != "1" ]]; then
+  echo "🧪 回归门禁：integration + api + vue..."
+  if ! (cd "${ROOT}" && npm run test:regression); then
+    echo "❌ 回归未通过 —— 已中止部署"
+    echo "   （确实需要跳过：DEPLOY_SKIP_TESTS=1）"
+    exit 1
+  fi
+  echo "✅ 回归通过"
+else
+  echo "⚠️ 已显式跳过回归门禁（DEPLOY_SKIP_TESTS=1）"
+fi
+
 echo "📦 本地执行 package.sh ..."
 bash "${ROOT}/package.sh"
 

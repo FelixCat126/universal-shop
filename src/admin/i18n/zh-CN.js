@@ -447,7 +447,10 @@ export default {
     usernameLength: '用户名长度为2-50个字符',
     realNameLength: '姓名长度为2-50个字符',
     emailFormat: '邮箱格式不正确',
-    passwordLength: '密码至少6个字符',
+    passwordLength: '至少8位，含数字与英文字母',
+    passwordMinLength: '密码至少8个字符',
+    passwordNeedsDigit: '密码须包含至少一个数字',
+    passwordNeedsLetter: '密码须包含至少一个英文字母',
     passwordMismatch: '两次密码不一致',
     messages: {
       loadFailed: '加载列表失败',

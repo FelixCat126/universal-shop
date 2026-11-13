@@ -446,7 +446,10 @@ export default {
     usernameLength: 'Username length should be 2-50 characters',
     realNameLength: 'Real name length should be 2-50 characters',
     emailFormat: 'Invalid email format',
-    passwordLength: 'Password should be at least 6 characters',
+    passwordLength: 'At least 8 characters, with a digit and a letter',
+    passwordMinLength: 'Password must be at least 8 characters',
+    passwordNeedsDigit: 'Password must contain at least one digit',
+    passwordNeedsLetter: 'Password must contain at least one letter',
     passwordMismatch: 'Passwords do not match',
     messages: {
       loadFailed: 'Failed to load list',
