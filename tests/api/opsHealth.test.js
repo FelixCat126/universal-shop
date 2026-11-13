@@ -9,6 +9,7 @@
  * GS-2 是真实故障注入：把 sequelize.query 打挂，看健康检查会不会仍然报"正常"。
  */
 import { describe, it, expect, afterEach } from 'vitest'
+import { createRequire } from 'node:module'
 import fs from 'node:fs'
 import path from 'node:path'
 import request from 'supertest'
@@ -79,5 +80,25 @@ describe('运维指标', () => {
     expect(d).toHaveProperty('databasePool')
     expect(d).toHaveProperty('slowRequests')
     expect(d).toHaveProperty('uptimeSeconds')
+  })
+})
+
+describe('PM2 配置', () => {
+  it('GS-6 package.sh 生成的 PM2 配置能被 require（ESM 项目里必须是 .cjs）', () => {
+    const require = createRequire(import.meta.url)
+    const pkg = fs.readFileSync(path.join(ROOT, 'package.sh'), 'utf8')
+    const m = pkg.match(/ecosystem\.config\.cjs[\s\S]*?<< 'EOF'\n([\s\S]*?)\nEOF/)
+    expect(m, 'package.sh 里应生成 ecosystem.config.cjs（.js 在 ESM 项目里 PM2 加载不了）').toBeTruthy()
+
+    // 放到项目目录里再 require —— .cjs 是否被当 CommonJS 取决于最近的 package.json
+    const tmp = path.join(ROOT, 'ecosystem.config.check.cjs')
+    fs.writeFileSync(tmp, m[1] + '\n')
+    try {
+      const cfg = require(tmp)
+      expect(cfg.apps?.[0]?.name).toBe('universal-shop')
+      expect(cfg.apps?.[0]?.kill_timeout, '缺 kill_timeout → 优雅停机被 SIGKILL 打断').toBeGreaterThanOrEqual(15000)
+    } finally {
+      fs.unlinkSync(tmp)
+    }
   })
 })

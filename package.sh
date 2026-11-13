@@ -55,7 +55,10 @@ cp -r scripts "${PACKAGE_DIR}/" 2>/dev/null || true
 chmod +x "${PACKAGE_DIR}/scripts/deploy-on-server.sh" 2>/dev/null || true
 
 # 生成PM2配置文件
-cat > "${PACKAGE_DIR}/ecosystem.config.js" << 'EOF'
+# ⚠️ 必须是 .cjs：项目的 package.json 声明了 "type": "module"，
+# .js 会被 Node 当成 ESM，而 PM2 用 require() 加载配置文件 → ERR_REQUIRE_ESM，
+# 部署时 pm2 reload 失败 → **老进程已停、新进程没起，服务直接 502**。
+cat > "${PACKAGE_DIR}/ecosystem.config.cjs" << 'EOF'
 module.exports = {
   apps: [{
     name: 'universal-shop',
@@ -85,6 +88,8 @@ module.exports = {
 EOF
 
 # 创建必要目录
+rm -f "${PACKAGE_DIR}/ecosystem.config.js"
+
 mkdir -p "${PACKAGE_DIR}/public/uploads"
 mkdir -p "${PACKAGE_DIR}/database"
 mkdir -p "${PACKAGE_DIR}/ssl"
@@ -246,7 +251,7 @@ pm2 monit
 ## 🔧 手动PM2部署
 ```bash
 # 使用配置文件启动
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 
 # 保存PM2进程列表
 pm2 save

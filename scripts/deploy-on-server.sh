@@ -234,18 +234,23 @@ fi
 # --------------------------------------------------------------------------
 echo "🚀 PM2 启动/重启..."
 export NODE_ENV=production
+# 旧版本生成的是 ecosystem.config.js（ESM 项目里 PM2 加载不了）→ 删掉，避免误用
+rm -f ecosystem.config.js
 if command -v pm2 >/dev/null 2>&1; then
   if pm2 describe universal-shop >/dev/null 2>&1; then
     # 带配置文件 reload：PM2 才会**重新应用**配置（如 kill_timeout）。
     # `pm2 reload universal-shop` 用的是 PM2 内存里的旧配置，
-    # 改了 ecosystem.config.js 不会生效（kill_timeout 之类）。
-    if [[ -f ecosystem.config.js ]]; then
-      pm2 reload ecosystem.config.js --update-env
+    # 改了 ecosystem.config.cjs 不会生效（kill_timeout 之类）。
+    # ⚠️ 配置文件必须是 .cjs：项目 package.json 是 "type": "module"，
+    # .js 会被 Node 当 ESM，PM2 用 require() 加载会 ERR_REQUIRE_ESM →
+    # reload 失败 → 老进程已停、新进程没起 → 服务 502。
+    if [[ -f ecosystem.config.cjs ]]; then
+      pm2 reload ecosystem.config.cjs --update-env
     else
       pm2 reload universal-shop --update-env
     fi
-  elif [[ -f ecosystem.config.js ]]; then
-    pm2 start ecosystem.config.js
+  elif [[ -f ecosystem.config.cjs ]]; then
+    pm2 start ecosystem.config.cjs
   else
     pm2 start src/server/index.js --name universal-shop
   fi
