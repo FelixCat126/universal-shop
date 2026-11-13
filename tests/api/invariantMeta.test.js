@@ -28,6 +28,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { QueryTypes } from 'sequelize'
+import { spawnSync } from 'node:child_process'
+import path from 'node:path'
 import { TestDatabase } from '../setup/test-database.js'
 import { CHECKS } from '@server/utils/dataInvariants.js'
 
@@ -105,4 +107,19 @@ describe('体检项的元测试', () => {
     }
     expect(noisy, '空库时不该有检查报错（说明 SQL 写错了，比如恒真条件）：\n' + noisy.join('\n')).toEqual([])
   })
+
+  it('IM-6 自证模式在生产环境必须被硬拦（它会 TRUNCATE 表）', async () => {
+    // 自证模式会清空表并写入违规数据。如果它在生产环境跑得起来，
+    // 一次手滑就是全站数据归零 —— 所以这条闸本身也要有护栏。
+    const script = path.resolve(__dirname, '../../scripts/check-data-invariants.mjs')
+    const res = spawnSync(process.execPath, [script, '--self-test', '--allow-production'], {
+      env: { ...process.env, NODE_ENV: 'production' },
+      encoding: 'utf8',
+      timeout: 30000
+    })
+
+    expect(res.status, '生产环境下自证模式必须以非 0 退出码拒绝执行').not.toBe(0)
+    const out = `${res.stdout || ''}${res.stderr || ''}`
+    expect(out, '拒绝时必须说明原因和正确的跑法').toMatch(/生产|清空|TRUNCATE/i)
+  }, 60000)
 })

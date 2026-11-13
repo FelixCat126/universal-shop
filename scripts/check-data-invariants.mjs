@@ -58,6 +58,31 @@ if (isProd && !allowProduction) {
   process.exit(2)
 }
 
+/**
+ * ⚠️ 硬闸：自证模式会 **TRUNCATE 表 + 写入违规数据**。
+ *
+ * 它**绝不能**在生产库上跑 —— --allow-production 只代表"允许只读重查询"，
+ * 不代表"允许清库"。这里单独拦一次，不给任何绕过参数。
+ *
+ * 判定方式：只有 NODE_ENV=test（连 DATABASE_URL_TEST）或显式 --confirm-write 才放行。
+ * 其它一律拒绝 —— 因为在 NODE_ENV 未设置时，连接串可能来自 DATABASE_URL，
+ * 那可能就是生产库（脚本无法从连接串本身判断是不是生产）。
+ */
+if (selfTest) {
+  if (isProd) {
+    console.error('❌ 自证模式（--self-test）会清空表并写入违规数据，禁止在生产环境运行')
+    console.error('   请在测试库上执行：NODE_ENV=test DATABASE_URL_TEST=... node scripts/check-data-invariants.mjs --self-test')
+    process.exit(2)
+  }
+  if (process.env.NODE_ENV !== 'test' && !args.includes('--confirm-write')) {
+    console.error('❌ 自证模式（--self-test）会清空表并写入违规数据')
+    console.error('   当前 NODE_ENV=' + (process.env.NODE_ENV || '(未设置)') + '，连接串可能来自 DATABASE_URL（可能是生产库）')
+    console.error('   请改用测试库：NODE_ENV=test DATABASE_URL_TEST=... node scripts/check-data-invariants.mjs --self-test')
+    console.error('   （确实知道目标库可清空时，可追加 --confirm-write）')
+    process.exit(2)
+  }
+}
+
 const { default: sequelize } = await import('../src/server/config/database.js')
 
 try {
