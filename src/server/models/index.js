@@ -19,8 +19,8 @@ import AdministrativeRegion from './AdministrativeRegion.js'
 import SystemConfig from './SystemConfig.js'
 import OperationLog from './OperationLog.js'
 import AuditLog from './AuditLog.js'
-import './UserPointBalance.js'
-import './PointTransaction.js'
+import UserPointBalance from './UserPointBalance.js'
+import PointTransaction from './PointTransaction.js'
 import Partner from './Partner.js'
 import PartnerOrder from './PartnerOrder.js'
 import PartnerOrderItem from './PartnerOrderItem.js'
@@ -65,7 +65,11 @@ export {
   Bundle,
   BundleItem,
   AfterSale,
-  ExportJob
+  ExportJob,
+  // ⚠️ 这两个之前**只 import 没有导出** —— 别的模块（自证脚本、运维工具）
+  // 从这里拿模型时会拿到 undefined，是个容易踩的坑。
+  UserPointBalance,
+  PointTransaction
 }
 
 // 导出默认对象
@@ -94,5 +98,7 @@ export default {
   Bundle,
   BundleItem,
   AfterSale,
-  ExportJob
+  ExportJob,
+  UserPointBalance,
+  PointTransaction
 }
