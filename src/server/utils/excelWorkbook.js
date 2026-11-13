@@ -158,6 +158,20 @@ export async function createStreamingExport ({ sheetName, headers, widths = [] }
         await fs.unlink(tmpFile).catch(() => {})
         throw err
       }
+    },
+
+    /**
+     * 放弃这次导出（失败路径必须调用）。
+     *
+     * WorkbookWriter 在**创建时**就 createWriteStream 打开了 fd，
+     * 只有 commit() 才会关它 —— 导出中途失败（DB 超时、进程重启、ExcelJS 报错）时：
+     *   - fd 泄漏 → 累积到 ulimit 后，进程所有文件操作（日志落盘、上传、静态文件）一起失败
+     *   - 临时文件泄漏 → 每次失败留一份（20 万行 xlsx 可达数十 MB），
+     *     而清理任务只回收"任务表里有 file_path 的行"，**孤儿文件永远收不回来**
+     */
+    async abort () {
+      try { await workbook.commit() } catch { /* 已经在错误态 */ }
+      await fs.unlink(tmpFile).catch(() => {})
     }
   }
 }

@@ -58,6 +58,20 @@ export const IMAGE_VARIANTS = {
 /** 主图最长边 */
 export const MAIN_MAX_EDGE = 1600
 
+/**
+ * 解码前的像素数上限（sharp 的 limitInputPixels）。
+ *
+ * ⚠️ multer 的 fileSize 限制的是**压缩后的字节数**，不约束**解码尺寸**：
+ * 一张 16000×16000 的纯色 PNG 压缩后不到 2MB（能过限制），
+ * 但 libvips 解码它要 ~2.56 亿像素 ≈ 0.8~1GB 内存 —— 并发几个直接 OOM，
+ * 整个 API 进程被杀掉。
+ *
+ * sharp 的默认值是 0x3FFF² ≈ 2.68 亿像素，等于**基本不限制**。
+ * 这里收到 5000 万像素（约 7000×7000，对商品图绰绰有余；
+ * 实际输出还会 resize 到 1600 边长），超出的直接报错 → 走下面的兜底（保留原图）。
+ */
+const MAX_INPUT_PIXELS = 50_000_000
+
 /** 派生出的变体文件名（与前端 utils/imageVariants.js 必须一致） */
 export function variantFileName (fileName, variant) {
   const ext = path.extname(fileName)
@@ -100,7 +114,7 @@ export async function processImageFile (filePath) {
   if (!sharp) return { main: fileName, thumb: null, mid: null }
 
   try {
-    const buf = await sharp(filePath)
+    const buf = await sharp(filePath, { limitInputPixels: MAX_INPUT_PIXELS })
       .rotate() // 按 EXIF 方向摆正，省得竖图躺倒
       .resize({ width: MAIN_MAX_EDGE, height: MAIN_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 82 })

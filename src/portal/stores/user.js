@@ -178,16 +178,13 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  // 获取推荐统计
-  const getReferralStats = async () => {
-    try {
-      const response = await api.get('/user/referral-stats')
-      return response.data
-    } catch (error) {
-      console.error('Get referral stats error:', error)
-      return { success: false, message: '获取推荐统计失败' }
-    }
-  }
+  /**
+   * 「推荐统计」的后端接口**从未实现**（后端没有 /api/user/referral-stats，
+   * 实际挂载的是 /api/users 与 /api/auth），而且这个函数**没有任何视图调用**。
+   *
+   * 留着会让人以为"推荐统计"是通的（真调了只会 404）→ 已删除。
+   * 等真有明确口径（推荐人数？佣金？返利？）再连同后端一起加。
+   */
 
   return {
     // 状态
@@ -211,6 +208,5 @@ export const useUserStore = defineStore('user', () => {
     logout,
     updateProfile,
     verifyReferralCode,
-    getReferralStats
   }
 })

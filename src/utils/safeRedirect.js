@@ -26,7 +26,20 @@ export function safeRedirectPath (target, fallback = '/') {
     const url = new URL(t, window.location.origin)
     if (url.origin !== window.location.origin) return fallback
     // 只保留路径与查询，不带 hash 之外的任何外部信息
-    return `${url.pathname}${url.search}${url.hash}`
+    const result = `${url.pathname}${url.search}${url.hash}`
+    /**
+     * ⚠️ 必须对**归一化之后**的结果再检一次。
+     *
+     * `new URL('/..//evil.com', origin)` 会把 `..` 归一化掉 →
+     * pathname 变成 `//evil.com`（authority 藏在 pathname 里）。
+     * 而 `url.origin` 只看 scheme/host/port，**发现不了**这种形态 ——
+     * 上面那几行 startsWith('//') 的判断发生在归一化**之前**，挡不住。
+     *
+     * 后果：登录后 router.push('//evil.com') → 落到 404 而不是目标页；
+     * 若将来把这个返回值接到 window.location，就是真正的开放重定向。
+     */
+    if (result.startsWith('//') || result.startsWith('/\\')) return fallback
+    return result
   } catch {
     return fallback
   }

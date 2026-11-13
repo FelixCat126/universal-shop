@@ -136,6 +136,52 @@ const upload = multer({
   }
 })
 
+/**
+ * public/ 目录的绝对路径（用于校验配置值指向的文件）。
+ */
+const PUBLIC_ROOT = path.resolve(__dirname, '../../../public')
+
+/**
+ * 安全删除 public/ 下的文件。
+ *
+ * ⚠️ 为什么要校验：
+ * `config_value` 来自数据库，而 setConfig 对 key/value/type **零校验** ——
+ * 管理员能把 home_banner 的值设成 '../../../../../../etc/passwd'，
+ * 这里 path.join 会把 ../ 归一化 → 路径**逃出 public/** → fs.unlink 删掉任意文件：
+ *   删 .env  → JWT 密钥丢失 → 全站掉线
+ *   删 dist/ → 前端白屏
+ *   删 uploads/ → 全部图片丢失
+ *
+ * 所以：解析后的绝对路径必须仍在 public/ 之内，否则**不删**。
+ *
+ * @param {string} relativePath 配置里存的相对路径
+ * @returns {Promise<{deleted: boolean, reason?: string}>}
+ */
+async function safeUnlinkInPublic (relativePath) {
+  /**
+   * ⚠️ 用 path.join 拼接、再用 path.resolve 归一化 —— 顺序不能反。
+   *
+   * path.resolve('/base', '/abs') = '/abs'   ← 绝对路径会**覆盖** base
+   * path.join('/base', '/abs')  = '/base/abs' ← 拼接（这正是上传接口存的形态）
+   *
+   * 先 resolve 的话，存的是 "/uploads/xxx.png" 的旧图会被解析到文件系统根目录，
+   * 结果是"文件删不掉"（覆盖上传会一直留垃圾文件）。
+   */
+  const target = path.resolve(path.join(PUBLIC_ROOT, String(relativePath || '')))
+  // 加 path.sep 是为了防 "/publicevil" 这类前缀绕过
+  if (target !== PUBLIC_ROOT && !target.startsWith(PUBLIC_ROOT + path.sep)) {
+    logger.warn('配置指向的路径不在 public 内，跳过删除', { relativePath, target })
+    return { deleted: false, reason: 'outside_public' }
+  }
+  try {
+    await fs.unlink(target)
+    return { deleted: true }
+  } catch (e) {
+    if (e?.code === 'ENOENT') return { deleted: false, reason: 'not_found' }
+    throw e
+  }
+}
+
 class SystemConfigController {
   // 获取所有系统配置
   static async getAllConfigs(req, res) {
@@ -189,6 +235,29 @@ class SystemConfigController {
           success: false,
           message: '配置键名不能为空'
         })
+      }
+
+      /**
+       * 图片类配置的值必须是**public 下的相对路径**。
+       *
+       * 这个值后续会被拼到 public/ 上做文件删除（unlink）——
+       * 不校验就能把值设成 '../../../../etc/passwd'，
+       * 路径归一化后逃出 public/ → 删掉任意文件（删 .env → 全站掉线）。
+       * 删除处也做了兜底校验，但**写入口就该拦住**。
+       */
+      if (type === 'image') {
+        const raw = value == null ? '' : String(value).trim()
+        const looksUnsafe =
+          raw === '' ||
+          raw.startsWith('/') ||          // 绝对路径
+          raw.includes('..') ||          // 目录穿越
+          raw.includes('\0')
+        if (looksUnsafe) {
+          return res.status(400).json({
+            success: false,
+            message: '图片路径必须是 public 目录下的相对路径（不能含 .. 或以 / 开头）'
+          })
+        }
       }
       
       // 货币单位：仅允许 THB / USD / CNY / MYR，默认泰铢
@@ -400,8 +469,7 @@ class SystemConfigController {
       
       if (config && config.config_type === 'image' && config.config_value) {
         try {
-          const imagePath = path.join(__dirname, '../../../public', config.config_value)
-          await fs.unlink(imagePath)
+          await safeUnlinkInPublic(config.config_value)
         } catch (error) {
           logger.warn('删除图片文件失败（不影响操作）:', error.message)
         }
@@ -462,8 +530,7 @@ class SystemConfigController {
         
         if (oldConfig && oldConfig.config_value) {
           try {
-            const oldImagePath = path.join(__dirname, '../../../public', oldConfig.config_value)
-            await fs.unlink(oldImagePath)
+            await safeUnlinkInPublic(oldConfig.config_value)
           } catch (error) {
             // 删除旧图片失败不影响上传流程，只记录警告
             logger.warn('删除旧首页长图失败（不影响上传）:', error.message)
@@ -528,8 +595,7 @@ class SystemConfigController {
         
         if (oldConfig && oldConfig.config_value) {
           try {
-            const oldImagePath = path.join(__dirname, '../../../public', oldConfig.config_value)
-            await fs.unlink(oldImagePath)
+            await safeUnlinkInPublic(oldConfig.config_value)
           } catch (error) {
             // 删除旧二维码失败不影响上传流程，只记录警告
             logger.warn('删除旧支付二维码失败（不影响上传）:', error.message)
@@ -576,8 +642,7 @@ class SystemConfigController {
       
       if (config && config.config_value) {
         try {
-          const imagePath = path.join(__dirname, '../../../public', config.config_value)
-          await fs.unlink(imagePath)
+          await safeUnlinkInPublic(config.config_value)
           logger.info('✅ 物理文件删除成功')
         } catch (error) {
           logger.warn('删除图片文件失败（不影响操作）:', error.message)
@@ -630,8 +695,7 @@ class SystemConfigController {
       
       if (config && config.config_value) {
         try {
-          const imagePath = path.join(__dirname, '../../../public', config.config_value)
-          await fs.unlink(imagePath)
+          await safeUnlinkInPublic(config.config_value)
           logger.info('✅ 物理文件删除成功')
         } catch (error) {
           logger.warn('删除二维码文件失败（不影响操作）:', error.message)

@@ -344,8 +344,19 @@ export async function importPartnerCsv (buffer, options = {}) {
 /**
  * 导出合作方为 CSV 文本（含 BOM）
  */
+/**
+ * 合作方 CSV 导出的行数上限（与同步导出、用户导出同一口径）。
+ * 之前是无上限全表读进内存 → 20 万行时峰值 1GB+，可被反复触发 OOM。
+ */
+const CSV_EXPORT_ROW_LIMIT = 50000
+
 export async function exportPartnersCsv () {
-  const partners = await Partner.findAll({ order: [['id', 'ASC']] })
+  const partners = await Partner.findAll({
+    // 只取要导出的列（password_hash 不进内存）
+    attributes: ['id', 'login', 'display_name', 'account_kind', 'discount_percent', 'is_active'],
+    order: [['id', 'ASC']],
+    limit: CSV_EXPORT_ROW_LIMIT
+  })
   const lines = [CSV_COLUMNS.join(',')]
   for (const p of partners) {
     const raw = p.toJSON()

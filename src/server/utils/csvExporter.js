@@ -102,6 +102,21 @@ export async function createStreamingCsvExport ({ headers = [], delimiter = ',' 
       const stat = await fs.stat(target)
       await fs.unlink(tmpFile).catch(() => {})
       return { size: stat.size }
+    },
+
+    /**
+     * 放弃这次导出（失败路径必须调用）。
+     *
+     * 句柄与临时文件都是在**创建时**就打开/落盘的，只有 writeTo / writeToFile
+     * 才会关掉它们 —— 导出中途失败（DB 超时、进程重启、ExcelJS 报错）时，
+     * 这个 fd 与临时文件就**永久泄漏**：
+     *   - fd 泄漏 → 累积到 ulimit 后，进程所有文件操作（日志落盘、上传、静态文件）一起失败
+     *   - 临时文件泄漏 → 每次失败留一份（20 万行 xlsx 可达数十 MB），
+     *     而清理任务只回收"ExportJob 表里有 file_path 的行"，**孤儿文件永远收不回来**
+     */
+    async abort () {
+      try { await handle.close() } catch { /* 已关闭 */ }
+      await fs.unlink(tmpFile).catch(() => {})
     }
   }
 }

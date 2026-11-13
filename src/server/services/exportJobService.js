@@ -91,18 +91,41 @@ function exportFormatOf (job) {
  * 按格式创建导出器 + 文件名。
  * @returns {Promise<{exporter: object, fileName: string}>}
  */
+/**
+ * 进行中的导出器：jobId → exporter。
+ *
+ * 导出器的句柄与临时文件都是**创建时**就打开/落盘的，
+ * 只有成功路径（writeTo / writeToFile）才会关掉。
+ * 任务失败时必须能拿到它来清理 —— 否则每次失败泄漏一个 fd + 一份临时文件
+ * （清理任务只回收"任务表里有 file_path 的行"，孤儿文件永远收不回来）。
+ */
+const activeExporters = new Map()
+
 async function makeExporter (job, { sheetName, headers, widths, baseName }) {
   const fmt = exportFormatOf(job)
   const day = new Date().toISOString().split('T')[0]
+  let exporter
+  let fileName
   if (fmt === 'csv') {
-    return {
-      exporter: await createStreamingCsvExport({ headers }),
-      fileName: `${baseName}_${day}_${job.id}.csv`
-    }
+    exporter = await createStreamingCsvExport({ headers })
+    fileName = `${baseName}_${day}_${job.id}.csv`
+  } else {
+    exporter = await createStreamingExport({ sheetName, headers, widths })
+    fileName = `${baseName}_${day}_${job.id}.xlsx`
   }
-  return {
-    exporter: await createStreamingExport({ sheetName, headers, widths }),
-    fileName: `${baseName}_${day}_${job.id}.xlsx`
+  activeExporters.set(job.id, exporter)
+  return { exporter, fileName }
+}
+
+/** 释放导出器占用的资源（失败或结束都调用） */
+async function disposeExporter (jobId) {
+  const exporter = activeExporters.get(jobId)
+  activeExporters.delete(jobId)
+  if (!exporter) return
+  try {
+    await exporter.abort?.()
+  } catch (e) {
+    logger.warn('清理导出器资源失败', { jobId, err: e?.message })
   }
 }
 
@@ -570,8 +593,19 @@ export async function runExportJob (job) {
       completed_at: new Date()
     })
     logger.info('导出任务完成', { jobId: job.id, type: job.type, rows: result.rowCount, ms: Date.now() - job.started_at })
+    /**
+     * 成功路径**不要**调 abort()。
+     *
+     * writeToFile 已经关掉句柄并清理了临时文件；再调 abort 会对**已 commit 的
+     * workbook 二次 commit** → archiver 抛 "archive already finalizing"，
+     * 且那个 promise 若没人接住就是 unhandledRejection → **整个进程退出**
+     * （E2E 里表现为 WebServer 崩溃，后续全部用例失败）。
+     */
+    activeExporters.delete(job.id)
   } catch (error) {
     logger.error('导出任务失败', { jobId: job.id, err: error?.message, stack: error?.stack })
+    // 失败路径必须清理：句柄 + 临时文件（成功路径已由 writeToFile 处理）
+    await disposeExporter(job.id)
     await job.update({
       status: 'failed',
       error_message: String(error?.message || '导出失败').slice(0, 500),
@@ -726,5 +760,42 @@ export async function cleanupExpiredExportFiles () {
       await job.update({ file_path: null })
     } catch { /* ignore */ }
   }
-  return removed
+
+  /**
+   * 再扫一遍目录，回收**孤儿文件**。
+   *
+   * 上一段只能删"ExportJob 表里有记录且已过期"的文件。而这些文件永远没人管：
+   *   - 导出任务**失败**时留下的临时文件（export-*.csv / export-*.xlsx）
+   *   - 任务记录被删/被清库、但文件还在的成品文件
+   * 它们的共同点：**数据库里没有对应记录**。
+   *
+   * 实测（本地）：tmp 目录里堆了 80+ 个跨 4 天的导出文件，全是孤儿 ——
+   * 磁盘只增不减，容器磁盘满了服务就挂。
+   *
+   * 判据：文件在目录里、**不在**数据库记录里、且 mtime 已超过 TTL → 删。
+   */
+  let orphans = 0
+  try {
+    const names = await fs.readdir(EXPORT_DIR)
+    const known = new Set(
+      (await ExportJob.findAll({ attributes: ['file_path'] }))
+        .map(j => j.file_path)
+        .filter(Boolean)
+    )
+    const ttlMs = FILE_TTL_HOURS * 3600000
+    for (const name of names) {
+      const full = path.join(EXPORT_DIR, name)
+      if (known.has(full)) continue
+      const st = await fs.stat(full).catch(() => null)
+      if (!st || !st.isFile()) continue
+      // 刚生成的文件可能正在被写 → 只删超过 TTL 的
+      if (Date.now() - st.mtimeMs < ttlMs) continue
+      await fs.unlink(full).catch(() => {})
+      orphans++
+    }
+  } catch (e) {
+    logger.warn('扫描导出目录清理孤儿文件失败', { err: e?.message })
+  }
+
+  return removed + orphans
 }

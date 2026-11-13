@@ -101,6 +101,16 @@ export const errorHandler = (err, req, res, next) => {
     return sendErrorResponse(res, 400, '请求数据格式错误', 'INVALID_JSON')
   }
 
+  /**
+   * URL 编码无效（如 `/%c0`）：扫描器打的畸形路径。
+   * Express 在**参数解码**阶段就抛了 URIError，此前没有分支接住它
+   * → 落到默认的 500（"服务器内部错误"）。
+   * 这是**客户端**给的坏请求，返回 400 更准确。
+   */
+  if (err instanceof URIError) {
+    return sendErrorResponse(res, 400, '请求的 URL 编码无效', 'INVALID_URL_ENCODING')
+  }
+
   // 默认服务器错误：客户端永远只看到通用提示
   const message = process.env.NODE_ENV === 'production'
     ? '服务器内部错误'

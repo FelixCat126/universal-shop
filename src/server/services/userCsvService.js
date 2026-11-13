@@ -419,8 +419,22 @@ export async function importUserCsv (buffer, options = {}) {
 /**
  * 导出用户为 CSV 文本（含 BOM）
  */
+/**
+ * 用户 CSV 导出的行数上限（与同步导出同一口径）。
+ *
+ * 之前是**无上限全表读进内存**（还把 password_hash 一并载入）→
+ * 20 万行时峰值内存 1GB+，配合限流可被反复触发 OOM。
+ * 订单导出早就改成"分批 keyset 游标 + 流式写出"，这两处漏了。
+ */
+const CSV_EXPORT_ROW_LIMIT = 50000
+
 export async function exportUsersCsv () {
-  const users = await User.findAll({ order: [['id', 'ASC']] })
+  const users = await User.findAll({
+    // 只取要导出的列：password_hash 等敏感列根本不必进内存
+    attributes: ['id', 'nickname', 'username', 'email', 'phone', 'country_code', 'referral_code', 'is_active'],
+    order: [['id', 'ASC']],
+    limit: CSV_EXPORT_ROW_LIMIT
+  })
   const lines = [CSV_COLUMNS.join(',')]
   for (const u of users) {
     const raw = u.toJSON()

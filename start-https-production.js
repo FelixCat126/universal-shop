@@ -54,11 +54,48 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
+/**
+ * 允许的 Host 白名单（逗号分隔）。
+ *
+ * 不配就用默认端口推导的主机名 —— 也就是只允许"访问者用的就是配置里的那个域名"。
+ * 配了则额外允许这些域名（反向代理/多域名场景）。
+ */
+const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || '')
+  .split(',')
+  .map(h => h.trim().toLowerCase())
+  .filter(Boolean)
+
+/**
+ * 校验 Host 头。
+ *
+ * ⚠️ 不校验 Host 就拼重定向 URL = **Host 头注入 / 开放重定向**：
+ * 请求带 `Host: evil.com` → 响应 `301 Location: https://evil.com/...`，
+ * 站点变成跳转器；前面的 CDN/nginx 若缓存了这个 301 → web cache poisoning，
+ * 所有访客被批量送去钓鱼站。
+ *
+ * 端口只允许数字（去掉端口后比主机名）。
+ */
+function isAllowedHost (hostHeader) {
+  if (!hostHeader) return false
+  const host = String(hostHeader).toLowerCase()
+  // 只允许 主机名[:端口] 的形式，主机名里不许再有别的结构
+  if (!/^[a-z0-9.-]+(:\d+)?$/.test(host)) return false
+  const hostname = host.split(':')[0]
+  const expected = String(process.env.HOST || `localhost:${HTTP_PORT}`).toLowerCase().split(':')[0]
+  if (hostname === expected) return true
+  return ALLOWED_HOSTS.some(h => h.split(':')[0] === hostname)
+}
+
 // HTTPS重定向中间件
 app.use((req, res, next) => {
   // 如果是HTTP请求，重定向到HTTPS
   if (req.header('x-forwarded-proto') !== 'https' && !req.secure) {
-    const httpsUrl = `https://${req.get('host').replace(`:${HTTP_PORT}`, `:${HTTPS_PORT}`)}${req.url}`
+    const host = req.get('host')
+    if (!isAllowedHost(host)) {
+      // Host 不可信 → 不给跳转，直接 400（绝不用不可信的 Host 拼 URL）
+      return res.status(400).type('text').send('Bad Request')
+    }
+    const httpsUrl = `https://${host.replace(`:${HTTP_PORT}`, `:${HTTPS_PORT}`)}${req.url}`
     return res.redirect(301, httpsUrl)
   }
   next()

@@ -73,7 +73,13 @@ export async function authenticatePartner (req, res, next) {
     req.partnerFull = partner
     next()
   } catch (e) {
-    logger.error('authenticatePartner', { err: e?.message, stack: e?.stack })
+    // 令牌过期/无效是用户常态（不是系统故障）→ 降级为 warn，别淹没真错误
+    const isTokenProblem = e?.name === 'TokenExpiredError' || e?.name === 'JsonWebTokenError'
+    if (isTokenProblem) {
+      logger.warn('合作方令牌已失效（需重新登录）', { err: e?.message, url: req.originalUrl })
+    } else {
+      logger.error('authenticatePartner', { err: e?.message, stack: e?.stack, url: req.originalUrl })
+    }
     return res.status(500).json({ success: false, message: '认证失败' })
   }
 }

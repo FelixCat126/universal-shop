@@ -134,7 +134,19 @@ export const authenticateAdmin = async (req, res, next) => {
     
     next()
   } catch (error) {
-    logger.error('管理员Token验证失败', { err: error?.message, stack: error?.stack })
+    /**
+     * 令牌过期/无效是**用户常态**（管理员 8 小时不登录就过期了），
+     * 不是系统故障 —— 记成 error + 完整 stack 会把真正的错误淹没。
+     *
+     * 实证：生产日志里最近仅有的两条"错误"全是这个
+     * （管理员 token 过期、扫描器打的畸形 URL），真问题反而看不见。
+     */
+    const isTokenProblem = error?.name === 'TokenExpiredError' || error?.name === 'JsonWebTokenError'
+    if (isTokenProblem) {
+      logger.warn('管理员令牌已失效（需重新登录）', { err: error?.message, url: req.originalUrl })
+    } else {
+      logger.error('管理员Token验证失败', { err: error?.message, stack: error?.stack, url: req.originalUrl })
+    }
     return res.status(401).json({
       success: false,
       message: '无效的认证令牌'
