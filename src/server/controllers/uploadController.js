@@ -21,7 +21,7 @@ async function assertImageMagicBytes (filePath) {
   const sig = await fileTypeFromFile(filePath).catch(() => null)
   const ok = sig && ALLOWED_IMAGE_MIMES.has(sig.mime)
   if (!ok) {
-    try { fs.unlinkSync(filePath) } catch {}
+    try { fs.unlinkSync(filePath) } catch { /* 文件可能已被清理，忽略 */ }
     const err = new Error('文件内容并非允许的图片格式（魔法字节校验失败）')
     err.status = 400
     throw err

@@ -1,0 +1,14 @@
+# ESLint 忽略清单
+#
+# 为什么要这个文件：lint 脚本此前是空壳（echo），配置还因 ESM/CJS 不匹配加载不了，
+# 于是静态检查网形同虚设。把 lint 真正启用后，下面两类文件会淹没真实问题：
+#
+# 1. 生成的数据文件：thailandRegions.js 有 8000+ 条行政区记录，
+#    单它一个就贡献 10 万+ 条风格告警（真正的代码问题只有几百条）。
+# 2. 构建产物：dist/ 与 src/**/dist/ 是打包输出，不该被 lint。
+dist/
+src/portal/dist/
+src/admin/dist/
+src/partner/dist/
+src/server/seeds/thailandRegions.js
+node_modules/

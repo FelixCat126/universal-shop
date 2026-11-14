@@ -42,6 +42,7 @@ function sanitizeCsvCell (value) {
   if (typeof value !== 'string' || value.length === 0) return value
   const FORMULA_START = /^\s*[=@|]/
   const SIGN_FORMULA = /^\s*[+-](?![0-9]\s*$)/
+  // eslint-disable-next-line no-control-regex -- 目的就是检测控制字符（它们能被用来绕过前导字符判定）
   const CONTROL_PREFIX = /^[\x00-\x1f\x7f]/
   const ZERO_WIDTH = /^[\uFEFF\u200B-\u200D\u2060]/g
   const probe = value.replace(ZERO_WIDTH, '')

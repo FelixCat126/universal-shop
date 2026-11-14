@@ -521,8 +521,7 @@ export const ROUTE_SCHEMAS = {
   'GET /api/admin/partner-orders': { response: pagedList('PartnerOrder') },
 
   /* ---------------- 用户与地址 ---------------- */
-  'GET /api/users/profile': { response: env('User') },
-  'PUT /api/users/profile': { response: env('User') },
+  // 注：GET/PUT /api/users/profile 的完整定义在下方「用户认证」区块（含 request schema），此处不重复登记
   'GET /api/admin/users': { response: pagedList('User') },
   'GET /api/admin/users/:userId/addresses': { response: envArray('Address') },
   'GET /api/addresses': { response: envArray('Address') },

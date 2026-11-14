@@ -13,6 +13,8 @@ import { parseId } from '../utils/params.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { likeContains } from '../utils/likeSearch.js'
 import { respondDbError } from '../utils/dbInputError.js'
+import { getBusinessTimezone } from '../utils/businessTimezone.js'
+import { applyCreatedBetween } from '../utils/dateFilters.js'
 
 // 单次导出行数安全上限（与 exportController 口径一致）；超出截断并在文件末尾追加说明行
 const EXPORT_ROW_LIMIT = 50000
@@ -226,14 +228,24 @@ class PartnerAdminController {
       const from = req.query.from != null ? String(req.query.from).trim() : ''
       const to = req.query.to != null ? String(req.query.to).trim() : ''
 
-      const where = {}
+      let where = {}
       if (status) where.status = status
 
-      if (from && to) {
-        where.created_at = {
-          [Op.between]: [new Date(`${from}T00:00:00.000Z`), new Date(`${to}T23:59:59.999Z`)]
-        }
-      }
+      /**
+       * 日期筛选统一走 applyCreatedBetween（与零售订单列表**同一口径**）。
+       *
+       * 之前这里写死 `new Date(`${from}T00:00:00.000Z`)` —— 按 **UTC** 切日，
+       * 而零售订单列表按本地（现按业务时区）切日，两者差 8 小时：
+       * 运营拿"3 月 10 日"同时筛零售单与合作方单，会看到**不同的单子**。
+       *
+       * 顺带修掉"必须同时给 from 和 to 才生效"：只给一个时被整段忽略，
+       * 看起来像筛选器坏了。
+       */
+      where = applyCreatedBetween(
+        where,
+        { start_date: from, end_date: to },
+        { timezone: await getBusinessTimezone() }
+      )
 
       const partnerIncludeWhere =
         partner_keyword.length > 0
@@ -355,13 +367,23 @@ class PartnerAdminController {
       const from = req.query.from != null ? String(req.query.from).trim() : ''
       const to = req.query.to != null ? String(req.query.to).trim() : ''
 
-      const where = {}
+      let where = {}
       if (status) where.status = status
-      if (from && to) {
-        where.created_at = {
-          [Op.between]: [new Date(`${from}T00:00:00.000Z`), new Date(`${to}T23:59:59.999Z`)]
-        }
-      }
+      /**
+       * 日期筛选统一走 applyCreatedBetween（与零售订单列表**同一口径**）。
+       *
+       * 之前这里写死 `new Date(`${from}T00:00:00.000Z`)` —— 按 **UTC** 切日，
+       * 而零售订单列表按本地（现按业务时区）切日，两者差 8 小时：
+       * 运营拿"3 月 10 日"同时筛零售单与合作方单，会看到**不同的单子**。
+       *
+       * 顺带修掉"必须同时给 from 和 to 才生效"：只给一个时被整段忽略，
+       * 看起来像筛选器坏了。
+       */
+      where = applyCreatedBetween(
+        where,
+        { start_date: from, end_date: to },
+        { timezone: await getBusinessTimezone() }
+      )
 
       const partnerIncludeWhere =
         partner_keyword.length > 0

@@ -13,6 +13,7 @@ import {
 import { logger } from '../utils/logger.js'
 import { ApiError } from '../middlewares/errorHandler.js'
 import { clearResponseCache } from '../utils/responseCache.js'
+import { getBusinessTimezone, localDateKey } from '../utils/businessTimezone.js'
 
 /**
  * CSV 用**内存存储**：不落盘。
@@ -109,7 +110,9 @@ export default class ProductCsvController {
   static async exportProducts (req, res) {
     try {
       const csv = await exportProductsCsv()
-      const filename = `products-${new Date().toISOString().slice(0, 10)}.csv`
+      // 文件名用业务时区的日期（原来用 UTC 日期，凌晨导出得到的是'昨天'的文件名）
+      const tz = await getBusinessTimezone()
+      const filename = `products-${localDateKey(tz, new Date())}.csv`
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
       return res.send(csv)

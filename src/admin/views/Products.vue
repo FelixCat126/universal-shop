@@ -152,7 +152,7 @@
               </template>
               <template #error>
                 <div class="image-error">
-                  <el-icon><Picture /></el-icon>
+                  <el-icon><PictureIcon /></el-icon>
                   <div class="error-text">{{ t('products.image.loadFailed') }}</div>
                 </div>
               </template>
@@ -482,7 +482,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
-import { Plus, Search, Refresh, Loading, Picture, Delete, Edit, ArrowDown, Upload, Download } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Loading, Picture as PictureIcon, ArrowDown, Upload, Download } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { productAPI } from '../api/products.js'
@@ -496,9 +496,7 @@ export default {
     Search,
     Refresh,
     Loading,
-    Picture,
-    Delete,
-    Edit,
+    PictureIcon,
     Upload,
     Download,
     // ⚠️ 这个文件用的是普通 <script>（不是 <script setup>）——

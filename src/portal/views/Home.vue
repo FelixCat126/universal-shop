@@ -989,7 +989,7 @@ watch(
 /** 中止在途的搜索请求 */
 function abortSearch () {
   if (searchAbort) {
-    try { searchAbort.abort() } catch (_) {}
+    try { searchAbort.abort() } catch (_) { /* 中止上一次搜索失败无需处理 */ }
     searchAbort = null
   }
 }

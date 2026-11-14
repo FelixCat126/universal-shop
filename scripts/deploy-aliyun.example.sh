@@ -66,6 +66,26 @@ else
   echo "⚠️ 已显式跳过回归门禁（DEPLOY_SKIP_TESTS=1）"
 fi
 
+# ===========================================
+# 静态检查门禁（默认开启）
+# ===========================================
+#
+# 为什么要有它：npm run lint 此前是 echo（Linting completed)（空壳），
+# 而 .eslintrc.js 又因 ESM/CJS 不匹配加载不了 —— 静态检查网形同虚设，
+# 连「给 const 重新赋值」这种会让接口 500 的错误都漏了过去。
+#
+# 现在 lint 是真的：正确性问题（error 级）会挡部署，风格问题只提醒。
+if [[ "${DEPLOY_SKIP_LINT:-0}" != "1" ]]; then
+  echo "🔍 静态检查（eslint）..."
+  if ! (cd "${ROOT}" && npm run lint); then
+    echo "❌ 静态检查未通过 —— 已中止部署"
+    echo "   （确实需要跳过：DEPLOY_SKIP_LINT=1）"
+    exit 1
+  fi
+  echo "✅ 静态检查通过"
+else
+  echo "⚠️ 已显式跳过静态检查（DEPLOY_SKIP_LINT=1）"
+fi
 echo "📦 本地执行 package.sh ..."
 bash "${ROOT}/package.sh"
 

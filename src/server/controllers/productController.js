@@ -779,14 +779,14 @@ class ProductController {
        */
       let affected = 0
       if (type === 'set') {
-        ;[affected] = await Product.update({ stock: q }, { where: { id }, paranoid: false })
+        [affected] = await Product.update({ stock: q }, { where: { id }, paranoid: false })
       } else if (type === 'add') {
-        ;[affected] = await Product.update(
+        [affected] = await Product.update(
           { stock: sequelize.literal(`stock + ${q}`) },
           { where: { id }, paranoid: false }
         )
       } else {
-        ;[affected] = await Product.update(
+        [affected] = await Product.update(
           { stock: sequelize.literal(`stock - ${q}`) },
           { where: { id, stock: { [Op.gte]: q } }, paranoid: false }
         )

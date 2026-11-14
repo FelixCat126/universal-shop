@@ -9,6 +9,7 @@ import {
   exportUsersCsv
 } from '../services/userCsvService.js'
 import { logger } from '../utils/logger.js'
+import { getBusinessTimezone, localDateKey } from '../utils/businessTimezone.js'
 
 /** 统一的错误响应 */
 function fail (res, error, fallback) {
@@ -71,7 +72,10 @@ export default class UserCsvController {
   static async exportUsers (req, res) {
     try {
       const csv = await exportUsersCsv()
-      const filename = `users-${new Date().toISOString().slice(0, 10)}.csv`
+      // 文件名用**业务时区**的日期（原来用 toISOString = UTC 日期，
+      // 凌晨导出得到的是"昨天"的文件名）
+      const tz = await getBusinessTimezone()
+      const filename = `users-${localDateKey(tz, new Date())}.csv`
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
       return res.send(csv)

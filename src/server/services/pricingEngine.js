@@ -353,8 +353,8 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
    * 统一按 id ASC 排序——买赠原查询即为 id ASC；满减原查询未指定排序，
    * 合并后 priority 与减免额完全相同的平级场景取 id 较小者，结果更确定
    */
-  let buyGetPromotions = []
-  let thresholdPromotions = []
+  const buyGetPromotions = []
+  const thresholdPromotions = []
   if (paymentMethod !== 'points') {
     const activePromotions = await Promotion.findAll({
       where: {
@@ -619,7 +619,7 @@ export async function priceOrder ({ items, paymentMethod = 'cod', now = new Date
           }
         }
         // 尾差归应付最大行；若为负（逐行取整导致多摊），从最大行扣回且不得为负
-        let tail = round2(couponOff - allocatedSum)
+        const tail = round2(couponOff - allocatedSum)
         if (tail !== 0 && maxLine) {
           const current = maxLine.discount_allocated
           let adjusted = round2(current + tail)

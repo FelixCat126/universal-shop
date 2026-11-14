@@ -17,7 +17,7 @@ const isProd = process.env.NODE_ENV === 'production'
 
 const logDir = process.env.LOG_DIR || path.resolve(process.cwd(), 'logs')
 if (!isTest) {
-  try { fs.mkdirSync(logDir, { recursive: true }) } catch {}
+  try { fs.mkdirSync(logDir, { recursive: true }) } catch { /* 日志目录已存在或不可创建，忽略 */ }
 }
 
 const baseFormat = winston.format.combine(

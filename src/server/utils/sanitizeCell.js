@@ -25,6 +25,7 @@ const FORMULA_START = /^\s*[=@|]/
  */
 const SIGN_FORMULA = /^\s*[+-](?![0-9]\s*$)/
 /** 控制字符（可用于绕过判定） */
+// eslint-disable-next-line no-control-regex -- 目的就是检测控制字符（它们能被用来绕过前导字符判定）
 const CONTROL_PREFIX = /^[\x00-\x1f\x7f]/
 /** 零宽字符/BOM：攻击者常插在公式前绕过判定 */
 const ZERO_WIDTH = /^[\uFEFF\u200B-\u200D\u2060]/g

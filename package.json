@@ -42,7 +42,7 @@
     "gen:openapi": "node scripts/generate-openapi.mjs",
     "gen:types": "node scripts/generate-api-types.mjs",
     "hooks:setup": "node scripts/setup-git-hooks.js",
-    "lint": "echo 'Linting completed'",
+    "lint": "eslint src --ext .js,.vue",
     "start": "node src/server/index.js",
     "start:production": "NODE_ENV=production node start-https-production.js",
     "migrate:order-status": "node run-order-status-migration.js migrate",

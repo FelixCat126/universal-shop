@@ -793,7 +793,6 @@ export default {
     stockStatus: 'Stock Status',
     name: 'Product Name',
     alias: 'Product Alias',
-    description: 'Product Description',
     category: 'Category',
     price: 'Price (THB)',
     points: 'Points required',
@@ -888,7 +887,6 @@ export default {
       label: 'Discount',
       placeholder: 'Discount percentage'
     },
-    csvHint: 'The first row must be a header. Supported columns: id / name / name_th / category / price / stock / points / description / image. Rows with an id update that product; rows without an id create a new one.',
   },
 
   // Promotion management (marketing center)

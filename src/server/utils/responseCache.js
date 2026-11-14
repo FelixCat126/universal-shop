@@ -65,7 +65,8 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
              * 请求被拖慢甚至超时。
              */
             const generation = cacheGeneration
-            let write
+  let write
+  // eslint-disable-next-line prefer-const -- 刻意拆开赋值：与 finally 串在一起会在初始化前触发 TDZ（见上方注释）
             write = cache.set(key, JSON.stringify(body), ttlMs)
               .then(async () => {
                 // 写入期间清过缓存 → 这条是旧数据，删掉，别让它活过这次清库
@@ -78,7 +79,7 @@ export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
             write.then(() => pendingWrites.delete(write), () => pendingWrites.delete(write))
             res.setHeader('X-Cache', 'MISS')
           }
-        } catch {}
+        } catch { /* 缓存写入失败不影响主流程 */ }
         return orig(body)
       }
       next()

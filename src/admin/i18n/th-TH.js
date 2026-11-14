@@ -38,8 +38,6 @@ export default {
     currency: '฿',
     currencyName: 'บาทไทย ฿',
     createTime: 'เวลาสร้าง',
-    confirm: 'ยืนยัน',
-    cancel: 'ยกเลิก',
     delete: 'ลบ',
     edit: 'แก้ไข',
     add: 'เพิ่ม',
@@ -795,7 +793,6 @@ export default {
     stockStatus: 'สถานะคลังสินค้า',
     name: 'ชื่อสินค้า',
     alias: 'ชื่อเรียกอื่น',
-    description: 'คำอธิบายสินค้า',
     category: 'หมวดหมู่',
     price: 'ราคา (บาท THB)',
     points: 'คะแนนที่ใช้แลกได้',
@@ -890,7 +887,6 @@ export default {
       label: 'ส่วนลด',
       placeholder: 'เปอร์เซ็นต์ส่วนลด'
     },
-    csvHint: 'แถวแรกต้องเป็นชื่อคอลัมน์ รองรับ: id / name / name_th / category / price / stock / points / description / image แถวที่มี id จะอัปเดตสินค้านั้น แถวที่ไม่มี id จะสร้างสินค้าใหม่',
   },
 
   // 促销管理页面（营销中心）

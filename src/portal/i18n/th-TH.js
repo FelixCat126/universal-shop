@@ -209,7 +209,6 @@ export default {
     otpInvalid: 'รหัสไม่ถูกต้องหรือหมดอายุ กรุณาขอรหัสใหม่',
     otpResendHint: 'กรุณาเลื่อนแคปช์อีกครั้งเพื่อรับรหัสยืนยันใหม่',
     resendOtp: 'ส่งอีกครั้ง',
-    newPassword: 'รหัสผ่านใหม่',
     newPasswordPlaceholder: 'กรอกรหัสผ่านใหม่',
     resetPassword: 'ตั้งรหัสผ่านใหม่',
     passwordResetOk: 'ตั้งรหัสผ่านใหม่เรียบร้อย กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่',

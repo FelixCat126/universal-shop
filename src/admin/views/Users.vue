@@ -732,7 +732,7 @@ const formatAddress = (address) => {
   }
   
   // 组合省市区，用空格分隔
-  let regionPart = parts.join(' ')
+  const regionPart = parts.join(' ')
   
   // 添加详细地址
   if (address.detail_address && address.detail_address.trim()) {

@@ -38,8 +38,6 @@ export default {
     currency: '฿',
     currencyName: '泰铢 ฿',
     createTime: '创建时间',
-    confirm: '确认',
-    cancel: '取消',
     delete: '删除',
     edit: '编辑',
     add: '添加',
@@ -794,7 +792,6 @@ export default {
     stockStatus: '库存状态',
     name: '产品名称',
     alias: '产品别名',
-    description: '产品描述',
     category: '分类',
     price: '价格（泰铢）',
     points: '购买所需积分',
@@ -889,7 +886,6 @@ export default {
       label: '折扣',
       placeholder: '折扣百分比'
     },
-    csvHint: 'CSV 第一行必须是表头，支持的列：id / name / name_th / category / price / stock / points / description / image。带 id 的行会更新对应商品，不带 id 的行会新建。',
   },
 
   // 促销管理页面（营销中心）

@@ -209,7 +209,6 @@ export default {
     otpInvalid: '验证码错误或已过期，请重新获取',
     otpResendHint: '请重新拖动滑块以获取新的验证码',
     resendOtp: '重新获取',
-    newPassword: '新密码',
     newPasswordPlaceholder: '请输入新密码',
     resetPassword: '重置密码',
     passwordResetOk: '密码已重置，请用新密码登录',

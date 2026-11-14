@@ -39,7 +39,6 @@ const useSsl = String(process.env.PG_SSL || '').toLowerCase() === 'true'
 
 const sequelize = new Sequelize(url, {
   dialect: 'postgres',
-  logging: false,
   pool: {
     max: parseInt(process.env.PG_POOL_MAX || '10', 10),
     min: parseInt(process.env.PG_POOL_MIN || '0', 10),

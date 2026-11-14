@@ -103,26 +103,22 @@ export const useAdminStore = defineStore('admin', () => {
       headers['Authorization'] = `Bearer ${token.value}`
     }
 
-    try {
-      const response = await fetch(fullUrl, {
-        ...options,
-        headers
-      })
+    const response = await fetch(fullUrl, {
+      ...options,
+      headers
+    })
 
-      // 如果token过期，自动登出并跳转到登录页
-      if (response.status === 401) {
-        logout()
-        // 在store中不能使用useRouter()，直接使用window.location跳转
-        if (typeof window !== 'undefined') {
-          window.location.href = `${import.meta.env.BASE_URL || '/'}login`
-        }
-        throw new Error('登录已过期，请重新登录')
+    // 如果token过期，自动登出并跳转到登录页
+    if (response.status === 401) {
+      logout()
+      // 在store中不能使用useRouter()，直接使用window.location跳转
+      if (typeof window !== 'undefined') {
+        window.location.href = `${import.meta.env.BASE_URL || '/'}login`
       }
-
-      return response
-    } catch (error) {
-      throw error
+      throw new Error('登录已过期，请重新登录')
     }
+
+    return response
   }
 
   // 验证token有效性

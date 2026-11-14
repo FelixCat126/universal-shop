@@ -111,7 +111,6 @@ export default {
     otpInvalid: 'Invalid or expired code, please request a new one',
     otpResendHint: 'Slide the captcha again to get a new verification code',
     resendOtp: 'Resend',
-    newPassword: 'New password',
     newPasswordPlaceholder: 'Enter a new password',
     resetPassword: 'Reset password',
     passwordResetOk: 'Password reset, please sign in with your new password',

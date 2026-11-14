@@ -73,7 +73,7 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
     selectedCode.value = c
     try {
       localStorage.setItem(STORAGE_KEY, c)
-    } catch (_) {}
+    } catch (_) { /* 汇率缺失时按兜底值处理，忽略读取失败 */ }
   }
 
   /**
@@ -96,7 +96,7 @@ export const usePortalCurrencyStore = defineStore('portalCurrency', () => {
           return
         }
       }
-    } catch (_) {}
+    } catch (_) { /* 读取失败时按兜底货币处理 */ }
     applyDefaultForLocale(locale)
   }
 
