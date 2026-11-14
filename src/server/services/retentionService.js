@@ -53,26 +53,64 @@ async function purgeInBatches (Model, where, batchSize, maxBatches = 200) {
 async function purgePointTransactionsWithArchive ({ where, batchSize }) {
   let total = 0
   for (let i = 0; i < 200; i++) {
-    // 先把即将被删的流水按用户汇总净额
-    const sums = await PointTransaction.findAll({
-      where,
-      attributes: ['user_id', [fn('SUM', col('delta')), 'net']],
-      group: ['user_id'],
-      raw: true
+    /**
+     * 一批的「锁 → 汇总 → 记账 → 删除」必须在**同一个事务**里。
+     *
+     * 为什么以前有隐患：原来是"先算净额、再记账、再删"三条独立语句
+     * （各自一个事务）。READ COMMITTED 下每条语句取自己的快照 ——
+     * 汇总之后、删除之前若有并发写入积分，那条新流水会被删掉，
+     * 但归档净额里**没有它** → 「余额 = 剩余流水累计 + archived_delta」不成立
+     * → 每日体检永久报红（用户看着"账不平"，其实是清理脚本的锅）。
+     *
+     * 修法：先**锁住受影响用户的余额行**（FOR UPDATE，与 pointsService
+     * 的 lockOrCreateBalance 同一把锁）→ 并发写积分会等待 →
+     * 汇总看到的集合 = 实际删掉的集合 → 归档净额精确。
+     *
+     * 锁顺序按 user_id 升序（全站约定），避免与其它持锁路径成环。
+     */
+    const deleted = await sequelize.transaction(async (transaction) => {
+      // 1) 这批要删的流水涉及哪些用户（升序 → 加锁顺序一致）
+      const userRows = await PointTransaction.findAll({
+        where,
+        attributes: ['user_id'],
+        group: ['user_id'],
+        order: [['user_id', 'ASC']],
+        transaction,
+        raw: true
+      })
+      if (!userRows.length) return 0
+
+      // 2) 锁住这些用户的余额行 → 并发写积分排队等待
+      await UserPointBalance.findAll({
+        where: { user_id: { [Op.in]: userRows.map((r) => r.user_id) } },
+        order: [['user_id', 'ASC']],
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+
+      // 3) 汇总即将被删的流水净额（此时并发写积分已被行锁挡住）
+      const sums = await PointTransaction.findAll({
+        where,
+        attributes: ['user_id', [fn('SUM', col('delta')), 'net']],
+        group: ['user_id'],
+        transaction,
+        raw: true
+      })
+
+      // 4) 记进余额行（不存在余额行的用户跳过 —— 余额为 0，归档净额无意义）
+      for (const row of sums) {
+        const net = Number(row.net) || 0
+        if (net === 0) continue
+        await UserPointBalance.update(
+          { archived_delta: literal(`COALESCE(archived_delta, 0) + ${net}`) },
+          { where: { user_id: row.user_id }, transaction }
+        )
+      }
+
+      // 5) 删除
+      return PointTransaction.destroy({ where, limit: batchSize, transaction })
     })
-    if (!sums.length) break
 
-    // 记进余额行（不存在余额行的用户跳过 —— 余额为 0，归档净额无意义）
-    for (const row of sums) {
-      const net = Number(row.net) || 0
-      if (net === 0) continue
-      await UserPointBalance.update(
-        { archived_delta: literal(`COALESCE(archived_delta, 0) + ${net}`) },
-        { where: { user_id: row.user_id } }
-      )
-    }
-
-    const deleted = await PointTransaction.destroy({ where, limit: batchSize })
     total += deleted
     if (deleted < batchSize) break
   }
