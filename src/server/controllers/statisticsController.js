@@ -25,6 +25,14 @@ const isTestEnv = process.env.NODE_ENV === 'test' && process.env.STATS_CACHE_ENA
  */
 const { getCachedOverview, setCachedOverview } = statsCache
 
+import {
+  getBusinessTimezone,
+  sqlDayBucket,
+  businessDayStartDaysAgo,
+  businessDaySeries,
+  startOfBusinessDay
+} from '../utils/businessTimezone.js'
+
 /**
  * 趋势统计按"服务器本地时区"的自然日分桶，SQL 与 JS 两侧口径必须一致：
  * - Sequelize 默认把每个连接的会话时区 SET 为 UTC（options.timezone='+00:00'），
@@ -34,30 +42,31 @@ const { getCachedOverview, setCachedOverview } = statsCache
  * PG 的 AT TIME ZONE 数字偏移是 POSIX 方向（东负西正），与 getTimezoneOffset 的符号天然一致。
  * 注：偏移按查询时刻计算，跨越夏令时切换的历史行可能有 ±1h 误差（部署地无夏令时，可忽略）。
  */
-const localDateKey = (d) => {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-const localTzOffsetLiteral = () => {
-  const offMin = new Date().getTimezoneOffset()
-  const sign = offMin <= 0 ? '-' : '+'
-  const abs = Math.abs(offMin)
-  return `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`
-}
-
-// 本地自然日的 SQL 分桶表达式（以下查询均为单表查询，created_at 无歧义）
-const localDateBucket = () =>
-  sequelize.fn('DATE', sequelize.literal(`created_at AT TIME ZONE '${localTzOffsetLiteral()}'`))
+/**
+ * 业务时区下的"今天"口径。
+ *
+ * 原来这里用的是**服务器本地时区**（`new Date().setHours(0,0,0,0)` 与
+ * `AT TIME ZONE '<服务器偏移>'`）—— 服务器换时区，"今日营收"就跟着变；
+ * 且在有夏令时的时区上，固定偏移的日分桶会与日历日筛选差一小时。
+ *
+ * 现在统一由 `business_timezone` 配置项决定（见 utils/businessTimezone.js），
+ * SQL 侧用 `AT TIME ZONE '<IANA 名>'`（PG 按每一行的时间戳求正确偏移，DST 也对），
+ * JS 侧用同一时区的日历日键 —— 两边逐字对齐。
+ *
+ * @param {string} tz 业务时区
+ */
+const localDateBucket = (tz) =>
+  sequelize.fn('DATE', sequelize.literal(sqlDayBucket(tz)))
 
 class StatisticsController {
   // 获取统计总览数据
   static async getOverviewStats(req, res) {
     try {
+      // 缓存键带业务时区：改了时区配置后，旧口径的缓存不能继续被读到
+      const tz = await getBusinessTimezone()
+      const cacheKey = `overview:${tz}`
       // 命中短缓存就直接返回（省掉 4 条全表聚合）
-      const cached = getCachedOverview()
+      const cached = getCachedOverview(cacheKey)
       if (cached) {
         return res.json({ success: true, data: cached })
       }
@@ -72,7 +81,7 @@ class StatisticsController {
        * 这时 this 是 undefined → this.getOverviewStatsData() 直接抛 TypeError → 500。
        */
       const data = await StatisticsController.getOverviewStatsData()
-      setCachedOverview(data)
+      setCachedOverview(data, cacheKey)
 
       res.json({ success: true, data })
     } catch (error) {
@@ -88,14 +97,13 @@ class StatisticsController {
   // 获取七天订单趋势数据
   static async getOrderTrend(req, res) {
     try {
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      sevenDaysAgo.setHours(0, 0, 0, 0)
+      const tz = await getBusinessTimezone()
+      const sevenDaysAgo = businessDayStartDaysAgo(tz, new Date(), 7)
 
       // 获取过去7天的订单数据
       const orderTrend = await Order.findAll({
         attributes: [
-          [localDateBucket(), 'date'],
+          [localDateBucket(tz), 'date'],
           [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
           [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'amount']
         ],
@@ -104,16 +112,13 @@ class StatisticsController {
             [Op.gte]: sevenDaysAgo
           }
         },
-        group: [localDateBucket()],
-        order: [[localDateBucket(), 'ASC']]
+        group: [localDateBucket(tz)],
+        order: [[localDateBucket(tz), 'ASC']]
       })
 
       // 生成完整的7天数据，包括没有订单的日期
       const trendData = []
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-        const dateStr = localDateKey(date)
+      for (const { dateStr, date } of businessDaySeries(tz, new Date(), 7)) {
         
         const dayData = orderTrend.find(item => item.dataValues.date === dateStr)
         
@@ -142,14 +147,13 @@ class StatisticsController {
   // 获取七天注册用户趋势数据
   static async getUserRegistrationTrend(req, res) {
     try {
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      sevenDaysAgo.setHours(0, 0, 0, 0)
+      const tz = await getBusinessTimezone()
+      const sevenDaysAgo = businessDayStartDaysAgo(tz, new Date(), 7)
 
       // 获取过去7天的注册用户数据
       const userTrend = await User.findAll({
         attributes: [
-          [localDateBucket(), 'date'],
+          [localDateBucket(tz), 'date'],
           [sequelize.fn('COUNT', sequelize.col('id')), 'count']
         ],
         where: {
@@ -157,16 +161,13 @@ class StatisticsController {
             [Op.gte]: sevenDaysAgo
           }
         },
-        group: [localDateBucket()],
-        order: [[localDateBucket(), 'ASC']]
+        group: [localDateBucket(tz)],
+        order: [[localDateBucket(tz), 'ASC']]
       })
 
       // 生成完整的7天数据，包括没有注册用户的日期
       const trendData = []
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-        const dateStr = localDateKey(date)
+      for (const { dateStr, date } of businessDaySeries(tz, new Date(), 7)) {
         
         const dayData = userTrend.find(item => item.dataValues.date === dateStr)
         
@@ -194,10 +195,13 @@ class StatisticsController {
   // 获取综合统计数据（包含总览和趋势）
   static async getComprehensiveStats(req, res) {
     try {
-      // 键含全部查询参数（排序后序列化，与参数顺序无关）；命中直接返回
-      const cacheKey = JSON.stringify(
-        Object.keys(req.query || {}).sort().map(k => [k, req.query[k]])
-      )
+      const tz = await getBusinessTimezone()
+      // 键含全部查询参数（排序后序列化，与参数顺序无关）+ 业务时区；
+      // 命中直接返回
+      const cacheKey = JSON.stringify([
+        tz,
+        ...Object.keys(req.query || {}).sort().map(k => [k, req.query[k]])
+      ])
       if (!isTestEnv) {
         const cached = comprehensiveCache.get(cacheKey)
         if (cached) {
@@ -238,6 +242,7 @@ class StatisticsController {
 
   // 内部方法：获取总览统计数据
   static async getOverviewStatsData() {
+    const tz = await getBusinessTimezone()
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
@@ -249,8 +254,7 @@ class StatisticsController {
      * 面板每次打开都要跑一遍，往返延迟是用户直接感受到的（尤其跨机房时）。
      * Promise.all 把 N 次往返压成 1 次。
      */
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
+    const todayStart = startOfBusinessDay(tz)
 
     const [totalOrders, totalAmountResult, totalUsers, activeUsers, todayStats, actionable] = await Promise.all([
       // 总订单数
@@ -328,13 +332,12 @@ class StatisticsController {
 
   // 内部方法：获取订单趋势数据
   static async getOrderTrendData() {
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    sevenDaysAgo.setHours(0, 0, 0, 0)
+    const tz = await getBusinessTimezone()
+    const sevenDaysAgo = businessDayStartDaysAgo(tz, new Date(), 7)
 
     const orderTrend = await Order.findAll({
       attributes: [
-        [localDateBucket(), 'date'],
+        [localDateBucket(tz), 'date'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
         // 与公共 getOrderTrend 口径一致：优先泰铢底价，缺省回退结算金额
         [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'amount']
@@ -344,15 +347,12 @@ class StatisticsController {
           [Op.gte]: sevenDaysAgo
         }
       },
-      group: [localDateBucket()],
-      order: [[localDateBucket(), 'ASC']]
+      group: [localDateBucket(tz)],
+      order: [[localDateBucket(tz), 'ASC']]
     })
 
     const trendData = []
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      const dateStr = localDateKey(date)
+    for (const { dateStr, date } of businessDaySeries(tz, new Date(), 7)) {
       
       const dayData = orderTrend.find(item => item.dataValues.date === dateStr)
       
@@ -369,13 +369,12 @@ class StatisticsController {
 
   // 内部方法：获取用户注册趋势数据
   static async getUserRegistrationTrendData() {
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    sevenDaysAgo.setHours(0, 0, 0, 0)
+    const tz = await getBusinessTimezone()
+    const sevenDaysAgo = businessDayStartDaysAgo(tz, new Date(), 7)
 
     const userTrend = await User.findAll({
       attributes: [
-        [localDateBucket(), 'date'],
+        [localDateBucket(tz), 'date'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'count']
       ],
       where: {
@@ -383,15 +382,12 @@ class StatisticsController {
           [Op.gte]: sevenDaysAgo
         }
       },
-      group: [localDateBucket()],
-      order: [[localDateBucket(), 'ASC']]
+      group: [localDateBucket(tz)],
+      order: [[localDateBucket(tz), 'ASC']]
     })
 
     const trendData = []
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      const dateStr = localDateKey(date)
+    for (const { dateStr, date } of businessDaySeries(tz, new Date(), 7)) {
       
       const dayData = userTrend.find(item => item.dataValues.date === dateStr)
       

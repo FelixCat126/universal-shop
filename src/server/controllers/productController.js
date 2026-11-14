@@ -584,6 +584,18 @@ class ProductController {
 
       if (action === 'activate' || action === 'deactivate') {
         const status = action === 'activate' ? 'active' : 'inactive'
+        /**
+         * ⚠️ 这里**故意不加 `paranoid: false`** ——
+         *
+         * Product 是软删模型。已删除（已下架）的商品**不参与**上下架：
+         * 对它"上架"既不会让它回来（deleted_at 不会被清），也只会让这次操作
+         * 少命中一行（affected 偏小）。
+         *
+         * 「让已删商品重新上架」只有一条路：`POST /api/admin/products/:id/restore`
+         * （restoreProduct，显式 paranoid:false + 清理 deleted_at）。
+         * 这条边界不能被"顺手加个 paranoid:false"抹掉 ——
+         * 那会让"删除"这个动作形同虚设（删了还能批量上架回来）。
+         */
         const [affected] = await Product.update(
           { status },
           { where: { id: { [Op.in]: idList } } }

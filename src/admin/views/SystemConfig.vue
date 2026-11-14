@@ -245,6 +245,46 @@
           </div>
         </div>
       </el-card>
+
+      <!-- 业务时区：决定"今天 / 本地日历日"的边界（今日营收、趋势分桶、日期筛选） -->
+      <el-card class="config-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3>{{ t('systemConfig.businessTimezone') }}</h3>
+            <span class="card-subtitle">{{ t('systemConfig.businessTimezoneSubtitle') }}</span>
+          </div>
+        </template>
+        <div class="config-content">
+          <div class="currency-unit-section">
+            <el-select
+              v-model="businessTimezone"
+              filterable
+              allow-create
+              clearable
+              default-first-option
+              :placeholder="t('systemConfig.businessTimezonePlaceholder')"
+              style="width: 320px"
+            >
+              <el-option
+                v-for="tz in commonTimezones"
+                :key="tz"
+                :label="tz"
+                :value="tz"
+              />
+            </el-select>
+            <el-button
+              type="primary"
+              style="margin-left: 12px"
+              @click="saveBusinessTimezone"
+            >
+              {{ t('systemConfig.saveBusinessTimezone') }}
+            </el-button>
+            <div class="exchange-rate-tips" style="margin-top: 12px">
+              <p>{{ t('systemConfig.businessTimezoneTips') }}</p>
+            </div>
+          </div>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -275,6 +315,24 @@ const exchangeRatesCny = ref(0)
 const exchangeRatesMyr = ref(0)
 const currencyCode = ref('THB')
 const pointsEarnRate = ref(0.01)
+
+/** 业务时区（IANA 名）：决定"今天 / 本地日历日"的边界 */
+const businessTimezone = ref('Asia/Shanghai')
+/** 常用时区（下拉里给运营选；允许手动输入其它 IANA 名，后端会校验） */
+const commonTimezones = [
+  'Asia/Shanghai',
+  'Asia/Bangkok',
+  'Asia/Singapore',
+  'Asia/Jakarta',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Asia/Kuala_Lumpur',
+  'Asia/Dubai',
+  'Europe/London',
+  'Europe/Paris',
+  'America/New_York',
+  'UTC'
+]
 
 const uploading = reactive({
   homeBanner: false,
@@ -328,6 +386,7 @@ const loadConfigs = async () => {
         mergeCurrencyCodeIntoLocales(mergeLocaleMessage, currencyCode.value)
         const per = parseFloat(configs.points_earn_rate?.value || '0.01')
         pointsEarnRate.value = Number.isFinite(per) && per >= 0 ? per : 0.01
+        businessTimezone.value = configs.business_timezone?.value || 'Asia/Shanghai'
       } else {
         ElMessage.error(data.message || t('systemConfig.messages.loadConfigFailed'))
       }
@@ -637,6 +696,42 @@ const savePointsEarnRate = async () => {
   } catch (error) {
     console.error('保存积分获取比率失败:', error)
     ElMessage.error(t('systemConfig.messages.pointsEarnRateSaveFailed'))
+  }
+}
+
+const saveBusinessTimezone = async () => {
+  try {
+    const tz = String(businessTimezone.value || '').trim()
+    if (!tz) {
+      ElMessage.error(t('systemConfig.messages.invalidBusinessTimezone'))
+      return
+    }
+    const response = await adminStore.apiRequest('/api/system-config/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        key: 'business_timezone',
+        value: tz,
+        type: 'text',
+        description: '业务时区：决定"今天/本地日历日"的边界（今日营收、趋势分桶、日期筛选）'
+      })
+    })
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success) {
+        businessTimezone.value = data.data?.business_timezone || tz
+        ElMessage.success(t('systemConfig.messages.businessTimezoneSaveSuccess'))
+      } else {
+        ElMessage.error(data.message || t('systemConfig.messages.businessTimezoneSaveFailed'))
+      }
+    } else {
+      ElMessage.error(t('systemConfig.messages.businessTimezoneSaveFailed'))
+    }
+  } catch (error) {
+    console.error('保存业务时区失败:', error)
+    ElMessage.error(t('systemConfig.messages.businessTimezoneSaveFailed'))
   }
 }
 

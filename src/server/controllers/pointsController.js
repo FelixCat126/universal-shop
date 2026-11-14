@@ -1,6 +1,7 @@
 import PointTransaction from '../models/PointTransaction.js'
 import Order from '../models/Order.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
+import { getBusinessTimezone } from '../utils/businessTimezone.js'
 import * as pointsService from '../services/pointsService.js'
 import { logger } from '../utils/logger.js'
 
@@ -38,7 +39,10 @@ class PointsController {
       const offset = (page - 1) * limit
 
       let where = { user_id: userId }
-      where = applyCreatedBetween(where, req.query, { column: 'PointTransaction.created_at' })
+      where = applyCreatedBetween(where, req.query, {
+        column: 'PointTransaction.created_at',
+        timezone: await getBusinessTimezone()
+      })
 
       const { count, rows } = await PointTransaction.findAndCountAll({
         where,

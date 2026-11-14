@@ -20,6 +20,7 @@ import { generateTemporaryPassword } from '../utils/temporaryPassword.js'
 import { invalidateResetFlagCache } from '../middlewares/passwordChangeGuard.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { getBusinessTimezone, startOfBusinessDay, businessDayStartDaysAgo } from '../utils/businessTimezone.js'
 
 class UserController {
   // 用户注册
@@ -572,10 +573,12 @@ class UserController {
        * 列表与统计互不依赖（统计只看 created_at，不看本页行）→ 并发发出。
        * 之前是"先等列表，再发 3 条统计"，两次往返；现在一次。
        */
-      const startOfToday = new Date()
-      startOfToday.setHours(0, 0, 0, 0)
-      const startOfWeek = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000)
-      const startOfMonth = new Date(startOfToday.getTime() - 29 * 24 * 60 * 60 * 1000)
+      // "今日新增 / 近 7 天 / 近 30 天"按**业务时区**切（business_timezone 配置），
+      // 不再依赖服务器本地时区 —— 服务器换时区，这些数字不该跟着变。
+      const tz = await getBusinessTimezone()
+      const startOfToday = startOfBusinessDay(tz)
+      const startOfWeek = businessDayStartDaysAgo(tz, new Date(), 6)
+      const startOfMonth = businessDayStartDaysAgo(tz, new Date(), 29)
       const statsPromise = Promise.all([
         User.count({ where: { created_at: { [Op.gte]: startOfToday } } }),
         User.count({ where: { created_at: { [Op.gte]: startOfWeek } } }),

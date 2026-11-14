@@ -18,6 +18,7 @@ import { thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchange
 import * as pointsService from '../services/pointsService.js'
 import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates, PRICING_ENGINE_VERSION } from '../services/pricingEngine.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
+import { getBusinessTimezone, startOfBusinessDay } from '../utils/businessTimezone.js'
 import { likeContains } from '../utils/likeSearch.js'
 import AuditLog from '../models/AuditLog.js'
 import PointTransaction from '../models/PointTransaction.js'
@@ -1367,7 +1368,8 @@ class OrderController {
       if (status) {
         where.status = status
       }
-      where = applyCreatedBetween(where, req.query)
+      // 日历日按业务时区切（business_timezone 配置）
+      where = applyCreatedBetween(where, req.query, { timezone: await getBusinessTimezone() })
 
       const { count, rows: orders } = await Order.findAndCountAll({
         where,
@@ -1551,7 +1553,7 @@ class OrderController {
        *   3. 非法日期没有任何校验 → 传什么崩什么。
        * applyCreatedBetween 三条一起解决。
        */
-      where = applyCreatedBetween(where, { start_date: startDate, end_date: endDate })
+      where = applyCreatedBetween(where, { start_date: startDate, end_date: endDate }, { timezone: await getBusinessTimezone() })
       if (keyword) {
         // 转义 LIKE 通配符 + 限长，避免 keyword=% 把精确筛选放大成全表匹配
         const like = likeContains(keyword)
@@ -1591,6 +1593,7 @@ class OrderController {
        * 不同筛选各算各的。
        */
       const statsCacheKey = JSON.stringify([
+        await getBusinessTimezone(),
         statusList.join(','), keyword || '', startDate || '', endDate || ''
       ])
       const cachedStats = getCachedOrderStats(statsCacheKey)
@@ -1602,8 +1605,9 @@ class OrderController {
           const n = Number(v)
           return Number.isFinite(n) ? n : 0
         }
-        const todayStart = new Date()
-        todayStart.setHours(0, 0, 0, 0)
+        // "今天"按业务时区切（business_timezone 配置），不再依赖服务器本地时区
+        const tz = await getBusinessTimezone()
+        const todayStart = startOfBusinessDay(tz)
         const statsWhere = { ...where }
         delete statsWhere.status
         /**
@@ -2208,7 +2212,7 @@ class OrderController {
         }
       }
       // 同列表：日期走 applyCreatedBetween，导出与列表口径一致（见 getAllOrders 处的说明）
-      where = applyCreatedBetween(where, { start_date: startDate, end_date: endDate })
+      where = applyCreatedBetween(where, { start_date: startDate, end_date: endDate }, { timezone: await getBusinessTimezone() })
 
       const orders = await Order.findAll({
         where,

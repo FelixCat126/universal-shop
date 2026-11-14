@@ -379,6 +379,11 @@ export default {
     pointsEarnRateSubtitle: 'Points earned per 1 THB actually paid',
     savePointsEarnRate: 'Save points rate',
     pointsEarnRateTips: '• Example: 0.01 means 1 point per 100 THB paid; 0 disables earning points on purchases',
+    businessTimezone: 'Business time zone',
+    businessTimezoneSubtitle: 'Defines the "today / local calendar day" boundary (today revenue, trend buckets, date filters)',
+    businessTimezonePlaceholder: 'Select or type a time zone (e.g. Asia/Bangkok)',
+    saveBusinessTimezone: 'Save time zone',
+    businessTimezoneTips: '• Use an IANA name (e.g. Asia/Bangkok); report boundaries do not move when the server moves',
 
     uploadTips: {
       bannerSize: '• Recommended size: 1200x300px or larger',
@@ -406,7 +411,10 @@ export default {
       currencyUnitSaveFailed: 'Failed to save currency symbol',
       pointsEarnRateSaveSuccess: 'Points earn rate saved',
       pointsEarnRateSaveFailed: 'Failed to save points earn rate',
-      invalidPointsEarnRate: 'Please enter a valid points earn rate (≥ 0, up to 4 decimal places)'
+      invalidPointsEarnRate: 'Please enter a valid points earn rate (≥ 0, up to 4 decimal places)',
+      businessTimezoneSaveSuccess: 'Business time zone saved',
+      businessTimezoneSaveFailed: 'Failed to save business time zone',
+      invalidBusinessTimezone: 'Please select or type a valid time zone (e.g. Asia/Bangkok)'
     }
   },
 

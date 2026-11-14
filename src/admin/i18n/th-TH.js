@@ -381,6 +381,11 @@ export default {
     pointsEarnRateSubtitle: 'จำนวนคะแนนที่ได้รับต่อยอดชำระจริง 1 บาท',
     savePointsEarnRate: 'บันทึกอัตราคะแนน',
     pointsEarnRateTips: '• ตัวอย่าง: 0.01 หมายถึงได้ 1 คะแนนต่อการชำระ 100 บาท; 0 หมายถึงไม่ให้คะแนนจากการซื้อ',
+    businessTimezone: 'เขตเวลาทางธุรกิจ',
+    businessTimezoneSubtitle: 'กำหนดขอบเขตของ "วันนี้ / วันปฏิทินท้องถิ่น" (รายได้วันนี้ กราฟแนวโน้ม ตัวกรองวันที่)',
+    businessTimezonePlaceholder: 'เลือกหรือพิมพ์ชื่อเขตเวลา (เช่น Asia/Bangkok)',
+    saveBusinessTimezone: 'บันทึกเขตเวลา',
+    businessTimezoneTips: '• ใช้ชื่อเขตเวลา IANA (เช่น Asia/Bangkok); เกณฑ์รายงานจะไม่เปลี่ยนตามที่เซิร์ฟเวอร์ย้าย',
 
     uploadTips: {
       bannerSize: '• ขนาดแนะนำ: 1200x300px หรือใหญ่กว่า',
@@ -408,7 +413,10 @@ export default {
       currencyUnitSaveFailed: 'บันทึกสัญลักษณ์ล้มเหลว',
       pointsEarnRateSaveSuccess: 'บันทึกอัตราการได้รับคะแนนแล้ว',
       pointsEarnRateSaveFailed: 'บันทึกอัตราการได้รับคะแนนล้มเหลว',
-      invalidPointsEarnRate: 'กรุณาใส่อัตราการได้รับคะแนนที่ถูกต้อง (≥ 0, ทศนิยมสูงสุด 4 ตำแหน่ง)'
+      invalidPointsEarnRate: 'กรุณาใส่อัตราการได้รับคะแนนที่ถูกต้อง (≥ 0, ทศนิยมสูงสุด 4 ตำแหน่ง)',
+      businessTimezoneSaveSuccess: 'บันทึกเขตเวลาทางธุรกิจแล้ว',
+      businessTimezoneSaveFailed: 'บันทึกเขตเวลาทางธุรกิจล้มเหลว',
+      invalidBusinessTimezone: 'กรุณาเลือกหรือพิมพ์ชื่อเขตเวลาที่ถูกต้อง (เช่น Asia/Bangkok)'
     }
   },
 

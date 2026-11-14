@@ -380,6 +380,11 @@ export default {
     pointsEarnRateSubtitle: '每 1 泰铢实付金额获得的积分数',
     savePointsEarnRate: '保存积分比率',
     pointsEarnRateTips: '• 例如：0.01 表示每实付 100 泰铢获得 1 积分；0 表示购物不赠送积分',
+    businessTimezone: '业务时区',
+    businessTimezoneSubtitle: '决定「今天 / 本地日历日」的边界（今日营收、趋势分桶、日期筛选）',
+    businessTimezonePlaceholder: '选择或输入时区名（如 Asia/Bangkok）',
+    saveBusinessTimezone: '保存业务时区',
+    businessTimezoneTips: '• 用 IANA 时区名（如 Asia/Bangkok）；服务器换机房时，报表口径不会跟着变',
 
     uploadTips: {
       bannerSize: '• 建议尺寸：1200x300px 或更大',
@@ -407,7 +412,10 @@ export default {
       currencyUnitSaveFailed: '货币单位保存失败',
       pointsEarnRateSaveSuccess: '积分获取比率已保存',
       pointsEarnRateSaveFailed: '积分获取比率保存失败',
-      invalidPointsEarnRate: '请输入有效的积分获取比率（≥0，最多四位小数）'
+      invalidPointsEarnRate: '请输入有效的积分获取比率（≥0，最多四位小数）',
+      businessTimezoneSaveSuccess: '业务时区已保存',
+      businessTimezoneSaveFailed: '业务时区保存失败',
+      invalidBusinessTimezone: '请选择或输入有效的时区名（如 Asia/Bangkok）'
     }
   },
 

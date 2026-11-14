@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url'
 import { fileTypeFromFile } from 'file-type'
 import { ApiError } from '../middlewares/errorHandler.js'
 import { logger } from '../utils/logger.js'
+import { isValidTimeZone } from '../utils/businessTimezone.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -338,6 +339,35 @@ class SystemConfigController {
           success: true,
           message: '汇率配置已保存',
           data: { exchange_rates: normalized }
+        })
+      }
+
+      /**
+       * 业务时区：决定"今天 / 本地日历日"的边界（今日营收、趋势分桶、日期筛选）。
+       *
+       * 只接受**真实的 IANA 时区名**（如 Asia/Bangkok / Asia/Shanghai）：
+       *   - 时区名会被拼进 SQL 的 `AT TIME ZONE '...'`，非法名字一律拒绝 → 挡掉注入
+       *   - 固定偏移（+07:00）不能表达夏令时，IANA 名才能让 PG 逐行算对
+       */
+      if (key === 'business_timezone') {
+        const tz = typeof value === 'string' ? value.trim() : ''
+        if (!isValidTimeZone(tz)) {
+          return res.status(400).json({
+            success: false,
+            message: '业务时区必须是有效的时区名（如 Asia/Bangkok、Asia/Shanghai）'
+          })
+        }
+        const config = await SystemConfig.setConfig(
+          key,
+          tz,
+          'text',
+          description || '业务时区：决定"今天/本地日历日"的边界（今日营收、趋势分桶、日期筛选）'
+        )
+        await clearResponseCache()
+        return res.json({
+          success: true,
+          message: '业务时区已保存',
+          data: { business_timezone: tz }
         })
       }
 
