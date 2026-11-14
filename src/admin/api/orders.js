@@ -54,7 +54,9 @@ export const deleteOrder = (orderId) => {
 
 // 导出订单数据
 export const exportOrders = (params = {}) => {
-  return api.get('/admin/orders/export', {
+  // 路由是 GET /api/admin/export/orders（exportRoutes 挂在 /api/admin/export 下）
+  // 之前写成 /admin/orders/export → 路径不对，调了必 404
+  return api.get('/admin/export/orders', {
     params,
     responseType: 'blob'
   })

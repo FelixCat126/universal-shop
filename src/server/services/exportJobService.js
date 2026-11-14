@@ -17,6 +17,7 @@ import { createStreamingCsvExport } from '../utils/csvExporter.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { likeContains } from '../utils/likeSearch.js'
 import { logger } from '../utils/logger.js'
+import { getBusinessTimezone, parseBusinessDayRange } from '../utils/businessTimezone.js'
 
 /**
  * 异步导出任务服务
@@ -141,7 +142,8 @@ async function exportOrdersTo (job) {
 
   let written = 0
   let cursor = 0
-  const filter = buildOrderFilter(job.params)
+  const tz = await getBusinessTimezone()
+  const filter = buildOrderFilter(job.params, tz)
   const first = await Order.findOne({ attributes: ['id'], where: filter, order: [['id', 'DESC']] })
   // 游标取「最大 id + 1」：下面查询用的是 id < cursor，
   // 若游标等于最大 id，最新一条会被静默漏掉。
@@ -205,7 +207,8 @@ async function exportUsersTo (job) {
   const ATTRS = ['id', 'username', 'nickname', 'email', 'phone', 'referral_code', 'referred_by_code', 'created_at', 'updated_at']
   let written = 0
   let cursor = 0
-  const filter = buildUserFilter(job.params)
+  const tz = await getBusinessTimezone()
+  const filter = buildUserFilter(job.params, tz)
   const first = await User.findOne({ attributes: ['id'], where: filter, order: [['id', 'DESC']] })
   // 同上：游标要取最大 id + 1，否则最新一条会被漏掉
   cursor = first ? first.id + 1 : 0
@@ -248,14 +251,69 @@ async function exportUsersTo (job) {
  * 若忽略 params，导出会变成「全量」，容易让人误判业务数据。
  * 条件口径与列表接口（getAllUsers / getAllOrders）保持一致。
  */
-function buildOrderFilter (params = {}) {
+/**
+ * 导出筛选里的**状态**：支持逗号分隔的多个值（与列表同一口径）。
+ *
+ * 之前是 `where.status = String(params.status)` —— 传 "paid,shipping"
+ * 会去匹配**字面量** 'paid,shipping' → 一条都导不出来（空文件）。
+ * 而列表页早就支持多状态了 → 列表显示 3 单、导出 0 行，"报表对不上"。
+ */
+function buildStatusCondition (params) {
+  const list = String(params.status || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+  if (list.length === 0) return null
+  if (list.length === 1) return list[0]
+  return { [Op.in]: list }
+}
+
+/**
+ * 导出筛选里的**日期范围**：按业务时区的日历日切（与列表 applyCreatedBetween 同一口径）。
+ *
+ * 之前是 `[Op.between]: [params.startDate, params.endDate]` 传裸 'YYYY-MM-DD' 字符串
+ * → PG 当成 **UTC 午夜** → 与列表（业务时区日界）**整整差一天**：
+ * 结束日当天的单全漏掉，开始日当天的单也漏掉。
+ *
+ * 参数名同时认 startDate/endDate 与 start_from/end_from
+ * （前端两个地方各叫各的，导出那处叫 start_from）。
+ */
+function buildDateRangeCondition (params, tz) {
+  const fromRaw = params.startDate ?? params.start_from
+  const toRaw = params.endDate ?? params.end_from
+  if (!fromRaw && !toRaw) return null
+
+  /**
+   * 一个边界值的解析：
+   *   - 'YYYY-MM-DD' → 按**业务时区**的日历日（与列表 applyCreatedBetween 同一口径）
+   *   - 完整 ISO 时间戳 → 当作精确时刻用（保持原有能力）
+   */
+  const bound = (raw, edge) => {
+    if (raw == null || raw === '') return null
+    const text = String(raw).trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      const range = parseBusinessDayRange(tz, text)
+      return range ? (edge === 'start' ? range.start : range.end) : null
+    }
+    const d = new Date(text)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+
+  const range = {}
+  const from = bound(fromRaw, 'start')
+  const to = bound(toRaw, 'end')
+  if (from) range[Op.gte] = from
+  if (to) range[Op.lte] = to
+  if (Reflect.ownKeys(range).length === 0) return null
+  return range
+}
+
+function buildOrderFilter (params = {}, tz) {
   const where = {}
-  if (params.status) {
-    where.status = String(params.status)
-  }
-  if (params.startDate && params.endDate) {
-    where.created_at = { [Op.between]: [params.startDate, params.endDate] }
-  }
+  const status = buildStatusCondition(params)
+  if (status) where.status = status
+  const range = buildDateRangeCondition(params, tz)
+  if (range) where.created_at = range
   if (params.keyword) {
     const like = likeContains(params.keyword)
     where[Op.or] = [
@@ -270,14 +328,12 @@ function buildOrderFilter (params = {}) {
 /**
  * 合作方订单的筛选条件（与直接导出 /api/admin/partner-orders/export 的口径一致）。
  */
-function buildPartnerOrderFilter (params = {}) {
+function buildPartnerOrderFilter (params = {}, tz) {
   const where = {}
-  if (params.status) {
-    where.status = String(params.status)
-  }
-  if (params.startDate && params.endDate) {
-    where.created_at = { [Op.between]: [params.startDate, params.endDate] }
-  }
+  const status = buildStatusCondition(params)
+  if (status) where.status = status
+  const range = buildDateRangeCondition(params, tz)
+  if (range) where.created_at = range
   if (params.partner_keyword) {
     const like = likeContains(params.partner_keyword)
     where.partner = {
@@ -290,11 +346,10 @@ function buildPartnerOrderFilter (params = {}) {
   return where
 }
 
-function buildProductFilter (params = {}) {
+function buildProductFilter (params = {}, tz) {
   const where = {}
-  if (params.status) {
-    where.status = String(params.status)
-  }
+  const status = buildStatusCondition(params)
+  if (status) where.status = status
   if (params.keyword) {
     const like = likeContains(params.keyword)
     where[Op.or] = [
@@ -320,26 +375,38 @@ function buildPartnerFilter (params = {}) {
   return where
 }
 
-function buildUserFilter (params = {}) {
-  const where = {}
+function buildUserFilter (params = {}, tz) {
+  /**
+   * 条件用 **Op.and 数组**（与列表 getAllUsers 同一构造）。
+   *
+   * 之前是分别往 where[Op.or] 里赋值 —— **后一次覆盖前一次**：
+   * 同时传 email 与 referral_code 时，email 条件被冲掉 →
+   * 导出结果比列表多（列表是"同时满足"）。对账时就会发现"导出来的比看到的多"。
+   */
+  const conditions = []
   if (params.email) {
     const like = likeContains(params.email)
-    where[Op.or] = [
-      { email: { [Op.like]: like } },
-      { username: { [Op.like]: like } }
-    ]
+    conditions.push({
+      [Op.or]: [
+        { email: { [Op.like]: like } },
+        { username: { [Op.like]: like } }
+      ]
+    })
   }
   if (params.phone) {
-    where.phone = { [Op.like]: likeContains(params.phone) }
+    conditions.push({ phone: { [Op.like]: likeContains(params.phone) } })
   }
   if (params.referral_code) {
     const like = likeContains(params.referral_code)
-    where[Op.or] = [
-      { referral_code: { [Op.like]: like } },
-      { referred_by_code: { [Op.like]: like } }
-    ]
+    conditions.push({
+      [Op.or]: [
+        { referral_code: { [Op.like]: like } },
+        { referred_by_code: { [Op.like]: like } }
+      ]
+    })
   }
-  return where
+  if (conditions.length === 0) return {}
+  return { [Op.and]: conditions }
 }
 
 /**
@@ -358,7 +425,8 @@ async function exportPartnerOrdersTo (job) {
   const target = path.join(EXPORT_DIR, fileName)
   await ensureDir()
 
-  const filter = buildPartnerOrderFilter(job.params)
+  const tz = await getBusinessTimezone()
+  const filter = buildPartnerOrderFilter(job.params, tz)
   let written = 0
   let cursor = 0
   const first = await PartnerOrder.findOne({ attributes: ['id'], where: filter, order: [['id', 'DESC']] })
@@ -439,7 +507,8 @@ async function exportProductsTo (job) {
 
   let written = 0
   let cursor = 0
-  const filter = buildProductFilter(job.params)
+  const tz = await getBusinessTimezone()
+  const filter = buildProductFilter(job.params, tz)
   const first = await Product.findOne({ attributes: ['id'], where: filter, order: [['id', 'DESC']] })
   cursor = first ? first.id + 1 : 0
 
