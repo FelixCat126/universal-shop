@@ -6,7 +6,7 @@ import Order from '../models/Order.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
 import * as statsCache from '../utils/statsCache.js'
-import { NON_REVENUE_STATUSES } from '../constants/revenueStatus.js'
+import { revenueStatusSql } from '../constants/revenueStatus.js'
 
 /**
  * 综合统计进程内短缓存（TTL 15s）：
@@ -261,7 +261,7 @@ class StatisticsController {
      * 变的只是**少扫了几遍表** —— 面板是运营每 30 秒自动刷新的页面，
      * 用户量越大，这几遍全表扫越贵。
      */
-    const revenueSql = `status NOT IN (${NON_REVENUE_STATUSES.map((x) => sequelize.escape(x)).join(', ')})`
+    const revenueSql = revenueStatusSql((v) => sequelize.escape(v))
 
     const [orderStats, userStats, todayStats, actionable] = await Promise.all([
       /**

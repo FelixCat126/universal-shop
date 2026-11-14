@@ -109,6 +109,43 @@ describe('URL 安全校验', () => {
   it('RI-5 带用户名密码的 URL → 拒绝', async () => {
     await expect(resolveSafeUrl('http://user:pass@example.com/a.png')).rejects.toThrow()
   })
+
+  /**
+   * 同一台机器的"另一种写法" —— 经典 SSRF 绕过手法。
+   *
+   * WHATWG URL 会把 IPv4 的十进制/十六进制/八进制/短形式**归一化**成点分十进制，
+   * 所以 `http://2130706433/` 拿到的是 `127.0.0.1`。
+   * 防护一旦改成手写解析（不再经过 URL 归一化），这些写法就会直接变成漏洞 ——
+   * 所以这里把它们钉死。
+   */
+  it('RI-11 IPv4 的各种"非点分十进制"写法一律拒绝', async () => {
+    const equivalents = [
+      'http://2130706433/a.png',       // 十进制 = 127.0.0.1
+      'http://0x7f000001/a.png',        // 十六进制 = 127.0.0.1
+      'http://0177.0.0.1/a.png',        // 八进制 = 127.0.0.1
+      'http://127.1/a.png',             // 短形式 = 127.0.0.1
+      'http://127.0.1/a.png',
+      'http://[::ffff:7f00:1]/a.png',   // IPv6 十六进制映射写法
+      'http://[::ffff:127.0.0.1]/a.png',
+      'http://[::1]/a.png',
+      'http://[::]/a.png',
+      'http://0.0.0.0/a.png',
+      'http://169.254.169.254/latest/meta-data/'
+    ]
+    for (const url of equivalents) {
+      await expect(resolveSafeUrl(url), url).rejects.toThrow()
+    }
+  })
+
+  it('RI-12 畸形 IP 输入一律判为不安全（解析不出来就拒）', () => {
+    const malformed = [
+      '', 'abc', '1.2.3', '1.2.3.4.5', '999.1.1.1', '0x7f000001', '2130706433',
+      '::ffff:127.0.0.1', '::ffff:7f00:1', '1.2.3.4 ', ' 8.8.8.8'
+    ]
+    for (const ip of malformed) {
+      expect(isPublicIP(ip), ip).toBe(false)
+    }
+  })
 })
 
 describe('实际下载', () => {

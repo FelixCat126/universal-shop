@@ -9,7 +9,7 @@ import Order from '../models/Order.js'
 import { JWT_SECRET } from '../config/jwtSecret.js'
 import * as pointsService from '../services/pointsService.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
-import { NON_REVENUE_STATUSES } from '../constants/revenueStatus.js'
+import { revenueWhere } from '../constants/revenueStatus.js'
 import AuditLog from '../models/AuditLog.js'
 import { recordLoginFailure, clearLoginFailures } from '../middlewares/loginGuard.js'
 import { grantRegisterGiftCoupons } from '../services/couponService.js'
@@ -1067,11 +1067,8 @@ class UserController {
        * 同一页两个数字对不上。
        */
       const spentRaw = await Order.sum('total_amount_thb', {
-        where: {
-          user_id: userId,
-          payment_method: { [Op.ne]: 'points' },
-          status: { [Op.notIn]: NON_REVENUE_STATUSES }
-        }
+        // 口径来自 constants/revenueStatus.js（与面板、订单列表**同一份**）
+        where: revenueWhere(Op, { user_id: userId })
       })
       const spent_thb = spentRaw != null && spentRaw !== ''
         ? parseFloat(String(spentRaw))

@@ -20,6 +20,18 @@
 export const NON_REVENUE_STATUSES = ['pending', 'cancelled']
 
 /**
+ * 不计入成交金额的**支付方式**。
+ *
+ * 积分换购单（payment_method='points'）用积分付的钱，实收金额记 0 ——
+ * 所以它对营收**没有数值影响**。但门户个人中心的累计消费**显式**排除了它，
+ * 面板与订单列表的今日营收没有排除 → 口径靠"积分单金额恒为 0"这个隐含前提撑着。
+ * 一旦出现历史遗留的积分单（total_amount_thb 非 0），同一个指标就会两个数。
+ *
+ * 所以：三个地方一律用下面这两个函数生成条件，**不再各写一遍**。
+ */
+export const NON_REVENUE_PAYMENT_METHODS = ['points']
+
+/**
  * 生成"成交订单"的 where 片段（Sequelize Op 语法）。
  *
  * @param {import('sequelize').Op} Op
@@ -27,5 +39,27 @@ export const NON_REVENUE_STATUSES = ['pending', 'cancelled']
  * @returns {object}
  */
 export function revenueWhere (Op, extra = {}) {
-  return { ...extra, status: { [Op.notIn]: NON_REVENUE_STATUSES } }
+  return {
+    ...extra,
+    status: { [Op.notIn]: NON_REVENUE_STATUSES },
+    payment_method: { [Op.notIn]: NON_REVENUE_PAYMENT_METHODS }
+  }
+}
+
+/**
+ * 生成"成交订单"的 **SQL 片段**（给 PG 的 FILTER 子句用）。
+ *
+ * 面板与订单列表的聚合要用 FILTER（一个 WHERE 会把订单数也滤掉），
+ * 那时不能走 Op 对象 → 这里给出与 revenueWhere **完全同口径**的文本版。
+ *
+ * ⚠️ 传进来的 escape 必须能正确转义字符串（用 sequelize.escape）。
+ *
+ * @param {(v: string) => string} escape
+ * @returns {string}
+ */
+export function revenueStatusSql (escape) {
+  const esc = typeof escape === 'function' ? escape : (v) => `'${String(v)}'`
+  const statuses = NON_REVENUE_STATUSES.map(esc).join(', ')
+  const methods = NON_REVENUE_PAYMENT_METHODS.map(esc).join(', ')
+  return `status NOT IN (${statuses}) AND payment_method NOT IN (${methods})`
 }

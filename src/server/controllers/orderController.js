@@ -28,7 +28,7 @@ import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
-import { NON_REVENUE_STATUSES } from '../constants/revenueStatus.js'
+import { revenueStatusSql } from '../constants/revenueStatus.js'
 import * as statsCache from '../utils/statsCache.js'
 import { parseId } from '../utils/params.js'
 import { respondDbError } from '../utils/dbInputError.js'
@@ -1636,7 +1636,7 @@ class OrderController {
          * 之前无筛选时不过滤状态 → 「总金额数 / 今日营收」把没付的钱和已取消的单
          * 都算进去 → 面板上的营收虚高，和订单列表的「累计消费」对不上。
          */
-        const revenueSql = statusSql || `status NOT IN (${NON_REVENUE_STATUSES.map((s) => sequelize.escape(s)).join(', ')})`
+        const revenueSql = statusSql || revenueStatusSql((v) => sequelize.escape(v))
         const totalAmountFilter = ` FILTER (WHERE ${revenueSql})`
         const todayAmountFilter = statusSql
           ? ` FILTER (WHERE created_at >= ${todayLit} AND ${statusSql})`
