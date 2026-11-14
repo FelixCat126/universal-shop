@@ -114,13 +114,23 @@ export async function refundPointsForOrder (transaction, {
   userId,
   orderId,
   points,
-  note = null
+  note = null,
+  /**
+   * 可选：**同一事务里已经加过行锁**的余额行实例。
+   *
+   * 批量路径下，同一个用户的很多张单会反复查同��行余额 ——
+   * 传入已锁定的实例可以省掉重复查询，**且不改变任何语义**：
+   * 行锁在事务内一直持有，实例里的 balance 会被本函数就地更新
+   * （row.balance = row.balance + n 后再 save），后续使用同一实例
+   * 读到的是**最新**余额，不是旧值。
+   */
+  balanceRow = null
 }) {
   const n = Number(points)
   if (!Number.isFinite(n) || n <= 0) {
     throw new Error('无效的退回积分')
   }
-  const row = await lockOrCreateBalance(userId, transaction)
+  const row = balanceRow || await lockOrCreateBalance(userId, transaction)
   row.balance = row.balance + n
   await row.save({ transaction })
   await PointTransaction.create({
@@ -142,13 +152,15 @@ export async function revokePurchasePoints (transaction, {
   userId,
   orderId,
   points,
-  note = null
+  note = null,
+  /** 可选：同一事务里已经加过行锁的余额行实例（见 refundPointsForOrder 的说明） */
+  balanceRow = null
 }) {
   const n = Number(points)
   if (!Number.isFinite(n) || n <= 0) {
     throw new Error('无效的收回积分')
   }
-  const row = await lockOrCreateBalance(userId, transaction)
+  const row = balanceRow || await lockOrCreateBalance(userId, transaction)
   const before = Number(row.balance) || 0
   const revoked = Math.min(before, n)
   // 余额已为 0、实际收回 0 时不写 delta=0 的流水（审计噪音），直接返回
