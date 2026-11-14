@@ -30,6 +30,7 @@ import { clearResponseCache } from '../utils/responseCache.js'
 import { NON_REVENUE_STATUSES } from '../constants/revenueStatus.js'
 import * as statsCache from '../utils/statsCache.js'
 import { parseId } from '../utils/params.js'
+import { respondDbError } from '../utils/dbInputError.js'
 
 /** 金额统一舍入到分：消除浮点误差，保证 Σ(行价×数量) 与订单总额严格一致 */
 const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100
@@ -2176,10 +2177,16 @@ class OrderController {
       })
 
     } catch (error) {
-      logger.error('删除订单失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '删除订单失败: ' + error.message
+      /**
+       * 走统一的错误翻译层：
+       *   - 数据库层的"坏输入"（超长/越界）→ 400 + 人话
+       *   - 其它 → 500 + 固定文案（**不再把 error.message 拼给客户端**：
+       *     那是 PG/Sequelize 的内部细节，属于信息泄漏）
+       */
+      return respondDbError(res, error, {
+        logLabel: '删除订单失败',
+        fallbackMessage: '删除订单失败',
+        logger
       })
     }
   }

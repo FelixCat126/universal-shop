@@ -4,6 +4,7 @@ import sequelize from '../config/database.js'
 import { createUserAddress } from '../services/addressService.js'
 import { logger } from '../utils/logger.js'
 import { parseId } from '../utils/params.js'
+import { respondDbError } from '../utils/dbInputError.js'
 
 class AddressController {
   // 获取用户地址列表
@@ -148,11 +149,10 @@ class AddressController {
 
     } catch (error) {
       await transaction.rollback()
-      logger.error('创建地址失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '创建地址失败',
-        code: 'INTERNAL_SERVER_ERROR'
+      return respondDbError(res, error, {
+        logLabel: '创建地址失败',
+        fallbackMessage: '创建地址失败',
+        logger
       })
     }
   }
@@ -332,11 +332,10 @@ class AddressController {
 
     } catch (error) {
       await transaction.rollback()
-      logger.error('更新地址失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '更新地址失败',
-        code: 'INTERNAL_SERVER_ERROR'
+      return respondDbError(res, error, {
+        logLabel: '更新地址失败',
+        fallbackMessage: '更新地址失败',
+        logger
       })
     } finally {
       // 事务兜底：上面任何一条「提前 return」的分支（未登录、参数校验失败等）

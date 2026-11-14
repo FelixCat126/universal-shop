@@ -138,6 +138,45 @@ const CHECKS = [
     `
   },
   {
+    /**
+     * 订单实收必须**等于**各行应付之和（既不能多收，也不能少收）。
+     *
+     * 为什么必须有这一条：原有的 `order_total_not_exceeding_items` 只查
+     * 「实收 ≤ 明细原价之和」—— 只能抓"多收了钱"，
+     * **抓不到"少收了钱"**（实收 < 行应付之和 = 客户少付/账单对不上）。
+     *
+     * 口径：
+     *   - 行应付 = line_total - discount_allocated
+     *     （line_total 是该行权威小计，组合包按权重分摊时 price×quantity ≠ line_total；
+     *      discount_allocated 是摊到该行的满减+券）
+     *   - line_total 为 NULL 的老行按 price × quantity 兜底（与 011 迁移的回填口径一致）
+     *   - 赠品行（is_gift）不参与金额
+     *   - **积分兑换单排除**：那种单实收记 0（用积分付的），而行里记的是 THB 参考价，
+     *     两者本就不该相等（拿它来判会每单误报）
+     */
+    name: 'order_total_equals_lines_payable',
+    title: '订单实收必须等于各行应付之和（不能多收也不能少收）',
+    selfTest: async (m) => {
+      const { order } = await makeSelfTestOrder(m)
+      // 实收被改成与明细对不上（多收了钱）
+      await m.Order.update({ total_amount_thb: 123.45 }, { where: { id: order.id } })
+    },
+    sql: `
+      SELECT o.id AS id, o.order_no AS order_no,
+             COALESCE(o.total_amount_thb, o.total_amount) AS total,
+             ROUND(COALESCE(SUM(COALESCE(i.line_total, i.price * i.quantity) - i.discount_allocated), 0), 2) AS lines_payable
+      FROM orders o
+      JOIN order_items i ON i.order_id = o.id
+      WHERE COALESCE(i.is_gift, false) = false
+        AND o.payment_method <> 'points'
+      GROUP BY o.id, o.order_no, COALESCE(o.total_amount_thb, o.total_amount)
+      HAVING ABS(
+        COALESCE(o.total_amount_thb, o.total_amount)
+        - ROUND(COALESCE(SUM(COALESCE(i.line_total, i.price * i.quantity) - i.discount_allocated), 0), 2)
+      ) > 0.01
+    `
+  },
+  {
     name: 'points_balance_matches_ledger',
     title: '积分余额 = 流水累计（账实相符）',
     selfTest: async (m) => {

@@ -5,6 +5,7 @@ import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { parseId } from '../utils/params.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { respondDbError } from '../utils/dbInputError.js'
 
 class ProductCategoryController {
   /** 前台 / 公共：全部类别，按排序 */
@@ -72,8 +73,11 @@ class ProductCategoryController {
       await clearResponseCache()
       return res.status(201).json({ success: true, data: row })
     } catch (e) {
-      logger.error('create category', { err: e?.message, stack: e?.stack })
-      return res.status(500).json({ success: false, message: '创建类别失败' })
+      return respondDbError(res, e, {
+        logLabel: 'create category',
+        fallbackMessage: '创建类别失败',
+        logger
+      })
     }
   }
 
@@ -104,8 +108,11 @@ class ProductCategoryController {
       await clearResponseCache()
       return res.json({ success: true, data: row })
     } catch (e) {
-      logger.error('update category', { err: e?.message, stack: e?.stack })
-      return res.status(500).json({ success: false, message: '更新类别失败' })
+      return respondDbError(res, e, {
+        logLabel: 'update category',
+        fallbackMessage: '更新类别失败',
+        logger
+      })
     }
   }
 

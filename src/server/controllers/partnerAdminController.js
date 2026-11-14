@@ -12,6 +12,7 @@ import { csvCell } from '../utils/csvExporter.js'
 import { parseId } from '../utils/params.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { respondDbError } from '../utils/dbInputError.js'
 
 // 单次导出行数安全上限（与 exportController 口径一致）；超出截断并在文件末尾追加说明行
 const EXPORT_ROW_LIMIT = 50000
@@ -119,8 +120,11 @@ class PartnerAdminController {
 
       return res.status(201).json({ success: true, data: row.toSafeJSON() })
     } catch (e) {
-      logger.error('PartnerAdminController.createPartner', { err: e?.message, stack: e?.stack })
-      return res.status(500).json({ success: false, message: '创建失败', code: 'INTERNAL_SERVER_ERROR' })
+      return respondDbError(res, e, {
+        logLabel: 'PartnerAdminController.createPartner',
+        fallbackMessage: '创建失败',
+        logger
+      })
     }
   }
 
@@ -151,8 +155,11 @@ class PartnerAdminController {
       await row.save()
       return res.json({ success: true, data: row.toSafeJSON() })
     } catch (e) {
-      logger.error('PartnerAdminController.updatePartner', { err: e?.message, stack: e?.stack })
-      return res.status(500).json({ success: false, message: '更新失败' })
+      return respondDbError(res, e, {
+        logLabel: 'PartnerAdminController.updatePartner',
+        fallbackMessage: '更新失败',
+        logger
+      })
     }
   }
 

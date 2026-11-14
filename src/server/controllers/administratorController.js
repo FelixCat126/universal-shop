@@ -10,6 +10,7 @@ import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { respondDbError } from '../utils/dbInputError.js'
 
 class AdministratorController {
   // 管理员登录
@@ -236,11 +237,10 @@ class AdministratorController {
         data: newAdmin.toSafeJSON()
       })
     } catch (error) {
-      logger.error('创建管理员失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '创建管理员失败',
-        code: 'INTERNAL_SERVER_ERROR'
+      return respondDbError(res, error, {
+        logLabel: '创建管理员失败',
+        fallbackMessage: '创建管理员失败',
+        logger
       })
     }
   }
@@ -328,11 +328,10 @@ class AdministratorController {
         data: { ...admin.toSafeJSON(), old_data: oldData }
       })
     } catch (error) {
-      logger.error('更新管理员失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '更新管理员失败',
-        code: 'INTERNAL_SERVER_ERROR'
+      return respondDbError(res, error, {
+        logLabel: '更新管理员失败',
+        fallbackMessage: '更新管理员失败',
+        logger
       })
     }
   }

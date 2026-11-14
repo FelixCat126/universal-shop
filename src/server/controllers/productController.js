@@ -8,6 +8,7 @@ import { resolvePagination } from '../utils/pagination.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { parseId, parseStrictInt } from '../utils/params.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { respondDbError } from '../utils/dbInputError.js'
 
 /**
  * 单商品积分上限。
@@ -349,11 +350,10 @@ class ProductController {
         data: created
       })
     } catch (error) {
-      logger.error('创建产品失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '创建产品失败',
-        code: 'INTERNAL_SERVER_ERROR'
+      return respondDbError(res, error, {
+        logLabel: '创建产品失败',
+        fallbackMessage: '创建产品失败',
+        logger
       })
     }
   }
@@ -549,11 +549,10 @@ class ProductController {
         data: out
       })
     } catch (error) {
-      logger.error('更新产品失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '更新产品失败',
-        code: 'INTERNAL_SERVER_ERROR'
+      return respondDbError(res, error, {
+        logLabel: '更新产品失败',
+        fallbackMessage: '更新产品失败',
+        logger
       })
     }
   }
@@ -615,8 +614,11 @@ class ProductController {
 
       return res.status(400).json({ success: false, message: '不支持的批量操作' })
     } catch (error) {
-      logger.error('批量操作商品失败', { err: error?.message, stack: error?.stack })
-      return res.status(500).json({ success: false, message: '批量操作失败', code: 'INTERNAL_SERVER_ERROR' })
+      return respondDbError(res, error, {
+        logLabel: '批量操作商品失败',
+        fallbackMessage: '批量操作失败',
+        logger
+      })
     }
   }
 
