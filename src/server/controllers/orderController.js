@@ -2120,6 +2120,33 @@ class OrderController {
             })
           }
 
+          /**
+           * 抵扣券释放（**无条件**，且必须在删单之前）。
+           *
+           * UserCoupon 模型的约定写得很清楚：
+           *   「used_by_order_id 仅逻辑关联 orders.id：订单允许硬删，不建外键约束
+           *     （释放先于删单完成）」
+           * 也就是说 —— **券的释放必须先于删单**，否则 used_by_order_id 会指向
+           * 一个不存在的订单（悬空引用）。
+           *
+           * 之前只在未履约状态（RESTORE_ON_DELETE_STATUSES）走了
+           * restoreOrderResources 顺带释放券，已履约订单删除时**没人释放**：
+           *   - 用户「我的优惠券」里永远躺着一张指向幽灵订单的「已使用」券，
+           *     再也用不了；
+           *   - 而体检项 coupon_used_has_order 只查 used_by_order_id IS NULL，
+           *     查不出"挂着一个不存在的订单" —— 查不出来 = 没人会发现。
+           *
+           * 未履约订单上面 restoreOrderResources 已经释放过（used_by_order_id 置 NULL），
+           * 这里再执行一次匹配 0 行，无副作用。
+           *
+           * 注意：已履约订单删除时**不回补库存与积分**（货确实发出去了），
+           * 这里只处理券 —— 券不是实物，不存在"回补了会多卖一件"的问题。
+           */
+          await UserCoupon.update(
+            { status: 'unused', used_by_order_id: null, used_at: null },
+            { where: { used_by_order_id: id }, transaction }
+          )
+
           // 再删除订单
           await order.destroy({ transaction })
 

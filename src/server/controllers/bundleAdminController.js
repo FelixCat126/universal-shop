@@ -1,5 +1,6 @@
 import sequelize from '../config/database.js'
 import Bundle from '../models/Bundle.js'
+import Cart from '../models/Cart.js'
 import BundleItem from '../models/BundleItem.js'
 import Product from '../models/Product.js'
 import { resolvePagination } from '../utils/pagination.js'
@@ -191,6 +192,24 @@ class BundleAdminController {
         return res.status(404).json({ success: false, message: '组合包不存在' })
       }
       await BundleItem.destroy({ where: { bundle_id: bundle.id }, transaction })
+
+      /**
+       * 购物车里引用该组合包的行**一起清掉**。
+       *
+       * 组合包是**硬删**（Bundle 没有 paranoid），而 carts.bundle_id
+       * 在**生产库没有外键**（测试库有、生产库没有 —— 见 docs/bug-hunt-round7-11.md）。
+       * 于是删完组合包，购物车里会留下一行指向"已不存在的组合包"的记录：
+       *   - 前端 include bundle 是 required:false → 那行**没有名称**，
+       *     用户看到一条空行（只能手动删掉）；
+       *   - 两库的结局还不一样：测试库的 FK 会把 bundle_id 置 NULL，
+       *     留下一行 product_id 与 bundle_id **都是 NULL** 的僵尸行。
+       *
+       * 这里显式删行，两个库的结局就一致了：不留悬空引用，也不留僵尸行。
+       * （订单明细 order_items.bundle_id **不动** —— 那是历史订单的来源记录，
+       *  行内已有商品/价格快照，删组合包不该改写历史。）
+       */
+      await Cart.destroy({ where: { bundle_id: bundle.id }, transaction })
+
       await bundle.destroy({ transaction })
       await transaction.commit()
       // 删除后清 GET 响应缓存

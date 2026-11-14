@@ -51,6 +51,44 @@ describe('体检项的元测试', () => {
     expect(dup, `重复的检查项：${dup.join(', ')}`).toEqual([])
   })
 
+  it('IM-1b 没有语义重复的检查（同一件事写了两遍）', () => {
+    /**
+     * IM-1 只查**名称**不重复 —— 查不出"同一件事写了两遍"。
+     *
+     * 实际踩过：`coupon_template_exists` 与 `user_coupon_template_exists`
+     * 查的是同一张表同一列（user_coupons.template_id），
+     * 名字不同所以 IM-1 放行，体检报告里同一件事报了两遍 ——
+     * **虚增了"覆盖度"的错觉**，让人以为检查项更多更全。
+     *
+     * 判定：把 SQL 归一化（去空白、去大小写差异）后比对。
+     */
+    /**
+     * 归一化只取「检查对象」：FROM 之后的 JOIN / WHERE 部分。
+     *
+     * 为什么不能比整条 SQL：两条语义相同的检查，投影列可能写得不一样
+     * （`uc.template_id` vs `uc.template_id AS template_id`）——
+     * 那是写法差异，不是检查内容差异。
+     * 而 FROM/JOIN/WHERE 才是"这条检查到底在查什么"。
+     */
+    const normalize = (sql) => {
+      const flat = String(sql || '').replace(/\s+/g, ' ').trim().toLowerCase()
+      const i = flat.indexOf(' from ')
+      return (i === -1 ? flat : flat.slice(i)).replace(/\s*([(),=<>])\s*/g, '$1')
+    }
+
+    const seen = new Map()
+    const dups = []
+    for (const check of CHECKS) {
+      const key = normalize(check.sql)
+      if (seen.has(key)) {
+        dups.push(`「${check.name}」与「${seen.get(key)}」查的是同一件事`)
+      } else {
+        seen.set(key, check.name)
+      }
+    }
+    expect(dups, '语义重复的检查项（同一件事写了两遍）：\n' + dups.join('\n')).toEqual([])
+  })
+
   it('IM-2 每条检查要么能自证会响，要么显式声明由什么保证', () => {
     const missing = CHECKS.filter(c => !c.selfTest && !c.defensive).map(c => c.name)
     expect(

@@ -36,6 +36,21 @@ export const RECENT_DAYS = 30
  * 直接写库造出违规数据（绕过应用层的校验），再跑这条检查，
  * 必须能抓到。抓不到 = 这条检查是"永远绿的假检查"。
  */
+/**
+ * 插入一条**违反外键**的行（仅自证用）。
+ *
+ * ## 为什么需要它
+ *
+ * 测试库的表结构是 sequelize.sync() 建的，比**生产库更全**：
+ * 例如 `carts.bundle_id` 在测试库有外键（SET NULL），在生产库**没有**。
+ * 于是"生产库真能出现的悬空行"在测试库里**根本插不进去** ——
+ * 自证做不了 → 这项检查要么被误标成"防御项"（把真能报的说成不可能），
+ * 要么干脆没人写（更糟）。
+ *
+ * 办法：临时禁用该表的触发器（需要表属主权限，测试库满足），插入后恢复。
+ *
+ * ⚠️ 只在测试库使用：生产的 `--self-test` 已被脚本硬闸拦住（会清库）。
+ */
 async function makeSelfTestOrder (m, opts = {}) {
   const user = await m.User.create({
     username: `selftest_u_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
@@ -195,6 +210,46 @@ const CHECKS = [
     sql: `SELECT id, user_id, code FROM user_coupons WHERE status = 'used' AND used_by_order_id IS NULL`
   },
   {
+    /**
+     * 已用券挂的订单必须**真实存在**。
+     *
+     * `user_coupons.used_by_order_id` **没有外键**（该列只做逻辑关联，
+     * 因为订单允许硬删），所以这是全库少数几个"孤儿真能出现"的引用之一 ——
+     * 与 after_sales.user_id 同类。
+     *
+     * 为什么必须单独查：原有的 coupon_used_has_order 只查
+     * `used_by_order_id IS NULL`（压根没挂），**查不出"挂着一个不存在的订单"** ——
+     * 检查名叫 has_order，却没验证 order 是否存在，属于"永远绿的假检查"。
+     *
+     * 真实触发场景：管理端删除已履约订单时券没被释放（已修），
+     * 以及任何绕过应用层直接写库的操作。
+     */
+    name: 'coupon_used_order_exists',
+    title: '已用券挂的订单必须真实存在（不能挂幽灵订单）',
+    selfTest: async (m) => {
+      const { user } = await makeSelfTestOrder(m)
+      // template_id 必须真实存在（user_coupons.template_id 是 NO ACTION 外键）
+      const tpl = await m.CouponTemplate.create({
+        name: `自证悬空券_${Date.now()}`,
+        type: 'discount',
+        amount: 50,
+        min_spend: 100,
+        status: 'active',
+        scope: { type: 'all', ids: [] }
+      })
+      // used_by_order_id 指向一个**不存在**的订单（该列无外键，能插进去）
+      await m.UserCoupon.create({
+        template_id: tpl.id, user_id: user.id, code: `DANG${Date.now().toString(36)}`,
+        status: 'used', used_by_order_id: 2147483647
+      })
+    },
+    sql: `SELECT c.id, c.user_id, c.code, c.used_by_order_id
+          FROM user_coupons c
+          WHERE c.status = 'used'
+            AND c.used_by_order_id IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.id = c.used_by_order_id)`
+  },
+  {
     name: 'coupon_template_exists',
     title: '用户券的模板必须存在（不能有孤儿券）',
     // 防御项：由数据库约束保证，应用层造不出这种数据
@@ -288,17 +343,34 @@ const CHECKS = [
   {
     name: 'after_sale_order_exists',
     title: '售后单必须挂在存在的订单上',
-    // 防御项：由数据库约束保证，应用层造不出这种数据
-    defensive: true,
-    defensiveReason: 'after_sales.order_id → orders 是 NO ACTION 外键（这正是删订单会 500 的原因）',
+    /**
+     * ⚠️ 之前这里被标成"防御项（由外键保证，应用层造不出）" —— **那是错的**。
+     *
+     * 事实：`after_sales.order_id` **根本没有外键**（测试库与生产库都没有）。
+     * 应用层删单时确实会显式清理售后单，但那是**应用层的约定**，不是数据库的保证；
+     * 任何绕过应用层的写库（脚本、迁移、运维直连）都能造出孤儿售后单。
+     *
+     * 误标成"防御项"的代价：以为这块有 FK 兜底 → 少了一条真能报的检查，
+     * 而且第 9 轮"全库唯一无外键引用是 after_sales.user_id"的结论也是错的 ——
+     * `after_sales.order_id` 与 `user_coupons.used_by_order_id` 同样没有外键。
+     */
+    selfTest: async (m) => {
+      const { order } = await makeSelfTestOrder(m)
+      // order_id 指向不存在的订单（该列无外键，能插进去）
+      await m.AfterSale.create({
+        order_id: 99999999, user_id: order.user_id, type: 'refund',
+        status: 'pending', reason: '自证', amount: 100
+      })
+    },
     sql: `SELECT a.id AS id, a.order_id AS order_id FROM after_sales a
           LEFT JOIN orders o ON o.id = a.order_id WHERE o.id IS NULL`
   },
   {
     name: 'after_sale_user_exists',
-    // ⚠️ after_sales.user_id 是全库**唯一没有外键保护**的用户引用 →
-    // 这项是真能报出来的检查（其余引用项都是防御）
-    title: '售后单必须挂在存在的用户上（无外键保护，唯一真能报的一项）',
+    // ⚠️ after_sales.user_id **没有外键保护** → 这项是真能报出来的检查
+    // （注意：不是"全库唯一"—— after_sales.order_id 与 user_coupons.used_by_order_id
+    //   同样没有外键；全库无外键的 *_id 列共 14 个，见 docs/bug-hunt-round7-11.md）
+    title: '售后单必须挂在存在的用户上（该列无外键保护，真能报）',
     selfTest: async (m) => {
       const { order } = await makeSelfTestOrder(m)
       // after_sales.user_id 是全库唯一没有外键保护的用户引用 → 能造出孤儿
@@ -315,24 +387,23 @@ const CHECKS = [
     // carts.product_id 是 SET NULL —— 商品被删后置 NULL 是**合法**的（该行等着被清理），
     // 所以只检查"非 NULL 却指向不存在的商品"
     title: '购物车行必须挂在存在的商品上（NULL = 商品已删，待清理）',
-    // 防御项：carts.product_id → products 是 SET NULL 外键
+    /**
+     * 防御项：carts.product_id → products 有外键，**插入时指向不存在的商品会被直接拒绝**
+     * （两个库都是这样：测试库 SET NULL、生产库 NO ACTION）。
+     *
+     * ⚠️ 测试库与生产库的 delete_rule 不同（SET NULL vs NO ACTION）：
+     * 删商品时，测试库会把购物车行的 product_id 置 NULL（合法状态，等着被清理），
+     * 生产库则直接拒绝删商品。**两个库都不会产生"指向不存在商品"的行**，
+     * 所以检查里排除 NULL 是对的 —— 但别把规则记错。
+     */
     //   - 插入时受外键约束 → 造不出"指向不存在商品"的行
     //   - 商品被删后该列置 NULL 是**合法**状态（购物车行等着被清理）
     // 所以本项只是防止将来有人去掉外键后悄悄产生孤儿
     defensive: true,
-    defensiveReason: 'carts.product_id → products 是 SET NULL 外键；NULL 是合法状态（待清理），插入时也受约束 → 应用层造不出孤儿行',
+    defensiveReason: 'carts.product_id → products 有外键，插入时指向不存在的商品会被直接拒绝（生产库 NO ACTION / 测试库 SET NULL，两个库都不会产生孤儿行）',
     sql: `SELECT c.id AS id, c.product_id AS product_id FROM carts c
           LEFT JOIN products p ON p.id = c.product_id
           WHERE c.product_id IS NOT NULL AND p.id IS NULL`
-  },
-  {
-    name: 'user_coupon_template_exists',
-    title: '用户券必须挂在存在的券模板上',
-    // 防御项：由数据库约束保证，应用层造不出这种数据
-    defensive: true,
-    defensiveReason: 'user_coupons.template_id → coupon_templates 是 NO ACTION 外键',
-    sql: `SELECT uc.id AS id, uc.template_id AS template_id FROM user_coupons uc
-          LEFT JOIN coupon_templates ct ON ct.id = uc.template_id WHERE ct.id IS NULL`
   },
   {
     name: 'point_transaction_user_exists',
