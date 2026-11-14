@@ -28,7 +28,7 @@ import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
-import { revenueStatusSql } from '../constants/revenueStatus.js'
+import { revenueStatusSql, revenueWhere } from '../constants/revenueStatus.js'
 import * as statsCache from '../utils/statsCache.js'
 import { parseId } from '../utils/params.js'
 import { respondDbError } from '../utils/dbInputError.js'
@@ -1374,9 +1374,31 @@ class OrderController {
       const safePage = Math.max(Number.parseInt(String(page), 10) || 1, 1)
       const offset = (safePage - 1) * safeLimit
 
+      /**
+       * 状态筛选支持**逗号分隔的多个值**（status=paid,shipping），
+       * 与管理端订单列表**同一套解析与校验**。
+       *
+       * 之前是把原始字符串直接塞进 where.status：
+       *   - 单个值能用；
+       *   - 传 "paid,shipping" → where.status = 'paid,shipping' → **匹配不到任何单**，
+       *     接口**静默返回空列表** —— 最坏的一种错：看起来像"我没有订单"，
+       *     实际是筛选写错了，而用户根本无从察觉。
+       */
+      const statusList = String(status || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const invalidStatus = statusList.find((s) => !ORDER_STATUS_VALUES.includes(s))
+      if (invalidStatus) {
+        return res.status(400).json({
+          success: false,
+          message: `无效的订单状态：${invalidStatus}（合法值：${ORDER_STATUS_VALUES.join('/')}）`
+        })
+      }
+
       let where = { user_id: userId }
-      if (status) {
-        where.status = status
+      if (statusList.length > 0) {
+        where.status = { [Op.in]: statusList }
       }
       // 日历日按业务时区切（business_timezone 配置）
       where = applyCreatedBetween(where, req.query, { timezone: await getBusinessTimezone() })
@@ -1390,17 +1412,12 @@ class OrderController {
 
       /**
        * 累计消费统计：只计真实成交的订单。
-       * 早期实现仅排除 points 支付，未支付（pending）与已取消（cancelled）的
-       * 订单金额也会被计入，导致前台展示的「累计消费」虚高。
+       *
+       * 口径来自 constants/revenueStatus.js —— 与面板总营收、订单列表今日营收、
+       * 个人中心累计消费**同一份**（这里曾经是第四份拷贝，各自写着
+       * ['pending','cancelled'] 和 != 'points'，改一处忘另一处就会两个数）。
        */
-      const SPENT_EXCLUDED_STATUSES = ['pending', 'cancelled']
-      const spentWhere = {
-        ...where,
-        payment_method: { [Op.ne]: 'points' },
-        status: where.status
-          ? { [Op.and]: [where.status, { [Op.notIn]: SPENT_EXCLUDED_STATUSES }] }
-          : { [Op.notIn]: SPENT_EXCLUDED_STATUSES }
-      }
+      const spentWhere = revenueWhere(Op, where)
       const spentRaw = await Order.sum('total_amount_thb', { where: spentWhere })
       const spentThbSum = spentRaw != null && spentRaw !== ''
         ? parseFloat(String(spentRaw))

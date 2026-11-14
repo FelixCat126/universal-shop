@@ -39,9 +39,17 @@ export const NON_REVENUE_PAYMENT_METHODS = ['points']
  * @returns {object}
  */
 export function revenueWhere (Op, extra = {}) {
+  /**
+   * extra 里如果已经有 status 条件（用户端订单列表按状态筛选时），
+   * 就把它与"排除非成交状态"**同时**满足（AND），而不是互相覆盖 ——
+   * 覆盖掉的话，用户筛了 paid，合计却会按全部成交单算，两个数字对不上。
+   */
+  const { status, ...rest } = extra
   return {
-    ...extra,
-    status: { [Op.notIn]: NON_REVENUE_STATUSES },
+    ...rest,
+    status: status
+      ? { [Op.and]: [status, { [Op.notIn]: NON_REVENUE_STATUSES }] }
+      : { [Op.notIn]: NON_REVENUE_STATUSES },
     payment_method: { [Op.notIn]: NON_REVENUE_PAYMENT_METHODS }
   }
 }
