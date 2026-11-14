@@ -10,6 +10,7 @@ import { fileTypeFromFile } from 'file-type'
 import { ApiError } from '../middlewares/errorHandler.js'
 import { logger } from '../utils/logger.js'
 import { isValidTimeZone } from '../utils/businessTimezone.js'
+import { respondDbError } from '../utils/dbInputError.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -478,11 +479,11 @@ class SystemConfigController {
         })
       }
     } catch (error) {
-      logger.error('设置配置失败', { err: error?.message, stack: error?.stack })
-      res.status(500).json({
-        success: false,
-        message: '设置配置失败',
-        code: 'INTERNAL_SERVER_ERROR'
+      // 统一错误翻译：超长/越界等**输入问题**应该是 400，不是 500
+      return respondDbError(res, error, {
+        logLabel: '设置配置失败',
+        fallbackMessage: '设置配置失败',
+        logger
       })
     }
   }
