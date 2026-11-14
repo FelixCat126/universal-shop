@@ -6,7 +6,7 @@ import Order from '../models/Order.js'
 import Product from '../models/Product.js'
 import { logger } from '../utils/logger.js'
 import * as statsCache from '../utils/statsCache.js'
-import { NON_REVENUE_STATUSES, revenueWhere } from '../constants/revenueStatus.js'
+import { NON_REVENUE_STATUSES } from '../constants/revenueStatus.js'
 
 /**
  * 综合统计进程内短缓存（TTL 15s）：
@@ -243,39 +243,58 @@ class StatisticsController {
   // 内部方法：获取总览统计数据
   static async getOverviewStatsData() {
     const tz = await getBusinessTimezone()
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-    /**
-     * 六组查询**并发**发出去，而不是一个算完再算下一个。
-     *
-     * 之前是串行 await = N 次「发查询 → 等结果 → 再发下一个」的往返；
-     * 数据库端的计算量没变，但**网络往返延迟 ×N**。
-     * 面板每次打开都要跑一遍，往返延迟是用户直接感受到的（尤其跨机房时）。
-     * Promise.all 把 N 次往返压成 1 次。
-     */
+    // 近 7 天活跃的起点：按**业务时区**的零点（与订单趋势同一口径）
+    const sevenDaysAgo = businessDayStartDaysAgo(tz, new Date(), 7)
     const todayStart = startOfBusinessDay(tz)
 
-    const [totalOrders, totalAmountResult, totalUsers, activeUsers, todayStats, actionable] = await Promise.all([
-      // 总订单数
-      Order.count(),
-      // 总金额数（只算**真实成交**：未付款/已取消的单不算营收）
+    /**
+     * 查询合并：**9 条 → 4 条**，orders 表的全表扫从 5 次降到 3 次。
+     *
+     * 原来的写法是「每个数字一条 count」，于是：
+     *   - COUNT(*) 与 SUM(...) 各扫一遍 orders（总数与营收）
+     *   - COUNT(*) 与活跃数各扫一遍 users
+     *   - 待发货/待支付各扫一遍 orders，低库存/缺货各扫一遍 products
+     * 而这些数字**全都可以用一条查询里的多个 FILTER 聚合一次算出来** ——
+     * PG 的 FILTER 让"不同口径的行数"可以在一次扫描里同时得到。
+     *
+     * 口径一个都没变（数字与优化前逐项相等，见 dashboard.actionable.test.js），
+     * 变的只是**少扫了几遍表** —— 面板是运营每 30 秒自动刷新的页面，
+     * 用户量越大，这几遍全表扫越贵。
+     */
+    const revenueSql = `status NOT IN (${NON_REVENUE_STATUSES.map((x) => sequelize.escape(x)).join(', ')})`
+
+    const [orderStats, userStats, todayStats, actionable] = await Promise.all([
+      /**
+       * 总单数 + 总营收（一次扫 orders）。
+       * 总营收只算**真实成交**：未付款/已取消的单不算营收。
+       */
       Order.findOne({
         attributes: [
-          [sequelize.fn('SUM', sequelize.literal('COALESCE(total_amount_thb, total_amount)')), 'total']
+          [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+          [
+            sequelize.literal(
+              `COALESCE(SUM(COALESCE(total_amount_thb, total_amount)) FILTER (WHERE ${revenueSql}), 0)`
+            ),
+            'revenue'
+          ]
         ],
-        where: revenueWhere(Op)
+        raw: true
       }),
-      // 总用户数
-      User.count(),
-      // 近七天活跃用户数
-      User.count({
-        where: {
-          last_login_at: {
-            [Op.gte]: sevenDaysAgo,
-            [Op.ne]: null
-          }
-        }
+      /**
+       * 总用户数 + 近七天活跃用户数（一次扫 users）。
+       * last_login_at 有索引（013 迁移补的），FILTER 里带上边界即可。
+       */
+      User.findOne({
+        attributes: [
+          [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+          [
+            sequelize.literal(
+              `COUNT(*) FILTER (WHERE last_login_at IS NOT NULL AND last_login_at >= ${sequelize.escape(sevenDaysAgo.toISOString())})`
+            ),
+            'active'
+          ]
+        ],
+        raw: true
       }),
       // 今日订单数 + 今日营收
       Order.findOne({
@@ -287,7 +306,7 @@ class StatisticsController {
             // ⚠️ 必须用 literal 而不是 fn：fn 会把整串当**函数名**加引号
             // （fn("SUM(x) FILTER(...)") → "SUM(x) FILTER(...)" → SQL 语法错误 500）
             sequelize.literal(
-              `SUM(COALESCE(total_amount_thb, total_amount)) FILTER (WHERE status NOT IN (${NON_REVENUE_STATUSES.map((x) => sequelize.escape(x)).join(', ')}))`
+              `COALESCE(SUM(COALESCE(total_amount_thb, total_amount)) FILTER (WHERE ${revenueSql}), 0)`
             ),
             'amount'
           ]
@@ -307,26 +326,53 @@ class StatisticsController {
        * 否则点进商品页看到的条数和面板上的数字对不上。
        */
       Promise.all([
-        Order.count({ where: { status: { [Op.in]: ['paid', 'shipping'] } } }),
-        Order.count({ where: { status: 'pending' } }),
-        Product.count({ where: { stock: { [Op.and]: [{ [Op.gt]: 0 }, { [Op.lte]: 10 }] } } }),
-        Product.count({ where: { stock: 0 } })
+        // 待发货 + 待支付（一次扫 orders）
+        Order.findOne({
+          attributes: [
+            [
+              sequelize.literal(
+                `COUNT(*) FILTER (WHERE status IN ('paid', 'shipping'))`
+              ),
+              'shipment'
+            ],
+            [
+              sequelize.literal(`COUNT(*) FILTER (WHERE status = 'pending')`),
+              'payment'
+            ]
+          ],
+          raw: true
+        }),
+        // 低库存 + 缺货（一次扫 products）
+        Product.findOne({
+          attributes: [
+            [
+              sequelize.literal('COUNT(*) FILTER (WHERE stock > 0 AND stock <= 10)'),
+              'low'
+            ],
+            [
+              sequelize.literal('COUNT(*) FILTER (WHERE stock = 0)'),
+              'out'
+            ]
+          ],
+          raw: true
+        })
       ])
     ])
 
-    const totalAmount = parseFloat(totalAmountResult?.dataValues?.total || 0)
+    const totalAmount = parseFloat(orderStats?.revenue || 0)
 
     return {
-      totalOrders,
+      totalOrders: Number(orderStats?.total || 0),
       totalAmount: totalAmount.toFixed(2),
-      totalUsers,
-      activeUsers,
+      totalUsers: Number(userStats?.total || 0),
+      activeUsers: Number(userStats?.active || 0),
       todayOrders: Number(todayStats?.orders || 0),
       todayAmount: Number(todayStats?.amount || 0).toFixed(2),
-      pendingShipment: actionable[0],
-      pendingPayment: actionable[1],
-      lowStock: actionable[2],
-      outOfStock: actionable[3]
+      // actionable 只有两项：[0]=订单侧计数（待发货/待支付），[1]=商品侧计数（低库存/缺货）
+      pendingShipment: Number(actionable[0]?.shipment || 0),
+      pendingPayment: Number(actionable[0]?.payment || 0),
+      lowStock: Number(actionable[1]?.low || 0),
+      outOfStock: Number(actionable[1]?.out || 0)
     }
   }
 
