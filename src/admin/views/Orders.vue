@@ -756,6 +756,8 @@ const pagination = reactive({
 
 // 后端全量聚合统计（新契约 /api/admin/orders 响应的 stats 字段）；无该字段时回退到当前页计算
 const serverStats = ref(null)
+// 业务时区（服务端返回）：前端兜底算"今天"时要用它，口径才和服务端一致
+const serverTimezone = ref(null)
 
 // 统计信息
 const stats = computed(() => {
@@ -780,8 +782,21 @@ const stats = computed(() => {
   }
   const totalAmount = orders.value.reduce((sum, order) => sum + sumOrderThb(order), 0).toFixed(2)
 
-  const today = new Date().toDateString()
-  const todayOrders = orders.value.filter(order => new Date(order.created_at).toDateString() === today)
+  // "今天"必须按**业务时区**算（服务端也是按 business_timezone 算的）。
+  // 直接用浏览器本地时区的话，一旦运营把业务时区改成别的（比如 Asia/Bangkok），
+  // 这个兜底数字就会和服务端对不上。
+  // 业务时区由服务端随列表返回（data.timezone）；拿不到时退回本地时区。
+  const dayKey = (value) => {
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return ''
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: serverTimezone.value || undefined }).format(d)
+    } catch {
+      return d.toDateString()
+    }
+  }
+  const today = dayKey(new Date())
+  const todayOrders = orders.value.filter(order => dayKey(order.created_at) === today)
   const todayAmount = todayOrders.reduce((sum, order) => sum + sumOrderThb(order), 0).toFixed(2)
   
   return {
@@ -842,6 +857,7 @@ const loadOrders = async () => {
         pagination.total = pg?.total ?? data.data?.total ?? 0
         pagination.totalPages = pg?.totalPages ?? data.data?.totalPages ?? 1
         serverStats.value = data.data?.stats || null
+        serverTimezone.value = data.data?.timezone || null
 
         // 删除/操作后当前页可能超出新的总页数，自动回退到最后一页再加载
         if (pagination.totalPages > 0 && pagination.page > pagination.totalPages) {

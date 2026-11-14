@@ -1619,8 +1619,11 @@ class OrderController {
        * 所以按筛选条件做 15s 短缓存：键含筛选条件（不含分页），
        * 不同筛选各算各的。
        */
+      // 业务时区：服务端所有"今天"口径都按它算；也随响应返回，
+      // 让前端在拿不到 stats 时能按同一口径聚合（见响应里的 timezone 字段）
+      const tz = await getBusinessTimezone()
       const statsCacheKey = JSON.stringify([
-        await getBusinessTimezone(),
+        tz,
         statusList.join(','), keyword || '', startDate || '', endDate || ''
       ])
       const cachedStats = getCachedOrderStats(statsCacheKey)
@@ -1633,7 +1636,6 @@ class OrderController {
           return Number.isFinite(n) ? n : 0
         }
         // "今天"按业务时区切（business_timezone 配置），不再依赖服务器本地时区
-        const tz = await getBusinessTimezone()
         const todayStart = startOfBusinessDay(tz)
         const statsWhere = { ...where }
         delete statsWhere.status
@@ -1740,7 +1742,10 @@ class OrderController {
           total: count,
           page,
           totalPages: Math.ceil(count / limit),
-          stats
+          stats,
+          // 业务时区：前端在拿不到 stats 时要自己按"今天"聚合，
+          // 口径必须与服务端一致（服务端按业务时区算，前端不能按浏览器本地时区算）
+          timezone: tz
         }
       })
 
