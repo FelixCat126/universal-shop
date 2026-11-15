@@ -279,8 +279,9 @@ function buildStatusCondition (params) {
  * （前端两个地方各叫各的，导出那处叫 start_from）。
  */
 function buildDateRangeCondition (params, tz) {
-  const fromRaw = params.startDate ?? params.start_from
-  const toRaw = params.endDate ?? params.end_from
+  // 参数名兼容：startDate/endDate（零售导出）、start_from/end_from、from/to（合作方订单）
+  const fromRaw = params.startDate ?? params.start_from ?? params.from
+  const toRaw = params.endDate ?? params.end_from ?? params.to
   if (!fromRaw && !toRaw) return null
 
   /**
