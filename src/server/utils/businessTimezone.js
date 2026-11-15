@@ -28,7 +28,19 @@
 
 import SystemConfig from '../models/SystemConfig.js'
 
-export const DEFAULT_BUSINESS_TIMEZONE = 'Asia/Shanghai'
+/**
+ * 业务时区默认值：**Asia/Bangkok**（泰国，UTC+7）。
+ *
+ * 为什么不是跟着服务器时区：
+ *   - 服务器换机房/换云区，报表口径不该跟着变；
+ *   - 店铺的**客户、计价货币（THB）、主要语言**都在泰国，
+ *     「今天」应该按顾客的时钟切 —— 泰国时间 23:30 的单属于**泰国的那一天**，
+ *     按中国时区算会被推到下一天，与平台的日结对不上。
+ *
+ * 运营可在管理端「系统配置 → 业务时区」随时改（改的是配置项，
+ * 不是代码默认值），所以这里定的是**默认值**，不是不可改的规则。
+ */
+export const DEFAULT_BUSINESS_TIMEZONE = 'Asia/Bangkok'
 
 /** 配置键名 */
 export const BUSINESS_TIMEZONE_KEY = 'business_timezone'

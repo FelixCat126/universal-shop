@@ -317,9 +317,10 @@ const currencyCode = ref('THB')
 const pointsEarnRate = ref(0.01)
 
 /** 业务时区（IANA 名）：决定"今天 / 本地日历日"的边界 */
-const businessTimezone = ref('Asia/Shanghai')
+const businessTimezone = ref('Asia/Bangkok')
 /** 常用时区（下拉里给运营选；允许手动输入其它 IANA 名，后端会校验） */
 const commonTimezones = [
+  'Asia/Bangkok',
   'Asia/Shanghai',
   'Asia/Bangkok',
   'Asia/Singapore',
