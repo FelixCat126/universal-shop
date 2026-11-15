@@ -43,10 +43,15 @@ end
 
 if ttl > 0 and pttl > 0 then
   -- 已有窗口：保留剩余 TTL 重写值
-  redis.call('SET', key, '"' .. current .. '"', 'PX', pttl)
+  -- ⚠️ 写回的格式必须与 RedisStore.set 一致：set 存的是 JSON.stringify(value)，
+  --    数字 3 → '3'（**不带引号**）。这里若写成 '"' .. current .. '"'，
+  --    get 的 JSON.parse('"3"') 会得到**字符串** '3' 而不是数字 3 ——
+  --    increment 返回数字、get 返回字符串，类型契约就破了。
+  --    （读取侧仍兼容带引号的旧值：上面的剥引号逻辑保留。）
+  redis.call('SET', key, current, 'PX', pttl)
 else
   -- 首次写入（或原本无 TTL）：设置完整窗口
-  redis.call('SET', key, '"' .. current .. '"', 'PX', ttl)
+  redis.call('SET', key, current, 'PX', ttl)
 end
 return current
 `
@@ -288,6 +293,35 @@ class RedisStore {
 export function createSharedStore (namespace) {
   const client = getRedisClient()
   return client ? new RedisStore(namespace, client) : new MemoryStore(namespace)
+}
+
+/**
+ * 显式创建**内存**后端（无视 REDIS_URL）。
+ *
+ * 为什么需要它：createSharedStore 会随 REDIS_URL 的有无切换后端，
+ * 于是同一组契约用例在不同环境下测的是**不同的实现** ——
+ * 设了 REDIS_URL 就只测 Redis，不设就只测内存，两者永远有一个没被测到。
+ * 测试要显式点名后端，才能把两个后端都覆盖住。
+ */
+export function createMemoryStore (namespace) {
+  return new MemoryStore(namespace)
+}
+
+/**
+ * 显式创建 **Redis** 后端（可指定连接串，不依赖全局 REDIS_URL）。
+ *
+ * 与 createMemoryStore 配对：测试要能点名后端，
+ * 否则同一组契约用例会随环境（有没有 REDIS_URL）测到不同的实现，
+ * 总有一个后端没被覆盖。
+ */
+export function createRedisStore (namespace, url) {
+  const client = url
+    ? new Redis(url, { maxRetriesPerRequest: 2, enableOfflineQueue: true, lazyConnect: false })
+    : getRedisClient()
+  if (!client) {
+    throw new Error('[shared-state] 创建 Redis 后端失败：未配置 REDIS_URL')
+  }
+  return new RedisStore(namespace, client)
 }
 
 export function isSharedStateDistributed () {

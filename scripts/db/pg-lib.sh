@@ -103,14 +103,21 @@ pg_restore_stream () {
 }
 
 # 单值查询：pg_scalar <url> <sql>
+#
+# ⚠️ 这里必须把 stdin 重定向到 /dev/null：
+#   psql 会继承调用方的 stdin。在循环里逐条查表时，psql 会把循环的输入
+#   （文件或管道）读走，下一次 read 立刻拿到 EOF —— 表现为"只比对了第一张表，
+#   后面的表悄悄没查"，而且**不报错**。容器模式下 docker exec -i 更是把
+#   这个行为放大（stdin 直接透传给容器里的 psql）。
+#   pg_scalar 不需要 stdin，所以直接掐断。
 pg_scalar () {
   local url="$1"; shift
   local sql="$*"
   pg_init "$url" || return 1
   if [[ "$PG_MODE" == "direct" ]]; then
-    psql "$url" -Atc "$sql"
+    psql "$url" -Atc "$sql" < /dev/null
   else
     docker exec -i -e PGPASSWORD="$PG_PASS" "$PG_CONTAINER" \
-      psql -U "$PG_USER" -d "$PG_DB" -Atc "$sql"
+      psql -U "$PG_USER" -d "$PG_DB" -Atc "$sql" < /dev/null
   fi
 }
