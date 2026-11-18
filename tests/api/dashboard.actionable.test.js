@@ -24,6 +24,7 @@ import app from '@server/app.js'
 import { TestDatabase } from '../setup/test-database.js'
 import { TestHelpers } from '../helpers/test-helpers.js'
 import { TestDataFactory } from '../factories/index.js'
+import { getBusinessTimezone, localCalendarDate, localDayStartUtc, addDaysToCalendarDate } from '@server/utils/businessTimezone.js'
 
 const models = () => TestDatabase.getSequelize().models
 
@@ -36,6 +37,30 @@ async function adminCtx () {
 
 let orderSeq = 0
 const uniqueOrderNo = () => `DA${Date.now()}${orderSeq++}`
+
+/**
+ * 业务时区里的"今天 10:00"与"昨天 10:00"（UTC 瞬间）。
+ *
+ * ⚠️ 之前这里用「本地时间」的昨天：
+ *     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); yesterday.setHours(10,0,0,0)
+ *   业务口径是**业务时区**（默认 Asia/Bangkok = UTC+7）的今天，
+ *   而服务器本地时区是 Asia/Shanghai（UTC+8）。
+ *   于是本地 00:00–07:00 这个窗口里，「本地昨天 10:00」正好落在**曼谷的今天**
+ *   → 昨天那单被算进今天 → 用例必挂。
+ *   这不是业务 bug，是测试把自己的假设写死在了本地时区上。
+ *
+ * 现在直接按业务时区算日历日，任何时刻跑结果都一样。
+ */
+async function businessDayMoments () {
+  const tz = await getBusinessTimezone()
+  const { y, m, d } = localCalendarDate(tz)
+  const prev = addDaysToCalendarDate(y, m, d, -1)
+  const at = (yy, mm, dd, hour) => new Date(localDayStartUtc(tz, yy, mm, dd) + hour * 3600 * 1000)
+  return {
+    todayAt10: at(y, m, d, 10),
+    yesterdayAt10: at(prev.y, prev.m, prev.d, 10)
+  }
+}
 
 /** 造一单（默认今天创建的） */
 async function mkOrder (overrides = {}) {
@@ -86,12 +111,10 @@ describe('面板今日待办', () => {
   it('DA-2 今日订单数只算今天', async () => {
     const { token } = await adminCtx()
 
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    yesterday.setHours(10, 0, 0, 0)
+    const { yesterdayAt10, todayAt10 } = await businessDayMoments()
 
-    await mkOrder({ created_at: yesterday, total_amount_thb: 50 })
-    await mkOrder({ total_amount_thb: 30 })
+    await mkOrder({ created_at: yesterdayAt10, total_amount_thb: 50 })
+    await mkOrder({ created_at: todayAt10, total_amount_thb: 30 })
 
     const res = await request(app).get('/api/admin/statistics/overview')
       .set('Authorization', `Bearer ${token}`)
@@ -101,15 +124,13 @@ describe('面板今日待办', () => {
   it('DA-3 今日营收只累加今天的订单', async () => {
     const { token } = await adminCtx()
 
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    yesterday.setHours(10, 0, 0, 0)
+    const { yesterdayAt10, todayAt10 } = await businessDayMoments()
 
     // ⚠️ 状态必须是**已成交**（shipping/completed…）：
     // 「营收」的口径是钱到账了才算，未付款（pending）与已取消（cancelled）不算。
-    await mkOrder({ created_at: yesterday, total_amount_thb: 500, status: 'shipping' })
-    await mkOrder({ total_amount_thb: 30, status: 'shipping' })
-    await mkOrder({ total_amount_thb: 20, status: 'shipping' })
+    await mkOrder({ created_at: yesterdayAt10, total_amount_thb: 500, status: 'shipping' })
+    await mkOrder({ created_at: todayAt10, total_amount_thb: 30, status: 'shipping' })
+    await mkOrder({ created_at: todayAt10, total_amount_thb: 20, status: 'shipping' })
 
     const res = await request(app).get('/api/admin/statistics/overview')
       .set('Authorization', `Bearer ${token}`)

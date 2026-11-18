@@ -140,7 +140,7 @@
             type="text"
             :placeholder="t('product.searchPlaceholder')"
             :aria-label="t('product.searchPlaceholder')"
-            class="w-full min-w-0 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+            class="w-full min-w-0 pl-10 pr-10 py-2 min-h-[44px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
             @keydown.enter.prevent="searchNow"
             @keydown.esc.prevent="clearSearch"
           >
@@ -278,11 +278,21 @@
           </div>
           
           <div class="p-4 flex flex-col flex-1 min-h-0">
-            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3rem] sm:min-h-[3.5rem]">
+            <!--
+              标题/描述不再预留固定高度：预留会在"标题只有一行"时留下空洞
+              （短标题的卡片下方出现一整块空白）。
+              卡片等高由 grid 的 items-stretch + 价格区的 mt-auto 保证，
+              底部按钮仍然对齐，不需要靠占位撑。
+            -->
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
               {{ getCurrentLanguageValue(product, 'name') }}
             </h3>
 
-            <p class="text-gray-600 text-sm mb-3 line-clamp-2 shrink-0 min-h-[2.5rem]">
+            <!-- 描述为空时不渲染：否则每张卡都白占一行（生产商品的 description 多为空） -->
+            <p
+              v-if="getCurrentLanguageValue(product, 'description')"
+              class="text-gray-600 text-sm mb-3 line-clamp-2 shrink-0"
+            >
               {{ getCurrentLanguageValue(product, 'description') }}
             </p>
             
@@ -330,11 +340,18 @@
                 </div>
               </div>
               
-              <div class="flex space-x-2">
+              <!--
+                移动端**纵向堆叠**，sm+ 才并排。
+                实测（390px 视口）：两按钮并排时每个只剩 65px 内容宽，
+                "Add to Cart" 被压成 **3 行竖排**，按钮区被撑到 82px 高
+                （本该 44px）—— 卡片底部白白多出 38px。
+                纵向堆叠后每个按钮有整行宽度，文字单行放得下。
+              -->
+              <div class="flex flex-col gap-2 sm:flex-row sm:space-x-2">
                 <button
                   @click.stop="addToCart(product)"
                   :disabled="product.stock === 0 || isAdding(product.id)"
-                  class="flex-1 px-3 py-2.5 sm:py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-1.5"
+                  class="w-full sm:flex-1 px-3 py-2.5 sm:py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
                 >
                   <span
                     v-if="isAdding(product.id)"
@@ -346,7 +363,7 @@
                 <button
                   @click.stop="buyNow(product)"
                   :disabled="product.stock === 0"
-                  class="flex-1 px-3 py-2.5 sm:py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
+                  class="w-full sm:flex-1 px-3 py-2.5 sm:py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 inline-flex items-center justify-center whitespace-nowrap"
                 >
                   {{ t('product.buyNow') }}
                 </button>

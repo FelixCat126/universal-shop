@@ -53,8 +53,14 @@
           
           <!-- 右侧操作 -->
           <div class="flex items-center shrink-0 gap-1.5 sm:gap-4 min-w-0">
-            <!-- 语言 + 币种 -->
-            <div class="flex flex-nowrap items-center gap-1 sm:gap-2">
+            <!--
+              语言 + 币种：sm+ 留在顶栏，**移动端下沉到页脚**。
+              原因（实测 390px 视口）：顶栏右区本来就占 306px，
+              再加上触控热区提到 44px（购物车图标 +8px），
+              已登录态还有「个人中心 + 退出」两个按钮 → 总宽会溢出容器约 13px。
+              移动端把这两个次要设置放到页脚，顶栏只留导航与账号操作。
+            -->
+            <div class="hidden sm:flex flex-nowrap items-center gap-1 sm:gap-2">
               <span class="text-xs text-gray-500 whitespace-nowrap hidden lg:inline">{{ t('language.label') }}</span>
               <select 
                 v-model="currentLanguage"
@@ -87,7 +93,7 @@
               <!-- 购物车 -->
               <router-link 
                 to="/cart"
-                class="relative p-1.5 sm:p-2 text-gray-400 hover:text-gray-500 shrink-0"
+                class="relative p-1.5 sm:p-2 text-gray-400 hover:text-gray-500 shrink-0 inline-flex items-center justify-center h-11 w-11 sm:h-auto sm:w-auto"
               >
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 1.5M7 13v6a2 2 0 002 2h6a2 2 0 002-2v-6" />
@@ -104,14 +110,14 @@
               <template v-if="userStore.isAuthenticated">
                 <router-link
                   to="/profile"
-                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap inline-flex items-center justify-center min-h-[44px] sm:min-h-0"
                 >
                   {{ t('nav.profile') }}
                 </router-link>
                 <button
                   type="button"
                   @click="handleLogout"
-                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap inline-flex items-center justify-center min-h-[44px] sm:min-h-0"
                 >
                   {{ t('nav.logout') }}
                 </button>
@@ -120,13 +126,13 @@
               <template v-else>
                 <router-link
                   to="/login"
-                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50 whitespace-nowrap inline-flex items-center justify-center min-h-[44px] sm:min-h-0"
                 >
                   {{ t('nav.login') }}
                 </router-link>
                 <router-link
                   to="/register"
-                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 whitespace-nowrap"
+                  class="px-2.5 py-2 sm:px-3 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 whitespace-nowrap inline-flex items-center justify-center min-h-[44px] sm:min-h-0"
                 >
                   {{ t('nav.register') }}
                 </router-link>
@@ -145,11 +151,43 @@
     </router-view>
 
     <footer class="border-t bg-white/80 py-4 sm:py-6 text-center text-xs text-gray-500">
-      <!-- 链接加 py-2 扩大触控热区到 32px（移动端易点），视觉尺寸不变 -->
+      <!--
+        移动端专属：语言 / 币种切换（桌面在顶栏，移动端下沉到这里 ——
+        顶栏在 390px 下放不下，见上方顶栏注释）。
+        保留完整入口，不能因为「藏起来」而让功能消失。
+      -->
+      <div class="sm:hidden mb-3 flex items-center justify-center gap-2">
+        <select
+          v-model="currentLanguage"
+          @change="changeLanguage"
+          :aria-label="t('language.label')"
+          class="portal-lang-select border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="zh-CN">{{ t('language.chinese') }}</option>
+          <option value="th-TH">{{ t('language.thai') }}</option>
+          <option value="en-US">{{ t('language.english') }}</option>
+        </select>
+        <select
+          :value="portalCurrency.selectedCode"
+          :aria-label="t('exchangeDisplay.currency')"
+          class="portal-currency-select border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 tabular-nums"
+          @change="onCurrencyChange($event.target.value)"
+        >
+          <option
+            v-for="opt in portalCurrency.options"
+            :key="opt.code"
+            :value="opt.code"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 链接加 min-h-[44px] 扩大触控热区（移动端易点），视觉尺寸不变 -->
       <div class="flex justify-center gap-1 sm:gap-4">
-        <router-link to="/terms" class="inline-block px-2 py-2 hover:text-blue-600">{{ t('legal.termsLink') }}</router-link>
+        <router-link to="/terms" class="inline-flex items-center min-h-[44px] px-2 hover:text-blue-600">{{ t('legal.termsLink') }}</router-link>
         <span aria-hidden="true" class="self-center">·</span>
-        <router-link to="/privacy" class="inline-block px-2 py-2 hover:text-blue-600">{{ t('legal.privacyLink') }}</router-link>
+        <router-link to="/privacy" class="inline-flex items-center min-h-[44px] px-2 hover:text-blue-600">{{ t('legal.privacyLink') }}</router-link>
       </div>
     </footer>
     
@@ -399,21 +437,24 @@ onMounted(async () => {
 <style scoped>
 /* 顶栏语言/币种下拉：窄屏收窄，sm+ 略放宽，下拉展开仍显示完整 option 文案 */
 /**
- * 移动端高度必须 ≥36px：早期 padding 只有 0.25rem，实测总高 28–30px，
+ * 移动端高度必须 ≥44px：早期 padding 只有 0.25rem，实测总高 28–30px，
  * 低于触控目标 32px 的下限，手指很难点中（iOS 建议 44px）。
+ *
+ * 之前这里设的是 36px —— 注释写着 44px、实现却是 36px（第 30 轮实测复核时才发现）。
+ * 现统一到 44px；sm+ 仍用紧凑高度（桌面用鼠标，不靠触达面积）。
  */
 .portal-lang-select {
   font-size: 0.75rem;
   line-height: 1.25rem;
   padding: 0.4375rem 0.375rem;
-  min-height: 36px;
+  min-height: 44px;
   min-width: 4.875rem;
 }
 .portal-currency-select {
   font-size: 0.75rem;
   line-height: 1.25rem;
   padding: 0.4375rem 0.25rem;
-  min-height: 36px;
+  min-height: 44px;
   min-width: 5.25rem;
   width: 5.25rem;
 }
