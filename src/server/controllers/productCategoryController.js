@@ -5,6 +5,7 @@ import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { parseId } from '../utils/params.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { resolvePagination } from '../utils/pagination.js'
 import { respondDbError } from '../utils/dbInputError.js'
 
 class ProductCategoryController {
@@ -25,9 +26,8 @@ class ProductCategoryController {
   static async listAdmin (req, res) {
     try {
       const keyword = (req.query.keyword || '').trim()
-      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1)
-      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '20'), 10) || 20))
-      const offset = (page - 1) * pageSize
+      // 统一走 resolvePagination：page 也必须有上限，否则深翻页把 OFFSET 打到近亿
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { maxPageSize: 100 })
 
       const where = {}
       if (keyword) {
@@ -37,7 +37,7 @@ class ProductCategoryController {
       const { count, rows } = await ProductCategory.findAndCountAll({
         where,
         offset,
-        limit: pageSize,
+        limit,
         order: [['sort_order', 'ASC'], ['id', 'ASC']]
       })
 

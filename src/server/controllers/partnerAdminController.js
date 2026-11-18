@@ -12,6 +12,7 @@ import { csvCell } from '../utils/csvExporter.js'
 import { parseId } from '../utils/params.js'
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { resolvePagination } from '../utils/pagination.js'
 import { respondDbError } from '../utils/dbInputError.js'
 import { getBusinessTimezone } from '../utils/businessTimezone.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
@@ -221,8 +222,8 @@ class PartnerAdminController {
 
   static async listPartnerOrders (req, res) {
     try {
-      const page = Math.max(1, parseInt(req.query.page, 10) || 1)
-      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 20))
+      // 统一走 resolvePagination：page 也必须有上限，否则深翻页把 OFFSET 打到近亿
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { maxPageSize: 100 })
       const partner_keyword = req.query.partner_keyword != null ? String(req.query.partner_keyword).trim() : ''
       const status = req.query.status != null ? String(req.query.status).trim() : ''
       const from = req.query.from != null ? String(req.query.from).trim() : ''
@@ -260,8 +261,8 @@ class PartnerAdminController {
       const { count, rows } = await PartnerOrder.findAndCountAll({
         where,
         order: [['created_at', 'DESC']],
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
+        limit,
+        offset,
         // 默认子查询模式：hasMany items 会让 JOIN 行膨胀，subQuery:false 时 LIMIT 作用在
         // 膨胀后的行上导致一页订单数少于 pageSize（分页错位）；子查询模式先对订单主表分页再回填关联
         distinct: true,

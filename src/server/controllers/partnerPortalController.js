@@ -6,6 +6,7 @@ import Product from '../models/Product.js'
 import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import PartnerAddress from '../models/PartnerAddress.js'
+import { resolvePagination } from '../utils/pagination.js'
 import { JWT_PARTNER_SECRET } from '../config/jwtSecret.js'
 import {
   partnerUnitPriceAfterDiscount,
@@ -283,8 +284,8 @@ class PartnerPortalController {
 
   static async listProducts (req, res) {
     try {
-      const page = Math.max(1, parseInt(req.query.page, 10) || 1)
-      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 20))
+      // 统一走 resolvePagination：page 也必须有上限，否则深翻页把 OFFSET 打到近亿
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { maxPageSize: 100 })
       const name = req.query.name != null ? String(req.query.name).trim() : ''
       const categoryIdRaw = req.query.category_id != null ? String(req.query.category_id).trim() : ''
 
@@ -325,8 +326,8 @@ class PartnerPortalController {
         where,
         paranoid: true,
         order: [['created_at', 'DESC']],
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
+        limit,
+        offset,
         attributes
       })
 
@@ -742,8 +743,7 @@ class PartnerPortalController {
 
   static async listMyOrders (req, res) {
     try {
-      const page = Math.max(1, parseInt(req.query.page, 10) || 1)
-      const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize, 10) || 5))
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { defaultPageSize: 5, maxPageSize: 50 })
 
       let fromStr = req.query.from != null ? String(req.query.from).trim() : ''
       let toStr = req.query.to != null ? String(req.query.to).trim() : ''
@@ -793,8 +793,8 @@ class PartnerPortalController {
       const { count, rows } = await PartnerOrder.findAndCountAll({
         where,
         order: [['created_at', 'DESC']],
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
+        limit,
+        offset,
         include: [{ model: PartnerOrderItem, as: 'items', required: false }]
       })
 

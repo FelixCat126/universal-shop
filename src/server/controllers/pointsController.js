@@ -1,6 +1,7 @@
 import PointTransaction from '../models/PointTransaction.js'
 import Order from '../models/Order.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
+import { resolvePagination } from '../utils/pagination.js'
 import { getBusinessTimezone } from '../utils/businessTimezone.js'
 import * as pointsService from '../services/pointsService.js'
 import { logger } from '../utils/logger.js'
@@ -33,10 +34,12 @@ class PointsController {
         return res.status(401).json({ success: false, message: '未登录' })
       }
 
-      const page = Math.max(Number.parseInt(String(req.query.page ?? '1'), 10) || 1, 1)
-      const rawLimit = Number.parseInt(String(req.query.limit ?? '20'), 10) || 20
-      const limit = Math.min(Math.max(rawLimit, 1), 100)
-      const offset = (page - 1) * limit
+      // 统一走 resolvePagination：page 也必须有上限（否则深翻页会把 OFFSET
+      // 打到近亿，PG 顺序扫全表 + COUNT(*) = 两次全表扫描）。
+      const { page, limit, offset } = resolvePagination(
+        req.query,
+        { pageSizeKey: 'limit', defaultPageSize: 20, maxPageSize: 100 }
+      )
 
       let where = { user_id: userId }
       where = applyCreatedBetween(where, req.query, {

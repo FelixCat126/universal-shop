@@ -1,4 +1,4 @@
-# 真问题排查 · 第 7–28 轮（2026-11-13 ~ 11-15）
+# 真问题排查 · 第 7–30 轮（2026-11-13 ~ 11-18）
 
 第 1–3 轮见 [bug-hunt-2026-11.md](./bug-hunt-2026-11.md) / [bug-hunt-round2-3.md](./bug-hunt-round2-3.md)，
 第 4–6 轮见 [bug-hunt-round4-6.md](./bug-hunt-round4-6.md)。
@@ -907,6 +907,8 @@ READ COMMITTED 下每条语句取自己的快照：汇总之后、删除之前�
 | 26 | 其余导出类型口径复核 | 逐个导出类型与列表比对 | 合作方/商品导出复核一致 + 日期参数别名 |
 | 27 | 两个遗留决策落地 | 性能取数 + 生产配置写入 | 时区默认 → 亚洲/曼谷 + 批量取消"有数据的不动" |
 | 28 | 发布就绪审计（备份/恢复链路） | 隔离恢复演练 + 两条误判自证伪 | 7 个真缺陷 + 2 条护栏复活 + 演练脚本 + 文档按实测重写 |
+| 29 | 冗余文件清理 | 全量引用扫描 + 逐个核实 | 删 11 个（一次性脚本 / 孤儿辅助） |
+| 30 | 分页一致性 + 跨库结构漂移 | 统一工具覆盖率 + 两库列类型全量 diff | 6 处深翻页 + 1 处列类型漂移 |
 
 
 ---
@@ -1037,6 +1039,112 @@ HTTP 抽查 `/uploads/products/product_1758200061313-648966103.webp` → **200**
   配异地副本需要另一台机器或对象存储 —— 属于基础设施决策，未擅自实施。
 
 
+
+---
+
+## 第 30 轮：分页一致性与跨库结构漂移
+
+这轮的角度：**同一件事在不同地方做成了两样**。前几轮修的是"某个接口算错了"，
+这轮找的是"同一个约定只在一半地方落实了"。
+
+### 30.1 深翻页：统一工具写好了，却只用在了一半地方
+
+项目里有统一分页工具 `src/server/utils/pagination.js`，它**明确处理了深翻页**：
+
+```js
+if (page > maxPage) page = maxPage          // maxPage = 10000
+if (offset > maxOffset) { offset = maxOffset ... }   // maxOffset = 100000
+```
+
+工具的注释把风险讲得很清楚：
+
+> page 也必须有上限：limit 有上限但 page 没有时，`page=999999999` 会产生近亿 OFFSET
+> —— PG 必须顺序扫过整表再丢弃，叠加 findAndCountAll 的 COUNT(*) 就是两次全表扫描。
+
+但扫遍所有控制器后发现：**26 个控制器里只有 7 个用了这个工具**，
+另外 **6 处是各自手写的**，而且手写的版本**只有下限、没有上限**：
+
+| 位置 | 手写解析 |
+|---|---|
+| `orderController.getMyOrders`（用户端我的订单） | `Math.max(1, parseInt(req.query.page, 10) \|\| 1)` |
+| `pointsController.listTransactions`（积分流水） | 同上 |
+| `productCategoryController.listAdmin`（后台类别） | 同上 |
+| `partnerAdminController.listPartnerOrders`（后台合作方订单） | 同上 |
+| `partnerPortalController`（商品列表 / 订单列表） | 同上 ×2 |
+
+`?page=999999999&pageSize=100` → offset ≈ 1e11 → **PG 顺序扫全表两次**。
+
+修法：6 处全部改走 `resolvePagination`，保留各自原有的默认值与上限语义
+（`limit` vs `pageSize` 参数名、默认 10/20/5、上限 100/50 都没变）。
+
+### 30.2 跨库结构漂移：生产与测试**只有一处**不一致
+
+第 14 轮吃过一次亏："测试库和生产库不一样"。这次把它做成**可复现的检查**：
+
+```bash
+# 两个库各导一份 (表.列 :: 类型) 再 diff
+psql -d shop_dev  -Atc "SELECT table_name||'.'||column_name||' :: '||data_type
+                      FROM information_schema.columns WHERE table_schema='public' ORDER BY 1"
+psql -d shop_test -Atc "同上"
+```
+
+生产 311 列 vs 测试库 310 列，差异**只有 3 处**：
+- `orders.shipped_at`：生产 `timestamp without time zone` / 测试 `timestamp with time zone` ← **真漂移**
+- `schema_migrations.*`：生产有迁移表，测试基建不建 → 正常
+- `HookProbes.*`：测试基建的探针表 → 正常
+
+根因：迁移 003 用手工 DDL 加的列是 `TIMESTAMP`（无时区），
+而模型里 `shipped_at: DataTypes.DATE` 在 PG 里映射成 `timestamptz`。
+**测试基建用 `sequelize.sync()` 按模型建表 → 测试库是对的、生产是错的** → 测试永远测不出生产的问题。
+
+### 30.3 naive 列的写入语义（实测，不是推断）
+
+同一个 naive 列，两种写入方式存的东西不一样：
+
+| 写入方式 | 写入 `2026-11-18T15:43:25Z` → 库里存 |
+|---|---|
+| Node 写（模型 `new Date()` → node-postgres 序列化成带时区 ISO，PG 插 naive 列时丢掉时区标记） | **2026-11-18 23:43:25**（本地墙上时间，本机 +08） |
+| PG 侧 `now()`（会话时区 +00） | **2026-11-18 15:43:50**（UTC） |
+
+同表两种时间来源**差 8 小时**。
+
+后果（泰国站点，浏览器在 UTC+7）：后台"发货时间"会比真实时间**晚 8 小时**。
+
+### 30.4 修复
+
+- 迁移 `014_orders_shipped_at_timestamptz`：naive → timestamptz，
+  历史值按 **Node 进程本地时区**解释（`AT TIME ZONE 'Asia/Shanghai'`）。
+  ⚠️ 用错基准会再偏 8 小时：**不是** PG 会话时区（生产是 UTC），
+  因为写入时存的是"本地墙上时间"。
+  幂等：已是 timestamptz 直接跳过（重复转换会把值平移一个偏移）。
+  生产该列 9 个订单**全为 NULL** → 转换零数据风险。
+- 6 处分页统一走 `resolvePagination`。
+
+### 30.5 查实"没问题"的（避免虚报）
+
+| 项 | 手段 | 结论 |
+|---|---|---|
+| 前端 XSS 落点 | 全量扫 `v-html` / `innerHTML` / `new Function` / `eval` | **零命中**（三个前端都没有） |
+| 路径遍历 | 扫 `path.join(req.*)` / `res.sendFile` | 只有三处固定文件名，安全 |
+| 原始 SQL 拼接 | 扫 `sequelize.query` + 模板串 | 只在 migrations 里（内部常量，无用户输入） |
+| 错误信息泄露 | 扫 `message: e.message` / `stack` | 全部是**带 status 的业务异常**才回显；无 stack 外泄 |
+| 其余分页点 | 逐个查 limit/pageSize 来源 | 全都有 `Math.min(上限, …)` |
+
+### 30.6 护栏（都做过反向验证）
+
+- `tests/api/deepPaginationGuard.test.js`（8 条）
+  - 断言**实际下发的 SQL** 里的 OFFSET 数值上限（不是"接口返回 200" —— 那是假绿）
+  - 一条**防退化扫描**：控制器里不允许再出现手写的分页解析
+  - 反向验证：去掉工具的钳制 → 接口层捕获到真实 OFFSET `99999999800` → 红；
+    故意写一处手写分页 → 扫描护栏红
+- `tests/api/shippedAtTimezoneGuard.test.js`（5 条）
+  - SA-3 先把测试库的列**改回 naive** 再跑迁移 —— 否则只会走到"已转换"的跳过分支，
+    那种永远绿的护栏最危险
+  - 断言历史值按本地时区解释、重复执行不漂移
+  - 反向验证：把 `AT TIME ZONE` 去掉 → 差值正好 `28800000` ms（8 小时）→ 红
+  - SA-5：全库不允许再有 naive **业务**列（迁移表自身的除外）
+
+
 ### 这轮的方法论收获
 
 1. **生产库实测比读代码硬**：外键覆盖、SET NULL 的合法状态、5 条软删商品的历史订单 —— 都是读代码看不出来的
@@ -1061,6 +1169,15 @@ HTTP 抽查 `/uploads/products/product_1758200061313-648966103.webp` → **200**
 8. **观察方式本身会造假** —— 这轮两条"重大发现"其实都是我的观察错误：
    `ls | head` 截断了输出、把"宿主机没装 pg_dump"当成了"没法 pg_dump"。
    下结论前先确认**看到的是全部**；环境探查要问到能用的那层（容器里可能就有）。
+
+9. **统一工具只落实了一半，比没有工具更危险** —— 分页工具有防深翻页的逻辑，
+   但只有 7/26 的控制器在用；剩下 6 处手写的只有下限没有上限。
+   下次做"统一"时，要**统计覆盖率**而不是"确认工具存在"。
+
+10. **结构漂移要靠 diff 两个库，不靠读模型定义** —— 生产与测试的列类型全量 diff，
+    311 列只差一处。那一处靠读代码根本看不出来（迁移 003 的手工 DDL vs 模型的 DATE）。
+    同理，naive 列的写入语义必须**实测**（Node 存本地墙上时间 vs PG 侧 now() 存 UTC），
+    我第一次的推断就是错的。
 
 **生产数据**：八轮全程 3 用户 / 9 订单 / 9 明细 / 18 商品 / 2 合作方 / 1 管理员，**一次没变**；
 数据不变量（23 项：15 自证 + 8 防御）每次全过。

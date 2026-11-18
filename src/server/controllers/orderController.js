@@ -1369,10 +1369,14 @@ class OrderController {
         })
       }
 
-      const { page = 1, limit = 10, status } = req.query
-      const safeLimit = Math.min(Math.max(Number.parseInt(String(limit), 10) || 10, 1), 100)
-      const safePage = Math.max(Number.parseInt(String(page), 10) || 1, 1)
-      const offset = (safePage - 1) * safeLimit
+      const { status } = req.query
+      // 统一走 resolvePagination：page 也必须有上限。
+      // 否则 ?page=999999999 会产生近亿 OFFSET —— PG 得顺序扫过整表再丢弃，
+      // 叠加 findAndCountAll 的 COUNT(*) 就是两次全表扫描（深翻页放大）。
+      const { page: safePage, limit: safeLimit, offset } = resolvePagination(
+        req.query,
+        { pageSizeKey: 'limit', defaultPageSize: 10, maxPageSize: 100 }
+      )
 
       /**
        * 状态筛选支持**逗号分隔的多个值**（status=paid,shipping），
