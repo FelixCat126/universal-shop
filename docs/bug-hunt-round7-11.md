@@ -1130,6 +1130,18 @@ psql -d shop_test -Atc "同上"
 | 错误信息泄露 | 扫 `message: e.message` / `stack` | 全部是**带 status 的业务异常**才回显；无 stack 外泄 |
 | 其余分页点 | 逐个查 limit/pageSize 来源 | 全都有 `Math.min(上限, …)` |
 
+### 30.6 生产实测（部署后）
+
+- 迁移 014 在生产启动时自动执行：`✅ 已执行迁移: 014_orders_shipped_at_timestamptz`
+- `orders.shipped_at` → `timestamp with time zone` ✓
+- 全库 naive 业务列只剩 `schema_migrations.applied_at`（迁移表自身，无业务含义）✓
+- **写入语义实测**（事务内验证并回滚，无残留）：
+  写 `2026-01-02T03:04:05.000Z` → 库里存 `2026-01-02 03:04:05+00`，
+  `shipped_at = '2026-01-02T03:04:05+00'` 为 **t**（瞬间正确，不再是本地墙上时间）
+- 深翻页钳制实测：`page=999999999&pageSize=100` → `page=1001, offset=100000` ✅
+- 24 项数据不变量全过；恢复演练 27 表一致；生产数据未变
+  （3 用户 / 9 订单 / 9 明细 / 18 商品 / 2 合作方 / 1 管理员）；error.log 无新增
+
 ### 30.6 护栏（都做过反向验证）
 
 - `tests/api/deepPaginationGuard.test.js`（8 条）
