@@ -775,7 +775,7 @@
               type="checkbox"
               class="remember-me-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded shrink-0"
             />
-            <label class="ml-2 block text-sm text-gray-700">{{ t('profile.setAsDefault') }}</label>
+            <label class="ml-2 inline-flex items-center min-h-[44px] text-sm text-gray-700">{{ t('profile.setAsDefault') }}</label>
           </div>
 
           <div class="flex justify-end space-x-3 pt-4">

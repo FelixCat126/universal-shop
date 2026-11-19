@@ -21,7 +21,7 @@
       >
         <div class="flex justify-between items-start gap-2 mb-2">
           <div>
-            <span v-if="a.is_default" class="text-[10px] font-semibold uppercase tracking-wide text-primary-700 bg-primary-50 px-2 py-0.5 rounded">
+            <span v-if="a.is_default" class="text-[11px] font-semibold uppercase tracking-wide text-primary-700 bg-primary-50 px-2 py-0.5 rounded">
               {{ t('addresses.defaultTag') }}
             </span>
             <span v-if="a.label" class="ml-2 text-sm text-gray-700 font-medium">{{ a.label }}</span>

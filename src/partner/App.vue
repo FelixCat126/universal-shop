@@ -41,7 +41,7 @@
           <div class="flex items-center gap-1 shrink-0">
             <select
               v-model="locale"
-              class="text-xs border-gray-200 rounded-lg px-2 py-1.5 sm:px-2.5 sm:py-1.5 bg-white max-w-[6.75rem] sm:max-w-[8.25rem] min-w-[5.75rem] sm:min-w-[6.75rem] touch-manipulation"
+              class="text-xs border-gray-200 rounded-lg px-2 py-1.5 sm:px-2.5 sm:py-1.5 bg-white max-w-[6.75rem] sm:max-w-[8.25rem] min-w-[5.75rem] sm:min-w-[6.75rem] touch-manipulation min-h-[44px] sm:min-h-0"
               @change="onLocaleChange"
             >
               <option value="zh-CN">{{ t('locale.zh') }}</option>

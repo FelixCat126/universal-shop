@@ -47,7 +47,7 @@
               v-for="c in categories"
               :key="c.id"
               type="button"
-              class="shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors whitespace-nowrap touch-manipulation"
+              class="shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors whitespace-nowrap touch-manipulation min-h-[44px]"
               :class="Number(selectedCategoryId) === Number(c.id)
                 ? 'bg-blue-600 text-white border-blue-600 shadow'
                 : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
@@ -200,7 +200,7 @@
           <div class="bg-white rounded-xl border border-gray-100 shadow-soft p-3 sm:p-4 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <h3 class="text-sm font-semibold text-gray-900">{{ t('shop.addressTitle') }}</h3>
-              <router-link to="/addresses" class="text-xs font-medium text-primary-600">{{ t('shop.manageAddresses') }}</router-link>
+              <router-link to="/addresses" class="inline-flex items-center min-h-[44px] text-xs font-medium text-primary-600">{{ t('shop.manageAddresses') }}</router-link>
             </div>
             <p class="text-xs text-gray-500">{{ t('shop.addressHint') }}</p>
             <div v-if="addresses.length">

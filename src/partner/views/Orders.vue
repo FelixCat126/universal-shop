@@ -116,7 +116,7 @@
               <button
                 type="button"
                 :disabled="reorderingId === order.id"
-                class="mt-2 touch-manipulation block w-full rounded-lg border border-primary-600 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-50 disabled:opacity-50"
+                class="mt-2 touch-manipulation block w-full rounded-lg border border-primary-600 px-3 py-2 min-h-[44px] text-xs font-semibold text-primary-700 hover:bg-primary-50 disabled:opacity-50"
                 @click.prevent.stop="reorder(order)"
               >
                 {{ reorderingId === order.id ? t('orders.reordering') : t('orders.reorder') }}

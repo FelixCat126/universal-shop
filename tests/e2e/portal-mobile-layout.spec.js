@@ -24,6 +24,21 @@
  */
 import { test, expect } from '@playwright/test'
 
+/**
+ * 要扫的页面（**不只首页**）。
+ *
+ * 第 32 轮的教训：第 31 轮的护栏只查首页，于是"详情页/购物车的返回按钮只有 32px"
+ * 这类问题一个都没被覆盖到 —— 护栏覆盖面不够，等于只守了大门。
+ */
+const PORTAL_PAGES = [
+  '/portal/',
+  '/portal/products/2',   // 真实商品（id=1 是软删商品，详情页会显示"不存在"）
+  '/portal/cart',
+  '/portal/login',
+  '/portal/register',
+  '/portal/nonexistent'   // 404 页
+]
+
 /** 等首页商品渲染出来 */
 async function gotoHomeWithProducts (page) {
   await page.goto('/portal/')
@@ -41,13 +56,17 @@ test.describe('门户移动端布局', () => {
     await page.setViewportSize({ width: 390, height: 844 })
   })
 
-  test('ML-1 页面无横向溢出', async ({ page }) => {
-    await gotoHomeWithProducts(page)
-    const m = await page.evaluate(() => ({
-      scrollW: document.documentElement.scrollWidth,
-      innerW: window.innerWidth
-    }))
-    expect(m.scrollW, `页面横向溢出：scrollWidth=${m.scrollW} > innerWidth=${m.innerW}`).toBeLessThanOrEqual(m.innerW + 1)
+  test('ML-1 各页面无横向溢出', async ({ page }) => {
+    for (const p of PORTAL_PAGES) {
+      await page.goto(p)
+      await page.waitForLoadState('domcontentloaded')
+      await page.waitForTimeout(700)
+      const m = await page.evaluate(() => ({
+        scrollW: document.documentElement.scrollWidth,
+        innerW: window.innerWidth
+      }))
+      expect(m.scrollW, `${p} 横向溢出：scrollWidth=${m.scrollW} > innerWidth=${m.innerW}`).toBeLessThanOrEqual(m.innerW + 1)
+    }
   })
 
   test('ML-2 顶栏不溢出容器', async ({ page }) => {
@@ -130,26 +149,71 @@ test.describe('门户移动端布局', () => {
     }
   })
 
-  test('ML-6 可点击控件触控热区 ≥ 40px', async ({ page }) => {
-    await gotoHomeWithProducts(page)
-    const small = await page.evaluate(() => {
-      const out = []
-      document.querySelectorAll('button, select, input').forEach((el) => {
-        const r = el.getBoundingClientRect()
-        if (r.width === 0 || r.height === 0) return
-        // 输入框里的清除按钮之类的小图标不算（它们有独立的 aria-label）
-        if (r.height < 40) {
-          out.push({
-            tag: el.tagName.toLowerCase(),
-            text: (el.textContent || '').trim().slice(0, 12),
-            cls: String(el.className || '').slice(0, 40),
-            h: Math.round(r.height),
-            w: Math.round(r.width)
-          })
-        }
+  /**
+   * ML-6 触控热区下限。
+   *
+   * 分档而不是一刀切 44px：
+   *   - button / select / input：**40px**（主要操作控件）
+   *   - a[href] 文本链接：**32px**（文字链接本身有文字尺寸，
+   *     一律 44px 会让页面被撑得松松垮垮；32px 是可点文本的通行下限）
+   * 不可见元素（opacity:0 / visibility:hidden / clip 隐藏的备用 input）不计入。
+   *
+   * ⚠️ 分档是为了让护栏**能长期保持绿** —— 一个永远红的护栏等于没有护栏。
+   *    但"永远绿"的陷阱靠的是**明确的判定依据**，不是放宽阈值。
+   */
+  test('ML-7 勾选框的 label 触控热区 ≥ 40px（热区由 label 提供）', async ({ page }) => {
+    const problems = []
+    for (const p of PORTAL_PAGES) {
+      await page.goto(p)
+      await page.waitForLoadState('domcontentloaded')
+      await page.waitForTimeout(700)
+      const bad = await page.evaluate(() => {
+        const out = []
+        document.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach((el) => {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 || r.height === 0) return
+          const cs = getComputedStyle(el)
+          if (cs.visibility === 'hidden' || cs.opacity === '0') return
+          const lab = (el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`)) ||
+                      el.closest('label')
+          if (!lab) { out.push('没有 label：' + (el.id || el.className).slice(0, 30)); return }
+          const lr = lab.getBoundingClientRect()
+          if (lr.height < 40) out.push('label 热区 ' + Math.round(lr.height) + 'px：' + (el.id || el.className).slice(0, 30))
+        })
+        return out
       })
-      return out
-    })
-    expect(small, `触控热区小于 40px：${JSON.stringify(small)}`).toEqual([])
+      bad.forEach(x => problems.push(p + ' → ' + x))
+    }
+    expect(problems, `勾选框热区不达标：\n${problems.join('\n')}`).toEqual([])
+  })
+
+  test('ML-6 可点击控件触控热区达标（所有门户页面）', async ({ page }) => {
+    const problems = []
+    for (const p of PORTAL_PAGES) {
+      await page.goto(p)
+      await page.waitForLoadState('domcontentloaded')
+      await page.waitForTimeout(700)
+      const small = await page.evaluate(() => {
+        const out = []
+        document.querySelectorAll('button, select, input, a[href]').forEach((el) => {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 || r.height === 0) return
+          const cs = getComputedStyle(el)
+          // 不可见（视觉隐藏但仍在 DOM 里）的备用控件不算触控目标
+          if (cs.visibility === 'hidden' || cs.opacity === '0' || cs.position === 'absolute' && r.width <= 2) return
+          const isControl = ['BUTTON', 'SELECT', 'INPUT', 'TEXTAREA'].includes(el.tagName)
+          // 原生勾选框/单选框本身只有 ~20px，触控热区由**它的 label** 提供
+          // → 单独按 20px 判定，并在下面的用例里断言 label 本身够大
+          const isNativeToggle = el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')
+          const min = isNativeToggle ? 20 : (isControl ? 40 : 32)
+          if (r.height < min) {
+            out.push(el.tagName.toLowerCase() + ':' + (el.textContent || '').trim().slice(0, 12) + ':' + Math.round(r.height) + '(需≥' + min + ')')
+          }
+        })
+        return out
+      })
+      small.forEach(x => problems.push(p + ' → ' + x))
+    }
+    expect(problems, `触控热区不达标：\n${problems.join('\n')}`).toEqual([])
   })
 })

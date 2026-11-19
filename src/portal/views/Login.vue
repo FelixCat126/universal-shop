@@ -95,7 +95,7 @@
                 type="checkbox"
                 class="remember-me-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded shrink-0"
               />
-              <label for="remember-me" class="ml-2 block text-sm text-gray-900">
+              <label for="remember-me" class="ml-2 inline-flex items-center min-h-[44px] text-sm text-gray-900">
                 {{ t('user.rememberMe') }}
               </label>
             </div>
@@ -122,7 +122,7 @@
             <button
               type="submit"
               :disabled="isLoading"
-              class="ui-btn-ripple w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              class="ui-btn-ripple w-full flex justify-center py-2 px-4 min-h-[44px] border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <div v-if="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
               {{ isLoading ? t('common.loading') : t('user.login') }}
@@ -165,7 +165,7 @@
     <div class="mt-8 text-center">
       <router-link
         :to="{ name: 'Home' }"
-        class="inline-flex items-center text-sm text-gray-600 hover:text-gray-500 py-1.5 -my-1"
+        class="inline-flex items-center text-sm text-gray-600 hover:text-gray-500 py-2.5 -my-2.5 min-h-[44px]"
       >
         <ArrowLeftIcon class="h-4 w-4 mr-1" />
         {{ t('nav.backToHome') }}
