@@ -1,12 +1,25 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+/**
+ * 合作方门户（批发端）样式入口
+ *
+ * ⚠️ `@config` 指向**批发端专用**的 Tailwind 配置：
+ * 主色墨绿、圆角方正 —— 与客户门户（零售：蓝、圆润）明显区分。
+ * 组件里的 primary-600 / rounded-lg 等类名不用改一个字。
+ *
+ * ⚠️ 这里用 \`@tailwind\` **指令**形式而不是 \`@import 'tailwindcss/...'\`：
+ *    \`@config\` 只在指令形式下生效 —— 混用会导致 Tailwind **一个 utility 都不生成**
+ *    （页面直接散架，但构建不报错，很难发现）。
+ */
+@config '../../tailwind.config.partner.js';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Noto Sans Thai', sans-serif;
-  background-color: #f9fafb;
+  background-color: #f1f5f4;
   -webkit-tap-highlight-color: transparent;
 }
 

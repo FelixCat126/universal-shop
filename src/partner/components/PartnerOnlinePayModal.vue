@@ -8,7 +8,7 @@
         <div class="mb-4 p-4 bg-gray-50 rounded-lg">
           <div class="mb-3">
             <div class="text-sm text-gray-600">{{ t('payment.orderAmount') }}</div>
-            <div class="text-2xl font-bold text-blue-600">{{ thbMoney(totalThb) }}</div>
+            <div class="text-2xl font-bold text-primary-700">{{ thbMoney(totalThb) }}</div>
           </div>
           <div class="pt-3 border-t border-gray-200">
             <div class="text-sm text-gray-600">{{ t('payment.usdtAmount') }}</div>
@@ -33,7 +33,7 @@
             </div>
           </div>
           <div v-if="qrPath" class="mt-2 text-center">
-            <div class="text-xs text-gray-500 bg-blue-50 px-3 py-2 rounded-md border border-blue-100">
+            <div class="text-xs text-gray-600 bg-primary-50 px-3 py-2 rounded-md border border-primary-100">
               💡 {{ t('payment.qrCodeSaveTip') }}
             </div>
           </div>

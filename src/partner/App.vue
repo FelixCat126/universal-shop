@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-[100dvh] flex flex-col bg-gray-50 text-gray-900">
+  <div class="min-h-[100dvh] flex flex-col bg-[#f1f5f4] text-gray-900">
     <!-- 致命错误兜底：组件抛错时别白屏 -->
     <div
       v-if="fatalError"
@@ -21,7 +21,7 @@
     <ToastContainer />
     <header
       v-if="showNav"
-      class="sticky top-0 z-30 border-b border-gray-200/90 bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80"
+      class="sticky top-0 z-30 border-b border-primary-900/40 bg-primary-900/95 backdrop-blur-md supports-[backdrop-filter]:bg-primary-900/85"
       :style="{ paddingTop: 'max(0px, env(safe-area-inset-top))' }"
     >
       <!-- 移动端展开的菜单背后点击关闭 -->
@@ -31,10 +31,10 @@
         aria-hidden="true"
         @click="closeNavMenu"
       />
-      <div class="relative z-[21] max-w-6xl mx-auto px-3 sm:px-4 bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
+      <div class="relative z-[21] max-w-6xl mx-auto px-3 sm:px-4 bg-primary-900/95 backdrop-blur-md supports-[backdrop-filter]:bg-primary-900/85">
         <div class="flex items-center gap-2 min-h-[3.25rem] sm:min-h-14 flex-nowrap">
           <div class="flex-1 min-w-0 py-1">
-            <p class="text-[15px] sm:text-base font-semibold tracking-tight text-gray-900 truncate">
+            <p class="text-[15px] sm:text-base font-semibold tracking-tight text-white truncate">
               {{ t('nav.brand') }}
             </p>
           </div>
@@ -53,28 +53,28 @@
           <nav class="hidden sm:flex items-center shrink-0 gap-0.5 sm:gap-1 overflow-x-auto no-scrollbar" aria-label="nav">
             <router-link
               to="/shop"
-              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-primary-100 hover:bg-white/15 hover:text-white"
               active-class="!bg-primary-100 !text-primary-700 hover:!bg-primary-100"
             >
               {{ t('nav.shop') }}
             </router-link>
             <router-link
               to="/orders"
-              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-primary-100 hover:bg-white/15 hover:text-white"
               active-class="!bg-primary-100 !text-primary-700 hover:!bg-primary-100"
             >
               {{ t('nav.orders') }}
             </router-link>
             <router-link
               to="/addresses"
-              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-primary-100 hover:bg-white/15 hover:text-white"
               active-class="!bg-primary-100 !text-primary-700 hover:!bg-primary-100"
             >
               {{ t('nav.addresses') }}
             </router-link>
             <router-link
               to="/password"
-              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              class="px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-manipulation min-h-[44px] inline-flex items-center text-primary-100 hover:bg-white/15 hover:text-white"
               active-class="!bg-primary-100 !text-primary-700 hover:!bg-primary-100"
             >
               {{ t('nav.password') }}
@@ -82,7 +82,7 @@
           </nav>
           <button
             type="button"
-            class="hidden sm:inline-flex touch-manipulation min-h-[44px] px-2 sm:px-3 text-sm font-medium text-gray-600 hover:text-red-600 rounded-lg hover:bg-red-50 whitespace-nowrap shrink-0 items-center"
+            class="hidden sm:inline-flex touch-manipulation min-h-[44px] px-2 sm:px-3 text-sm font-medium text-primary-100 hover:text-white rounded-lg hover:bg-white/15 whitespace-nowrap shrink-0 items-center"
             @click="logout"
           >
             {{ t('nav.logout') }}
@@ -90,7 +90,7 @@
           <!-- 移动端：菜单合集按钮 -->
           <button
             type="button"
-            class="sm:hidden touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-800 shrink-0"
+            class="sm:hidden touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/10 text-white shrink-0"
             :aria-expanded="navMenuOpen"
             :aria-label="navMenuOpen ? t('nav.menuCloseAria') : t('nav.menuAria')"
             @click="toggleNavMenu"
@@ -147,7 +147,7 @@
         </div>
         <div
           v-if="showNav && welcomeDisplayName"
-          class="-mx-3 sm:-mx-4 px-3 sm:px-4 pt-1 pb-2 border-t border-gray-100 bg-white/70"
+          class="-mx-3 sm:-mx-4 px-3 sm:px-4 pt-1 pb-2 border-t border-primary-700/30 bg-[#e6efed]"
         >
           <p class="text-sm text-gray-600 truncate">
             {{ t('nav.welcome', { name: welcomeDisplayName }) }}
