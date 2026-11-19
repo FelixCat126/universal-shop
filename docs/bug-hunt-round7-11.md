@@ -2155,6 +2155,7 @@ partner 端的 toast **原本不支持** action → 扩展 `useToast`（加 acti
 ### 39.5 生产实测
 
 - 客户端加购提示：带「**Checkout**」按钮 ✓（生产站点默认英文）
+- 后台产物含「输入即搜」逻辑 ✓ · 合作方产物含「去下单」✓
 - 三端产物均已更新并生效：
   partner 含「去下单」+ goSubmit 逻辑 · admin 含快捷改状态文案 + status: 命令 · portal 已更新
 - 页面自检：/portal/ /partner/login /admin/login 全部 200
