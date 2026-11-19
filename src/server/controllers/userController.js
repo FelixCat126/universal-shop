@@ -146,6 +146,26 @@ class UserController {
         }
       })
     } catch (error) {
+      /**
+       * 并发注册同一手机号：预检（findOne）与插入之间有竞态窗口，
+       * 两个请求都通过预检 → 后到的那个撞 (country_code, phone) 唯一约束（23505）。
+       *
+       * 原来这条路径**不做兜底**（只有游客自动注册路径有），
+       * 结果是：并发自助注册时，失败的那一方收到 **500「注册失败」** ——
+       * 明明是"手机号已被注册"这种业务结果，却报内部错误（还会往错误日志里堆栈）。
+       *
+       * 现在统一按业务语义处理：撞唯一约束 → 400 + 稳定的中文提示。
+       */
+      const isUniqueViolation =
+        error?.name === 'SequelizeUniqueConstraintError' ||
+        error?.parent?.code === '23505' ||
+        error?.original?.code === '23505'
+      if (isUniqueViolation) {
+        return res.status(400).json({
+          success: false,
+          message: '该手机号已被注册'
+        })
+      }
       logger.error('用户注册失败', { err: error?.message, stack: error?.stack })
       res.status(500).json({
         success: false,
