@@ -331,9 +331,19 @@
   min-height: 60vh;
 }
 
-.page-shell {
-  background: var(--ui-bg, #f9fafb);
-  min-height: 60vh;
+/**
+ * ⚠️ 用 background-color 而不是 background 简写，且放进 @layer components：
+ *   1) `background` 简写会**重置 background-image** —— 而 `background-image`
+ *      是无 layer 的普通样式，优先级高于 Tailwind 的 utilities layer
+ *      → 页面的 bg-gradient-to-br / bg-* 会**被整个抹掉**
+ *      （第 37 轮引入，登录页深色渐变消失、白字浮在浅底上，就是这个原因）
+ *   2) 放进 components layer 后优先级低于 utilities → 页面自己的背景类照常生效
+ */
+@layer components {
+  .page-shell {
+    background-color: var(--ui-bg, #f9fafb);
+    min-height: 60vh;
+  }
 }
 
 .page-fade-enter-active {

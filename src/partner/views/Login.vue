@@ -7,16 +7,25 @@
 
     <div class="relative flex-1 flex flex-col min-h-0 py-10 sm:py-12 px-4 sm:px-6">
       <div class="w-full max-w-md mx-auto text-center animate-fade-in">
+        <!--
+          标识：**白色实底方块 + 墨绿图形**。
+          原来这里是"白色图标画在 15% 不透明白底上"——实测对比度 **1.0**，
+          等于看不见（WCAG AA 要求 4.5:1，图形至少要 3:1）。
+          换成白底实色后对比度约 12:1，在深色背景上非常清楚。
+        -->
         <div class="flex justify-center">
-          <div
-            class="h-16 w-16 rounded-2xl bg-white/15 ring-2 ring-white/25 shadow-strong backdrop-blur flex items-center justify-center"
-          >
-            <BuildingStorefrontIcon class="h-9 w-9 text-white" />
-          </div>
+          <PartnerLogo
+            box-class="h-16 w-16 rounded-2xl bg-white text-primary-700 shadow-strong ring-1 ring-black/5"
+            icon-class="h-10 w-10"
+          />
         </div>
-        <h1 class="mt-6 text-2xl sm:text-3xl font-extrabold tracking-tight">
-          {{ t('login.title') }}
+        <!-- 标题分两层：品牌名 + 这道门是干什么的（原来只有"合作方登录"这种功能描述） -->
+        <h1 class="mt-6 text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+          {{ t('nav.brand') }}
         </h1>
+        <p class="mt-2 text-sm sm:text-base text-slate-300 font-medium">
+          {{ t('login.subtitle') }}
+        </p>
       </div>
 
       <div class="mt-8 w-full max-w-md mx-auto flex-1 flex flex-col justify-center">
@@ -82,12 +91,12 @@
       <div
         class="mt-auto pt-6 w-full max-w-md mx-auto flex flex-row justify-between items-center gap-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
-        <p class="text-left text-xs text-slate-400 flex-1 min-w-0 leading-snug">
+        <p class="text-left text-xs text-slate-300 flex-1 min-w-0 leading-snug">
           {{ t('login.forgotHint') }}
         </p>
         <select
           v-model="localeModel"
-          class="shrink-0 text-xs rounded-lg px-2.5 py-1.5 min-h-[44px] bg-white/10 border border-white/20 text-white min-w-[7.75rem] max-w-[10rem] touch-manipulation"
+          class="shrink-0 text-xs rounded-lg px-2.5 py-1.5 min-h-[44px] bg-white/90 border border-white/40 text-slate-800 min-w-[7.75rem] max-w-[10rem] touch-manipulation"
           @change="persistLocale"
         >
           <option class="text-gray-900" value="zh-CN">{{ t('locale.zh') }}</option>
@@ -104,7 +113,8 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ensureLocale } from '../i18n/index.js'
-import { BuildingStorefrontIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import PartnerLogo from '../components/PartnerLogo.vue'
 import { usePartnerStore } from '../stores/partner.js'
 import { useToast } from '../composables/useToast.js'
 import SliderCaptcha from '../components/SliderCaptcha.vue'

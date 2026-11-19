@@ -19,6 +19,8 @@ export default {
   },
   login: {
     title: 'เข้าสู่ระบบคู่ค้า',
+
+  subtitle: 'สั่งซื้อสินค้า wholesale · ราคาพิเศษสำหรับคู่ค้า',
     loginName: 'ชื่อเข้าระบบ',
     password: 'รหัสผ่าน',
     loginBtn: 'เข้าสู่ระบบ',

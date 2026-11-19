@@ -156,8 +156,11 @@ body {
   min-height: 60vh;
 }
 
+/* background-color 而非 background 简写：
+   background 简写会**重置 background-image**，页面自身的渐变底色会被抹掉。
+   （后台不用 Tailwind，没有 components layer 可用，直接用普通样式即可。） */
 .page-shell {
-  background: #f5f7fa;
+  background-color: #f5f7fa;
   min-height: 60vh;
 }
 

@@ -19,6 +19,8 @@ export default {
   },
   login: {
     title: 'Partner sign in',
+
+  subtitle: 'Wholesale ordering · Contract pricing',
     loginName: 'Login',
     password: 'Password',
     loginBtn: 'Sign in',

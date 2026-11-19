@@ -19,6 +19,8 @@ export default {
   },
   login: {
     title: '合作方登录',
+
+  subtitle: '批发订货 · 专属价格与账期',
     loginName: '登录名',
     password: '密码',
     loginBtn: '登录',

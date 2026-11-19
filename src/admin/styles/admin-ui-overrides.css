@@ -65,6 +65,20 @@ html body #app .el-button .el-button__text > .el-icon:not(:last-child) {
  *   检索区      .admin-filter-bar：单行、间距 8px、底部 16px
  */
 html body #app {
+  /**
+   * 主色：Element Plus 默认的 #409eff 上放白字，对比度只有 **2.78**
+   * （WCAG AA 要求 4.5:1）—— 按钮文字读起来发飘。
+   * 换成 #2563eb → **5.17** ✓，同时与门户端的蓝统一。
+   * 配套的 light/dark 色阶一起给，避免悬停态反而变浅。
+   */
+  --el-color-primary: #2563eb;
+  --el-color-primary-light-3: #60a5fa;
+  --el-color-primary-light-5: #93c5fd;
+  --el-color-primary-light-7: #bfdbfe;
+  --el-color-primary-light-8: #dbeafe;
+  --el-color-primary-light-9: #eff6ff;
+  --el-color-primary-dark-2: #1d4ed8;
+
   /* 圆角：一次统一按钮 / 输入框 / 选择器 / 分页器 */
   --el-border-radius-base: 8px;
   --el-border-radius-small: 6px;

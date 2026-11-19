@@ -33,7 +33,12 @@
       />
       <div class="relative z-[21] max-w-6xl mx-auto px-3 sm:px-4 bg-primary-900/95 backdrop-blur-md supports-[backdrop-filter]:bg-primary-900/85">
         <div class="flex items-center gap-2 min-h-[3.25rem] sm:min-h-14 flex-nowrap">
-          <div class="flex-1 min-w-0 py-1">
+          <!-- 品牌区：与登录页同一个标识（白底墨绿图形），两处保持一致 -->
+          <div class="flex items-center gap-2 flex-1 min-w-0 py-1">
+            <PartnerLogo
+              box-class="h-8 w-8 rounded-lg bg-white text-primary-700"
+              icon-class="h-5 w-5"
+            />
             <p class="text-[15px] sm:text-base font-semibold tracking-tight text-white truncate">
               {{ t('nav.brand') }}
             </p>
@@ -183,6 +188,7 @@ import ToastContainer from './components/ToastContainer.vue'
 import { usePartnerStore } from './stores/partner.js'
 import { fatalError, reportFatalError } from '../utils/fatalError.js'
 import { useRoutePrefetch } from '../utils/routePrefetch.js'
+import PartnerLogo from './components/PartnerLogo.vue'
 
 const route = useRoute()
 const router = useRouter()

@@ -46,9 +46,13 @@ body {
   min-height: 60vh;
 }
 
-.page-shell {
-  background: #f1f5f4;
-  min-height: 60vh;
+/* background-color 而非 background 简写（简写会重置 background-image），
+   且放进 components layer（优先级低于 utilities → 页面自己的 bg-* 照常生效） */
+@layer components {
+  .page-shell {
+    background-color: #f1f5f4;
+    min-height: 60vh;
+  }
 }
 
 .page-fade-enter-active {
