@@ -118,16 +118,27 @@ const CHECKS = [
       const bcrypt = await import('bcrypt')
       const { Administrator, Partner } = sequelizeRef.models
       const out = []
-      const admins = await Administrator.findAll({ attributes: ['id', 'username', 'password'] })
+      /**
+       * 判定口径：**仍在用默认口令，且没有被标记为"必须改密"**才算违规。
+       *
+       * 为什么标记了就不算：
+       *   风险不是"密码是 123456"本身，而是"能用 123456 长期使用后台"。
+       *   被标记 must_reset_password 的账号，登录后会被服务端拦住（403）
+       *   并强制改密 —— 风险已经被**处置**，不该再反复报。
+       *   （否则这项会永远红，而"永远红的体检"没人看 —— 等于没有体检。）
+       */
+      const admins = await Administrator.findAll({ attributes: ['id', 'username', 'password', 'must_reset_password'] })
       for (const a of admins) {
+        if (a.must_reset_password === true) continue
         if (await bcrypt.compare('123456', a.password)) {
-          out.push({ id: a.id, account: a.username, kind: 'administrator', issue: '仍在使用默认口令 123456' })
+          out.push({ id: a.id, account: a.username, kind: 'administrator', issue: '仍在使用默认口令 123456，且未强制改密' })
         }
       }
-      const partners = await Partner.findAll({ attributes: ['id', 'login', 'password'] })
+      const partners = await Partner.findAll({ attributes: ['id', 'login', 'password', 'must_reset_password'] })
       for (const p of partners) {
+        if (p.must_reset_password === true) continue
         if (await bcrypt.compare('123456', p.password)) {
-          out.push({ id: p.id, account: p.login, kind: 'partner', issue: '仍在使用默认口令 123456' })
+          out.push({ id: p.id, account: p.login, kind: 'partner', issue: '仍在使用默认口令 123456，且未强制改密' })
         }
       }
       return out
