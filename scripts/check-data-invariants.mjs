@@ -84,6 +84,14 @@ if (selfTest) {
 }
 
 const { default: sequelize } = await import('../src/server/config/database.js')
+/**
+ * 必须加载模型：自定义检查项（如默认口令比对）要用 sequelize.models，
+ * 而模型是在 models/index.js 里注册到 sequelize.models 上的 ——
+ * 只 import config/database.js 的话 sequelize.models 是**空对象**，
+ * 表现为"Cannot read properties of undefined (reading 'findAll')"。
+ * （测试环境因为同进程里 app.js 已经加载过模型而侥幸通过。）
+ */
+await import('../src/server/models/index.js')
 
 try {
   if (schema) {
