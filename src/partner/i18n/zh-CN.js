@@ -95,6 +95,7 @@ export default {
     submit: '提交订单',
     submitting: '提交中…',
     cartAdded: '已加入清单',
+    goSubmit: '去下单',
     orderOk: '订单已提交',
     orderPendingPay: '订单已生成，请扫码付款并在弹窗内确认完成',
     moqWarn: '数量须从 {unit} 起，并可按步长 {step} 增加',

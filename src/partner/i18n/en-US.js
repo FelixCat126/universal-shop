@@ -95,6 +95,7 @@ export default {
     submit: 'Place order',
     submitting: 'Submitting…',
     cartAdded: 'Added to list',
+    goSubmit: 'Checkout now',
     orderOk: 'Order submitted',
     orderPendingPay: 'Order created — scan to pay, then confirm in this dialog',
     moqWarn: 'Qty must start at {unit}, then steps of {step}',

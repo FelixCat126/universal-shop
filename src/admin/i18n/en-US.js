@@ -646,6 +646,10 @@ export default {
 
   // Order management
   orders: {
+    quickTo: "Mark as",
+    quickConfirm: "Mark this order as \"{status}\"?",
+    quickTitle: "Change order status",
+    quickDone: "Marked as \"{status}\"",
     trackingNumber: 'Tracking number',
     trackingNumberPlaceholder: 'Courier tracking no. (optional)',
     shippedAt: 'Shipped at',

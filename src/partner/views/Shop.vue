@@ -290,7 +290,7 @@
  * @typedef {import('../../types/api').Product} Product
  * @typedef {import('../../types/api').ProductCategory} ProductCategory
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import config from '../../config/index.js'
@@ -464,6 +464,23 @@ async function loadAddresses () {
  */
 let productLoadSeq = 0
 
+/**
+ * **输入即搜**（debounce 300ms）。
+ *
+ * 原来必须点「搜索」按钮或按回车才发起请求 —— 批发商一天要搜几十次商品，
+ * 每次都多点一下是纯浪费。debounce 300ms 既避免了逐字符发请求，
+ * 又让"打完字就出结果"成为默认行为；搜索按钮保留（习惯用回车/按钮的人不受影响）。
+ */
+let searchTimer = null
+watch(keyword, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    load()
+  }, 300)
+})
+onBeforeUnmount(() => clearTimeout(searchTimer))
+
 async function load () {
   loading.value = true
   const seq = ++productLoadSeq
@@ -522,7 +539,12 @@ function add (row) {
     toast.warning(r.code === 'AGENT_MAX_3_SKU' ? t('shop.agentMaxSkuExceeded') : r.message)
     return
   }
-  toast.success(t('shop.cartAdded'))
+  // 加进清单后直接给「去提交订单」入口：
+  // 否则商家还要自己找到右侧清单面板 → 再找提交按钮 → 才能下单（多两次点击）。
+  toast.success(t('shop.cartAdded'), 5000, {
+    label: t('shop.goSubmit'),
+    onClick: () => openConfirm()
+  })
 }
 
 function chgQtyCommit (line) {

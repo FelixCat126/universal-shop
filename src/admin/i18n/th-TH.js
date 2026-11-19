@@ -646,6 +646,10 @@ export default {
 
   // 订单管理页面
   orders: {
+    quickTo: "ตั้งเป็น",
+    quickConfirm: "ยืนยันการตั้งสถานะคำสั่งซื้อเป็น \"{status}\"?",
+    quickTitle: "เปลี่ยนสถานะคำสั่งซื้อ",
+    quickDone: "ตั้งเป็น \"{status}\" แล้ว",
     trackingNumber: 'เลขพัสดุ',
     trackingNumberPlaceholder: 'เลขพัสดุของขนส่ง (ไม่บังคับ)',
     shippedAt: 'เวลาจัดส่ง',

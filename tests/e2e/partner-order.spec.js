@@ -46,7 +46,9 @@ test.describe('合作方订货', () => {
 
     // 打开订货清单并提交
     await page.getByText('订货清单').first().click()
-    await page.getByRole('button', { name: '提交订单' }).click()
+    // exact: true —— getByRole 的 name 默认是**子串匹配**，
+    // 提示条上的「去下单」这类动作按钮会造成 strict mode 命中多个
+    await page.getByRole('button', { name: '提交订单', exact: true }).click()
 
     // 可能出现「确认提交」二次确认
     const confirmBtn = page.getByRole('button', { name: '确认提交' })

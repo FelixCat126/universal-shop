@@ -430,14 +430,26 @@
       </section>
     </main>
 
-    <!-- 消息提示 -->
+    <!--
+      消息提示。
+      带**可选的操作按钮**：加购成功时直接给一个「去结算」——
+      否则用户加完购还要：点顶栏购物车图标 → 进购物车页 → 点「去结算」＝多 2 次点击。
+    -->
     <Transition name="fade">
-      <div 
-        v-if="showMessage" 
+      <div
+        v-if="showMessage"
         :class="messageClass"
-        class="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40"
+        class="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40 flex items-center gap-3"
       >
-        {{ message }}
+        <span>{{ message }}</span>
+        <button
+          v-if="messageAction"
+          type="button"
+          class="shrink-0 px-3 py-1.5 rounded-md text-sm font-semibold bg-white/90 text-blue-700 hover:bg-white shadow-sm"
+          @click="messageAction.onClick"
+        >
+          {{ messageAction.label }}
+        </button>
       </div>
     </Transition>
   </div>
@@ -563,6 +575,8 @@ const hasMore = computed(() => currentPage.value < totalPages.value)
 const showMessage = ref(false)
 const message = ref('')
 const messageType = ref('success')
+/** 提示条上的可选操作按钮（如加购后的「去结算」） */
+const messageAction = ref(null)
 
 /**
  * 当前语言：跟随全局 locale（见下方 watch(..., { immediate: true })）。
@@ -585,15 +599,17 @@ const getImageUrl = (imagePath) => {
 }
 
 // 显示消息提示
-const showMessageToast = (msg, type = 'success', params = {}) => {
+const showMessageToast = (msg, type = 'success', params = {}, action = null) => {
   const translatedMsg = getTranslatedMessage(msg, params)
   message.value = translatedMsg
   messageType.value = type
+  messageAction.value = action
   showMessage.value = true
   
   setTimeout(() => {
     showMessage.value = false
-  }, 3000)
+    messageAction.value = null
+  }, action ? 5000 : 3000)
 }
 
 // 获取国际化消息
@@ -915,7 +931,11 @@ const addToCart = async (product) => {
     const result = await cartStore.addToCart(product, 1)
     
     if (result.success) {
-      showMessageToast(result.message, 'success', result.messageParams || {})
+      // 加购成功 → 提示条上直接给「去结算」，省掉"点购物车 → 点结算"两次点击
+      showMessageToast(result.message, 'success', result.messageParams || {}, {
+        label: t('cart.checkout'),
+        onClick: () => router.push('/checkout')
+      })
     } else {
       showMessageToast(result.message || 'addFailed', 'error', result.messageParams || {})
     }

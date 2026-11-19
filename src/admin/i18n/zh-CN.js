@@ -645,6 +645,10 @@ export default {
 
   // 订单管理页面
   orders: {
+    quickTo: "标记为",
+    quickConfirm: "确认把该订单标记为「{status}」？",
+    quickTitle: "改订单状态",
+    quickDone: "已标记为「{status}」",
     trackingNumber: '物流单号',
     trackingNumberPlaceholder: '快递单号（选填）',
     shippedAt: '发货时间',

@@ -13,6 +13,15 @@
       </div>
       <div class="flex-1 min-w-0">
         <p :class="['text-sm font-medium', textClasses]">{{ toast.message }}</p>
+        <!-- 可选操作按钮：例：加入清单后直接「去提交订单」，少点两次 -->
+        <button
+          v-if="toast.action && toast.action.label"
+          type="button"
+          class="mt-1.5 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-white/90 text-primary-800 hover:bg-white shadow-sm touch-manipulation"
+          @click="onAction"
+        >
+          {{ toast.action.label }}
+        </button>
       </div>
       <button
         type="button"
@@ -35,6 +44,7 @@
 
 <script setup>
 import { computed } from 'vue'
+
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -47,7 +57,13 @@ const props = defineProps({
   toast: { type: Object, required: true }
 })
 
-defineEmits(['close'])
+const emit = defineEmits(['close'])
+
+/** 点击提示条上的操作按钮（如「去提交订单」）→ 执行后关掉提示 */
+function onAction () {
+  props.toast.action?.onClick?.()
+  emit('close', props.toast.id)
+}
 
 const iconComponent = computed(() => {
   const icons = {

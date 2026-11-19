@@ -280,8 +280,21 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="detail">{{ t('orders.viewDetails') }}</el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>{{ t('common.delete') }}</el-dropdown-item>
+                  <!--
+                    **快捷改状态**：运营最高频的动作是发货/改状态，
+                    原来必须「操作 → 查看详情 → 在弹窗里选状态 → 保存」＝4 次点击。
+                    这里把该订单**当前状态允许流转到的状态**直接列进菜单：
+                    点一次菜单 + 一次确认 = 2 次，且不用离开当前列表上下文。
+                  -->
+                  <el-dropdown-item
+                    v-for="st in nextStatusesOf(scope.row)"
+                    :key="'st_' + st"
+                    :command="'status:' + st"
+                  >
+                    {{ t('orders.quickTo') }} {{ getStatusText(st) }}
+                  </el-dropdown-item>
+                  <el-dropdown-item command="detail" divided>{{ t('orders.viewDetails') }}</el-dropdown-item>
+                  <el-dropdown-item command="delete">{{ t('common.delete') }}</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -882,9 +895,39 @@ const loadOrders = async () => {
 
 
 // 操作列下拉菜单统一分发：窄列 + fixed 共存，避免宽操作列遮挡业务列
+/** 某订单当前允许流转到的状态（与后端 ORDER_STATUS_TRANSITIONS 保持一致） */
+const nextStatusesOf = (row) => (ORDER_STATUS_TRANSITIONS[row?.status] || [])
+
 const handleOrderAction = (command, row) => {
   if (command === 'detail') return viewOrderDetail(row)
   if (command === 'delete') return deleteOrder(row.id)
+  if (typeof command === 'string' && command.startsWith('status:')) {
+    return quickChangeStatus(row, command.slice('status:'.length))
+  }
+}
+
+/**
+ * 快捷改状态：确认 → 调接口 → 刷新列表。
+ * 不走详情弹窗 —— 运营改状态时通常不需要先看整单详情。
+ */
+const quickChangeStatus = async (row, nextStatus) => {
+  const label = getStatusText(nextStatus)
+  try {
+    await ElMessageBox.confirm(
+      `${t('orders.quickConfirm', { status: label })}`,
+      t('orders.quickTitle'),
+      { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') }
+    )
+  } catch {
+    return // 用户取消
+  }
+  const res = await updateOrderStatus(row.id, { status: nextStatus })
+  if (res.success) {
+    ElMessage.success(t('orders.quickDone', { status: label }))
+    load()
+  } else {
+    ElMessage.error(res.message || t('common.error'))
+  }
 }
 
 // 删除订单
