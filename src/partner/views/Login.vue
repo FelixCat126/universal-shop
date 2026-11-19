@@ -87,7 +87,7 @@
         </p>
         <select
           v-model="localeModel"
-          class="shrink-0 text-xs rounded-lg px-2.5 py-1.5 bg-white/10 border border-white/20 text-white min-w-[7.75rem] max-w-[10rem] touch-manipulation"
+          class="shrink-0 text-xs rounded-lg px-2.5 py-1.5 min-h-[44px] bg-white/10 border border-white/20 text-white min-w-[7.75rem] max-w-[10rem] touch-manipulation"
           @change="persistLocale"
         >
           <option class="text-gray-900" value="zh-CN">{{ t('locale.zh') }}</option>
