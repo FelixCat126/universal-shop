@@ -469,6 +469,7 @@ import { usePortalCurrencyStore, loadPublicConfig } from '../stores/portalCurren
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import ImageFade from '../components/ui/ImageFade.vue'
 import { appleSpring, subtleSpring, bouncySpring } from '../composables/useSpring.js'
+import { prefetchRoutesWhenIdle } from '../../utils/routePrefetch.js'
 import { useReducedMotion } from '../composables/useReducedMotion.js'
 import { imageSrcSet, imageLoadingFor } from '../../utils/imageVariants.js'
 
@@ -1052,6 +1053,12 @@ watch(
 
 // 组件挂载时加载数据
 onMounted(async () => {
+  /**
+   * 空闲时预取商品详情页的 chunk。
+   * 商品卡是 <div @click>（不是链接），hover 事件委托覆盖不到它，
+   * 所以补一条"空闲预取"：用户还在看首页时，详情页代码就已下载好。
+   */
+  prefetchRoutesWhenIdle(router, ['ProductDetail'])
   loadSystemConfig()
   loadBundles()
   await loadCategories()

@@ -155,8 +155,19 @@
         </div>
       </div>
     </header>
+    <!--
+      路由视图：第 37 轮补上过渡 —— 原来**完全没有过渡**（硬切），
+      切页时是"啪"一下换掉，比带动画的更像刷新。
+      现在与另外两端同一套做法：重叠在场 + 只做 opacity → 无空白帧、无位移。
+    -->
     <main class="flex-1 w-full pb-[max(1rem,env(safe-area-inset-bottom))]">
-      <router-view />
+      <div class="route-stage">
+        <router-view v-slot="{ Component, route }">
+          <Transition name="page-fade">
+            <component :is="Component" :key="route.path" class="page-shell" />
+          </Transition>
+        </router-view>
+      </div>
     </main>
   </div>
 </template>
@@ -171,9 +182,12 @@ import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
 import ToastContainer from './components/ToastContainer.vue'
 import { usePartnerStore } from './stores/partner.js'
 import { fatalError, reportFatalError } from '../utils/fatalError.js'
+import { useRoutePrefetch } from '../utils/routePrefetch.js'
 
 const route = useRoute()
 const router = useRouter()
+// 路由 chunk 预取：切换批发页面时不再白屏
+useRoutePrefetch(router)
 const partnerStore = usePartnerStore()
 const { t, locale } = useI18n()
 

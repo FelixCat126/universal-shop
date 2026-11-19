@@ -143,12 +143,26 @@
       </div>
     </header>
     
-    <!-- 路由视图：spring 页面切换（苹果风） -->
-    <router-view v-slot="{ Component, route }">
-      <Transition name="spring-page" mode="out-in">
-        <component :is="Component" :key="route.path" />
-      </Transition>
-    </router-view>
+    <!--
+      路由视图：**无空档**的页面切换。
+
+      原来用 `mode="out-in"` + 位移缩放动画（spring-page）：
+        旧页向上缩小淡出 → 旧元素移除 → 新页从下方弹上来
+      中间既没有旧页也没有新页（空白帧），加上位移/缩放本身，
+      人眼读到的就是"页面在跳 / 在刷新"。
+
+      现在：
+        - 去掉 out-in → 新旧**同时在场**，新页在上层盖住旧页 → 永不空白
+        - 只做 opacity（不做位移/缩放）→ 不再"跳"
+        - 离开元素 absolute 定位 → 不占文档流 → 页面高度不因切换而塌
+    -->
+    <div class="route-stage">
+      <router-view v-slot="{ Component, route }">
+        <Transition name="page-fade">
+          <component :is="Component" :key="route.path" class="page-shell" />
+        </Transition>
+      </router-view>
+    </div>
 
     <footer class="border-t bg-white/80 py-4 sm:py-6 text-center text-xs text-gray-500">
       <!--
@@ -202,6 +216,7 @@ import { useI18n } from 'vue-i18n'
 import { syncDocumentLang } from '../utils/htmlLang.js'
 import { useRoute, useRouter } from 'vue-router'
 import { fatalError, reportFatalError } from '../utils/fatalError.js'
+import { useRoutePrefetch } from '../utils/routePrefetch.js'
 import { useCartStore } from './stores/cart.js'
 import { useUserStore } from './stores/user.js'
 import ToastContainer from './components/ui/Toast/ToastContainer.vue'
@@ -216,6 +231,8 @@ import { usePortalCurrencyStore } from './stores/portalCurrency.js'
 const { locale, t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+// 路由 chunk 预取：鼠标移到链接上就把该页代码下载好，切换时不再白屏
+useRoutePrefetch(router)
 
 // 状态管理
 const cartStore = useCartStore()

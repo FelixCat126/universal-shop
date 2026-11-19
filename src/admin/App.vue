@@ -20,11 +20,18 @@
         {{ t('common.reload') }}
       </el-button>
     </div>
-    <router-view v-slot="{ Component, route }">
-      <Transition name="admin-page" mode="out-in">
-        <component :is="Component" :key="route.path" />
-      </Transition>
-    </router-view>
+    <!--
+      路由视图：**无空档**的页面切换（第 37 轮）。
+      原来 `mode="out-in"` → 旧页淡出被移除后新页才淡入，中间是空白帧，
+      运营在列表页之间来回切时能明显看到"闪一下"。现在新旧重叠在场，只做 opacity。
+    -->
+    <div class="route-stage">
+      <router-view v-slot="{ Component, route }">
+        <Transition name="admin-page">
+          <component :is="Component" :key="route.path" class="page-shell" />
+        </Transition>
+      </router-view>
+    </div>
   </div>
 </template>
 
@@ -32,13 +39,17 @@
 import { watch, onMounted, onErrorCaptured } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { syncDocumentLang } from '../utils/htmlLang.js'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from './stores/admin.js'
 import { fatalError, reportFatalError } from '../utils/fatalError.js'
+import { useRoutePrefetch } from '../utils/routePrefetch.js'
 
 // 国际化
 const { locale, t } = useI18n()
 const route = useRoute()
+const router = useRouter()
+// 路由 chunk 预取：切换后台页面时不再白屏
+useRoutePrefetch(router)
 
 // 更新页面标题
 const updatePageTitle = () => {
@@ -134,12 +145,38 @@ body {
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
 }
 
-/* 极简高级风：admin 路由切换 120ms fade，不打扰运营任务流 */
-.admin-page-enter-active,
-.admin-page-leave-active {
-  transition: opacity 120ms cubic-bezier(0.4, 0, 0.2, 1);
+/* 极简高级风：admin 路由切换（120ms fade，不打扰运营任务流） */
+/**
+ * 第 37 轮：去掉 mode="out-in" 之后，旧的 leave-active 不能再和 enter-active
+ * 共用同一条规则 —— 离开的页面要**绝对定位**（不占文档流），
+ * 否则新旧页面在文档流里上下堆叠 → 页面高度翻倍 → 又是另一种"跳动"。
+ */
+.route-stage {
+  position: relative;
+  min-height: 60vh;
 }
-.admin-page-enter-from,
+
+.page-shell {
+  background: #f5f7fa;
+  min-height: 60vh;
+}
+
+.admin-page-enter-active {
+  transition: opacity 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.admin-page-enter-from {
+  opacity: 0;
+}
+
+.admin-page-leave-active {
+  transition: opacity 110ms ease-out;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
 .admin-page-leave-to {
   opacity: 0;
 }
