@@ -70,11 +70,36 @@ function partnerOrderPhoneWithoutDuplicateName (contactName, contactPhone) {
 class PartnerAdminController {
   static async listPartners (req, res) {
     try {
-      const rows = await Partner.findAll({
+      /**
+       * 分页 + 关键词筛选。
+       *
+       * 原来这里是 `Partner.findAll()` —— **一次性把全部合作方拉出来**，
+       * 后台列表页不分页。合作方账号数量上来后，这个页面会越来越慢，
+       * 而且与其它后台页面（都有翻页区）**形态不一致**（第 36 轮"焕新"要求
+       * 按钮/表格/翻页区/检索区整齐划一）。
+       */
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { maxPageSize: 100 })
+      const keyword = req.query.keyword != null ? String(req.query.keyword).trim() : ''
+      const where = {}
+      if (keyword) {
+        where[Op.or] = [
+          { login: { [Op.like]: likeContains(keyword) } },
+          { display_name: { [Op.like]: likeContains(keyword) } }
+        ]
+      }
+
+      const { count, rows } = await Partner.findAndCountAll({
+        where,
         order: [['created_at', 'DESC']],
+        limit,
+        offset,
         attributes: { exclude: ['password'] }
       })
-      return res.json({ success: true, data: rows })
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: { total: count, page, pageSize, totalPages: Math.ceil(count / pageSize) || 1 }
+      })
     } catch (e) {
       logger.error('PartnerAdminController.listPartners', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '读取合作方列表失败' })

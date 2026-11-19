@@ -102,9 +102,9 @@
       <!-- 批量操作：选中后出现（成批上下架/删除，运营的高频动作） -->
       <div
         v-if="selectedProductIds.length"
-        class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2"
+        style="margin-bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid #dbeafe; background: #eff6ff; border-radius: 8px; padding: 8px 12px;"
       >
-        <span class="text-sm text-blue-800">
+        <span style="font-size: 14px; color: #1e40af;">
           {{ t('products.bulkSelected', { count: selectedProductIds.length }) }}
         </span>
         <el-button size="small" :loading="bulkActing" @click="bulkUpdate('activate')">

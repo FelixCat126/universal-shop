@@ -37,3 +37,172 @@ html body #app .el-button > i.el-icon:not(:last-child) {
 html body #app .el-button .el-button__text > .el-icon:not(:last-child) {
   margin-inline-end: 0.25em !important;
 }
+
+/**
+ * ============================================================================
+ * 后台统一视觉规范（第 36 轮"焕新"）
+ * ============================================================================
+ *
+ * ## 为什么放在这一层
+ *
+ * 量化后发现后台的不整齐来自**同一个页面里并存几种写法**：
+ *   - 圆角：primary 按钮 4px、default/small 按钮 3px（同一页并存）
+ *   - 按钮高度：工具栏 32px、表格内 small 24px、partners 的 link 按钮 20px
+ *   - 翻页区：有的带 is-background（带底色块）、有的没有
+ *   - 表格：表头纯白、行高 41~101px 不等
+ *
+ * 逐个视图改 class 能改，但**下一次新增页面又会走样**。
+ * 这里改的是 Element Plus 的**设计令牌**（CSS 变量）——
+ * 按钮、输入框、选择器、分页器会一起跟着变，新增页面自动继承，
+ * 不依赖谁记得写规范。
+ *
+ * ## 规范
+ *
+ *   圆角        按钮/输入 6px，卡片 8px（--el-border-radius-*）
+ *   控件高度    默认 32px / small 28px（--el-component-size*）
+ *   表格        表头 #f8fafc、单元格上下 8px、字号 13px
+ *   翻页区      统一靠右、浅灰底色块、与其他区块 16px 间距
+ *   检索区      .admin-filter-bar：单行、间距 8px、底部 16px
+ */
+html body #app {
+  /* 圆角：一次统一按钮 / 输入框 / 选择器 / 分页器 */
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+
+  /* 控件高度：默认 32px、small 28px（原来 small 是 24px，与默认 32 差一档） */
+  --el-component-size: 32px;
+  --el-component-size-small: 28px;
+
+  /* 后台自有令牌 */
+  --admin-radius: 8px;
+  --admin-radius-sm: 6px;
+  --admin-btn-h: 32px;
+  --admin-btn-h-sm: 28px;
+  --admin-table-head-bg: #f8fafc;
+  --admin-table-border: #e5e7eb;
+  --admin-border: #e5e7eb;
+  --admin-text-1: #1f2937;
+  --admin-text-2: #6b7280;
+}
+
+/* 按钮：圆角与高度统一（link 型按钮也纳入，否则表格内会出现第三种高度） */
+html body #app .el-button {
+  border-radius: var(--admin-radius-sm);
+}
+
+html body #app .el-button--small {
+  height: var(--admin-btn-h-sm);
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* link 按钮：文字型也要有稳定的行高（否则表格操作列高度忽高忽低） */
+html body #app .el-button.is-link {
+  height: auto;
+  min-height: var(--admin-btn-h-sm);
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+/* 表格：表头底色、留白、字号统一 */
+html body #app .el-table th.el-table__cell {
+  background-color: var(--admin-table-head-bg) !important;
+  color: var(--admin-text-1);
+  font-weight: 600;
+}
+
+html body #app .el-table .el-table__cell {
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+html body #app .el-table__inner-wrapper::before {
+  background-color: var(--admin-table-border);
+}
+
+/* 翻页区：统一靠右 + 浅灰底色块（不管有没有 is-background 类） */
+html body #app .el-pagination {
+  --el-pagination-bg-color: #f3f4f6;
+  --el-pagination-button-disabled-bg-color: #f3f4f6;
+  --el-pagination-hover-color: #2563eb;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding: 4px 8px;
+  background-color: #f9fafb;
+  border-radius: var(--admin-radius-sm);
+  overflow: hidden;
+}
+
+html body #app .el-pagination .el-pager li {
+  background-color: #f3f4f6;
+  border-radius: 4px;
+  margin: 0 2px;
+}
+
+/**
+ * 检索区（筛选栏）统一规范。
+ * 用它替代各页各写一套的筛选条 —— 之前那些写法里混着失效的 Tailwind 类
+ * （后台没引 Tailwind CSS，类名写了不生效，布局就散了）。
+ */
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-filter-bar .el-input,
+.admin-filter-bar .el-select {
+  width: 180px;
+}
+
+.admin-filter-bar .el-button {
+  flex: 0 0 auto;
+}
+
+/**
+ * 检索区（筛选栏）统一规范
+ * ---------------------------------------------------------------
+ * 各视图原来各写一份 scoped 的 .filter-section / .search-form，
+ * margin 有 20px 也有 16px、padding 有 8px 也有 0 —— 同类区块间距不一致。
+ * 这里给一份全局规范（特异性高于 scoped 的 `.x[data-v-xxx]`），
+ * 新增页面只要用这两个类名就自动一致。
+ */
+html body #app .filter-section {
+  margin-bottom: 16px;
+}
+
+html body #app .filter-section .el-card__body {
+  padding: 16px 16px 0;
+}
+
+html body #app .search-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+}
+
+html body #app .search-form .el-form-item {
+  margin-bottom: 16px;
+  margin-right: 0;
+}
+
+/**
+ * 筛选控件宽度统一。
+ * 原来每个输入框/下拉都是**手写内联宽度**（200/180/140/150…，共 12 种），
+ * 同一行里控件宽窄不一。这里统一 180px —— 内联样式优先级最高，
+ * 所以必须用 !important 才能压住；内联宽度是历史遗留，后续可逐页清理。
+ */
+html body #app .search-form .el-input,
+html body #app .search-form .el-select {
+  width: 180px !important;
+}
+
+/* 表格区块与检索区之间保持同样的 16px 间距 */
+html body #app .table-section {
+  margin-bottom: 16px;
+}

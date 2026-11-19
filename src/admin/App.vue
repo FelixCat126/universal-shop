@@ -1,22 +1,24 @@
 <template>
   <div id="app">
     <!-- 致命错误兜底：组件抛错时别白屏 -->
+    <!--
+      致命错误兜底页。
+      ⚠️ 这里**不用 Tailwind 类**：后台没引 Tailwind CSS（main.js 只引 element-plus），
+      类名写了也不生效 —— 原来的兜底页是"看起来居中、实际铺满整屏"。
+      改用 Element Plus 原语 + 内联样式，保证任何时候都真的能兜住。
+    -->
     <div
       v-if="fatalError"
-      class="fixed inset-0 z-[100] bg-white/95 backdrop-blur flex flex-col items-center justify-center gap-4 px-6 text-center"
+      style="position: fixed; inset: 0; z-index: 100; background: rgba(255,255,255,0.97); backdrop-filter: blur(4px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center;"
       role="alert"
     >
-      <h2 class="text-lg font-semibold text-gray-900">{{ t('common.somethingWentWrong') }}</h2>
-      <p class="text-sm text-gray-500 max-w-md">{{ t('common.tryAgainHint') }}</p>
-      <p v-if="fatalError.message" class="text-xs text-gray-400 max-w-md break-words font-mono">{{ fatalError.message }}</p>
-      <pre v-if="fatalError.stack" class="text-[10px] text-gray-300 max-w-md max-h-24 overflow-auto whitespace-pre-wrap break-words text-left">{{ fatalError.stack }}</pre>
-      <button
-        type="button"
-        class="mt-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-        @click="reloadPage"
-      >
+      <h2 style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0;">{{ t('common.somethingWentWrong') }}</h2>
+      <p style="font-size: 14px; color: #6b7280; max-width: 480px; margin: 0;">{{ t('common.tryAgainHint') }}</p>
+      <p v-if="fatalError.message" style="font-size: 12px; color: #9ca3af; max-width: 480px; word-break: break-word; font-family: ui-monospace, monospace; margin: 0;">{{ fatalError.message }}</p>
+      <pre v-if="fatalError.stack" style="font-size: 11px; color: #d1d5db; max-width: 480px; max-height: 96px; overflow: auto; white-space: pre-wrap; word-break: break-word; text-align: left; margin: 0;">{{ fatalError.stack }}</pre>
+      <el-button type="primary" style="margin-top: 8px;" @click="reloadPage">
         {{ t('common.reload') }}
-      </button>
+      </el-button>
     </div>
     <router-view v-slot="{ Component, route }">
       <Transition name="admin-page" mode="out-in">

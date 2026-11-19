@@ -7,6 +7,8 @@
  *   AT-5 PUT /:id/password 重置密码 → 200
  *   AT-6 GET /api/admin/partner-orders 列表
  *   AT-7 PUT /api/admin/partner-orders/:id/status 改状态
+ *   AT-8 合作方列表分页（第 36 轮补：原来一次性拉全量，与其它后台页形态不一致）
+ *   AT-9 合作方列表关键词筛选
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
@@ -99,6 +101,43 @@ describe('P3.admin.partner', () => {
       .set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)
     expect(res.body.data.orders.length).toBe(1)
+  })
+
+  it('AT-8 合作方列表分页', async () => {
+    const { token } = await adminCtx()
+    const { Partner } = TestDatabase.getSequelize().models
+    for (let i = 0; i < 25; i++) {
+      await Partner.create(TestDataFactory.createPartner({ login: `pg_partner_${i}`, display_name: `分页测试${i}` }))
+    }
+
+    const res = await request(app).get('/api/admin/partners?page=2&pageSize=10')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.data.length, '第 2 页应有 10 条').toBe(10)
+    expect(res.body.pagination.total, '总数应为 25').toBe(25)
+    expect(res.body.pagination.page).toBe(2)
+    expect(res.body.pagination.pageSize).toBe(10)
+    expect(res.body.pagination.totalPages).toBe(3)
+
+    // pageSize 超上限要被钳住（统一分页工具）
+    const big = await request(app).get('/api/admin/partners?pageSize=99999')
+      .set('Authorization', `Bearer ${token}`)
+    expect(big.status).toBe(200)
+    expect(big.body.pagination.pageSize, 'pageSize 应被钳到上限 100').toBe(100)
+  })
+
+  it('AT-9 合作方列表关键词筛选', async () => {
+    const { token } = await adminCtx()
+    const { Partner } = TestDatabase.getSequelize().models
+    await Partner.create(TestDataFactory.createPartner({ login: 'kw_alpha', display_name: '甲公司' }))
+    await Partner.create(TestDataFactory.createPartner({ login: 'kw_beta', display_name: '乙公司' }))
+
+    const res = await request(app).get('/api/admin/partners?keyword=kw_alpha')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.data.length, '只应命中 1 条').toBe(1)
+    expect(res.body.data[0].login).toBe('kw_alpha')
+    expect(res.body.pagination.total).toBe(1)
   })
 
   it('AT-7 PUT /partner-orders/:id/status 改状态', async () => {

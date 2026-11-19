@@ -18,7 +18,27 @@
       @imported="load"
     />
 
-    <el-card style="margin-top: 16px">
+    <!-- 检索区：与其他后台页面同构（filter-section + search-form） -->
+    <div class="filter-section" style="margin-top: 16px;">
+      <el-card>
+        <el-form :model="searchForm" inline class="search-form" @submit.prevent="handleSearch">
+          <el-form-item :label="t('partnersMgmt.login')">
+            <el-input
+              v-model="searchForm.keyword"
+              :placeholder="t('partnersMgmt.loginPlaceholder')"
+              clearable
+              style="width: 180px"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">{{ t('common.search') }}</el-button>
+            <el-button @click="resetSearch">{{ t('common.reset') }}</el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
+    </div>
+
+    <el-card class="table-section">
       <el-table v-loading="loading" :data="rows" stripe border style="width: 100%">
         <el-table-column prop="id" label="ID" width="72" />
         <el-table-column prop="login" :label="t('partnersMgmt.login')" min-width="110" />
@@ -42,12 +62,24 @@
         </el-table-column>
         <el-table-column :label="t('common.actions')" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="openEdit(row)">{{ t('partnersMgmt.edit') }}</el-button>
-            <el-button type="warning" link @click="openPwd(row)">{{ t('partnersMgmt.resetPwd') }}</el-button>
-            <el-button type="danger" link @click="confirmDelete(row)">{{ t('partnersMgmt.delete') }}</el-button>
+            <el-button type="primary" link size="small" @click="openEdit(row)">{{ t('partnersMgmt.edit') }}</el-button>
+            <el-button type="warning" link size="small" @click="openPwd(row)">{{ t('partnersMgmt.resetPwd') }}</el-button>
+            <el-button type="danger" link size="small" @click="confirmDelete(row)">{{ t('partnersMgmt.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrap" v-if="pagination.totalPages > 1">
+        <el-pagination
+          layout="total, sizes, prev, pager, next"
+          :total="pagination.total"
+          :page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :current-page="pagination.page"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="createVisible" :title="t('partnersMgmt.createTitle')" width="480px">
@@ -134,6 +166,9 @@ const loading = ref(false)
 const saving = ref(false)
 const pwdSaving = ref(false)
 const rows = ref([])
+/** 检索与分页状态（与其它后台页面同构） */
+const searchForm = reactive({ keyword: '' })
+const pagination = reactive({ total: 0, page: 1, pageSize: 20, totalPages: 1 })
 
 /* ---------------- CSV 批量导入 / 导出 ---------------- */
 
@@ -242,10 +277,20 @@ async function confirmDelete (row) {
 async function load () {
   loading.value = true
   try {
-    const res = await adminStore.apiRequest('/api/admin/partners')
+    const params = new URLSearchParams({
+      page: String(pagination.page),
+      pageSize: String(pagination.pageSize)
+    })
+    if (searchForm.keyword) params.set('keyword', searchForm.keyword)
+    const res = await adminStore.apiRequest(`/api/admin/partners?${params.toString()}`)
     const json = await res.json()
     if (json.success) {
       rows.value = json.data || []
+      const pg = json.pagination || {}
+      pagination.total = Number(pg.total) || 0
+      pagination.page = Number(pg.page) || 1
+      pagination.pageSize = Number(pg.pageSize) || pagination.pageSize
+      pagination.totalPages = Number(pg.totalPages) || 1
     } else {
       ElMessage.error(json.message || t('partnersMgmt.loadFailed'))
     }
@@ -357,6 +402,28 @@ async function submitPwd () {
   } finally {
     pwdSaving.value = false
   }
+}
+
+function handleSearch () {
+  pagination.page = 1
+  load()
+}
+
+function resetSearch () {
+  searchForm.keyword = ''
+  pagination.page = 1
+  load()
+}
+
+function handlePageChange (page) {
+  pagination.page = page
+  load()
+}
+
+function handleSizeChange (size) {
+  pagination.pageSize = size
+  pagination.page = 1
+  load()
 }
 
 onMounted(() => {

@@ -320,7 +320,7 @@
       <!-- 履约操作：改状态 / 填物流单号 / 内部备注 -->
       <template #footer>
         <!-- 窄屏（手机/平板）下改成整行堆叠，固定宽度会挤爆弹窗底部 -->
-        <div class="flex flex-col sm:flex-row sm:flex-wrap items-end gap-3 sm:justify-end">
+        <div style="display: flex; flex-direction: column; flex-wrap: wrap; align-items: flex-end; gap: 12px; justify-content: flex-end;">
           <div class="w-full sm:w-44">
             <label class="block text-xs text-gray-500 mb-1">{{ t('orders.trackingNumber') }}</label>
             <el-input
