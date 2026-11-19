@@ -365,6 +365,7 @@ import { useI18n } from 'vue-i18n'
 import { promotionAPI } from '../api/promotions.js'
 import { productAPI } from '../api/products.js'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
+import { useAutoSearch } from '../composables/useAutoSearch.js'
 
 const { t } = useI18n()
 
@@ -759,6 +760,9 @@ const handleSearch = () => {
   currentPage.value = 1
   loadPromotions()
 }
+
+// 筛选条件改动 → 自动搜索（debounce 300ms），省掉每次"打字后再点搜索"
+useAutoSearch(searchForm, handleSearch)
 
 const resetSearch = () => {
   Object.assign(searchForm, { status: '', type: '' })

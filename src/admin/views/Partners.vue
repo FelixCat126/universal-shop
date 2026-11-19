@@ -151,6 +151,7 @@
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
+import { useAutoSearch } from '../composables/useAutoSearch.js'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -408,6 +409,10 @@ function handleSearch () {
   pagination.page = 1
   load()
 }
+
+// 筛选条件改动 → 自动搜索（debounce 300ms），省掉每次"打字后再点搜索"
+useAutoSearch(searchForm, handleSearch)
+
 
 function resetSearch () {
   searchForm.keyword = ''

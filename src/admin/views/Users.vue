@@ -411,6 +411,7 @@ import CsvImportDialog from '../components/CsvImportDialog.vue'
 import api from '../api/index.js'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
+import { useAutoSearch } from '../composables/useAutoSearch.js'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -592,6 +593,9 @@ const handleSearch = () => {
   currentPage.value = 1
   loadUsers()
 }
+
+// 筛选条件改动 → 自动搜索（debounce 300ms），省掉每次"打字后再点搜索"
+useAutoSearch(searchForm, handleSearch)
 
 // 重置搜索
 const resetSearch = () => {

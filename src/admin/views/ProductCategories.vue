@@ -106,6 +106,7 @@ import 'element-plus/es/components/message-box/style/css'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { categoryAdminAPI } from '../api/categories.js'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
+import { useAutoSearch } from '../composables/useAutoSearch.js'
 
 const { t } = useI18n()
 
@@ -158,6 +159,9 @@ const handleSearch = () => {
   page.value = 1
   loadData()
 }
+
+// 筛选条件改动 → 自动搜索（debounce 300ms），省掉每次"打字后再点搜索"
+useAutoSearch(searchForm, handleSearch)
 
 const resetSearch = () => {
   searchForm.keyword = ''

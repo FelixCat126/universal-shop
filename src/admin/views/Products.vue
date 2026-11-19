@@ -488,6 +488,7 @@ import { useRoute } from 'vue-router'
 import { productAPI } from '../api/products.js'
 import CsvImportDialog from '../components/CsvImportDialog.vue'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
+import { useAutoSearch } from '../composables/useAutoSearch.js'
 
 export default {
   name: 'Products',
@@ -855,6 +856,9 @@ export default {
       currentPage.value = 1
       loadProducts()
     }
+
+    // 筛选条件改动 → 自动搜索（debounce 300ms），省掉每次"打字后再点搜索"
+    useAutoSearch(searchForm, handleSearch)
 
     const resetSearch = () => {
       clearTimeout(searchTimeout.value)
