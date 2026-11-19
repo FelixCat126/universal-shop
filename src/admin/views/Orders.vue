@@ -924,7 +924,7 @@ const quickChangeStatus = async (row, nextStatus) => {
   const res = await updateOrderStatus(row.id, { status: nextStatus })
   if (res.success) {
     ElMessage.success(t('orders.quickDone', { status: label }))
-    load()
+    loadOrders()
   } else {
     ElMessage.error(res.message || t('common.error'))
   }
