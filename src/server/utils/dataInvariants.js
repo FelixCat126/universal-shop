@@ -90,7 +90,69 @@ async function makeSelfTestOrder (m, opts = {}) {
   return { user, product, order, item }
 }
 
+/**
+ * custom 检查项需要访问模型实例（bcrypt 比对要用）。
+ * 由 checkDataInvariants 在运行时注入，避免在模块加载时就去连数据库。
+ */
+let sequelizeRef = { models: {} }
+function setInvariantSequelizeRef (instance) {
+  sequelizeRef = instance
+}
+
 const CHECKS = [
+  /**
+   * 管理端/合作方账号不得仍在使用**出厂默认口令**。
+   *
+   * 第 33 轮安全彻查实测发现：生产的 1 个管理员 + 2 个合作方账号的密码
+   * 全都是出厂值 123456 —— 站点在公网，等于任何人都能登进后台。
+   *
+   * 这一项是**防复发**的闸：靠 scripts/force-password-reset.mjs 置位解决当下，
+   * 靠这一项保证以后不会再悄悄回到默认口令。
+   *
+   * 为什么用 custom 而不是 SQL：bcrypt 比对必须是异步的，且 SQL 无法做哈希比对。
+   */
+  {
+    name: 'no_default_password_accounts',
+    title: '管理端/合作方账号不得仍在使用默认口令',
+    custom: async () => {
+      const bcrypt = await import('bcrypt')
+      const { Administrator, Partner } = sequelizeRef.models
+      const out = []
+      const admins = await Administrator.findAll({ attributes: ['id', 'username', 'password'] })
+      for (const a of admins) {
+        if (await bcrypt.compare('123456', a.password)) {
+          out.push({ id: a.id, account: a.username, kind: 'administrator', issue: '仍在使用默认口令 123456' })
+        }
+      }
+      const partners = await Partner.findAll({ attributes: ['id', 'login', 'password'] })
+      for (const p of partners) {
+        if (await bcrypt.compare('123456', p.password)) {
+          out.push({ id: p.id, account: p.login, kind: 'partner', issue: '仍在使用默认口令 123456' })
+        }
+      }
+      return out
+    },
+    selfTest: async (m) => {
+      /**
+       * 造一个用默认口令的管理员。
+       *
+       * 必须**绕过模型校验与 hook**：模型层已经禁止弱密码
+       * （管理员密码策略是后来加的，生产上残留的 123456 是历史数据），
+       * 走正常 create 会被 Validation error 挡下来 —— 那就造不出违规数据了。
+       * hooks:false 同时避免 beforeCreate 再 hash 一次（会变成"密码是哈希的哈希"）。
+       */
+      const bcrypt = await import('bcrypt')
+      const hash = await bcrypt.hash('123456', 10)
+      await m.Administrator.bulkCreate([{
+        username: 'selftest_default_pwd_' + Date.now(),
+        email: 'selftest_default_pwd_' + Date.now() + '@test.local',
+        password: hash,
+        role: 'admin',
+        is_active: true
+      }], { validate: false, hooks: false })
+    }
+  },
+
   // ── 硬约束 ──────────────────────────────────────────────
   {
     name: 'stock_not_negative',
@@ -558,26 +620,30 @@ const CHECKS = [
  */
 export async function checkDataInvariants ({ sequelize, limit = 20, recentDays = RECENT_DAYS } = {}) {
   if (!sequelize) throw new Error('checkDataInvariants 需要 sequelize 实例')
+  setInvariantSequelizeRef({ models: sequelize.models })
   const results = []
   for (const check of CHECKS) {
-    let rows = []
+    let list = []
     let error = null
     try {
-      const out = await sequelize.query(check.sql, {
-        type: QueryTypes.SELECT,
-        replacements: { days: String(recentDays) }
-      })
-      rows = Array.isArray(out?.[0]) ? out[0] : (Array.isArray(out) ? out : [])
+      if (check.custom) {
+        // 自定义异步检查（如 bcrypt 比对默认口令）：直接给违规行
+        list = (await check.custom()) || []
+      } else {
+        const out = await sequelize.query(check.sql, {
+          type: QueryTypes.SELECT,
+          replacements: { days: String(recentDays) }
+        })
+        const rows = Array.isArray(out?.[0]) ? out[0] : (Array.isArray(out) ? out : [])
+        list = Array.isArray(rows) ? rows : []
+        if (check.filter) {
+          // filter 允许是异步函数（bcrypt 比对必须异步）
+          list = (await check.filter(list)) || []
+        }
+      }
     } catch (err) {
       error = err
-    }
-    let list = Array.isArray(rows) ? rows : []
-    if (!error && check.filter) {
-      try {
-        list = check.filter(list)
-      } catch (err) {
-        error = err
-      }
+      list = []
     }
     results.push({
       name: check.name,
@@ -601,4 +667,4 @@ export function listInvariantNames () {
   }))
 }
 
-export { CHECKS }
+export { CHECKS, setInvariantSequelizeRef }

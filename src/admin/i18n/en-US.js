@@ -14,6 +14,23 @@ export default {
     partnerOrders: 'Partner wholesale orders - Mall Management System'
   },
 
+  // 修改本人密码（强制改密 / 常规改密共用）
+  password: {
+    changeTitle: "Change password",
+    forcedNotice: "You are still using the initial password. Change it before using the admin console.",
+    oldPassword: "Current password",
+    newPassword: "New password",
+    confirmPassword: "Confirm new password",
+    submit: "Update password",
+    success: "Password updated. Please sign in again.",
+    failed: "Failed to update password",
+    oldPasswordRequired: "Please enter your current password",
+    newPasswordRequired: "Please enter a new password",
+    confirmPasswordRequired: "Please confirm the new password",
+    mismatch: "The two new passwords do not match",
+    policyHint: "At least 8 characters, including both letters and digits",
+  },
+
   // Common
   common: {
     somethingWentWrong: 'Something went wrong',

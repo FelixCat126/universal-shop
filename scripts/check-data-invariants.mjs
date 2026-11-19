@@ -91,6 +91,20 @@ try {
   }
   const results = await checkDataInvariants({ sequelize, recentDays })
   if (selfTest) {
+    /**
+     * 先跑迁移：自证模式直连的是测试库的 public schema（历史遗留），
+     * 那里可能缺新加的列（例如 administrators.must_reset_password）。
+     * 迁移是幂等的，跑一遍只会补齐、不会破坏。
+     */
+    try {
+      const { runMigrations } = await import('../src/server/migrations/index.js')
+      const r = await runMigrations({ sequelize })
+      if (r.applied?.length) console.log('🧱 自证前补跑迁移：' + r.applied.join(', '))
+    } catch (e) {
+      console.error('❌ 自证前补跑迁移失败:', e.message)
+      process.exit(2)
+    }
+
     // 从 utils/dataInvariants.js 取 selfTest 定义
     const { CHECKS } = await import('../src/server/utils/dataInvariants.js')
     // 用项目自己的模型工厂（它连的是同一个库：NODE_ENV=test 时优先 DATABASE_URL_TEST）
@@ -112,12 +126,20 @@ try {
       await sequelize.query(
         'TRUNCATE TABLE order_items, orders, carts, user_coupons, point_transactions, ' +
         'user_point_balances, after_sales, export_jobs, products, users, partners, ' +
-        'coupon_templates RESTART IDENTITY CASCADE'
+        'administrators, coupon_templates RESTART IDENTITY CASCADE'
       )
       try {
         await check.selfTest(models)
-        const rows = await sequelize.query(check.sql, { replacements: { days: String(recentDays) } })
-        const list = Array.isArray(rows?.[0]) ? rows[0] : (Array.isArray(rows) ? rows : [])
+        // custom 检查项（如 bcrypt 比对）没有 SQL，直接调它取违规行
+        let list
+        if (check.custom) {
+          const { setInvariantSequelizeRef } = await import('../src/server/utils/dataInvariants.js')
+          setInvariantSequelizeRef({ models })
+          list = (await check.custom()) || []
+        } else {
+          const rows = await sequelize.query(check.sql, { replacements: { days: String(recentDays) } })
+          list = Array.isArray(rows?.[0]) ? rows[0] : (Array.isArray(rows) ? rows : [])
+        }
         if (list.length > 0) {
           console.log(`  ✅ ${check.name} —— 造的违规数据被抓到了（${list.length} 行）`)
         } else {

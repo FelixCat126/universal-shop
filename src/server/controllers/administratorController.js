@@ -103,7 +103,9 @@ class AdministratorController {
         message: '登录成功',
         data: {
           admin: admin.toSafeJSON(),
-          token
+          token,
+          // 强制改密标志：前端据此跳改密页（服务端也会拦，见 adminAuthMiddleware）
+          must_reset_password: admin.must_reset_password === true
         }
       })
     } catch (error) {
@@ -446,6 +448,63 @@ class AdministratorController {
       res.status(500).json({
         success: false,
         message: '重置密码失败',
+        code: 'INTERNAL_SERVER_ERROR'
+      })
+    }
+  }
+
+  /**
+   * 修改**自己**的密码。
+   *
+   * 为什么必须有这个接口：管理员端此前**没有任何**"改自己密码"的入口
+   * （只有管理员改别人的 resetPassword），所以"必须改密"这件事无处可去。
+   *
+   * 安全点：
+   * - 校验**旧密码**（防止会话被劫持后直接改密码）
+   * - 强度与其它端同一把尺子（assertPasswordPolicy）
+   * - 不允许与旧密码相同
+   * - 改密后递增 token_version → 旧 JWT 立即失效；并清掉 must_reset_password
+   */
+  static async changeMyPassword(req, res) {
+    try {
+      const { old_password, new_password } = req.body || {}
+      if (!old_password || !new_password) {
+        return res.status(400).json({ success: false, message: '请填写原密码与新密码' })
+      }
+
+      const policy = assertPasswordPolicy(new_password)
+      if (!policy.ok) {
+        return res.status(400).json({ success: false, message: policy.message })
+      }
+      if (String(old_password) === String(new_password)) {
+        return res.status(400).json({ success: false, message: '新密码不能与原密码相同' })
+      }
+
+      const admin = await Administrator.findByPk(req.admin.id)
+      if (!admin) {
+        return res.status(404).json({ success: false, message: '管理员不存在' })
+      }
+      const ok = await admin.validatePassword(String(old_password))
+      if (!ok) {
+        return res.status(400).json({ success: false, message: '原密码不正确' })
+      }
+
+      admin.password = String(new_password)
+      admin.must_reset_password = false
+      admin.token_version = (Number(admin.token_version) || 0) + 1
+      await admin.save()
+      invalidateAdminAuthCache(admin.id)
+
+      return res.json({
+        success: true,
+        message: '密码修改成功，请重新登录',
+        data: { id: admin.id, username: admin.username }
+      })
+    } catch (error) {
+      logger.error('修改本人密码失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({
+        success: false,
+        message: '密码修改失败',
         code: 'INTERNAL_SERVER_ERROR'
       })
     }

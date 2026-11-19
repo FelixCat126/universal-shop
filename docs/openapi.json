@@ -1252,6 +1252,10 @@
             "type": "integer",
             "description": "令牌版本：改密/重置时递增，旧 JWT 立即失效"
           },
+          "must_reset_password": {
+            "type": "boolean",
+            "description": "首次登录是否强制改密（后台账号默认口令下线时置位）"
+          },
           "created_by": {
             "type": "integer",
             "nullable": true,
@@ -1271,6 +1275,7 @@
           "role",
           "is_active",
           "token_version",
+          "must_reset_password",
           "created_at",
           "updated_at"
         ]
@@ -5540,6 +5545,118 @@
           }
         },
         "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/me": {
+      "get": {
+        "summary": "GET /api/admin/me",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/me/password": {
+      "put": {
+        "summary": "PUT /api/admin/me/password",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
         "x-generated-from": "express-route-table"
       }
     },

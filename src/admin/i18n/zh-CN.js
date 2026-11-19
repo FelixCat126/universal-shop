@@ -14,6 +14,23 @@ export default {
     partnerOrders: '合作方订单 - 商城管理系统'
   },
 
+  // 修改本人密码（强制改密 / 常规改密共用）
+  password: {
+    changeTitle: "修改登录密码",
+    forcedNotice: "当前仍在使用初始密码，请先修改后再使用后台",
+    oldPassword: "原密码",
+    newPassword: "新密码",
+    confirmPassword: "确认新密码",
+    submit: "确认修改",
+    success: "密码修改成功，请重新登录",
+    failed: "密码修改失败",
+    oldPasswordRequired: "请填写原密码",
+    newPasswordRequired: "请填写新密码",
+    confirmPasswordRequired: "请再次填写新密码",
+    mismatch: "两次输入的新密码不一致",
+    policyHint: "新密码至少 8 位，且需同时包含英文字母与数字",
+  },
+
   // 通用
   common: {
     somethingWentWrong: '页面出了点问题',

@@ -69,6 +69,19 @@ const Administrator = sequelize.define('Administrator', {
     defaultValue: 0,
     comment: '令牌版本：改密/重置时递增，旧 JWT 立即失效'
   },
+  /**
+   * 是否必须先改密才能使用后台。
+   *
+   * 用户端（users）与合作方端（partners）早就有同名字段与完整前端流程，
+   * 管理员端此前**缺失** —— 生产实测发现后台账号仍在用出厂口令 123456，
+   * 而管理员既没有"自己改密码"的入口，也没有强制改密的机制。
+   */
+  must_reset_password: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: '首次登录是否强制改密（后台账号默认口令下线时置位）'
+  },
   created_by: {
     type: DataTypes.INTEGER,
     allowNull: true,

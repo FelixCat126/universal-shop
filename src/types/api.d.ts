@@ -301,6 +301,7 @@ export interface Administrator {
   is_active: boolean
   last_login_at?: string | null
   token_version: number
+  must_reset_password: boolean
   created_by?: number | null
   created_at: string
   updated_at: string

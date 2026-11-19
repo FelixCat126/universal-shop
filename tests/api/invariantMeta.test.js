@@ -119,10 +119,17 @@ describe('体检项的元测试', () => {
       }
       let rows = []
       try {
-        rows = await sequelize().query(check.sql, {
-          type: QueryTypes.SELECT,
-          replacements: { days: '30' }
-        })
+        if (check.custom) {
+          // custom 检查项（如 bcrypt 比对默认口令）没有 SQL，直接调它
+          const { setInvariantSequelizeRef } = await import('../../src/server/utils/dataInvariants.js')
+          setInvariantSequelizeRef({ models: models() })
+          rows = (await check.custom()) || []
+        } else {
+          rows = await sequelize().query(check.sql, {
+            type: QueryTypes.SELECT,
+            replacements: { days: '30' }
+          })
+        }
       } catch (e) {
         failures.push(`${check.name}：检查 SQL 执行失败 → ${e.message}`)
         continue
@@ -137,10 +144,17 @@ describe('体检项的元测试', () => {
   it('IM-5 清理干净时，所有检查都不该报（没数据 → 没违规）', async () => {
     const noisy = []
     for (const check of CHECKS) {
-      const rows = await sequelize().query(check.sql, {
-        type: QueryTypes.SELECT,
-        replacements: { days: '30' }
-      })
+      let rows = []
+      if (check.custom) {
+        const { setInvariantSequelizeRef } = await import('../../src/server/utils/dataInvariants.js')
+        setInvariantSequelizeRef({ models: models() })
+        rows = (await check.custom()) || []
+      } else {
+        rows = await sequelize().query(check.sql, {
+          type: QueryTypes.SELECT,
+          replacements: { days: '30' }
+        })
+      }
       if (rows.length) noisy.push(`${check.name}（空库就报了 ${rows.length} 行）`)
     }
     expect(noisy, '空库时不该有检查报错（说明 SQL 写错了，比如恒真条件）：\n' + noisy.join('\n')).toEqual([])

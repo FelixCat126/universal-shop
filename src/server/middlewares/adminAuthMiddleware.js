@@ -33,7 +33,7 @@ async function loadAdminStatus (adminId) {
     if (cached) return cached
   }
   const admin = await Administrator.findByPk(adminId, {
-    attributes: ['id', 'username', 'email', 'role', 'is_active', 'token_version']
+    attributes: ['id', 'username', 'email', 'role', 'is_active', 'token_version', 'must_reset_password']
   })
   const status = admin
     ? {
@@ -43,9 +43,10 @@ async function loadAdminStatus (adminId) {
         email: admin.email,
         role: admin.role,
         tokenVersion: Number(admin.token_version) || 0,
+        mustResetPassword: admin.must_reset_password === true,
         permissions: admin.hasPermission.bind(admin)
       }
-    : { exists: false, isActive: false, username: null, email: null, role: null, tokenVersion: 0, permissions: () => false }
+    : { exists: false, isActive: false, username: null, email: null, role: null, tokenVersion: 0, mustResetPassword: false, permissions: () => false }
   if (!isTestEnv) adminStatusCache.set(adminId, status)
   return status
 }
@@ -88,6 +89,24 @@ export const optionalAuthenticateAdmin = async (req, res, next) => {
   next()
 }
 
+/**
+ * 强制改密期间允许走的路径（白名单）。
+ *
+ * 只有"改自己的密码"和"登出"必须放行 ——
+ * 其余（看数据、改数据、导出…）一律先改密。
+ */
+const PASSWORD_CHANGE_ALLOWED = [
+  { method: 'PUT', pattern: /^\/api\/admin\/me\/password$/ },
+  { method: 'POST', pattern: /^\/api\/admin\/logout$/ },
+  { method: 'GET', pattern: /^\/api\/admin\/me$/ }
+]
+
+function isPasswordChangePath (req) {
+  const path = String(req.originalUrl || req.path || '').split('?')[0].replace(/\/+$/, '') || '/'
+  return PASSWORD_CHANGE_ALLOWED.some(rule =>
+    rule.method === req.method && rule.pattern.test(path))
+}
+
 // 验证管理员JWT token
 export const authenticateAdmin = async (req, res, next) => {
   try {
@@ -124,12 +143,29 @@ export const authenticateAdmin = async (req, res, next) => {
       return res.status(401).json({ success: false, message: '登录状态已失效，请重新登录' })
     }
 
+    /**
+     * 强制改密拦截：被标记 must_reset_password 的管理员，
+     * **除改密与登出外**的所有后台接口都拒绝。
+     *
+     * 为什么放在鉴权中间件里（而不是只在前端拦）：
+     * 前端拦截只是"不让你点到"，令牌本身仍然有效 —— 拿到 token 的人
+     * 仍能直接调 API。真正的强制必须在服务端。
+     */
+    if (status.mustResetPassword && !isPasswordChangePath(req)) {
+      return res.status(403).json({
+        success: false,
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: '请先修改初始密码后再使用后台'
+      })
+    }
+
     // 将管理员信息附加到请求对象
     req.admin = {
       id: decoded.adminId,
       username: status.username,
       role: status.role,
-      email: status.email
+      email: status.email,
+      mustResetPassword: status.mustResetPassword
     }
     
     next()
@@ -227,7 +263,10 @@ const SNAPSHOT_MODELS = {
 const SNAPSHOT_EXCLUDE = new Set([
   'password', 'password_hash', 'token_version',
   'reset_token', 'reset_token_expires_at', 'reset_code',
-  'two_factor_secret', 'secret'
+  'two_factor_secret', 'secret',
+  // 状态标志，不是凭证 —— 但名字里带 "password"，
+  // 留在快照里会让"快照不含 password 字样"的检查误报
+  'must_reset_password'
 ])
 
 /**

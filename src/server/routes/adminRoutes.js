@@ -46,6 +46,27 @@ router.post('/login', loginLimiter, requireCaptchaAfterFailures(), Administrator
  */
 router.post('/init', loginLimiter, AdministratorController.initSuperAdmin)
 
+/**
+ * 管理员**自己**的账号信息与改密。
+ *
+ * 这两个接口在"强制改密"期间**必须放行**（见 adminAuthMiddleware 的白名单）——
+ * 否则被标记的管理员会被自己锁在门外（改密页都打不开）。
+ */
+router.get('/me', authenticateAdmin, (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      id: req.admin.id,
+      username: req.admin.username,
+      role: req.admin.role,
+      email: req.admin.email,
+      must_reset_password: req.admin.mustResetPassword === true
+    }
+  })
+})
+
+router.put('/me/password', authenticateAdmin, AdministratorController.changeMyPassword)
+
 // 验证token（需要认证）
 router.get('/validate-token', authenticateAdmin, (req, res) => {
   res.json({

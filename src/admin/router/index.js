@@ -13,6 +13,13 @@ const router = createRouter({
       meta: { hideLayout: true, title: '管理员登录' }
     },
     {
+      // 修改本人密码：强制改密期间**不带布局**（此时其他页面都用不了）
+      path: '/password',
+      name: 'Password',
+      component: () => import('../views/Password.vue'),
+      meta: { hideLayout: true, title: '修改密码', requiresAuth: true }
+    },
+    {
       path: '/',
       name: 'Layout',
       component: () => import('../components/Layout.vue'),
@@ -119,6 +126,16 @@ router.beforeEach((to, from, next) => {
     if (!suffix || suffix === '/') suffix = '/'
     else if (!suffix.startsWith('/')) suffix = `/${suffix}`
     next({ path: suffix, query: to.query, hash: to.hash, replace: true })
+    return
+  }
+
+  /**
+   * 强制改密：后台账号仍在用默认口令时，**除改密页外一律跳走**。
+   * 服务端也会拦（adminAuthMiddleware 的 PASSWORD_CHANGE_REQUIRED），
+   * 这里只是让用户不必去点一个必然 403 的按钮。
+   */
+  if (adminStore.isLoggedIn && adminStore.mustResetPassword && to.name !== 'Password') {
+    next({ name: 'Password', replace: true })
     return
   }
 

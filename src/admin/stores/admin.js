@@ -6,6 +6,8 @@ export const useAdminStore = defineStore('admin', () => {
   // 状态
   const token = ref(localStorage.getItem('admin_token') || '')
   const adminInfo = ref(null)
+  /** 是否必须先改密（后台账号仍在用默认口令时为 true） */
+  const mustResetPassword = ref(false)
 
   // 初始化管理员信息
   const initAdminInfo = () => {
@@ -57,12 +59,15 @@ export const useAdminStore = defineStore('admin', () => {
       if (data.success) {
         token.value = data.data.token
         adminInfo.value = data.data.admin
-        
+
+        // 强制改密标志（后台账号默认口令下线时置位）
+        mustResetPassword.value = data.data.must_reset_password === true
+
         // 保存到localStorage
         localStorage.setItem('admin_token', data.data.token)
         localStorage.setItem('admin_info', JSON.stringify(data.data.admin))
-        
-        return { success: true, message: data.message }
+
+        return { success: true, message: data.message, mustResetPassword: mustResetPassword.value }
       } else {
         // 透传 HTTP 状态码与业务 code（如 428 CAPTCHA_REQUIRED / CAPTCHA_INVALID），供登录页做验证码分流
         return { success: false, message: data.message, status: response.status, code: data.code }
@@ -77,6 +82,7 @@ export const useAdminStore = defineStore('admin', () => {
   const logout = () => {
     token.value = ''
     adminInfo.value = null
+    mustResetPassword.value = false
     
     // 清除localStorage
     localStorage.removeItem('admin_token')
@@ -154,6 +160,7 @@ export const useAdminStore = defineStore('admin', () => {
     // 状态
     token,
     adminInfo,
+    mustResetPassword,
     
     // 计算属性
     isLoggedIn,
