@@ -1634,6 +1634,23 @@ cart 4 / address 4 / upload 3 / export 2 / coupon 1）。
 （并发测试文件：writePathConcurrency / concurrencyStrike / concurrencyStrike2 /
 orderRace / supplement.p2.concurrency / supplement.p6.concurrency）
 
+### 34.5 生产实测
+
+并发自助注册（5 个并发请求打同一手机号）：
+
+```
+400 400 201 400 400
+{"success":false,"message":"该手机号已被注册"}
+```
+
+→ **1 个 201 + 4 个 400，零 500** ✓（修复前失败的那几个是 500）
+
+复验：25 项不变量全过 · 恢复演练 27 表一致 · 数据未变（3 用户 / 9 订单 / 9 明细 /
+18 商品 / 2 合作方 / 1 管理员）· error.log 无新增。
+
+> 实测时我在生产注册了一个测试用户（users 3→4），**已按 id 精确删除**并复核计数回到 3。
+> 生产数据的"只增不减"纪律：验证要么用只读探针，要么用能精确回滚的临时数据。
+
 ### 34.5 一个"测试自己的坑"（记录下来）
 
 写 WR-3/WR-5 时先失败了两次，原因都是**造的数据不对**，不是产品问题：
