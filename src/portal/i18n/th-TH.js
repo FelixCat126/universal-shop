@@ -76,6 +76,7 @@ export default {
   product: {
     decreaseQty: 'ลดจำนวน',
     relatedProducts: 'สินค้าที่คนอื่นมักซื้อ',
+    allCategories: 'ทั้งหมด',
     insufficientStock: "สต็อกไม่พอ เหลือเพียง {stock} ชิ้น",
     title: 'สินค้า',
     name: 'ชื่อสินค้า',
@@ -166,6 +167,7 @@ export default {
     stockIssue: 'สินค้าบางรายการมีสต็อกไม่เพียงพอ',
     productUnavailable: 'สินค้าไม่พร้อมจำหน่าย',
     productUnavailableDesc: 'สินค้านี้ถูกลบหรือปิดการขายแล้ว กรุณานำออกก่อนชำระเงิน',
+    productOffShelf: 'สินค้านี้ปิดการขายแล้ว กรุณานำออกก่อนชำระเงิน',
     itemCount: 'จำนวนสินค้า',
     backToCart: 'กลับไปตะกร้าสินค้า',
     emptyCannotSubmit: 'ตะกร้าสินค้าว่าง ไม่สามารถสั่งซื้อได้',

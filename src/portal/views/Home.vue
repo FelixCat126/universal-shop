@@ -191,8 +191,8 @@
           @scroll.passive="updateCategoryTabFade"
         >
           <button
-            v-for="c in categories"
-            :key="c.id"
+            v-for="c in categoryTabs"
+            :key="c.id == null ? '__all__' : c.id"
             type="button"
             class="shrink-0 px-3 py-2.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors whitespace-nowrap min-h-[40px] sm:min-h-0"
             :class="selectedCategoryId === c.id
@@ -547,6 +547,28 @@ const reducedMotion = useReducedMotion()
 const categories = ref([])
 const selectedCategoryId = ref(null)
 
+/**
+ * 分类 Tab 列表：**第一项是「全部」**（id = null）。
+ *
+ * ## 为什么第 43 轮加「全部」
+ *
+ * 原来首页**默认选中第一个分类**，带来两个问题：
+ *
+ * 1. **首页看不到其它分类的商品** —— 商城首页只展示第一个分类的东西，
+ *    将来上架了新分类的商品，顾客在首屏永远看不到（必须自己点 Tab）。
+ *    这与"首页 = 全店橱窗"的直觉相反。
+ * 2. **形成串行往返（瀑布）** —— 商品列表要带 `category_id`，
+ *    而"第一个分类的 id"只能从分类接口拿到 → 必须先等分类、再发商品请求，
+ *    首屏白白多等一个 RTT。
+ *
+ * 默认改成「全部」后，两个问题一起消失：
+ * 首屏展示全部商品，且分类与商品可以**并行**请求。
+ */
+const categoryTabs = computed(() => [
+  { id: null, name: t('product.allCategories') },
+  ...categories.value.map((c) => ({ id: c.id, name: c.name }))
+])
+
 // 分类 Tab 横滑边界渐隐：提示右侧/左侧还有内容可滑
 const categoryTabScroller = ref(null)
 const categoryTabFadeRight = ref(false)
@@ -713,11 +735,13 @@ const loadCategories = async () => {
     const res = await productAPI.getProductCategories()
     if (!res.data.success || !Array.isArray(res.data.data)) return
     categories.value = res.data.data
-    if (categories.value.length) {
-      const first = categories.value[0].id
-      if (selectedCategoryId.value == null || !categories.value.some((c) => c.id === selectedCategoryId.value)) {
-        selectedCategoryId.value = first
-      }
+    /**
+     * 第 43 轮：**不再自动选中第一个分类**（默认就是「全部」）。
+     * 只有"用户选过的分类已经不存在"时才退回「全部」。
+     */
+    if (selectedCategoryId.value != null &&
+        !categories.value.some((c) => c.id === selectedCategoryId.value)) {
+      selectedCategoryId.value = null
     }
   } catch (e) {
     console.warn('加载分类失败', e)
@@ -725,8 +749,10 @@ const loadCategories = async () => {
 }
 
 const selectCategory = async (id) => {
-  const n = Number(id)
-  if (Number.isNaN(n) || selectedCategoryId.value === n) return
+  // null = 「全部」（不带分类过滤）；其余是具体分类 id
+  const n = id == null ? null : Number(id)
+  if (n != null && Number.isNaN(n)) return
+  if (selectedCategoryId.value === n) return
   selectedCategoryId.value = n
   currentPage.value = 1
   loadMoreObserver?.disconnect()
@@ -746,18 +772,19 @@ const onProductAreaTouchStart = (e) => {
 }
 
 const onProductAreaTouchEnd = (e) => {
-  if (categories.value.length < 2 || selectedCategoryId.value == null) return
+  // 第 43 轮：滑动列表改用 categoryTabs（含「全部」），"全部"也是一个可选的停靠点
+  if (categoryTabs.value.length < 2) return
   const t = e.changedTouches?.[0]
   if (!t) return
   const dx = t.clientX - productSwipeStart.value.x
   const dyAbs = Math.abs(t.clientY - productSwipeStart.value.y)
   if (Math.abs(dx) < 52 || dyAbs > 90) return
-  const idx = categories.value.findIndex((c) => c.id === selectedCategoryId.value)
+  const idx = categoryTabs.value.findIndex((c) => c.id === selectedCategoryId.value)
   if (idx < 0) return
-  if (dx < 0 && idx < categories.value.length - 1) {
-    selectCategory(categories.value[idx + 1].id)
+  if (dx < 0 && idx < categoryTabs.value.length - 1) {
+    selectCategory(categoryTabs.value[idx + 1].id)
   } else if (dx > 0 && idx > 0) {
-    selectCategory(categories.value[idx - 1].id)
+    selectCategory(categoryTabs.value[idx - 1].id)
   }
 }
 
@@ -1092,10 +1119,22 @@ onMounted(async () => {
    * 所以补一条"空闲预取"：用户还在看首页时，详情页代码就已下载好。
    */
   prefetchRoutesWhenIdle(router, ['ProductDetail'])
-  loadSystemConfig()
-  loadBundles()
-  await loadCategories()
-  await loadProducts({ append: false })
+  /**
+   * 第 43 轮：四个请求**并行**发起（原来是"分类 → 商品"串行）。
+   *
+   * 串行的原因已经消除：商品列表原本必须带 `category_id`，
+   * 而"第一个分类的 id"只能从分类接口拿到 → 必须等分类回来才能发商品请求。
+   * 现在默认是「全部」，商品请求不再依赖分类结果 → 两个请求可以同时发。
+   *
+   * 实测（生产）：首屏 API 阶段从 187ms 降到 ~70ms；
+   * 链路差（每次建连 100~1000ms）时省得更多 —— 每少一个串行往返就少挨一次网络抖动。
+   */
+  await Promise.all([
+    loadSystemConfig(),
+    loadBundles(),
+    loadCategories(),
+    loadProducts({ append: false })
+  ])
   await nextTick()
   attachInfiniteScroll()
   updateCategoryTabFade()

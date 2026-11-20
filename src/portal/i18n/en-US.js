@@ -161,6 +161,7 @@ export default {
   product: {
     decreaseQty: 'Decrease quantity',
     relatedProducts: 'You may also like',
+    allCategories: 'All',
     title: 'Products',
     name: 'Product Name',
     price: 'Price',
@@ -260,6 +261,7 @@ export default {
     stockIssue: 'Some items are out of stock',
     productUnavailable: 'Item unavailable',
     productUnavailableDesc: 'This product has been removed. Please remove it before checkout.',
+    productOffShelf: 'This product is no longer on sale. Please remove it before checkout.',
     confirmClearMessage: 'Are you sure you want to clear all items from your cart?',
     confirmClear: 'Clear All',
     clearing: 'Clearing...',

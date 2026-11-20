@@ -337,8 +337,19 @@ const loadProduct = async () => {
     
     if (response.data.success) {
       product.value = response.data.data
-      // 拉到商品后顺带拉相关推荐（不阻塞首屏，失败就当没有）
-      loadRelatedProducts(response.data.data)
+      /**
+       * 第 43 轮：相关推荐**已经随详情一起返回**了（服务端 related 字段）。
+       * 之前是"拿到详情 → 再发一次列表请求"，而列表请求要用的 category_id
+       * 只能从详情响应里拿 → 两个请求天然串行，详情页白等一个来回。
+       *
+       * 老格式（没有 related 字段）仍然兜底走单独请求，保证向前兼容。
+       */
+      const related = response.data.data?.related
+      if (Array.isArray(related)) {
+        relatedProducts.value = related.slice(0, 4)
+      } else {
+        loadRelatedProducts(response.data.data)
+      }
     } else {
       product.value = null
     }

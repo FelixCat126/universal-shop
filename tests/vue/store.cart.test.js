@@ -164,4 +164,36 @@ describe('VS.store.cart', () => {
     expect(api.post).toHaveBeenCalledTimes(2)
     expect(localStorage.getItem('guest_cart')).toBeNull()
   })
+
+  /**
+   * 第 43 轮：下架商品（status = 'inactive'）在购物车里必须算**失效**。
+   *
+   * 背景：公开列表/详情已经不再返回下架商品，下单也会拦（400）。
+   * 唯独购物车没管 → 用户把下架商品留在车里，点「去结算」才被拦，白走一趟。
+   *
+   * 断言三件事：
+   *   1. 标记 unavailable（前端会禁用「去结算」并显示提示）
+   *   2. 标记 offShelf（前端据此显示"已下架"）
+   *   3. 不计入总价（失效行不参与金额计算）
+   */
+  it('CS-8 loadCart：下架商品被标记失效且不计入总价', async () => {
+    useUserStore().__setLogged(true)
+    api.get.mockResolvedValue({
+      data: {
+        success: true,
+        data: [
+          { id: 1, product_id: 1, quantity: 1, product: { id: 1, name: '在售', price: 100, stock: 5, status: 'active' } },
+          { id: 2, product_id: 2, quantity: 2, product: { id: 2, name: '已下架', price: 50, stock: 5, status: 'inactive' } }
+        ]
+      }
+    })
+    const c = useCartStore()
+    await c.loadCart()
+    expect(c.items.length).toBe(2)
+    const off = c.items.find(i => i.product_id === 2)
+    expect(off.unavailable, '下架商品必须标记失效').toBe(true)
+    expect(off.offShelf, '下架商品必须带 offShelf 标记（前端据此显示已下架）').toBe(true)
+    expect(off.product?.name, '失效时要保留商品名，用户才知道要删哪一件').toBe('已下架')
+    expect(c.totalAmount, '失效行不参与总价').toBe(100)
+  })
 })

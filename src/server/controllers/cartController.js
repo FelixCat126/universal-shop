@@ -67,7 +67,7 @@ class CartController {
           {
             model: Product,
             as: 'product',
-            attributes: ['id', 'name', 'description', 'price', 'points', 'discount', 'stock', 'image', 'category_id'],
+            attributes: ['id', 'name', 'description', 'price', 'points', 'discount', 'stock', 'image', 'category_id', 'status'],
             include: [{
               model: ProductCategory,
               as: 'productCategory',

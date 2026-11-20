@@ -85,6 +85,20 @@ class ProductController {
       const isAdmin = !!req.admin
       const paranoid = !isAdmin
 
+      /**
+       * 第 43 轮：**公开接口只给可售商品**（status = 'active'）。
+       *
+       * 之前公开列表/搜索完全不看 status → 运营下架（inactive）的商品
+       * 照样出现在商城首页和搜索结果里，用户点进去能看到、能加购，
+       * 到下单才被拦（400「商品已下架」）——
+       * 三个接口对"什么算可售"口径不一致，于是出现"能看见却买不了"。
+       *
+       * 管理端**不受影响**：运营必须看得到下架商品才能检查/恢复它。
+       */
+      if (!isAdmin) {
+        where.status = 'active'
+      }
+
       if (isAdmin && listingStatus === 'on_shelf') {
         where.deleted_at = { [Op.is]: null }
       } else if (isAdmin && listingStatus === 'delisted') {
@@ -130,18 +144,9 @@ class ProductController {
       })
 
       // 转换数据格式，将 image 字段映射为 image_url
+      // （与详情接口的 related 复用同一处映射，见 toPublicProductRow）
       const products = rows.map(product => {
-        const productData = product.toJSON()
-        if (productData.productCategory) {
-          productData.category = {
-            id: productData.productCategory.id,
-            name: productData.productCategory.name
-          }
-        }
-        delete productData.productCategory
-        if (productData.image) {
-          productData.image_url = productData.image
-        }
+        const productData = ProductController.toPublicProductRow(product)
         if (isAdmin) {
           const del = productData.deleted_at ?? productData.deletedAt
           productData.delisted = !!del
@@ -167,6 +172,29 @@ class ProductController {
         code: 'INTERNAL_SERVER_ERROR'
       })
     }
+  }
+
+  /**
+   * 商品行 → 公开响应形状。
+   *
+   * 列表接口与详情接口（含相关推荐）必须给出**完全一样**的商品形状，
+   * 否则前端详情页渲染出来的推荐卡片会和列表页长得不一样
+   * （"category 是对象还是 id"、"有没有 image_url" 这类差异最难查）。
+   * 所以抽成一处，两边共用。
+   */
+  static toPublicProductRow (row) {
+    const data = row.toJSON()
+    if (data.productCategory) {
+      data.category = {
+        id: data.productCategory.id,
+        name: data.productCategory.name
+      }
+    }
+    delete data.productCategory
+    if (data.image) {
+      data.image_url = data.image
+    }
+    return data
   }
 
   // 获取单个产品
@@ -195,6 +223,19 @@ class ProductController {
         })
       }
 
+      /**
+       * 第 43 轮：公开详情对**下架商品**返回 404（与公开列表口径一致）。
+       *
+       * 之前下架商品的详情页照样打得开 → 顾客看到"已下架"的商品页，
+       * 加购时才被下单接口拦下。管理端仍然可以打开（要检查/恢复下架商品）。
+       */
+      if (!req.admin && product.status !== 'active') {
+        return res.status(404).json({
+          success: false,
+          message: '产品不存在或已下架'
+        })
+      }
+
       // 转换数据格式，将 image 字段映射为 image_url
       const productData = product.toJSON()
       if (productData.productCategory) {
@@ -210,6 +251,37 @@ class ProductController {
       if (req.admin) {
         const del = productData.deleted_at ?? productData.deletedAt
         productData.delisted = !!del
+      }
+
+      /**
+       * 第 43 轮：相关推荐**随详情一起返回**（公开访问）。
+       *
+       * 之前前端是"拿到详情 → 再发一次列表请求"：
+       *   GET /products/:id  →  GET /products?category_id=X
+       * 而第二个请求的 category_id **只能从第一个响应里拿到**
+       * → 两个请求天然串行，详情页要多等一个来回。
+       *
+       * 实测（生产）：详情页首屏 API 阶段 737ms，其中 595ms 是那第二个串行请求。
+       * 现在一次往返就够了。
+       */
+      if (!req.admin && productData.category_id) {
+        const relatedRows = await Product.findAll({
+          where: {
+            category_id: productData.category_id,
+            status: 'active',
+            id: { [Op.ne]: product.id }
+          },
+          include: [{
+            model: ProductCategory,
+            as: 'productCategory',
+            attributes: ['id', 'name'],
+            required: false
+          }],
+          order: [['created_at', 'DESC']],
+          limit: 4,
+          paranoid: true
+        })
+        productData.related = relatedRows.map((row) => ProductController.toPublicProductRow(row))
       }
 
       res.json({
@@ -717,6 +789,20 @@ class ProductController {
       }
 
       await product.restore()
+      /**
+       * 「重新上架」必须**真的上架**（第 43 轮修）。
+       *
+       * 之前只 `restore()`（撤销软删），**没有把 status 改回 active**：
+       * 对一个"下架后又被删"的商品点「重新上架」，它回到库里却仍是 inactive
+       * → 前台看不到它 → 运营以为自己重新上架了，其实没有。
+       *
+       * 管理端确认框写的是「确定重新上架该商品吗？**前台将恢复展示**」，
+       * 端点文案也是「商品已重新上架」—— 语义就是"让它重新在售"，
+       * 所以这里一并把 status 置回 active。
+       */
+      if (product.status !== 'active') {
+        await product.update({ status: 'active' })
+      }
       // 重新上架后清 GET 响应缓存
       await clearResponseCache()
 

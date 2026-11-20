@@ -527,11 +527,20 @@ export async function startServer() {
     process.exit(1)
   }
 
-  const server = app.listen(PORT, '0.0.0.0', () => {
+  /**
+   * 监听地址（第 43 轮）：默认 0.0.0.0（本地开发/容器场景都要监听所有网卡），
+   * 生产可用 `BIND_HOST=127.0.0.1` 只让本机 nginx 反代。
+   *
+   * 为什么要有这个开关：Node 端口直接暴露在公网上，等于**绕过**了 nginx 的
+   * 限速（limit_req）、安全响应头与 TLS —— 实测生产机的 3000 端口从外网可直接连通。
+   * 应用本身只该让 nginx 访问。
+   */
+  const bindHost = process.env.BIND_HOST || '0.0.0.0'
+  const server = app.listen(PORT, bindHost, () => {
     console.log('')
     console.log('🎉 Universal Shop 启动成功！')
     console.log('================================================')
-    console.log(`🌐 HTTP服务器: http://0.0.0.0:${PORT}`)
+    console.log(`🌐 HTTP服务器: http://${bindHost}:${PORT}`)
     console.log(`📱 用户门户: http://localhost:${PORT}/portal/`)
     console.log(`🔧 管理后台: http://localhost:${PORT}/admin/`)
     console.log(`🤝 合作方门户: http://localhost:${PORT}/partner/`)

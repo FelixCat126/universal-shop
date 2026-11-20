@@ -75,16 +75,17 @@
                 <div v-if="isItemUnavailable(item)" class="flex items-center justify-between gap-4">
                   <div class="flex items-center space-x-4 min-w-0">
                     <img
-                      :src="defaultImage"
+                      :src="item.offShelf ? (item.product?.image_url || defaultImage) : defaultImage"
                       alt=""
                       class="h-16 w-16 sm:h-20 sm:w-20 rounded-md object-cover opacity-50"
                     />
                     <div class="min-w-0">
+                      <!-- 第 43 轮：下架商品保留商品名，用户能看出是哪一件需要删 -->
                       <h3 class="text-base sm:text-lg font-medium text-gray-400">
-                        {{ t('cart.productUnavailable') }}
+                        {{ item.offShelf ? (item.product?.name || t('cart.productUnavailable')) : t('cart.productUnavailable') }}
                       </h3>
                       <p class="text-sm text-gray-400 mt-1">
-                        {{ t('cart.productUnavailableDesc') }}
+                        {{ item.offShelf ? t('cart.productOffShelf') : t('cart.productUnavailableDesc') }}
                       </p>
                     </div>
                   </div>

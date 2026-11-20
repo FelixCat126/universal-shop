@@ -76,6 +76,7 @@ export default {
   product: {
     decreaseQty: '减少数量',
     relatedProducts: '相关推荐',
+    allCategories: '全部',
     insufficientStock: "库存不足，仅剩 {stock} 件",
     title: '商品',
     name: '商品名称',
@@ -166,6 +167,7 @@ export default {
     stockIssue: '有商品库存不足',
     productUnavailable: '商品已失效',
     productUnavailableDesc: '该商品已被下架或删除，请移除后再结算',
+    productOffShelf: '该商品已下架，请移除后再结算',
     itemCount: '商品数量',
     backToCart: '返回购物车',
     emptyCannotSubmit: '购物车为空，无法提交订单',

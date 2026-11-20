@@ -67,6 +67,20 @@ export const useCartStore = defineStore('cart', () => {
     if (!item.product) {
       return { ...item, product: null, price: 0, unavailable: true }
     }
+    /**
+     * 第 43 轮：**下架商品（status = 'inactive'）在购物车里也算失效**。
+     *
+     * 公开列表与详情都已经不再返回下架商品（第 43 轮修的），
+     * 下单接口也会拦（400「商品已下架」）。
+     * 唯独购物车没管 → 用户把下架商品留在购物车里，
+     * 要等到点「去结算」被拦才知，白走一趟。
+     *
+     * 这里保留商品本身（不置空），这样前端还能显示**是哪一件**下架了，
+     * 用户能直接把它删掉 —— 而不是只看到一个无名占位。
+     */
+    if (item.product.status && item.product.status !== 'active') {
+      return { ...item, price: 0, unavailable: true, offShelf: true }
+    }
     return {
       ...item,
       price: getActualPrice(item.product)
