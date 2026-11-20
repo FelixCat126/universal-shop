@@ -1,3 +1,4 @@
+import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { Op, fn, col, literal } from 'sequelize'
 import sequelize from '../config/database.js'
 import AuditLog from '../models/AuditLog.js'
@@ -68,7 +69,15 @@ async function purgePointTransactionsWithArchive ({ where, batchSize }) {
      *
      * 锁顺序按 user_id 升序（全站约定），避免与其它持锁路径成环。
      */
-    const deleted = await sequelize.transaction(async (transaction) => {
+    /**
+     * 套 withDeadlockRetry（第 44 轮）：这里锁**积分余额行**，
+     * 与所有积分写路径（下单发积分、取消收积分）用的是同一把锁。
+     * 原来没有重试，一旦撞上死锁（40P01），
+     * 每日清理任务会直接失败 —— 而"清理失败"往往没人立刻发现，
+     * 等发现时流水已经堆了很久。
+     */
+    const deleted = await withDeadlockRetry(async () => {
+      return sequelize.transaction(async (transaction) => {
       // 1) 这批要删的流水涉及哪些用户（升序 → 加锁顺序一致）
       const userRows = await PointTransaction.findAll({
         where,
@@ -107,9 +116,10 @@ async function purgePointTransactionsWithArchive ({ where, batchSize }) {
         )
       }
 
-      // 5) 删除
-      return PointTransaction.destroy({ where, limit: batchSize, transaction })
-    })
+        // 5) 删除
+        return PointTransaction.destroy({ where, limit: batchSize, transaction })
+      })
+    }, { label: 'retention.purgePointTransactions' })
 
     total += deleted
     if (deleted < batchSize) break

@@ -16,6 +16,8 @@ import { resolvePagination } from '../utils/pagination.js'
 import { respondDbError } from '../utils/dbInputError.js'
 import { getBusinessTimezone } from '../utils/businessTimezone.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
+import { withDeadlockRetry } from '../utils/dbRetry.js'
+import { httpError } from '../utils/httpError.js'
 
 // 单次导出行数安全上限（与 exportController 口径一致）；超出截断并在文件末尾追加说明行
 const EXPORT_ROW_LIMIT = 50000
@@ -332,55 +334,63 @@ class PartnerAdminController {
       return res.status(400).json({ success: false, message: '无效状态' })
     }
 
-    const transaction = await sequelize.transaction()
     try {
+      /**
+       * 套 withDeadlockRetry（第 44 轮）：这里会锁**合作方订单行**与**商品行**，
+       * 而合作方下单、支付确认、超时清扫也锁这两类行 —— 交叉时可能死锁（40P01）。
+       * 原来没有重试，死锁直接变成 500「更新失败」。
+       */
+      const updated = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          // 行锁防并发双转移
+          const order = await PartnerOrder.findByPk(id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          })
+          if (!order) {
+            throw httpError(404, '订单不存在')
+          }
 
-      // 行锁防并发双转移
-      const order = await PartnerOrder.findByPk(id, {
-        transaction,
-        lock: transaction.LOCK.UPDATE
-      })
-      if (!order) {
-        await transaction.rollback()
-        return res.status(404).json({ success: false, message: '订单不存在' })
-      }
+          const fromStatus = order.status
+          const allowedTargets = PARTNER_ORDER_STATUS_TRANSITIONS[fromStatus] || []
+          if (!allowedTargets.includes(status)) {
+            throw httpError(400,
+              `订单状态不允许从「${PARTNER_ORDER_STATUS_ZH[fromStatus] || fromStatus}」变更为「${PARTNER_ORDER_STATUS_ZH[status] || status}」`)
+          }
 
-      const fromStatus = order.status
-      const allowedTargets = PARTNER_ORDER_STATUS_TRANSITIONS[fromStatus] || []
-      if (!allowedTargets.includes(status)) {
-        await transaction.rollback()
-        return res.status(400).json({
-          success: false,
-          message: `订单状态不允许从「${PARTNER_ORDER_STATUS_ZH[fromStatus] || fromStatus}」变更为「${PARTNER_ORDER_STATUS_ZH[status] || status}」`
-        })
-      }
+          // 进入 cancelled（原状态在此不可能是 cancelled，状态机已拦截）：同事务回补库存
+          if (status === 'cancelled') {
+            const items = await PartnerOrderItem.findAll({
+              where: { partner_order_id: order.id },
+              transaction
+            })
+            // 按 product_id 升序回补：与下单扣减/超时清扫的加锁顺序一致，消除 AB-BA 死锁
+            items.sort((a, b) => a.product_id - b.product_id)
+            for (const item of items) {
+              const qty = parseInt(item.quantity, 10)
+              if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue
+              await Product.update(
+                { stock: sequelize.literal(`stock + ${qty}`) },
+                // paranoid:false —— Product 是软删模型，默认过滤会让已软删商品的库存静默丢失
+                // （零售路径 orderController 的同一动作早就加了，这里与超时清扫一起补上）
+                { where: { id: item.product_id }, transaction, paranoid: false }
+              )
+            }
+          }
 
-      // 进入 cancelled（原状态在此不可能是 cancelled，状态机已拦截）：同事务回补库存
-      if (status === 'cancelled') {
-        const items = await PartnerOrderItem.findAll({
-          where: { partner_order_id: order.id },
-          transaction
-        })
-        // 按 product_id 升序回补：与下单扣减/超时清扫的加锁顺序一致，消除 AB-BA 死锁
-        items.sort((a, b) => a.product_id - b.product_id)
-        for (const item of items) {
-          const qty = parseInt(item.quantity, 10)
-          if (!Number.isInteger(qty) || qty <= 0 || !item.product_id) continue
-          await Product.update(
-            { stock: sequelize.literal(`stock + ${qty}`) },
-            // paranoid:false —— Product 是软删模型，默认过滤会让已软删商品的库存静默丢失
-            // （零售路径 orderController 的同一动作早就加了，这里与超时清扫一起补上）
-            { where: { id: item.product_id }, transaction, paranoid: false }
-          )
+          order.status = status
+          await order.save({ transaction })
+          await transaction.commit()
+          return order
+        } catch (e) {
+          await transaction.rollback().catch(() => {})
+          throw e
         }
-      }
-
-      order.status = status
-      await order.save({ transaction })
-      await transaction.commit()
-      return res.json({ success: true, data: order })
+      })
+      return res.json({ success: true, data: updated })
     } catch (e) {
-      await transaction.rollback()
+      if (e?.status) return res.status(e.status).json({ success: false, message: e.message })
       logger.error('PartnerAdminController.updatePartnerOrderStatus', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '更新失败' })
     }

@@ -9,6 +9,7 @@ import { restoreOrderResources } from './orderController.js'
 import { logger } from '../utils/logger.js'
 import { parseId } from '../utils/params.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
+import { httpError } from '../utils/httpError.js'
 
 const REQUESTABLE_STATUSES = ['paid', 'shipping', 'shipped', 'delivered', 'completed']
 
@@ -46,63 +47,64 @@ async function assertPointsCanBeRevoked (order, transaction) {
 }
 
 
-/**
- * 业务错误：带 HTTP 状态码，由控制器的 catch 分支统一转成响应。
- * 用它替代「事务内 rollback + return res.status(...)」——
- * 后者在被 withDeadlockRetry 包裹时会被当成正常返回，导致错误响应丢失。
- */
-function httpError (status, message) {
-  const err = new Error(message)
-  err.status = status
-  return err
-}
-
 class AfterSaleController {
   static async create (req, res) {
-    const transaction = await sequelize.transaction()
+    const userId = req.user?.userId
+    const orderId = parseId(req.params.id)
+    const { type, reason } = req.body || {}
+    // 参数校验放在事务之前（与 review 一致）：避免事务内提前 return 不 rollback 造成连接泄漏
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: '无效的订单 ID' })
+    }
+    if (!userId) {
+      return res.status(401).json({ success: false, message: '请先登录' })
+    }
+    if (!['refund', 'return'].includes(type)) {
+      return res.status(400).json({ success: false, message: '售后类型必须为 refund 或 return' })
+    }
+    if (!reason || String(reason).trim().length < 2 || String(reason).length > 500) {
+      return res.status(400).json({ success: false, message: '请填写 2-500 字的售后原因' })
+    }
+
     try {
-      const userId = req.user?.userId
-      const orderId = parseId(req.params.id)
-      const { type, reason } = req.body || {}
-      if (!orderId) {
-        throw httpError(400, '无效的订单 ID')
-      }
-      if (!userId) {
-        throw httpError(401, '请先登录')
-      }
-      if (!['refund', 'return'].includes(type)) {
-        throw httpError(400, '售后类型必须为 refund 或 return')
-      }
-      if (!reason || String(reason).trim().length < 2 || String(reason).length > 500) {
-        throw httpError(400, '请填写 2-500 字的售后原因')
-      }
+      /**
+       * 套 withDeadlockRetry（第 44 轮）：申请售后会锁**订单行**，
+       * 而订单取消/删除/超时清扫也锁同一行 —— 两条路径交叉时可能死锁（40P01）。
+       * 原来这里没有重试，死锁直接变成 500「提交售后申请失败」，
+       * 用户看到的是"系统错误"，重试一次其实就好了。
+       */
+      const row = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          const order = await Order.findOne({
+            where: { id: orderId, user_id: userId },
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          })
+          if (!order) {
+            throw httpError(404, '订单不存在')
+          }
+          if (!REQUESTABLE_STATUSES.includes(order.status)) {
+            throw httpError(400, `当前订单状态 ${order.status} 不支持申请售后`)
+          }
 
-      const order = await Order.findOne({
-        where: { id: orderId, user_id: userId },
-        transaction,
-        lock: transaction.LOCK.UPDATE
+          await assertNoActiveAfterSale(order.id, transaction)
+          const created = await AfterSale.create({
+            order_id: order.id,
+            user_id: userId,
+            type,
+            reason: String(reason).trim(),
+            status: 'pending'
+          }, { transaction })
+          await transaction.commit()
+          return created
+        } catch (e) {
+          await transaction.rollback().catch(() => {})
+          throw e
+        }
       })
-      if (!order) {
-        throw httpError(404, '订单不存在')
-      }
-      if (!REQUESTABLE_STATUSES.includes(order.status)) {
-        await transaction.rollback()
-        return res.status(400).json({ success: false, message: `当前订单状态 ${order.status} 不支持申请售后` })
-      }
-
-      await assertNoActiveAfterSale(order.id, transaction)
-      const row = await AfterSale.create({
-        order_id: order.id,
-        user_id: userId,
-        type,
-        reason: String(reason).trim(),
-        status: 'pending'
-      }, { transaction })
-      await transaction.commit()
       return res.status(201).json({ success: true, message: '售后申请已提交', data: row })
     } catch (error) {
-      // 事务可能尚未创建（参数校验阶段就抛错）→ 可选链兜底
-      if (typeof transaction !== 'undefined') await transaction.rollback().catch(() => {})
       if (error.status) return res.status(error.status).json({ success: false, message: error.message })
       logger.error('创建售后申请失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({ success: false, message: '提交售后申请失败', code: 'INTERNAL_SERVER_ERROR' })

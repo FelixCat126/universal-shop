@@ -88,8 +88,13 @@ const MAX_BUNDLE_LINE_QTY = 5000 * 999
  *
  * @returns {Promise<{ok: boolean, message?: string}>}
  */
-async function assertEarnedPointsNotSpent (order, transaction) {
-  const earnTxs = await PointTransaction.findAll({
+async function assertEarnedPointsNotSpent (order, transaction, options = {}) {
+  /**
+   * options.earnTxs 预取好的 earn_purchase 流水（数组）。
+   *   批量路径一次查完整批的流水再传进来 —— 否则每单都查一遍，
+   *   10 单就多 10 条查询（被「批量取消查询数不随订单数线性膨胀」的护栏抓到）。
+   */
+  const earnTxs = options.earnTxs || await PointTransaction.findAll({
     where: { order_id: order.id, type: 'earn_purchase' },
     transaction
   })
@@ -147,7 +152,11 @@ export async function restoreOrderResources (order, transaction, options = {}) {
    * options.earnTxs   预取的该单购物积分流水（数组）。
    *                    批量路径下一次查完所有单的流水再传进来 ——
    *                    原来这里会**再查一遍**（守卫已经查过一次）。
-   * options.balanceRow 同一事务里已加行锁的余额行实例（可省一次查询）。
+   *
+   * 第 44 轮：原先还有一个 options.balanceRow（"同一事务里已加行锁的余额行实例"），
+   * 它是批量路径提前给余额行加 FOR UPDATE 时留下的。
+   * 批量路径改用与单条路径同一个**非加锁**守卫后（为了统一全局加锁顺序），
+   * 就没有人再传这个参数了 —— 一并删掉，免得留下"看起来还能用"的死选项。
    */
   /**
    * 幂等护栏：订单已是 cancelled 说明资源此前已回补过，重复回补会让库存虚增、
@@ -182,15 +191,33 @@ export async function restoreOrderResources (order, transaction, options = {}) {
     )
   }
 
+  /**
+   * 抵扣券释放（第 44 轮：**提前到积分之前**）。
+   *
+   * 全局加锁顺序（第 44 轮统一）：
+   *   Product（product_id 升序） → UserCoupon → UserPointBalance
+   *
+   * 下单路径（createOrder）就是这个顺序：扣库存 → 核销券 → 扣积分。
+   * 取消/回补路径原来是"库存 → 积分 → 券"，**券与积分的顺序正好相反**
+   * → 同一张券既在下单核销、又在取消释放时，两个事务就可能互等（AB-BA）。
+   *
+   * 这里把券释放提到积分操作之前，两条路径的顺序就完全一致了。
+   * 语义无变化：券释放与积分收回都是幂等 UPDATE，谁先谁后都不影响结果。
+   */
+  // 抵扣券释放：该单核销占位的券退回未使用状态；
+  // 无券订单 where 匹配 0 行，天然无操作；券已过期也无碍——/mine 查询时惰性再置 expired
+  await UserCoupon.update(
+    { status: 'unused', used_by_order_id: null, used_at: null },
+    { where: { used_by_order_id: order.id }, transaction }
+  )
+
   const pointsRedeemed = Number(order.points_redeemed) || 0
   if (order.payment_method === 'points' && pointsRedeemed > 0) {
     await pointsService.refundPointsForOrder(transaction, {
       userId: order.user_id,
       orderId: order.id,
       points: pointsRedeemed,
-      note: `订单取消退回积分 ${order.order_no}`,
-      // 批量路径下传入**已加行锁**的余额行实例 → 省一次查询，语义不变
-      balanceRow: options.balanceRow || null
+      note: `订单取消退回积分 ${order.order_no}`
     })
   }
 
@@ -205,9 +232,7 @@ export async function restoreOrderResources (order, transaction, options = {}) {
       userId: order.user_id,
       orderId: order.id,
       points: earned,
-      note: `订单取消收回购物积分 ${order.order_no}`,
-      // 同上：复用已加锁的余额行实例
-      balanceRow: options.balanceRow || null
+      note: `订单取消收回购物积分 ${order.order_no}`
     })
     if (revokeResult.truncated > 0) {
       logger.warn('订单取消收回购物积分时余额不足，已按 0 截断', {
@@ -220,12 +245,7 @@ export async function restoreOrderResources (order, transaction, options = {}) {
     }
   }
 
-  // 抵扣券释放（P2）：该单核销占位的券退回未使用状态；
-  // 无券订单 where 匹配 0 行，天然无操作；券已过期也无碍——/mine 查询时惰性再置 expired
-  await UserCoupon.update(
-    { status: 'unused', used_by_order_id: null, used_at: null },
-    { where: { used_by_order_id: order.id }, transaction }
-  )
+  // 抵扣券释放已提前到库存回补之后、积分操作之前（见上方注释：统一全局加锁顺序）
 }
 
 /**
@@ -1262,33 +1282,45 @@ class OrderController {
        */
       // 积分获取比例（points_earn_rate）：事务外读取，按订单折后实付 THB 换算应发积分
       const pointsEarnRate = await getPointsEarnRate()
-      const transaction = await sequelize.transaction()
       let affected = 0
       try {
-        const updateResult = await Order.update(
-          { status: 'shipping', online_paid_at: new Date() },
-          {
-            where: {
-              id: order.id,
-              user_id: userId,
-              status: 'pending',
-              online_paid_at: null
-            },
-            transaction
-          }
-        )
-        affected = updateResult[0]
+        /**
+         * 套 withDeadlockRetry（第 44 轮）：条件 UPDATE 会锁**订单行**，
+         * 发积分会锁**积分余额行** —— 与订单取消/删除路径（同样锁这两类行）
+         * 交叉时可能死锁（40P01）。原来死锁直接 500「确认支付失败」。
+         */
+        affected = await withDeadlockRetry(async () => {
+          const transaction = await sequelize.transaction()
+          try {
+            const updateResult = await Order.update(
+              { status: 'shipping', online_paid_at: new Date() },
+              {
+                where: {
+                  id: order.id,
+                  user_id: userId,
+                  status: 'pending',
+                  online_paid_at: null
+                },
+                transaction
+              }
+            )
+            const n = updateResult[0]
 
-        if (affected === 1) {
-          // 发放口径：floor(折后实付 THB × points_earn_rate)，为 0 不发
-          const earnPoints = calcPointsEarn(Number(order.total_amount_thb) || 0, pointsEarnRate)
-          if (earnPoints > 0) {
-            await pointsService.grantPurchasePoints(userId, order.id, earnPoints, { transaction })
+            if (n === 1) {
+              // 发放口径：floor(折后实付 THB × points_earn_rate)，为 0 不发
+              const earnPoints = calcPointsEarn(Number(order.total_amount_thb) || 0, pointsEarnRate)
+              if (earnPoints > 0) {
+                await pointsService.grantPurchasePoints(userId, order.id, earnPoints, { transaction })
+              }
+            }
+            await transaction.commit()
+            return n
+          } catch (e) {
+            await transaction.rollback().catch(() => {})
+            throw e
           }
-        }
-        await transaction.commit()
+        })
       } catch (error) {
-        await transaction.rollback().catch(() => {})
         logger.error('确认在线支付失败', { err: error?.message, stack: error?.stack })
         return res.status(500).json({ success: false, message: '确认支付失败' })
       }
@@ -1878,29 +1910,32 @@ class OrderController {
             if (status === 'cancelled') {
               // 预取数据（见上方说明）：流水与明细各一条查询拿完整批
               const earnTxs = earnTxsByOrder.get(order.id) || []
-              const totalEarned = earnTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.delta) || 0), 0)
-              let balanceRow = null
-              if (totalEarned > 0) {
-                // 每单读一次（不能跨单缓存：前单回收后余额已变），行锁保持不变
-                balanceRow = await UserPointBalance.findOne({
-                  where: { user_id: order.user_id },
-                  transaction,
-                  lock: transaction.LOCK.UPDATE
+              /**
+               * 积分守卫（第 44 轮）：改用与**单条取消路径同一个**非加锁守卫。
+               *
+               * 原来这里对余额行加了 FOR UPDATE → 批量取消的加锁顺序变成
+               * "先锁余额 → 后锁商品"，而下单路径是"先锁商品 → 后锁余额"
+               * → 正好相反 → 同一个用户一边下单一边批量取消时 40P01 死锁。
+               *
+               * 单条路径早就改成普通读了（见 assertEarnedPointsNotSpent 的注释：
+               * 「这里不加行锁（普通读即可）」），批量路径却没跟上 ——
+               * 这就是"约定改了，只改了一半"。
+               *
+               * 不加锁是否安全：余额的并发安全由 revokePurchasePoints 内部保证
+               * （它自己 lockOrCreateBalance 并按 min(余额, 数量) 截断，账仍然对得上）。
+               */
+              const guard = await assertEarnedPointsNotSpent(order, transaction, { earnTxs })
+              if (!guard.ok) {
+                skipped.push({
+                  id: order.id,
+                  status: order.status,
+                  reason: guard.message
                 })
-                const currentBalance = Number(balanceRow?.balance) || 0
-                if (currentBalance < totalEarned) {
-                  skipped.push({
-                    id: order.id,
-                    status: order.status,
-                    reason: `该订单获得的 ${totalEarned} 积分已被使用（当前余额 ${currentBalance}），无法取消`
-                  })
-                  continue
-                }
+                continue
               }
 
               order.items = itemsByOrder.get(order.id) || []
-              // 余额行实例与积分服务共用 → 省掉一次查询，语义不变（行锁已在手）
-              await restoreOrderResources(order, transaction, { earnTxs, balanceRow })
+              await restoreOrderResources(order, transaction, { earnTxs })
             }
 
             const patch = { status }

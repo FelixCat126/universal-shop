@@ -1,4 +1,5 @@
 import Address from '../models/Address.js'
+import User from '../models/User.js'
 
 /**
  * 创建用户地址（统一逻辑，可复用）
@@ -83,6 +84,23 @@ export async function createUserAddress(params, transaction) {
 
   // 如需设为默认，先清理旧的默认地址
   if (is_default) {
+    /**
+     * 第 44 轮：**先锁用户行**再清默认地址。
+     *
+     * "设为默认"是两步：先把该用户**全部**默认清成 false，再把新的设成 true。
+     * 两步之间没有锁的话，用户在另一台设备上的操作会交错：
+     *   T1 清理全部 → T1 设 A → T2 清理全部（把 A 又清掉）→ T2 设 B
+     * 结果可能是**两个默认地址**，或者**一个默认都没有**（结算页地址凭空变空）。
+     *
+     * 锁**用户行**而不是地址行：地址行之间没有父子关系，
+     * 锁地址行挡不住"清理全部"那一步（它更新的是该用户的**所有**地址行）。
+     *
+     * 放在这个**共用函数**里，是因为有两条路径会走到这里：
+     *   1. 地址控制器的"新增地址"（早就有 lockUserAddressScope 锁用户行 → 这里重复锁是幂等的）
+     *   2. **游客下单时建默认地址**（订单事务内直接调这里）—— 原来**没有**用户行锁，
+     *      正好能撞出"两个默认地址"。
+     */
+    await User.findByPk(userId, { transaction, lock: transaction.LOCK.UPDATE })
     await Address.update(
       { is_default: false },
       {

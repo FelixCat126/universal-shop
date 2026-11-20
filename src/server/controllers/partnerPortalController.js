@@ -1022,43 +1022,35 @@ class PartnerPortalController {
         return res.status(404).json({ success: false, message: '地址不存在' })
       }
 
-      let attempt = 0
-      let lastErr
-      while (attempt < 3) {
-        attempt++
-        try {
-          /**
-           * 先锁 Partner 父行 —— 与本组其它地址写路径（create/update/delete）
-           * 保持同一把锁，否则会与「更新地址」的两步写交错：
-           *   T1 updateAddress：把全部置 false → （窗口）→ save 目标 true
-           *   T2 setDefaultAddress：单条 UPDATE 把 Y 置 true
-           * T2 落在 T1 的两步之间 → 最终 **X 和 Y 都是默认地址**，
-           * 下单时默认取哪一条不确定 → 可能发错货。
-           */
-          await sequelize.transaction(async (transaction) => {
-            await Partner.findByPk(partner_id, { transaction, lock: transaction.LOCK.UPDATE })
-            await sequelize.query(
-              `UPDATE partner_addresses
-                  SET is_default = (id = :targetId),
-                      updated_at = NOW()
-                WHERE partner_id = :partnerId`,
-              { replacements: { targetId: id, partnerId: partner_id }, transaction }
-            )
-          })
-          lastErr = null
-          break
-        } catch (e) {
-          lastErr = e
-          // PG: 40P01 deadlock_detected, 40001 serialization_failure
-          const code = e?.parent?.code || e?.original?.code
-          if (code === '40P01' || code === '40001') {
-            await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 30)))
-            continue
-          }
-          throw e
-        }
-      }
-      if (lastErr) throw lastErr
+      /**
+       * 用全站统一的 withDeadlockRetry（第 44 轮）。
+       *
+       * 原来这里**手写**了一个等价循环（3 次 + 20~49ms 退避 + 只认 40P01/40001），
+       * 行为与 withDeadlockRetry 一致，但：
+       *   - 全站口径不统一（别人要读两遍才确认这两个是不是一回事）
+       *   - 重试**不留痕**（死锁风暴看不见）
+       * 现在直接用公共工具。
+       */
+      await withDeadlockRetry(async () => {
+        /**
+         * 先锁 Partner 父行 —— 与本组其它地址写路径（create/update/delete）
+         * 保持同一把锁，否则会与「更新地址」的两步写交错：
+         *   T1 updateAddress：把全部置 false → （窗口）→ save 目标 true
+         *   T2 setDefaultAddress：单条 UPDATE 把 Y 置 true
+         * T2 落在 T1 的两步之间 → 最终 **X 和 Y 都是默认地址**，
+         * 下单时默认取哪一条不确定 → 可能发错货。
+         */
+        await sequelize.transaction(async (transaction) => {
+          await Partner.findByPk(partner_id, { transaction, lock: transaction.LOCK.UPDATE })
+          await sequelize.query(
+            `UPDATE partner_addresses
+                SET is_default = (id = :targetId),
+                    updated_at = NOW()
+              WHERE partner_id = :partnerId`,
+            { replacements: { targetId: id, partnerId: partner_id }, transaction }
+          )
+        })
+      }, { label: 'partner.setDefaultAddress' })
 
       const fresh = await PartnerAddress.findByPk(id)
       return res.json({ success: true, data: fresh })
