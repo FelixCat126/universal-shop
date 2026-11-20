@@ -204,16 +204,12 @@ elif [[ "${SKIP_NPM_ON_UPGRADE}" != "true" && "${SKIP_NPM_ON_UPGRADE}" != "1" ]]
   RUN_NPM="1"
   echo "📦 增量部署：DEPLOY_UPGRADE_SKIP_NPM=false → 执行 npm install --omit=dev ..."
 else
-  /**
-   * 自动检测依赖是否变化（第 41 轮）。
-   *
-   * 为什么不能只靠开关：依赖升级后如果没人记得把
-   * DEPLOY_UPGRADE_SKIP_NPM 改成 false，部署会"成功"，
-   * 但服务器上跑的还是**旧版本依赖** —— 代码与依赖不一致，
-   * 而且这种不一致**不报错**，要到出问题时才发现。
-   *
-   * 做法：比较 package-lock.json 的哈希，与上次部署记录的哈希不同就装。
-   */
+  # 自动检测依赖是否变化（第 41 轮）。
+  # 为什么不能只靠开关：依赖升级后如果没人记得把
+  # DEPLOY_UPGRADE_SKIP_NPM 改成 false，部署会"成功"，
+  # 但服务器上跑的还是**旧版本依赖** —— 代码与依赖不一致，
+  # 而且这种不一致**不报错**，要到出问题时才发现。
+  # 做法：比较 package-lock.json 的哈希，与上次部署记录的哈希不同就装。
   DEPS_HASH_FILE="${DEPLOY_PATH}/.deps-hash"
   NEW_DEPS_HASH=""
   if [[ -f "${DEPLOY_PATH}/package-lock.json" ]]; then
