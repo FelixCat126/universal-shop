@@ -43,6 +43,7 @@ const SCRIPT = path.join(ROOT, 'scripts/deploy-on-server.sh')
  */
 const SERVER_ONLY_ENTRIES = [
   '.deploy_initialized', // 首次/增量部署标记（本次 bug 的主角）
+  '.deps-hash',          // 依赖指纹（被删过 → 每次部署都判成"依赖变化" → 每次都 npm install）
   '.env',                // 生产配置（密钥、DSN）
   'database/',           // 备份
   'public/uploads/',     // 用户上传的图片

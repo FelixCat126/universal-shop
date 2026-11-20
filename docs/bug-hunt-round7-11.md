@@ -2888,6 +2888,13 @@ Product（product_id 升序） → UserCoupon → UserPointBalance
 修法：rsync 排除清单加 `--exclude '.deploy_initialized'`，
 并在脚本里写清"服务器专属文件清单"（每加一个部署过程自己产生的文件就要同步补进去）。
 
+**同一个根因还咬了第二口**：`.deps-hash`（第 41 轮加的"依赖变了就自动 npm install"用的指纹文件）
+也在部署目录里，同样没在排除清单里 → 每次都被删 →
+于是每次部署都判成"依赖变化" → **每次都跑 npm install**，
+"增量部署跳过 npm"的意图同样等于没有。
+（服务器上 `ls -a` 一眼能看出该有哪些隐藏文件：`.deploy_initialized` `.deps-hash` `.env` `.pg_migration_done`。）
+现在两个都排除了。
+
 护栏：`tests/api/deployScriptGuard.test.js`（DS-1/2/3）——
 扫 `deploy-on-server.sh`，断言"服务器专属文件都在排除清单里"、
 "排除项里没有通配"、"bash 注释必须用 `#`"（第 41 轮的事故）。

@@ -167,6 +167,9 @@ echo "📋 rsync 同步发布目录..."
 # 本次排查发现的其它服务器专属文件：
 #   - ecosystem.config.cjs → 由 package.sh 每次生成并打进包里 ✓ 不受影响
 #   - .env / database/ / public/uploads/ / logs/ / ssl/ → 已在排除清单里 ✓
+#   - .deps-hash → 依赖指纹（第 41 轮加的"依赖变了就自动 npm install"用它判断）
+#     同样是被删掉过：删掉之后每次部署都会判成"依赖变化" → 每次都跑 npm install，
+#     "增量部署跳过 npm"的意图等于没有。
 rsync -a --delete \
   --exclude 'database/' \
   --exclude 'public/uploads/' \
@@ -176,6 +179,7 @@ rsync -a --delete \
   --exclude 'ssl/' \
   --exclude '.pg_migration_done' \
   --exclude '.deploy_initialized' \
+  --exclude '.deps-hash' \
   "${SOURCE_DIR}/" "${DEPLOY_PATH}/"
 
 if [[ ! -f "${DEPLOY_PATH}/.env" ]] && [[ -f "${DEPLOY_PATH}/env.example" ]]; then
