@@ -143,6 +143,7 @@ export default {
     system: 'จัดการระบบ',
     operationLogs: 'บันทึกการดำเนินการ',
     systemConfig: 'การตั้งค่าระบบ',
+    afterSales: 'หลังการขาย',
     logout: 'ออกจากระบบ'
   },
 
@@ -437,6 +438,9 @@ export default {
 
   // 操作员管理页面
   operators: {
+    editTitle: 'แก้ไขผู้ดูแลระบบ',
+    phone: 'โทรศัพท์',
+    enterPhone: 'กรุณากรอกหมายเลขโทรศัพท์',
     title: 'จัดการผู้ดำเนินการ',
     description: 'จัดการบัญชีผู้ดูแลระบบและผู้ดำเนินการ',
     refresh: 'รีเฟรช',
@@ -477,6 +481,8 @@ export default {
     passwordNeedsLetter: 'รหัสผ่านต้องมีตัวอักษรอย่างน้อยหนึ่งตัว',
     passwordMismatch: 'รหัสผ่านไม่ตรงกัน',
     messages: {
+      updateSuccess: 'อัปเดตผู้ดูแลระบบแล้ว',
+      updateFailed: 'อัปเดตผู้ดูแลระบบไม่สำเร็จ',
       loadFailed: 'โหลดรายการล้มเหลว',
       createSuccess: 'สร้างสำเร็จ',
       createFailed: 'สร้างล้มเหลว',
@@ -749,6 +755,14 @@ export default {
 
   // 产品管理页面
   csv: {
+    initialPasswordTitle: 'นำเข้าสำเร็จ: รหัสผ่านเริ่มต้น',
+    initialPasswordHint: 'รหัสผ่านเริ่มต้นของบัญชีเหล่านี้แสดงครั้งเดียว กรุณาคัดลอกและแจ้งผู้ใช้แต่ละราย (ผู้ใช้ต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก)',
+    initialPassword: 'รหัสผ่านเริ่มต้น',
+    nickname: 'ชื่อ',
+    username: 'บัญชี',
+    copyPasswords: 'คัดลอกทั้งหมด',
+    copyPasswordsDone: 'คัดลอกไปยังคลิปบอร์ดแล้ว',
+    copyPasswordsFailed: 'คัดลอกไม่สำเร็จ กรุณาเลือกและคัดลอกเอง',
     modeStrict: 'เข้มงวด (มีปัญหาแล้วไม่นำเข้าทั้งบatch)',
     modeSkip: 'ข้ามแถวที่มีปัญหา',
     modeStrictHint: 'ถ้ามีแถวใดมีปัญหา จะไม่เขียนข้อมูลใด ๆ ทั้งหมด — ไม่มีการนำเข้าครึ่ง ๆ',
@@ -1131,6 +1145,32 @@ export default {
   },
 
   // Async export jobs
+  afterSales: {
+    title: 'รายการขอหลังการขาย',
+    listTotal: 'ทั้งหมด',
+    filterStatus: 'สถานะ',
+    statusPending: 'รอตรวจสอบ',
+    statusApproved: 'อนุมัติแล้ว',
+    statusRejected: 'ปฏิเสธแล้ว',
+    statusReceived: 'รับสินค้าแล้ว',
+    orderId: 'เลขที่คำสั่งซื้อ',
+    orderNo: 'เลขที่คำสั่งซื้อ',
+    type: 'ประเภท',
+    typeRefund: 'คืนเงินเท่านั้น',
+    typeReturn: 'คืนสินค้าและคืนเงิน',
+    reason: 'เหตุผล',
+    status: 'สถานะ',
+    appliedAt: 'เวลาที่ยื่น',
+    approve: 'อนุมัติ',
+    reject: 'ปฏิเสธ',
+    confirmReceived: 'ยืนยันรับสินค้า',
+    adminNote: 'หมายเหตุ',
+    adminNotePlaceholder: 'หมายเหตุให้ลูกค้าเห็น (ไม่บังคับ)',
+    reviewDone: 'ดำเนินการแล้ว',
+    reviewFailed: 'ดำเนินการไม่สำเร็จ',
+    loadFailed: 'โหลดรายการขอหลังการขายไม่สำเร็จ'
+  },
+
   exportTasks: {
     typePartnerOrders: 'คำสั่งซื้อพาร์ทเนอร์',
     typeProducts: 'ข้อมูลสินค้า',

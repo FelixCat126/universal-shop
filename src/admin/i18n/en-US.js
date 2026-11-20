@@ -143,6 +143,7 @@ export default {
     system: 'System Management',
     operationLogs: 'Operation Logs',
     systemConfig: 'System Configuration',
+    afterSales: 'After-sales',
     logout: 'Logout'
   },
 
@@ -437,6 +438,9 @@ export default {
 
   // Operator management
   operators: {
+    editTitle: 'Edit operator',
+    phone: 'Phone',
+    enterPhone: 'Enter phone number',
     title: 'Operator Management',
     description: 'Manage system administrator and operator accounts',
     refresh: 'Refresh',
@@ -477,6 +481,8 @@ export default {
     passwordNeedsLetter: 'Password must contain at least one letter',
     passwordMismatch: 'Passwords do not match',
     messages: {
+      updateSuccess: 'Operator updated',
+      updateFailed: 'Failed to update the operator',
       loadFailed: 'Failed to load list',
       createSuccess: 'Created successfully',
       createFailed: 'Creation failed',
@@ -749,6 +755,14 @@ export default {
 
   // Product management
   csv: {
+    initialPasswordTitle: 'Import done: initial passwords',
+    initialPasswordHint: 'These initial passwords are shown only once. Copy them and pass them to each user (they must change the password at first login).',
+    initialPassword: 'Initial password',
+    nickname: 'Name',
+    username: 'Account',
+    copyPasswords: 'Copy all',
+    copyPasswordsDone: 'Copied to clipboard',
+    copyPasswordsFailed: 'Copy failed, please select and copy manually',
     modeStrict: 'Strict (all or nothing)',
     modeSkip: 'Skip bad rows',
     modeStrictHint: 'If any row has a problem, nothing is written — no half-imported batches.',
@@ -1131,6 +1145,32 @@ export default {
   },
 
   // Async export jobs
+  afterSales: {
+    title: 'After-sales requests',
+    listTotal: 'Total',
+    filterStatus: 'Status',
+    statusPending: 'Pending',
+    statusApproved: 'Approved',
+    statusRejected: 'Rejected',
+    statusReceived: 'Received',
+    orderId: 'Order ID',
+    orderNo: 'Order No.',
+    type: 'Type',
+    typeRefund: 'Refund only',
+    typeReturn: 'Return & refund',
+    reason: 'Reason',
+    status: 'Status',
+    appliedAt: 'Applied at',
+    approve: 'Approve',
+    reject: 'Reject',
+    confirmReceived: 'Confirm received',
+    adminNote: 'Internal note',
+    adminNotePlaceholder: 'Note for the customer (optional)',
+    reviewDone: 'Done',
+    reviewFailed: 'Failed',
+    loadFailed: 'Failed to load after-sales requests'
+  },
+
   exportTasks: {
     typePartnerOrders: 'Partner orders',
     typeProducts: 'Products',

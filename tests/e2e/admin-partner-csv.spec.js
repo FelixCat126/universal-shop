@@ -153,7 +153,15 @@ test.describe('管理端 合作方 CSV 批量导入', () => {
      * 导入成功后对话框会关闭（失败则保持打开并弹错误提示）——
      * 用"对话框关闭"作为成功信号，比看 toast 可靠：
      * 预览那步也会弹 success toast，它还没消失就会把断言骗过去。
+     *
+     * ⚠️ 第 45 轮起，导入成功后会**另外**弹出「初始密码」对话框
+     * （批量导入生成的初始密码只显示这一次，运营必须当场拿走）。
+     * 所以这里的成功信号改成"初始密码对话框出现"，
+     * 关掉它之后再断言导入对话框已经关闭。
      */
+    const passwordDialog = page.getByTestId('csv-initial-password-dialog')
+    await expect(passwordDialog).toBeVisible({ timeout: 30_000 })
+    await passwordDialog.getByRole('button', { name: /^(确认|确定|Confirm|OK)$/ }).last().click()
     await expect(page.locator('.el-dialog:visible')).toHaveCount(0, { timeout: 30_000 })
 
     // 列表里能找到刚导入的合作方

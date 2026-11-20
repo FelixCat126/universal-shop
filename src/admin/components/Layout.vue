@@ -85,6 +85,10 @@
             <el-icon><Document /></el-icon>
             <span>{{ t('menu.orders') }}</span>
           </el-menu-item>
+          <el-menu-item index="/after-sales">
+            <el-icon><Tickets /></el-icon>
+            {{ t('menu.afterSales') }}
+          </el-menu-item>
           <el-sub-menu index="/marketing" v-if="adminStore.hasPermission('products')">
             <template #title>
               <el-icon><PriceTag /></el-icon>
@@ -140,7 +144,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ensureLocale } from '../i18n/index.js'
-import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag } from '@element-plus/icons-vue'
+import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag, Tickets } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { useAdminStore } from '../stores/admin.js'

@@ -22,6 +22,7 @@
  */
 import crypto from 'node:crypto'
 import User from '../models/User.js'
+import sequelize from '../config/database.js'
 import { parseCsvTable } from '../utils/csvTable.js'
 import { generateTemporaryPassword } from '../utils/temporaryPassword.js'
 import { csvCell } from '../utils/csvExporter.js'
@@ -341,6 +342,20 @@ export async function importUserCsv (buffer, options = {}) {
   const updated = []
   const failed = []
 
+  /**
+   * 写入阶段**整体在一个事务里**（第 45 轮）。
+   *
+   * 之前逐行独立写（没有事务）：中途失败/进程被杀 → **半截数据留在库里**
+   * （导入 100 个客户，第 60 个报错 → 前 59 个已经建好了），
+   * 而 strict 模式号称"整批不落库"，实际做不到。
+   *
+   * 现在：
+   *   - 每行包在**保存点**里 → 某行报错只回滚那一行，不会污染整个事务
+   *   - strict 模式下只要有失败行 → **整批回滚**（与模式承诺一致）
+   *   - skip 模式 → 成功行提交，失败行照旧回报
+   */
+  const transaction = await sequelize.transaction()
+  try {
   for (const row of rows) {
     if (invalidRows.has(row.rowNumber)) continue
     const { values, errors } = validateUserRow(row.cells, existing)
@@ -348,12 +363,14 @@ export async function importUserCsv (buffer, options = {}) {
       failed.push({ rowNumber: row.rowNumber, nickname: values.nickname, reason: errors.join('；') })
       continue
     }
+    // 每行一个保存点：行内报错时只回滚这一行（PG 里事务一旦报错就整体 aborted）
+    const sp = await sequelize.transaction({ transaction })
+    let rowFailed = false
     try {
       if (values.id != null) {
         if (!existing.ids.has(values.id)) {
           failed.push({ rowNumber: row.rowNumber, nickname: values.nickname, reason: `id ${values.id} 的用户不存在` })
-          continue
-        }
+        } else {
         // 只写 CSV 里**出现过**的列 —— 缺省值不等于"运营要清空这一列"
         const patch = {}
         if (present.has('nickname')) patch.nickname = values.nickname
@@ -365,12 +382,13 @@ export async function importUserCsv (buffer, options = {}) {
 
         const [affected] = await User.update(
           patch,
-          { where: { id: values.id } }
+          { where: { id: values.id }, transaction }
         )
         if (!affected) {
           failed.push({ rowNumber: row.rowNumber, nickname: values.nickname, reason: `id ${values.id} 的用户不存在` })
         } else {
           updated.push({ rowNumber: row.rowNumber, id: values.id, nickname: values.nickname })
+        }
         }
       } else {
         const initialPassword = generateTemporaryPassword()
@@ -387,7 +405,7 @@ export async function importUserCsv (buffer, options = {}) {
           password: initialPassword,
           // 邀请流程：首次登录必须改密（用户自己设最终密码）
           must_reset_password: true
-        })
+        }, { transaction })
         created.push({
           rowNumber: row.rowNumber,
           id: user.id,
@@ -398,9 +416,29 @@ export async function importUserCsv (buffer, options = {}) {
         })
       }
     } catch (e) {
+      // 回滚到本行的保存点（否则整个事务进入 aborted，后续语句全部 25P02）
+      rowFailed = true
+      await sp.rollback().catch(() => {})
       failed.push({ rowNumber: row.rowNumber, nickname: values.nickname, reason: e.message })
     }
+    // 成功则释放保存点（否则保存点会一直堆到事务结束）
+    if (!rowFailed) {
+      await sp.commit().catch(() => {})
+    }
   }
+
+  /**
+   * strict 模式：**有失败行就整批不落库**（与模式承诺一致）。
+   * 之前是"成功的写了、失败的回报" —— 严格模式名不副实。
+   */
+  if (mode === 'strict' && failed.length > 0) {
+    await transaction.rollback().catch(() => {})
+    throw Object.assign(
+      new Error(`导入过程中有 ${failed.length} 行失败，已整批回滚，未导入任何数据`),
+      { status: 400, preview: { ...preview, failed } }
+    )
+  }
+  await transaction.commit()
 
   const skipped = mode === 'skip' ? preview.invalid : []
   return {
@@ -413,6 +451,11 @@ export async function importUserCsv (buffer, options = {}) {
     failed,
     // skip 模式下"有问题被跳过"的行（strict 模式下这里恒为空）
     skipped
+  }
+  } catch (e) {
+    // 任何未预期的异常（连接断开、约束冲突…）→ 整批回滚，不留半截数据
+    await transaction.rollback().catch(() => {})
+    throw e
   }
 }
 

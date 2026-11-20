@@ -272,6 +272,10 @@ export default {
 
   // 订单
   order: {
+    cancelOrder: 'Cancel order',
+    cancelConfirm: 'Cancel this order? Stock is released and any coupon or points are returned.',
+    cancelled: 'Order cancelled',
+    cancelFailed: 'Failed to cancel the order',
     accountReusedHint: 'Order created. This phone number already had an account — sign in with {phone} and your initial password to view it.',
     reorder: 'Buy again',
     reordering: 'Working...',
@@ -461,6 +465,36 @@ export default {
   },
 
   // 个人中心
+  afterSale: {
+    tab: 'After-sales',
+    title: 'My after-sales requests',
+    apply: 'Request after-sales',
+    applyTitle: 'Request after-sales',
+    type: 'Type',
+    typeRefund: 'Refund only (keep the item)',
+    typeReturn: 'Return & refund',
+    reason: 'Reason',
+    reasonPlaceholder: 'Describe the problem (2-500 characters)',
+    reasonRequired: 'Please give a reason (at least 2 characters)',
+    submit: 'Submit request',
+    submitFailed: 'Failed to submit the request',
+    applied: 'After-sales request submitted',
+    listEmpty: 'No after-sales requests',
+    status: 'Status',
+    statusPending: 'Pending review',
+    statusApproved: 'Approved (refund in progress)',
+    statusRejected: 'Rejected',
+    statusReceived: 'Received and refunded',
+    typeLabel: 'Type',
+    orderNo: 'Order No.',
+    appliedAt: 'Applied at',
+    adminNote: 'Note from support',
+    cannotApply: 'This order is not eligible for an after-sales request',
+    alreadyApplied: 'There is already an open after-sales request for this order',
+    refundOnlyHint: 'Refund only: the item is not returned; the order closes once the refund arrives',
+    returnHint: 'Return & refund: the order closes after the item is returned and received'
+  },
+
   profile: {
     passwordChangeNotice: 'Your account still uses a system-generated temporary password. Set your own password so only you know it (button on the right).',
     defaultNickname: 'User',

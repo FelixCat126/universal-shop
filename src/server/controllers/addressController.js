@@ -5,6 +5,7 @@ import { createUserAddress } from '../services/addressService.js'
 import { logger } from '../utils/logger.js'
 import { parseId } from '../utils/params.js'
 import { respondDbError } from '../utils/dbInputError.js'
+import { normalizeAddressType, isValidAddressType } from '../constants/addressType.js'
 
 /**
  * 锁住用户行：把"这个用户的地址默认项"相关操作**串行化**。
@@ -85,6 +86,20 @@ class AddressController {
         address_type = 'home'
       } = req.body
 
+      /**
+       * 地址类型（第 45 轮）：create 路径**原来完全不校验**，
+       * 于是什么都能存进去（前端提交 company 也照收），
+       * 而 update 路径又只认 office → 同一个含义两种写法、且"能建不能改"。
+       * 现在两条路径同一套口径，存进去的都是规范值。
+       */
+      if (!isValidAddressType(address_type)) {
+        return res.status(400).json({
+          success: false,
+          message: '无效的地址类型'
+        })
+      }
+      const normalizedAddressType = normalizeAddressType(address_type)
+
       // 验证必填字段
       if (!contact_name || !contact_phone || !detail_address) {
         return res.status(400).json({
@@ -160,7 +175,7 @@ class AddressController {
         detail_address,
         postal_code,
         is_default,
-        address_type
+        address_type: normalizedAddressType
       }, transaction)
 
       await transaction.commit()
@@ -252,8 +267,12 @@ class AddressController {
       }
 
       // 地址类型白名单（模型定义：home-家庭, office-公司, other-其他）
-      const allowedAddressTypes = ['home', 'office', 'other']
-      if (!allowedAddressTypes.includes(address_type)) {
+      /**
+       * 地址类型（第 45 轮统一口径）：规范值 home/office/other，
+       * 兼容历史别名 `company`（客户端表单一直提交的是 company）。
+       * 之前这里只认 `office` → **编辑地址必 400**（而新建不校验，能建出来）。
+       */
+      if (!isValidAddressType(address_type)) {
         return res.status(400).json({
           success: false,
           message: '无效的地址类型'
@@ -346,7 +365,7 @@ class AddressController {
         full_address,
         postal_code,
         is_default: nextIsDefault,
-        address_type
+        address_type: normalizeAddressType(address_type)
       }, { transaction })
 
       await transaction.commit()

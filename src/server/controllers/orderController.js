@@ -249,6 +249,56 @@ export async function restoreOrderResources (order, transaction, options = {}) {
 }
 
 /**
+ * 取消订单的公共动作（第 45 轮抽出）。
+ *
+ * 管理端「改状态为已取消」与用户「自助取消」**要做的是同一件事**：
+ *   1. 状态机校验（当前状态能不能转 cancelled）
+ *   2. 防"刷积分"守卫（本单获得的购物积分是否已经被花掉）
+ *   3. 加载订单明细
+ *   4. 回补库存 / 积分 / 抵扣券
+ *
+ * ## 为什么要抽出来
+ *
+ * 之前这段只在管理端那条路径里（updateOrderStatus 内联），
+ * 用户侧**没有取消入口** → 于是：
+ *   - **积分退回**（refund_cancel / revoke_cancel）只有管理员能触发
+ *   - **抵扣券退还**（used_by_order_id 置空）同理
+ *   - 客户想取消自己的订单都做不到，只能等运营
+ *
+ * 抽成一份，两条路径共用 → 不会出现"管理端能退积分、用户端不能"的分裂。
+ *
+ * @param {object} order 已加行锁的订单实例
+ * @param {import('sequelize').Transaction} transaction
+ * @returns {Promise<{ok: true} | {ok: false, status: number, message: string}>}
+ */
+async function performOrderCancel (order, transaction) {
+  const fromStatus = order.status
+  const allowedTargets = ORDER_STATUS_TRANSITIONS[fromStatus] || []
+  if (!allowedTargets.includes('cancelled')) {
+    return {
+      ok: false,
+      status: 400,
+      message: `订单状态不允许从「${fromStatus}」变更为「cancelled」`
+    }
+  }
+
+  /**
+   * 防"刷积分"漏洞：本订单 earn_purchase 是否已超用户当前余额？
+   * 余额 >= earn 时 revoke 全额成功，截断为 0；
+   * 余额 <  earn 时 revoke 截断，相当于部分积分被"免费花掉"。
+   * 直接拦截：余额不足时不允许取消，提示用户先归还部分积分兑换订单。
+   */
+  const guard = await assertEarnedPointsNotSpent(order, transaction)
+  if (!guard.ok) {
+    return { ok: false, status: 400, message: guard.message }
+  }
+
+  order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
+  await restoreOrderResources(order, transaction)
+  return { ok: true }
+}
+
+/**
  * PG 唯一约束冲突判定（口径与 pointsService.lockOrCreateBalance 一致：
  * 兼容 Sequelize 包装错误与原始 PG 错误码 23505）
  */
@@ -1481,6 +1531,88 @@ class OrderController {
   }
 
   // 获取订单详情（门户：仅能查本人订单；管理端：按 id 查任意订单）
+  /**
+   * 用户自助取消订单（第 45 轮）
+   * =================================
+   *
+   * ## 为什么要有它
+   *
+   * 之前**只有管理端能取消订单**（PUT /api/admin/orders/:id/status）。
+   * 客户想取消自己的订单，唯一办法是联系运营 —— 而这连带出一串"断头路"：
+   *
+   *   - **积分退回**（refund_cancel / revoke_cancel）只有管理员能触发
+   *   - **抵扣券退还**（used_by_order_id 置空）同理
+   *   - 客户在自己的订单列表里看不到任何"我能不能取消"的说明
+   *
+   * 也就是说：**取消订单 → 资源回补**这条业务链，只有起点没有客户的入口。
+   *
+   * ## 规则
+   *
+   * - 只能取消**自己的**订单（where 里带 user_id）
+   * - 状态机允许哪些状态可以转 cancelled，由 ORDER_STATUS_TRANSITIONS 决定
+   *   （pending / paid / shipping 可以；已发货之后不行）
+   * - 库存 / 积分 / 券的回补走**与管理端同一份实现**（performOrderCancel）
+   */
+  static async cancelOrder (req, res) {
+    const id = parseId(req.params.id)
+    const userId = req.user?.userId
+    if (!id) {
+      return res.status(400).json({ success: false, message: '无效的订单 ID' })
+    }
+    if (!userId) {
+      return res.status(401).json({ success: false, message: '请先登录' })
+    }
+
+    try {
+      const result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          // 行锁防并发双取消（与管理员同时操作时也串行化）
+          const order = await Order.findOne({
+            where: { id, user_id: userId },
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          })
+          if (!order) {
+            await transaction.rollback()
+            return { ok: false, status: 404, message: '订单不存在' }
+          }
+
+          const cancelResult = await performOrderCancel(order, transaction)
+          if (!cancelResult.ok) {
+            await transaction.rollback()
+            return cancelResult
+          }
+
+          await order.update({ status: 'cancelled' }, { transaction })
+          await transaction.commit()
+          return { ok: true, orderId: order.id }
+        } catch (e) {
+          await transaction.rollback().catch(() => {})
+          throw e
+        }
+      })
+
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message })
+      }
+
+      const updatedOrder = await Order.findByPk(result.orderId, {
+        include: [
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [{ model: Product, as: 'product', paranoid: false }]
+          }
+        ]
+      })
+      return res.json({ success: true, message: '订单已取消', data: updatedOrder })
+    } catch (error) {
+      logger.error('用户取消订单失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '取消订单失败', code: 'INTERNAL_SERVER_ERROR' })
+    }
+  }
+
   static async getOrderDetail(req, res) {
     try {
       // 路径参数严格解析：非正整数会让 PG 抛 invalid input syntax（500）
@@ -2019,22 +2151,13 @@ class OrderController {
             }
           }
 
-          // 进入 cancelled 时回补库存与积分（原状态在此不可能是 cancelled，状态机已拦截）
+          // 进入 cancelled 时回补库存与积分（公共动作，用户端自助取消也走这一份）
           if (status === 'cancelled') {
-            /**
-             * 防"刷积分"漏洞：本订单 earn_purchase 是否已超用户当前余额？
-             * 余额 >= earn 时 revoke 全额成功，截断为 0；
-             * 余额 <  earn 时 revoke 截断，相当于部分积分被"免费花掉"。
-             * 直接拦截：余额不足时不允许取消，提示用户先归还部分积分兑换订单。
-             */
-            const guard = await assertEarnedPointsNotSpent(order, transaction)
-            if (!guard.ok) {
+            const cancelResult = await performOrderCancel(order, transaction)
+            if (!cancelResult.ok) {
               await transaction.rollback()
-              return { ok: false, status: 400, message: guard.message }
+              return cancelResult
             }
-
-            order.items = await OrderItem.findAll({ where: { order_id: order.id }, transaction })
-            await restoreOrderResources(order, transaction)
           }
 
           /**

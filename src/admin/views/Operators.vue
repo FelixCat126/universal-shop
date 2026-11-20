@@ -68,6 +68,14 @@
             >
               {{ row.is_active ? t('operators.disabled') : t('operators.enabled') }}
             </el-button>
+            <!--
+              编辑（第 45 轮补上）：后端一直支持改 role / email / real_name / phone，
+              但前端只能发 is_active（启停）→ **角色改不了 = 权限分配不了**：
+              一个 operator 想升成 admin，只能删掉重建（连用户名都换）。
+            -->
+            <el-button size="small" type="warning" @click="openEdit(row)">
+              {{ t('operators.edit') }}
+            </el-button>
             <el-button size="small" type="primary" @click="showResetPassword(row)">
               {{ t('operators.resetPassword') }}
             </el-button>
@@ -122,6 +130,45 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑操作员对话框（第 45 轮）：角色 / 邮箱 / 姓名 / 手机 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      :title="t('operators.editTitle')"
+      width="500px"
+    >
+      <el-form :model="editForm" label-width="80px">
+        <el-form-item :label="t('operators.username')">
+          <el-input :model-value="editForm.username" disabled />
+        </el-form-item>
+        <el-form-item :label="t('operators.realName')">
+          <el-input v-model="editForm.real_name" :placeholder="t('operators.enterRealName')" />
+        </el-form-item>
+        <el-form-item :label="t('operators.email')">
+          <el-input v-model="editForm.email" :placeholder="t('operators.enterEmail')" />
+        </el-form-item>
+        <el-form-item :label="t('operators.phone')">
+          <el-input v-model="editForm.phone" :placeholder="t('operators.enterPhone')" />
+        </el-form-item>
+        <el-form-item :label="t('operators.role')">
+          <el-select v-model="editForm.role" :placeholder="t('operators.selectRole')" style="width: 100%">
+            <el-option :label="t('role.operator')" value="operator" />
+            <el-option :label="t('role.admin')" value="admin" />
+            <!-- 只有超管能授予超管（后端也会再挡一次） -->
+            <el-option v-if="adminStore.isSuperAdmin" :label="t('role.superAdmin')" value="super_admin" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="editDialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="submitEdit" :loading="editing">
+            {{ t('common.save') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 重置密码对话框 -->
     <el-dialog
       v-model="passwordDialogVisible"
@@ -150,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
@@ -167,6 +214,62 @@ const adminStore = useAdminStore()
 const administrators = ref([])
 const loading = ref(false)
 const submitting = ref(false)
+
+/**
+ * 编辑操作员（第 45 轮）
+ *
+ * 后端 updateAdministrator 一直支持 role / email / real_name / phone，
+ * 前端却只能发 is_active → **角色改不了**，
+ * 于是"给某个同事加权限"只能删号重建（连用户名都换）。
+ */
+const editDialogVisible = ref(false)
+const editing = ref(false)
+const editForm = reactive({
+  id: null,
+  username: '',
+  role: 'operator',
+  email: '',
+  real_name: '',
+  phone: ''
+})
+
+function openEdit (row) {
+  editForm.id = row.id
+  editForm.username = row.username
+  editForm.role = row.role
+  editForm.email = row.email || ''
+  editForm.real_name = row.real_name || ''
+  editForm.phone = row.phone || ''
+  editDialogVisible.value = true
+}
+
+async function submitEdit () {
+  if (!editForm.id || editing.value) return
+  editing.value = true
+  try {
+    const res = await adminStore.apiRequest(`/api/admin/administrators/${editForm.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        role: editForm.role,
+        email: editForm.email,
+        real_name: editForm.real_name,
+        phone: editForm.phone
+      })
+    })
+    const data = await res.json()
+    if (data.success) {
+      ElMessage.success(t('operators.messages.updateSuccess'))
+      editDialogVisible.value = false
+      await loadAdmins()
+    } else {
+      ElMessage.error(data.message || t('operators.messages.updateFailed'))
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || t('operators.messages.operationFailed'))
+  } finally {
+    editing.value = false
+  }
+}
 
 // 对话框状态
 const dialogVisible = ref(false)

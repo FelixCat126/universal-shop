@@ -130,13 +130,20 @@ async function submit () {
         new_password: form.new_password
       })
     })
-    if (res.success) {
-      ElMessage.success(res.message || t('password.success'))
+    /**
+     * ⚠️ `apiRequest` 返回的是 **fetch 的 Response 对象**，不是解析后的 JSON ——
+     * 之前这里直接判 `res.success`（在 Response 上恒为 undefined），
+     * 于是**改密成功了却弹「失败」**，而且不执行下面的 logout / 跳登录：
+     * 用户以为没改成，其实密码已经改了（服务端 token_version 已递增）。
+     */
+    const json = await res.json()
+    if (json.success) {
+      ElMessage.success(json.message || t('password.success'))
       // 改密后旧令牌已失效（服务端递增了 token_version）→ 重新登录
       store.logout()
       router.push('/login')
     } else {
-      ElMessage.error(res.message || t('password.failed'))
+      ElMessage.error(json.message || t('password.failed'))
     }
   } catch (e) {
     ElMessage.error(e?.message || t('password.failed'))

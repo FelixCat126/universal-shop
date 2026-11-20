@@ -121,6 +121,48 @@
       </el-button>
     </template>
   </el-dialog>
+
+  <!--
+    初始密码展示（第 45 轮补上）。
+
+    批量导入用户/合作方时，系统会给每个新账号生成一个**初始密码**，
+    后端只在导入结果里返回一次（"初始密码只在这里出现一次，运营要线下告知用户"）。
+    之前前端把整个导入结果丢掉了（@imported 只用来刷新列表）
+    → **运营根本拿不到这些密码** → 导入的账号谁也登不进去，
+    只能一个个"重置密码"。
+
+    所以这里必须把它显示出来，并且支持一键复制。
+  -->
+  <el-dialog
+    v-model="passwordVisible"
+    :title="t('csv.initialPasswordTitle')"
+    width="560px"
+    data-testid="csv-initial-password-dialog"
+  >
+    <p class="text-sm text-gray-600 mb-3">{{ t('csv.initialPasswordHint') }}</p>
+    <div class="max-h-80 overflow-y-auto border border-gray-200 rounded">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600">
+          <tr>
+            <th class="text-left px-3 py-2">{{ t('csv.nickname') }}</th>
+            <th class="text-left px-3 py-2">{{ t('csv.username') }}</th>
+            <th class="text-left px-3 py-2">{{ t('csv.initialPassword') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="acc in createdAccounts" :key="acc.rowNumber" class="border-t border-gray-100">
+            <td class="px-3 py-2 text-gray-900">{{ acc.nickname }}</td>
+            <td class="px-3 py-2 text-gray-600">{{ acc.username }}</td>
+            <td class="px-3 py-2 font-mono text-gray-900 select-all">{{ acc.initialPassword }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <template #footer>
+      <el-button @click="copyPasswords">{{ t('csv.copyPasswords') }}</el-button>
+      <el-button type="primary" @click="passwordVisible = false">{{ t('common.confirm') }}</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -133,6 +175,10 @@ import api from '../api/index.js'
 
 const { t } = useI18n()
 const emit = defineEmits(['imported'])
+
+// 初始密码（第 45 轮）：导入结果里带初始密码的新账号
+const passwordVisible = ref(false)
+const createdAccounts = ref([])
 
 const props = defineProps({
   /**
@@ -266,6 +312,16 @@ const doImport = async () => {
       ElMessage.success(res.data.message || t('common.success'))
       visible.value = false
       emit('imported', res.data.data)
+      /**
+       * 第 45 轮：把**初始密码**显示出来。
+       * 后端只在导入结果里返回一次，丢了就再也拿不到 →
+       * 导入的账号谁也登不进去（只能逐个重置密码）。
+       */
+      const withPassword = (res.data.data?.created || []).filter(c => c.initialPassword)
+      if (withPassword.length > 0) {
+        createdAccounts.value = withPassword
+        passwordVisible.value = true
+      }
     } else {
       ElMessage.error(res?.data?.message || t('common.error'))
     }
@@ -273,6 +329,19 @@ const doImport = async () => {
     ElMessage.error(e?.response?.data?.message || t('common.error'))
   } finally {
     importing.value = false
+  }
+}
+
+/** 复制全部初始密码（运营要发给用户） */
+const copyPasswords = async () => {
+  const text = createdAccounts.value
+    .map(a => `${a.nickname}\t${a.username}\t${a.initialPassword}`)
+    .join('\n')
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(t('csv.copyPasswordsDone'))
+  } catch {
+    ElMessage.warning(t('csv.copyPasswordsFailed'))
   }
 }
 

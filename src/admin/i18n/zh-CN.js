@@ -143,6 +143,7 @@ export default {
     system: '系统管理',
     operationLogs: '操作日志',
     systemConfig: '系统配置',
+    afterSales: '售后管理',
     logout: '退出登录'
   },
 
@@ -436,6 +437,9 @@ export default {
 
   // 操作员管理页面
   operators: {
+    editTitle: '编辑操作员',
+    phone: '手机号',
+    enterPhone: '请输入手机号',
     title: '操作员管理',
     description: '管理系统管理员和操作员账户',
     refresh: '刷新',
@@ -476,6 +480,8 @@ export default {
     passwordNeedsLetter: '密码须包含至少一个英文字母',
     passwordMismatch: '两次密码不一致',
     messages: {
+      updateSuccess: '操作员已更新',
+      updateFailed: '更新操作员失败',
       loadFailed: '加载列表失败',
       createSuccess: '创建成功',
       createFailed: '创建失败',
@@ -748,6 +754,14 @@ export default {
 
   // 产品管理页面
   csv: {
+    initialPasswordTitle: '导入成功：初始密码',
+    initialPasswordHint: '这些账号的初始密码只在这一次显示，请复制保存并告知对应用户（登录后会被要求改密）。',
+    initialPassword: '初始密码',
+    nickname: '昵称',
+    username: '账号',
+    copyPasswords: '复制全部',
+    copyPasswordsDone: '已复制到剪贴板',
+    copyPasswordsFailed: '复制失败，请手动选中复制',
     modeStrict: '严格（有问题就整批不导入）',
     modeSkip: '跳过错误行',
     modeStrictHint: '只要有一行有问题，整批都不会写入 —— 不会出现"导了一半"的糊涂账。',
@@ -1130,6 +1144,32 @@ export default {
   },
 
   // 异步导出任务
+  afterSales: {
+    title: '售后单',
+    listTotal: '共',
+    filterStatus: '状态',
+    statusPending: '待审核',
+    statusApproved: '已同意',
+    statusRejected: '已驳回',
+    statusReceived: '已收货入库',
+    orderId: '订单ID',
+    orderNo: '订单号',
+    type: '类型',
+    typeRefund: '仅退款',
+    typeReturn: '退货退款',
+    reason: '申请原因',
+    status: '状态',
+    appliedAt: '申请时间',
+    approve: '同意',
+    reject: '驳回',
+    confirmReceived: '确认收货',
+    adminNote: '处理备注',
+    adminNotePlaceholder: '给客户看的处理说明（可选）',
+    reviewDone: '处理完成',
+    reviewFailed: '处理失败',
+    loadFailed: '加载售后列表失败'
+  },
+
   exportTasks: {
     typePartnerOrders: '合作方订单',
     typeProducts: '商品数据',

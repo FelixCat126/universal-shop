@@ -923,11 +923,17 @@ const quickChangeStatus = async (row, nextStatus) => {
     return // 用户取消
   }
   const res = await updateOrderStatus(row.id, { status: nextStatus })
-  if (res.success) {
+  /**
+   * ⚠️ `updateOrderStatus` 走 axios → 返回的是**响应对象**，
+   * 业务字段在 `res.data` 里。之前判 `res.success`（恒为 undefined）→
+   * **状态明明改成功了，却弹「错误」，而且不刷新列表**
+   * （只能等 30 秒的自动刷新才看得到）。
+   */
+  if (res.data?.success) {
     ElMessage.success(t('orders.quickDone', { status: label }))
     loadOrders()
   } else {
-    ElMessage.error(res.message || t('common.error'))
+    ElMessage.error(res.data?.message || t('common.error'))
   }
 }
 

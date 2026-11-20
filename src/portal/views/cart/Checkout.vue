@@ -308,7 +308,8 @@
                   class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   <option value="home">{{ t('order.addressHome') || '家庭' }}</option>
-                  <option value="company">{{ t('order.addressCompany') || '公司' }}</option>
+                  <!-- 第 45 轮：规范值是 office（与模型注释/管理端一致）；company 为历史别名 -->
+                  <option value="office">{{ t('order.addressCompany') || '公司' }}</option>
                   <option value="other">{{ t('order.addressOther') || '其他' }}</option>
                 </select>
               </div>

@@ -69,6 +69,14 @@ const router = createRouter({
           meta: { title: '订单管理', requiresAuth: true, permission: 'orders', keepScroll: true }
         },
         {
+          // 售后单（第 45 轮补上管理端入口）：
+          // 后端接口一直都在，但管理端没有页面 → 用户提交的售后单没人看得到、审不了。
+          path: '/after-sales',
+          name: 'AfterSales',
+          component: () => import('../views/AfterSales.vue'),
+          meta: { title: '售后管理', requiresAuth: true, permission: 'orders', keepScroll: true }
+        },
+        {
           path: '/users',
           name: 'Users',
           component: () => import('../views/Users.vue'),

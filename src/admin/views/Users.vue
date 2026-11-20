@@ -715,6 +715,7 @@ const getAddressTypeText = (type) => {
   const typeMap = {
     'home': t('users.home'),
     'office': t('users.office'),
+    'company': t('users.office'), // 第 45 轮：历史别名
     'other': t('users.other')
   }
   return typeMap[type] || t('users.other')

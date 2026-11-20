@@ -71,6 +71,25 @@
               >
                 {{ t('order.goPay') }}
               </button>
+              <!-- 申请售后（第 45 轮）：后端接口一直都在，客户端此前**没有入口** -->
+              <button
+                v-if="canApplyAfterSale"
+                type="button"
+                class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-blue-700 border border-blue-600 hover:bg-blue-50"
+                @click="openAfterSale"
+              >
+                {{ t('afterSale.apply') }}
+              </button>
+              <!-- 取消订单（第 45 轮）：客户自助取消（与后端状态机一致） -->
+              <button
+                v-if="canCancelOrder"
+                type="button"
+                class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-red-600 border border-red-300 hover:bg-red-50"
+                :disabled="cancelling"
+                @click="confirmCancelOrder"
+              >
+                {{ cancelling ? t('common.submitting') : t('order.cancelOrder') }}
+              </button>
             </div>
             <div class="mt-2">
               <template v-if="order.payment_method === 'points'">
@@ -268,6 +287,62 @@
       </div>
     </div>
 
+    <!-- 申请售后弹窗（第 45 轮） -->
+    <div v-if="afterSaleVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ t('afterSale.applyTitle') }}</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('afterSale.type') }}</label>
+            <div class="space-y-2">
+              <label class="flex items-start gap-2 text-sm text-gray-700">
+                <input v-model="afterSaleForm.type" type="radio" value="refund" class="mt-1" />
+                <span>
+                  <span class="font-medium">{{ t('afterSale.typeRefund') }}</span>
+                  <span class="block text-xs text-gray-500">{{ t('afterSale.refundOnlyHint') }}</span>
+                </span>
+              </label>
+              <label class="flex items-start gap-2 text-sm text-gray-700">
+                <input v-model="afterSaleForm.type" type="radio" value="return" class="mt-1" />
+                <span>
+                  <span class="font-medium">{{ t('afterSale.typeReturn') }}</span>
+                  <span class="block text-xs text-gray-500">{{ t('afterSale.returnHint') }}</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('afterSale.reason') }}</label>
+            <textarea
+              v-model="afterSaleForm.reason"
+              rows="4"
+              maxlength="500"
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              :placeholder="t('afterSale.reasonPlaceholder')"
+            ></textarea>
+            <p v-if="afterSaleError" class="mt-1 text-xs text-red-600">{{ afterSaleError }}</p>
+          </div>
+        </div>
+        <div class="mt-6 flex gap-3">
+          <button
+            type="button"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            @click="afterSaleVisible = false"
+          >
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+            :disabled="afterSaleSubmitting"
+            @click="submitAfterSale"
+          >
+            {{ afterSaleSubmitting ? t('common.submitting') : t('afterSale.submit') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 成功/错误消息 -->
     <div 
       v-if="message.show"
@@ -290,7 +365,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { formatAmount } from '../../../shared/money.js'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi } from '../../api/orders.js'
+import { getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi, createAfterSale, cancelOrder as cancelOrderApi } from '../../api/orders.js'
 import {
   ArrowLeftIcon,
   ShoppingBagIcon,
@@ -346,6 +421,85 @@ const message = reactive({
 })
 
 // 显示消息
+/**
+ * 申请售后（第 45 轮）
+ *
+ * 后端的售后接口（申请 / 我的售后）一直都在，
+ * 但客户端**从没调用过** → 客户根本没法发起售后，管理员也看不到（管理端入口同期补上）。
+ */
+const afterSaleVisible = ref(false)
+const afterSaleSubmitting = ref(false)
+const afterSaleError = ref('')
+const afterSaleForm = reactive({ type: 'refund', reason: '' })
+
+/** 可申请售后的订单状态（与后端 afterSaleController 的 REQUESTABLE_STATUSES 一致） */
+const AFTER_SALE_REQUESTABLE = ['paid', 'shipping', 'shipped', 'delivered', 'completed']
+
+const canApplyAfterSale = computed(() =>
+  !!order.value && AFTER_SALE_REQUESTABLE.includes(order.value.status))
+
+function openAfterSale () {
+  afterSaleError.value = ''
+  afterSaleForm.type = 'refund'
+  afterSaleForm.reason = ''
+  afterSaleVisible.value = true
+}
+
+async function submitAfterSale () {
+  const reason = String(afterSaleForm.reason || '').trim()
+  if (reason.length < 2) {
+    afterSaleError.value = t('afterSale.reasonRequired')
+    return
+  }
+  afterSaleSubmitting.value = true
+  try {
+    const res = await createAfterSale(order.value.id, { type: afterSaleForm.type, reason })
+    if (res.data?.success) {
+      afterSaleVisible.value = false
+      showMessage(t('afterSale.applied'), 'success')
+      await loadOrderDetail()
+    } else {
+      afterSaleError.value = res.data?.message || t('afterSale.submitFailed')
+    }
+  } catch (e) {
+    afterSaleError.value = e?.response?.data?.message || t('afterSale.submitFailed')
+  } finally {
+    afterSaleSubmitting.value = false
+  }
+}
+
+/**
+ * 取消订单（第 45 轮）
+ *
+ * 可取消的状态与后端 ORDER_STATUS_TRANSITIONS 保持一致
+ * （pending / paid / shipping 可取消；已发货之后不行）。
+ */
+const USER_CANCELLABLE_STATUSES = ['pending', 'paid', 'shipping']
+const cancelling = ref(false)
+
+const canCancelOrder = computed(() =>
+  !!order.value && USER_CANCELLABLE_STATUSES.includes(order.value.status))
+
+async function confirmCancelOrder () {
+  if (!order.value || cancelling.value) return
+  const ok = window.confirm(t('order.cancelConfirm'))
+  if (!ok) return
+  cancelling.value = true
+  try {
+    const res = await cancelOrderApi(order.value.id)
+    if (res.data?.success) {
+      showMessage(res.data.message || t('order.cancelled'), 'success')
+      await loadOrderDetail()
+    } else {
+      showMessage(res.data?.message || t('order.cancelFailed'), 'error')
+    }
+  } catch (e) {
+    showMessage(e?.response?.data?.message || t('order.cancelFailed'), 'error')
+  } finally {
+    cancelling.value = false
+  }
+}
+
 const showMessage = (text, type = 'success') => {
   message.text = text
   message.type = type

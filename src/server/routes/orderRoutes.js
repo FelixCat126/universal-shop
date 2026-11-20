@@ -16,6 +16,8 @@ router.get('/after-sales/mine', authenticateToken, AfterSaleController.listMine)
 router.post('/:id/after-sales', writeLimiter, authenticateToken, AfterSaleController.create)
 router.get('/', authenticateToken, OrderController.getUserOrders)
 router.post('/:id/confirm-online-payment', writeLimiter, authenticateToken, OrderController.confirmOnlinePayment)
+// 用户自助取消订单（第 45 轮）：让「取消 → 积分退回 / 券退还」这条链有客户的入口
+router.post('/:id/cancel', writeLimiter, authenticateToken, OrderController.cancelOrder)
 router.get('/:id', authenticateToken, OrderController.getOrderDetail)
 
 export default router

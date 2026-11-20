@@ -237,7 +237,18 @@ export const profileUpdateSchema = Joi.object({
   nickname: Joi.string().min(1).max(50).optional(),
   // 上界与 DB 列宽一致（users.email 为 STRING(100)）
   email: Joi.string().email().max(100).allow('').optional(),
-  avatar_url: Joi.string().uri({ scheme: ['http', 'https'] }).max(512).allow('').optional()
+  /**
+   * avatar_url：**允许站内相对路径**（`/uploads/avatars/xxx.jpg`）与 null（移除头像）。
+   *
+   * 之前这里写的是 `Joi.string().uri({ scheme: ['http','https'] })`（要求绝对 URI），
+   * 而上传接口返回的就是**相对路径**（`uploadController.js` 返回 `/uploads/avatars/<file>`）
+   * → **换头像与移除头像每一次都 400**（控制器那层的白名单其实是接受相对路径的，
+   * 矛盾出在路由校验层）。
+   *
+   * 真正的安全校验在控制器里（只允许 `/uploads/avatars/` 前缀 + 纯文件名 + 图片扩展名，
+   * 见 userController.updateProfile），所以这里不再重复要求"绝对 URI"。
+   */
+  avatar_url: Joi.string().max(512).allow('', null).optional()
 })
 
 export const registerSchema = Joi.object({

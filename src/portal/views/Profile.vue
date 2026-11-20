@@ -112,6 +112,19 @@
               <ShoppingBagIcon class="w-5 h-5 mr-2" />
               {{ t('profile.myOrders') }}
             </button>
+            <!-- 我的售后（第 45 轮）：让客户能看到自己提交的售后单被处理成什么状态 -->
+            <button
+              @click="activeTab = 'afterSales'"
+              :class="[
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                activeTab === 'afterSales'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ]"
+            >
+              <ExclamationCircleIcon class="w-5 h-5 mr-2" />
+              {{ t('afterSale.tab') }}
+            </button>
             <button 
               @click="activeTab = 'addresses'" 
               :class="[
@@ -284,6 +297,58 @@
               <div class="mx-auto flex h-12 w-12 items-center justify-center text-gray-400"><ShoppingBagIcon class="h-12 w-12" /></div>
               <h3 class="mt-2 text-sm font-medium text-gray-900">{{ t('order.noOrders') }}</h3>
               <p class="mt-1 text-sm text-gray-500">{{ t('profile.noOrdersDesc') }}</p>
+            </div>
+          </div>
+
+          <!-- 我的售后（第 45 轮）：售后闭环的"客户可见"那一端 -->
+          <div v-else-if="activeTab === 'afterSales'">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-medium text-gray-900">{{ t('afterSale.title') }}</h3>
+              <button
+                type="button"
+                class="text-sm text-blue-600 hover:text-blue-700"
+                @click="loadMyAfterSales"
+              >
+                {{ t('common.refresh') }}
+              </button>
+            </div>
+
+            <div v-if="loadingAfterSales" class="text-center py-8">
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <p class="mt-2 text-sm text-gray-500">{{ t('common.loading') }}</p>
+            </div>
+
+            <div v-else-if="myAfterSales.length === 0" class="text-center py-12 text-gray-500">
+              {{ t('afterSale.listEmpty') }}
+            </div>
+
+            <div v-else class="space-y-3">
+              <div
+                v-for="item in myAfterSales"
+                :key="item.id"
+                class="border border-gray-200 rounded-lg p-4"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <span class="text-gray-500">{{ t('afterSale.orderNo') }}:</span>
+                    <span class="font-medium text-gray-900">{{ item.order?.order_no || `#${item.order_id}` }}</span>
+                    <span class="px-2 py-0.5 rounded text-xs"
+                      :class="item.type === 'refund' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'">
+                      {{ item.type === 'refund' ? t('afterSale.typeRefund') : t('afterSale.typeReturn') }}
+                    </span>
+                  </div>
+                  <span class="px-2 py-0.5 rounded text-xs" :class="afterSaleStatusClass(item.status)">
+                    {{ afterSaleStatusText(item.status) }}
+                  </span>
+                </div>
+                <p class="mt-2 text-sm text-gray-700">{{ item.reason }}</p>
+                <p v-if="item.admin_note" class="mt-2 text-xs text-gray-500">
+                  {{ t('afterSale.adminNote') }}: {{ item.admin_note }}
+                </p>
+                <p class="mt-1 text-xs text-gray-400">
+                  {{ t('afterSale.appliedAt') }}: {{ formatDate(item.created_at) }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -523,7 +588,7 @@
                       {{ formatAddress(address) }}
                     </p>
                                       <p class="text-xs text-gray-500 mt-1">
-                    {{ address.address_type === 'home' ? t('order.addressHome') : address.address_type === 'company' ? t('order.addressCompany') : t('order.addressOther') }}
+                    {{ address.address_type === 'home' ? t('order.addressHome') : (address.address_type === 'office' || address.address_type === 'company') ? t('order.addressCompany') : t('order.addressOther') }}
                   </p>
                   </div>
                   <div class="flex flex-col space-y-2 ml-4">
@@ -764,7 +829,8 @@
               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="home">{{ t('order.addressHome') }}</option>
-              <option value="company">{{ t('order.addressCompany') }}</option>
+              <!-- 第 45 轮：规范值是 office（与模型注释/管理端一致）；company 为历史别名 -->
+              <option value="office">{{ t('order.addressCompany') }}</option>
               <option value="other">{{ t('order.addressOther') }}</option>
             </select>
           </div>
@@ -868,7 +934,7 @@ import { useUserStore } from '../stores/user.js'
 import { usePortalCurrencyStore, loadPublicConfig } from '../stores/portalCurrency.js'
 import { useCartStore } from '../stores/cart.js'
 import { getAddresses, addAddress, updateAddress, deleteAddress as deleteAddressAPI, setDefaultAddress as setDefaultAddressAPI } from '../api/addresses.js'
-import { getUserOrders, getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi } from '../api/orders.js'
+import { getUserOrders, getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi, getMyAfterSales } from '../api/orders.js'
 import { getAvailableCoupons, claimCoupon, getMyCoupons } from '../api/coupons.js'
 import { userAPI } from '../api/users.js'
 import api from '../api/index.js'
@@ -886,7 +952,8 @@ import {
   StarIcon,
   ShoppingBagIcon,
   TicketIcon,
-  UserIcon
+  UserIcon,
+  ExclamationCircleIcon
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
@@ -934,7 +1001,8 @@ const activeTab = ref('orders')
 watch(
   () => route.query.tab,
   (tabParam) => {
-    if (tabParam && ['orders', 'addresses', 'points', 'coupons', 'profile'].includes(String(tabParam))) {
+    // 第 45 轮：新增「我的售后」页签（afterSales）
+    if (tabParam && ['orders', 'afterSales', 'addresses', 'points', 'coupons', 'profile'].includes(String(tabParam))) {
       activeTab.value = String(tabParam)
     }
   },
@@ -1723,6 +1791,48 @@ const handleClaimCoupon = async (tpl) => {
   }
 }
 
+/**
+ * 我的售后（第 45 轮）
+ *
+ * 售后的后端接口一直都在，但客户端**从没调用过**：
+ * 客户没法发起售后，也看不到自己提交的售后被处理成什么状态。
+ */
+const myAfterSales = ref([])
+const loadingAfterSales = ref(false)
+
+const AFTER_SALE_STATUS_MAP = {
+  pending: 'afterSale.statusPending',
+  approved: 'afterSale.statusApproved',
+  rejected: 'afterSale.statusRejected',
+  received: 'afterSale.statusReceived'
+}
+
+const afterSaleStatusText = (status) => t(AFTER_SALE_STATUS_MAP[status] || 'afterSale.statusPending')
+
+const afterSaleStatusClass = (status) => ({
+  pending: 'bg-amber-100 text-amber-700',
+  approved: 'bg-blue-100 text-blue-700',
+  rejected: 'bg-red-100 text-red-700',
+  received: 'bg-green-100 text-green-700'
+}[status] || 'bg-gray-100 text-gray-700')
+
+const loadMyAfterSales = async () => {
+  try {
+    loadingAfterSales.value = true
+    const response = await getMyAfterSales()
+    if (response.data?.success) {
+      myAfterSales.value = Array.isArray(response.data.data) ? response.data.data : []
+    } else {
+      myAfterSales.value = []
+    }
+  } catch (e) {
+    myAfterSales.value = []
+    console.error('加载售后列表失败:', e?.response?.data?.message || e?.message)
+  } finally {
+    loadingAfterSales.value = false
+  }
+}
+
 watch(couponStatusTab, () => {
   if (activeTab.value === 'coupons') loadMyCoupons()
 })
@@ -2017,7 +2127,7 @@ const onAvatarFileChange = async (e) => {
     const url = res.data.data?.url
     const upd = await userStore.updateProfile({
       nickname: profileForm.value.nickname.trim(),
-      email: profileForm.value.email.trim() || undefined,
+      email: profileForm.value.email.trim(),
       avatar_url: url
     })
     if (upd.success) {
@@ -2040,7 +2150,7 @@ const removeAvatar = async () => {
   try {
     const upd = await userStore.updateProfile({
       nickname: profileForm.value.nickname.trim(),
-      email: profileForm.value.email.trim() || undefined,
+      email: profileForm.value.email.trim(),
       avatar_url: null
     })
     if (upd.success) {
@@ -2066,7 +2176,8 @@ const handleSaveProfile = async () => {
     
     const updateData = {
       nickname: profileForm.value.nickname.trim(),
-      email: profileForm.value.email.trim() || undefined
+      // 空串 = "清空邮箱"（服务端：不传=保持原值，传空串=清空）
+      email: profileForm.value.email.trim()
     }
     
     const response = await userStore.updateProfile(updateData)
@@ -2119,10 +2230,22 @@ onMounted(async () => {
   ])
 
   await nextTick()
+  /**
+   * ⚠️ `watch(activeTab, ...)` 没有 immediate —— 而 tab 参数的 watcher 是
+   * `{ immediate: true }`，也就是说**直接带 ?tab=xxx 打开页面**时，
+   * activeTab 在 setup 期间就被改掉了，activeTab 的 watcher 根本不会触发。
+   *
+   * 已有的页签（points / coupons / orders）各自在下面显式补了一次加载，
+   * 所以它们没出问题；但**新增页签时必须同样补上**，
+   * 否则"直接打开 ?tab=xxx"会是空的（页签在、数据永远不来）。
+   * （第 45 轮做「我的售后」页签时踩到了：直接打开 ?tab=afterSales 列表是空的。）
+   */
   if (activeTab.value === 'points') {
     await loadPointTransactions({ reset: true })
   } else if (activeTab.value === 'coupons') {
     await loadCouponsTab()
+  } else if (activeTab.value === 'afterSales') {
+    await loadMyAfterSales()
   } else if (activeTab.value === 'orders') {
     setupOrdersIntersection()
   }
@@ -2146,6 +2269,11 @@ watch(activeTab, async (tab) => {
     if (!couponsLoaded.value) {
       await loadCouponsTab()
     }
+  } else if (tab === 'afterSales') {
+    // 第 45 轮：进入「我的售后」时拉一次（售后单数量少，不做无限滚动）
+    teardownOrdersIo()
+    teardownPointsIo()
+    await loadMyAfterSales()
   } else {
     teardownOrdersIo()
     teardownPointsIo()

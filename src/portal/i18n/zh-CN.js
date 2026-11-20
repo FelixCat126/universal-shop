@@ -270,6 +270,10 @@ export default {
 
   // 订单
   order: {
+    cancelOrder: '取消订单',
+    cancelConfirm: '确定取消这笔订单吗？取消后库存会释放，抵扣券与积分会退回。',
+    cancelled: '订单已取消',
+    cancelFailed: '取消订单失败',
     accountReusedHint: '订单已创建。该手机号之前已建过账号，请用手机号 {phone} 和初始密码登录查看订单。',
     reorder: '再来一单',
     reordering: '处理中...',
@@ -458,6 +462,36 @@ export default {
   },
 
   // 个人中心
+  afterSale: {
+    tab: '我的售后',
+    title: '我的售后',
+    apply: '申请售后',
+    applyTitle: '申请售后',
+    type: '售后类型',
+    typeRefund: '仅退款（不退货）',
+    typeReturn: '退货退款',
+    reason: '申请原因',
+    reasonPlaceholder: '请描述遇到的问题（2-500 字）',
+    reasonRequired: '请填写申请原因（至少 2 个字）',
+    submit: '提交申请',
+    submitFailed: '提交售后申请失败',
+    applied: '售后申请已提交',
+    listEmpty: '暂无售后记录',
+    status: '状态',
+    statusPending: '待处理',
+    statusApproved: '已同意（退款处理中）',
+    statusRejected: '已驳回',
+    statusReceived: '已收货退款完成',
+    typeLabel: '类型',
+    orderNo: '订单号',
+    appliedAt: '申请时间',
+    adminNote: '处理说明',
+    cannotApply: '该订单当前状态不支持申请售后',
+    alreadyApplied: '该订单已有进行中的售后申请',
+    refundOnlyHint: '仅退款：商品不退回，收到退款后本单结束',
+    returnHint: '退货退款：商品寄回并确认收货后，本单结束'
+  },
+
   profile: {
     passwordChangeNotice: '你的账号还在用系统生成的临时密码，建议现在就设置一个只有你知道的密码（点右边按钮即可）。',
     defaultNickname: '用户',

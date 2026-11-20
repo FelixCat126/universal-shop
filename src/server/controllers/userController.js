@@ -187,9 +187,21 @@ class UserController {
       let nextAvatarUrl
       const avatarKeyPresent = Object.prototype.hasOwnProperty.call(req.body, 'avatar_url')
 
-      // 基本校验
-      if (!nickname || nickname.length > 50) {
-        return res.status(400).json({ success: false, message: '昵称不能为空且不超过50个字符' })
+      /**
+       * 昵称（第 45 轮）：**不传 = 保持原值**，传了才校验。
+       *
+       * 之前这里是"必填"（`!nickname` 直接 400），而路由层的 Joi 校验
+       * 又把它标成了 optional —— **两份契约自相矛盾**：
+       * 只改头像 / 只移除头像的请求（不带昵称）会被 400 拒掉。
+       *
+       * DB 列是 NOT NULL，所以"不传"只能理解为"不改"，不能理解成"清空"。
+       */
+      const nicknameProvided = nickname !== undefined && nickname !== null
+      if (nicknameProvided) {
+        const trimmedNickname = String(nickname).trim()
+        if (!trimmedNickname || trimmedNickname.length > 50) {
+          return res.status(400).json({ success: false, message: '昵称不能为空且不超过50个字符' })
+        }
       }
 
       if (avatarKeyPresent) {
@@ -236,10 +248,23 @@ class UserController {
         return res.status(404).json({ success: false, message: '用户不存在' })
       }
 
-      user.nickname = nickname
-      // 同步email与username（兼容旧逻辑用户名即邮箱）
-      user.email = email || null
-      user.username = email || null
+      if (nicknameProvided) {
+        user.nickname = String(nickname).trim()
+      }
+      /**
+       * 邮箱：与昵称同一口径 —— **不传 = 保持原值**，传了才改。
+       *
+       * 之前是 `user.email = email || null`（无条件覆盖）：
+       * 只改头像的请求（不带 email）会把邮箱**清空** → 邮箱即用户名的老账号直接登不上。
+       * 而昵称改成"不传=保持"之后，这种部分更新就更容易发生了 —— 两处必须同一口径。
+       *
+       * 传空串仍然表示"清空邮箱"（客户端把空输入框传成 ''）。
+       */
+      if (email !== undefined) {
+        user.email = email || null
+        // 同步email与username（兼容旧逻辑用户名即邮箱）
+        user.username = email || null
+      }
       if (avatarKeyPresent) {
         user.avatar_url = nextAvatarUrl
       }

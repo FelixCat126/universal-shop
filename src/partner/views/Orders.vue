@@ -224,7 +224,16 @@ async function reorder (order) {
   try {
     const ids = [...new Set(items.map(it => it.product_id))]
     const res = await partnerStore.api(`/products?ids=${ids.join(',')}&pageSize=100`)
-    const products = res?.data?.data?.products || res?.products || []
+    /**
+     * ⚠️ `partnerStore.api()` 返回的是 **fetch 的 Response 对象**（不是解析后的 JSON）——
+     * 所以必须先 `await res.json()`，再从 `data.products` 取。
+     *
+     * 之前这里写的是 `res?.data?.data?.products`（照抄门户的 axios 写法），
+     * 而 Response 上没有 `.data` → products 恒为 [] → **「再来一单」100% 失效**，
+     * 每次都弹「无法重新下单」。
+     */
+    const json = await res.json()
+    const products = json?.data?.products || []
     const byId = new Map(products.map(p => [Number(p.id), p]))
 
     let added = 0
