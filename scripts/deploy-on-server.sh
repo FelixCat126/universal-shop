@@ -236,6 +236,19 @@ if [[ "$RUN_NPM" == "1" ]]; then
     echo "🧹 检测到残留 sqlite3 模块，清理..."
     npm uninstall --no-save --silent sqlite3 2>/dev/null || true
   fi
+  # 运行时兼容性检查（第 41 轮）：
+  # 依赖"能在当前 Node 上加载"只有 import 一下才知道，而 npm install 不做这种检查。
+  # 生产是 Node 18，本地可能是 Node 22 —— 本地测过不代表生产能跑
+  # （第 41 轮就因为 file-type 22 的依赖用了 Node 20+ 的正则标志，
+  #   导致服务启动即崩、PM2 重启 200+ 次）。
+  # 这里在**重启服务之前**检查，不兼容就中止部署：服务继续跑旧版本依赖。
+  if [[ -f "${DEPLOY_PATH}/scripts/check-runtime-compat.mjs" ]]; then
+    if ! node "${DEPLOY_PATH}/scripts/check-runtime-compat.mjs"; then
+      echo "❌ 生产依赖在当前 Node 上不兼容 —— 中止部署（服务保持旧依赖继续运行）"
+      exit 1
+    fi
+  fi
+
   # 记录本次依赖指纹：下次部署据此判断"依赖有没有变"
   if [[ -f "${DEPLOY_PATH}/package-lock.json" ]]; then
     if command -v sha256sum >/dev/null 2>&1; then
