@@ -155,6 +155,18 @@ fi
 # 4. rsync 替换代码（保留 database/、uploads/、.env、ssl/、logs/）
 # --------------------------------------------------------------------------
 echo "📋 rsync 同步发布目录..."
+# ⚠️ `--delete` 会删掉"本地包里没有、服务器上有"的文件。
+# 服务器上有些文件是**部署过程自己产生的**，本地包里没有 → 必须显式排除，
+# 否则每次部署都会把它们删掉。
+#
+# `.deploy_initialized` 就是这样一个文件（第 44 轮查出来）：
+# 它标记"这个目录已经初始化过了"，脚本靠它区分首次部署 / 增量部署。
+# 之前没排除 → **每次部署都被当成首次部署**：
+#   - 重跑 npm install（DEPLOY_UPGRADE_SKIP_NPM 的意图完全失效）
+#   - 重跑整套初始化流程（PG sync + 配置播种 + 管理员检查）
+# 本次排查发现的其它服务器专属文件：
+#   - ecosystem.config.cjs → 由 package.sh 每次生成并打进包里 ✓ 不受影响
+#   - .env / database/ / public/uploads/ / logs/ / ssl/ → 已在排除清单里 ✓
 rsync -a --delete \
   --exclude 'database/' \
   --exclude 'public/uploads/' \
@@ -163,6 +175,7 @@ rsync -a --delete \
   --exclude 'logs/' \
   --exclude 'ssl/' \
   --exclude '.pg_migration_done' \
+  --exclude '.deploy_initialized' \
   "${SOURCE_DIR}/" "${DEPLOY_PATH}/"
 
 if [[ ! -f "${DEPLOY_PATH}/.env" ]] && [[ -f "${DEPLOY_PATH}/env.example" ]]; then
