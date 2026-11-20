@@ -204,7 +204,33 @@ elif [[ "${SKIP_NPM_ON_UPGRADE}" != "true" && "${SKIP_NPM_ON_UPGRADE}" != "1" ]]
   RUN_NPM="1"
   echo "📦 增量部署：DEPLOY_UPGRADE_SKIP_NPM=false → 执行 npm install --omit=dev ..."
 else
-  echo "⏭️  增量部署：跳过 npm install（依赖有变请设 DEPLOY_UPGRADE_SKIP_NPM=false 后重新部署）"
+  /**
+   * 自动检测依赖是否变化（第 41 轮）。
+   *
+   * 为什么不能只靠开关：依赖升级后如果没人记得把
+   * DEPLOY_UPGRADE_SKIP_NPM 改成 false，部署会"成功"，
+   * 但服务器上跑的还是**旧版本依赖** —— 代码与依赖不一致，
+   * 而且这种不一致**不报错**，要到出问题时才发现。
+   *
+   * 做法：比较 package-lock.json 的哈希，与上次部署记录的哈希不同就装。
+   */
+  DEPS_HASH_FILE="${DEPLOY_PATH}/.deps-hash"
+  NEW_DEPS_HASH=""
+  if [[ -f "${DEPLOY_PATH}/package-lock.json" ]]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      NEW_DEPS_HASH="$(sha256sum "${DEPLOY_PATH}/package-lock.json" | awk '{print $1}')"
+    else
+      NEW_DEPS_HASH="$(shasum -a 256 "${DEPLOY_PATH}/package-lock.json" | awk '{print $1}')"
+    fi
+  fi
+  OLD_DEPS_HASH=""
+  [[ -f "$DEPS_HASH_FILE" ]] && OLD_DEPS_HASH="$(cat "$DEPS_HASH_FILE")"
+  if [[ -n "$NEW_DEPS_HASH" && "$NEW_DEPS_HASH" != "$OLD_DEPS_HASH" ]]; then
+    RUN_NPM="1"
+    echo "📦 检测到依赖变化（lock 哈希不同）→ 自动执行 npm install --omit=dev ..."
+  else
+    echo "⏭️  增量部署：依赖未变化，跳过 npm install"
+  fi
 fi
 
 if [[ "$RUN_NPM" == "1" ]]; then
@@ -213,6 +239,14 @@ if [[ "$RUN_NPM" == "1" ]]; then
   if [[ -d "${DEPLOY_PATH}/node_modules/sqlite3" ]]; then
     echo "🧹 检测到残留 sqlite3 模块，清理..."
     npm uninstall --no-save --silent sqlite3 2>/dev/null || true
+  fi
+  # 记录本次依赖指纹：下次部署据此判断"依赖有没有变"
+  if [[ -f "${DEPLOY_PATH}/package-lock.json" ]]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum "${DEPLOY_PATH}/package-lock.json" | awk '{print $1}' > "${DEPLOY_PATH}/.deps-hash"
+    else
+      shasum -a 256 "${DEPLOY_PATH}/package-lock.json" | awk '{print $1}' > "${DEPLOY_PATH}/.deps-hash"
+    fi
   fi
 fi
 
