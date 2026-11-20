@@ -532,11 +532,11 @@
                   <div class="total-amount">
                     <template v-if="selectedOrder.payment_method === 'points'">
                       <div>{{ adminLinePointsLabel(item) }}</div>
-                      <div class="text-xs text-gray-500">{{ t('orders.priceThbRef', { v: lineTotalOf(item).toFixed(2) }) }}</div>
+                      <div class="text-xs text-gray-500">{{ t('orders.priceThbRef', { v: formatAmount(lineTotalOf(item)) }) }}</div>
                     </template>
                     <template v-else>
                       <div>{{ formatLineRecordedFromThb(selectedOrder, lineTotalOf(item)) }}</div>
-                      <div class="text-xs text-gray-500">THB {{ lineTotalOf(item).toFixed(2) }}</div>
+                      <div class="text-xs text-gray-500">THB {{ formatAmount(lineTotalOf(item)) }}</div>
                     </template>
                   </div>
                 </div>
@@ -563,6 +563,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch, onUnmounted } from 'vue'
+import { formatAmount } from '../../shared/money.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
@@ -779,8 +780,8 @@ const stats = computed(() => {
     return {
       total: Number(s.total),
       completed: Number(s.completed),
-      totalAmount: Number(s.totalAmount).toFixed(2),
-      todayAmount: Number(s.todayAmount).toFixed(2)
+      totalAmount: formatAmount(s.totalAmount),
+      todayAmount: formatAmount(s.todayAmount)
     }
   }
   const total = orders.value.length
@@ -793,7 +794,7 @@ const stats = computed(() => {
         : order.total_amount
     return parseFloat(raw || 0)
   }
-  const totalAmount = orders.value.reduce((sum, order) => sum + sumOrderThb(order), 0).toFixed(2)
+  const totalAmount = orders.value.reduce((sum, order) => sum + sumOrderThb(order), 0)
 
   // "今天"必须按**业务时区**算（服务端也是按 business_timezone 算的）。
   // 直接用浏览器本地时区的话，一旦运营把业务时区改成别的（比如 Asia/Bangkok），
@@ -810,7 +811,7 @@ const stats = computed(() => {
   }
   const today = dayKey(new Date())
   const todayOrders = orders.value.filter(order => dayKey(order.created_at) === today)
-  const todayAmount = todayOrders.reduce((sum, order) => sum + sumOrderThb(order), 0).toFixed(2)
+  const todayAmount = todayOrders.reduce((sum, order) => sum + sumOrderThb(order), 0)
   
   return {
     total,
@@ -1167,7 +1168,7 @@ const adminUsdtHint = (row) => {
   const thb = parseFloat(row.total_amount_thb)
   const r = parseFloat(row.exchange_rate)
   if (!(Number.isFinite(thb) && Number.isFinite(r))) return '0.00'
-  return (thb * r).toFixed(2)
+  return formatAmount(thb * r)
 }
 
 // THB 金额展示：非有限数值兜底为 0.00，避免 NaN

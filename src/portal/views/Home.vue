@@ -93,18 +93,18 @@
                 <div class="mb-3 space-y-1">
                   <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <span class="text-xl font-bold text-blue-600">
-                      {{ portalCurrency.formatThb(Number(bundle.price).toFixed(2)) }}
+                      {{ portalCurrency.formatThb(Number(bundle.price)) }}
                     </span>
                     <span
                       v-if="bundleSave(bundle) > 0"
                       class="px-1.5 py-0.5 text-xs bg-red-100 text-red-600 rounded"
                     >
-                      {{ t('bundle.save', { amount: portalCurrency.formatThb(bundleSave(bundle).toFixed(2)) }) }}
+                      {{ t('bundle.save', { amount: portalCurrency.formatThb(bundleSave(bundle)) }) }}
                     </span>
                   </div>
                   <div v-if="bundleSave(bundle) > 0" class="text-xs text-gray-400">
                     {{ t('bundle.standaloneTotal') }}
-                    <span class="line-through">{{ portalCurrency.formatThb(Number(bundle.standalone_total).toFixed(2)) }}</span>
+                    <span class="line-through">{{ portalCurrency.formatThb(Number(bundle.standalone_total)) }}</span>
                   </div>
                   <div
                     class="text-xs tabular-nums"
@@ -457,6 +457,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { formatAmount } from '../../shared/money.js'
 /**
  * v-motion 指令**按需引入**（不全局注册 → 动画库只跟着本页的 chunk 走）。
  *
@@ -905,7 +906,7 @@ const getDiscountPrice = (product) => {
     return product.price
   }
   const discountPrice = product.price * (1 - product.discount / 100)
-  return discountPrice.toFixed(2)
+  return formatAmount(discountPrice)
 }
 
 // 跳转到产品详情

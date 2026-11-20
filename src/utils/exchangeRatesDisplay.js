@@ -1,4 +1,5 @@
 /** 门户展示：美元/人民币/马来西亚令吉（相对泰铢底价的汇算比例） */
+import { roundMoney, convertMoney, formatAmount } from '../shared/money.js'
 
 export const FX_DISPLAY_ORDER = [
   { key: 'USD', symbol: '$' },
@@ -45,8 +46,8 @@ export function convertedAmountLines (thbAmount, rates) {
     const r = rs == null || rs === '' ? 0 : parseFloat(String(rs))
     const rate = Number.isFinite(r) && r >= 0 ? r : 0
     if (rate <= 0) continue
-    const cv = base * rate
-    out.push({ key, symbol, amount: cv.toFixed(2) })
+    // 统一舍入（原先直接 toFixed → 与服务端结算口径可能差 1 分钱）
+    out.push({ key, symbol, amount: formatAmount(convertMoney(base, rate)) })
   }
   return out
 }
@@ -60,13 +61,13 @@ export function convertedAmountLines (thbAmount, rates) {
 export function convertThbToCurrency (thbAmount, currencyCode, rates) {
   const thb = parseFloat(String(thbAmount))
   const base = Number.isFinite(thb) ? thb : 0
-  if (currencyCode === 'THB') return Math.round(base * 100) / 100
+  if (currencyCode === 'THB') return roundMoney(base)
   if (!rates || typeof rates !== 'object') return 0
   const r = rates[currencyCode]
   const rate = r == null || r === '' ? 0 : parseFloat(String(r))
   const n = Number.isFinite(rate) && rate >= 0 ? rate : 0
   if (n <= 0) return 0
-  return Math.round(base * n * 100) / 100
+  return convertMoney(base, n)
 }
 
 /**
@@ -79,7 +80,7 @@ export function formatConvertedMoney (thbAmount, currencyCode, rates) {
   const thbNum = Number.isFinite(base) ? base : 0
   const code = String(currencyCode || 'THB').toUpperCase()
   /** 底价非 0 但所选外币汇率缺失或为 0 时仍按泰铢标价展示，避免出现 ¥0.00/$0 */
-  const asThb = () => `${symbolForCurrencyCode('THB')}${thbNum.toFixed(2)}`
+  const asThb = () => `${symbolForCurrencyCode('THB')}${formatAmount(thbNum)}`
   if (code === 'THB') return asThb()
   /** 未识别的币种 code（如 XXX）也回退 THB，避免无符号裸金额 */
   if (!symbolForCurrencyCode(code)) return asThb()
@@ -90,8 +91,8 @@ export function formatConvertedMoney (thbAmount, currencyCode, rates) {
     if (Number.isFinite(p)) rateNum = p
   }
   if (!(rateNum > 0)) {
-    return thbNum !== 0 ? asThb() : `${symbolForCurrencyCode(code)}${(0).toFixed(2)}`
+    return thbNum !== 0 ? asThb() : `${symbolForCurrencyCode(code)}${formatAmount(0)}`
   }
   const n = convertThbToCurrency(thbAmount, currencyCode, rates)
-  return `${symbolForCurrencyCode(currencyCode)}${n.toFixed(2)}`
+  return `${symbolForCurrencyCode(currencyCode)}${formatAmount(n)}`
 }

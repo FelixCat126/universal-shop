@@ -80,13 +80,13 @@
                 <div class="text-lg font-bold text-blue-600">{{ formattedOrder.mainLabel }}</div>
                 <div class="text-sm text-green-600">≈ {{ usdtFromOrder }} USDT</div>
                 <div v-if="formattedOrder.amountThb != null && order.currency_code !== 'THB'" class="text-sm text-gray-500">
-                  (≈ {{ t('product.currencyThbSymbol') }}{{ formattedOrder.amountThb.toFixed(2) }} THB)
+                  (≈ {{ t('product.currencyThbSymbol') }}{{ formatAmount(formattedOrder.amountThb) }} THB)
                 </div>
               </template>
               <template v-else>
                 <p class="text-lg font-bold text-blue-600">{{ formattedOrder.mainLabel }}</p>
                 <div v-if="formattedOrder.amountThb != null && order.currency_code !== 'THB'" class="text-sm text-gray-500">
-                  (≈ {{ t('product.currencyThbSymbol') }}{{ formattedOrder.amountThb.toFixed(2) }} THB)
+                  (≈ {{ t('product.currencyThbSymbol') }}{{ formatAmount(formattedOrder.amountThb) }} THB)
                 </div>
               </template>
             </div>
@@ -287,6 +287,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { formatAmount } from '../../../shared/money.js'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi } from '../../api/orders.js'
@@ -331,7 +332,7 @@ const onlinePayThbFmt = computed(() => {
 const onlinePayUsdt = computed(() => {
   const thb = parseFloat(onlinePayThbFmt.value)
   const t0 = Number.isFinite(thb) ? thb : 0
-  return (t0 * onlinePayRate.value).toFixed(2)
+  return (t0 * onlinePayRate.value)
 })
 
 // 默认图片
@@ -465,7 +466,7 @@ const usdtFromOrder = computed(() => {
   const thb = parseFloat(o.total_amount_thb)
   const r = parseFloat(o.exchange_rate)
   if (!(Number.isFinite(thb) && Number.isFinite(r))) return '0.00'
-  return (thb * r).toFixed(2)
+  return (thb * r)
 })
 
 // 加载订单详情

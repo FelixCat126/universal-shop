@@ -3,6 +3,7 @@
  * @typedef {import('../../types/api').CartAddRequest} CartAddRequest
  */
 import { defineStore } from 'pinia'
+import { formatAmount } from '../../shared/money.js'
 import { ref, computed } from 'vue'
 import api from '../api/index.js'
 import { useUserStore } from './user.js'
@@ -45,7 +46,7 @@ export const useCartStore = defineStore('cart', () => {
       return basePrice
     }
     const discountPrice = basePrice * (1 - discount / 100)
-    return parseFloat(discountPrice.toFixed(2))
+    return formatAmount(parseFloat(discountPrice))
   }
 
   // 加载购物车数据时逐项防御：商品/套餐被删除（product 或 bundle 为 null）的项标记为不可用，不影响其他正常项

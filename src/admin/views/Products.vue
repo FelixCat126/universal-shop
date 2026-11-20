@@ -479,6 +479,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { formatAmount } from '../../shared/money.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
@@ -611,7 +612,7 @@ export default {
         return product.price
       }
       const discountPrice = product.price * (1 - product.discount / 100)
-      return discountPrice.toFixed(2)
+      return formatAmount(discountPrice)
     }
 
     const formatDate = (date) => {

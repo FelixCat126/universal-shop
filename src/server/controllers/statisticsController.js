@@ -1,4 +1,5 @@
 import { Op } from 'sequelize'
+import { formatAmount } from '../../shared/money.js'
 import { LRUCache } from 'lru-cache'
 import sequelize from '../config/database.js'
 import User from '../models/User.js'
@@ -126,7 +127,7 @@ class StatisticsController {
           date: dateStr,
           dateLabel: date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
           count: dayData ? parseInt(dayData.dataValues.count) : 0,
-          amount: dayData ? parseFloat(dayData.dataValues.amount || 0).toFixed(2) : '0.00'
+          amount: dayData ? formatAmount(dayData.dataValues.amount || 0) : '0.00'
         })
       }
 
@@ -363,11 +364,11 @@ class StatisticsController {
 
     return {
       totalOrders: Number(orderStats?.total || 0),
-      totalAmount: totalAmount.toFixed(2),
+      totalAmount: formatAmount(totalAmount),
       totalUsers: Number(userStats?.total || 0),
       activeUsers: Number(userStats?.active || 0),
       todayOrders: Number(todayStats?.orders || 0),
-      todayAmount: Number(todayStats?.amount || 0).toFixed(2),
+      todayAmount: formatAmount(todayStats?.amount || 0),
       // actionable 只有两项：[0]=订单侧计数（待发货/待支付），[1]=商品侧计数（低库存/缺货）
       pendingShipment: Number(actionable[0]?.shipment || 0),
       pendingPayment: Number(actionable[0]?.payment || 0),
@@ -406,7 +407,7 @@ class StatisticsController {
         date: dateStr,
         dateLabel: date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
         count: dayData ? parseInt(dayData.dataValues.count) : 0,
-        amount: dayData ? parseFloat(dayData.dataValues.amount || 0).toFixed(2) : '0.00'
+        amount: dayData ? formatAmount(dayData.dataValues.amount || 0) : '0.00'
       })
     }
 

@@ -1,4 +1,5 @@
 import XLSX, { createStreamingExport } from '../utils/excelWorkbook.js'
+import { formatAmount } from '../../shared/money.js'
 import { createStreamingCsvExport } from '../utils/csvExporter.js'
 import { Op } from 'sequelize'
 import User from '../models/User.js'
@@ -395,7 +396,7 @@ class ExportController {
           ? parseFloat(order.total_amount_thb)
           : parseFloat(order.total_amount)
         const codAmount = order.payment_method === 'cod' && Number.isFinite(amountThb)
-          ? amountThb.toFixed(2)
+          ? formatAmount(amountThb)
           : '0'
         
         // 订单状态三语言转换：泰文（中文、英文）
@@ -439,7 +440,7 @@ class ExportController {
           'รหัสไปรษณีย์（目的邮编、Postal Code）': sanitizeCell(order.postal_code || ''),
           'ที่อยู่ผู้รับ（收件地址、Delivery Address）': sanitizeCell(detailAddress),
           'ชื่อสินค้า（物品名称、Product Name）': sanitizeCell(productNames),
-          'มูลค่าสินค้า（物品价值、Product Value）': (order.total_amount_thb != null && order.total_amount_thb !== '' ? Number(order.total_amount_thb).toFixed(2) : order.total_amount) || '',
+          'มูลค่าสินค้า（物品价值、Product Value）': (order.total_amount_thb != null && order.total_amount_thb !== '' ? formatAmount(order.total_amount_thb) : order.total_amount) || '',
           'หมายเหตุ（备注、Remarks）': sanitizeCell(order.notes || ''),
           'เก็บเงินปลายทาง（代收货款、Cash on Delivery）': codAmount,
           'สถานะคำสั่งซื้อ（订单状态、Order Status）': getStatusText(order.status),

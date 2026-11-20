@@ -1,4 +1,5 @@
 import fs from 'fs/promises'
+import { formatAmount } from '../../shared/money.js'
 import path from 'path'
 import os from 'os'
 import { Op } from 'sequelize'
@@ -179,7 +180,7 @@ async function exportOrdersTo (job) {
         sanitizeCell(order.delivery_address || ''),
         sanitizeCell(names),
         qty,
-        order.total_amount_thb != null ? Number(order.total_amount_thb).toFixed(2) : (order.total_amount || ''),
+        order.total_amount_thb != null ? formatAmount(order.total_amount_thb) : (order.total_amount || ''),
         sanitizeCell(order.payment_method || ''),
         order.created_at ? new Date(order.created_at).toISOString() : ''
       ])
@@ -456,7 +457,7 @@ async function exportPartnerOrdersTo (job) {
           sanitizeCell(oj.order_no || ''), partnerLogin, partnerName,
           sanitizeCell(oj.status || ''), sanitizeCell(oj.contact_name || ''),
           sanitizeCell(oj.contact_phone || ''), sanitizeCell(oj.delivery_address || ''),
-          oj.total_amount_thb != null ? Number(oj.total_amount_thb).toFixed(2) : '',
+          oj.total_amount_thb != null ? formatAmount(oj.total_amount_thb) : '',
           '', '', '', '', '', '', '', '',
           oj.created_at ? new Date(oj.created_at).toISOString() : ''
         ])
@@ -472,14 +473,14 @@ async function exportPartnerOrdersTo (job) {
           sanitizeCell(oj.contact_name || ''),
           sanitizeCell(oj.contact_phone || ''),
           sanitizeCell((oj.delivery_address ?? '').replace(/\n/g, ' ')),
-          oj.total_amount_thb != null ? Number(oj.total_amount_thb).toFixed(2) : '',
+          oj.total_amount_thb != null ? formatAmount(oj.total_amount_thb) : '',
           it.product_id,
           sanitizeCell(it.product_name_snapshot || ''),
           it.quantity,
-          it.partner_discount_percent_snapshot != null ? Number(it.partner_discount_percent_snapshot).toFixed(2) : '',
-          it.base_unit_thb != null ? Number(it.base_unit_thb).toFixed(2) : '',
-          it.unit_price_thb != null ? Number(it.unit_price_thb).toFixed(2) : '',
-          it.line_total_thb != null ? Number(it.line_total_thb).toFixed(2) : '',
+          it.partner_discount_percent_snapshot != null ? formatAmount(it.partner_discount_percent_snapshot) : '',
+          it.base_unit_thb != null ? formatAmount(it.base_unit_thb) : '',
+          it.unit_price_thb != null ? formatAmount(it.unit_price_thb) : '',
+          it.line_total_thb != null ? formatAmount(it.line_total_thb) : '',
           oj.created_at ? new Date(oj.created_at).toISOString() : ''
         ])
         written++
@@ -528,7 +529,7 @@ async function exportProductsTo (job) {
         sanitizeCell(product.name || ''),
         sanitizeCell(product.name_th || ''),
         sanitizeCell(product.productCategory?.name || ''),
-        product.price != null ? Number(product.price).toFixed(2) : '',
+        product.price != null ? formatAmount(product.price) : '',
         product.stock ?? '',
         product.points ?? '',
         sanitizeCell(product.status || ''),
@@ -577,7 +578,7 @@ async function exportPartnersTo (job) {
         sanitizeCell(partner.login || ''),
         sanitizeCell(partner.display_name || ''),
         sanitizeCell(partner.account_kind || ''),
-        partner.discount_percent != null ? Number(partner.discount_percent).toFixed(2) : '',
+        partner.discount_percent != null ? formatAmount(partner.discount_percent) : '',
         partner.is_active ? 'true' : 'false',
         partner.last_login_at ? new Date(partner.last_login_at).toISOString() : '',
         partner.created_at ? new Date(partner.created_at).toISOString() : ''

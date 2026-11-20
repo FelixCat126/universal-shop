@@ -461,7 +461,7 @@
                 </div>
                 <!-- 选中券独占一行：避免窄栏下与标签同行重叠 -->
                 <div v-if="selectedCoupon" class="mt-1 truncate font-medium text-orange-600">
-                  {{ selectedCoupon.name }} -{{ portalCurrency.formatThb(Number(selectedCoupon.amount).toFixed(2)) }}
+                  {{ selectedCoupon.name }} -{{ portalCurrency.formatThb(Number(selectedCoupon.amount)) }}
                 </div>
                 <div v-else class="mt-1 text-gray-400">{{ t('coupon.none') }}</div>
               </button>
@@ -500,7 +500,7 @@
                     </div>
                   </div>
                   <span class="shrink-0 font-bold text-orange-600 tabular-nums">
-                    -{{ portalCurrency.formatThb(Number(c.amount).toFixed(2)) }}
+                    -{{ portalCurrency.formatThb(Number(c.amount)) }}
                   </span>
                 </div>
               </div>
@@ -510,7 +510,7 @@
               <!-- 商品小计 -->
               <div class="flex justify-between">
                 <span class="text-sm text-gray-600">{{ t('cart.subtotal') }}</span>
-                <span class="text-sm font-medium">{{ portalCurrency.formatThb(summaryItemsTotal.toFixed(2)) }}</span>
+                <span class="text-sm font-medium">{{ portalCurrency.formatThb(summaryItemsTotal) }}</span>
               </div>
 
               <!-- 满减优惠（服务端报价；无报价/报价失败时不展示，摘要回退本地计算） -->
@@ -523,7 +523,7 @@
                     class="px-1.5 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded"
                   >{{ promo.name }}</span>
                 </span>
-                <span class="text-sm font-medium text-green-600 whitespace-nowrap tabular-nums">-{{ portalCurrency.formatThb(quoteDiscount.toFixed(2)) }}</span>
+                <span class="text-sm font-medium text-green-600 whitespace-nowrap tabular-nums">-{{ portalCurrency.formatThb(quoteDiscount) }}</span>
               </div>
 
               <!-- 优惠券优惠（服务端报价 applied_coupon；券不可用报价时 400 已自动取消选中） -->
@@ -532,7 +532,7 @@
                   <span>{{ t('coupon.discountLine') }}</span>
                   <span class="px-1.5 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded">{{ appliedCoupon.name }}</span>
                 </span>
-                <span class="text-sm font-medium text-green-600 whitespace-nowrap tabular-nums">-{{ portalCurrency.formatThb(Number(appliedCoupon.amount).toFixed(2)) }}</span>
+                <span class="text-sm font-medium text-green-600 whitespace-nowrap tabular-nums">-{{ portalCurrency.formatThb(Number(appliedCoupon.amount)) }}</span>
               </div>
 
               <!-- 赠品（买多赠一，服务端报价 gifts；0 元不计入金额） -->
@@ -577,7 +577,7 @@
                 </template>
                 <div v-else class="flex flex-nowrap justify-between gap-3 items-center">
                   <span class="text-lg font-semibold text-gray-900 shrink-0 whitespace-nowrap">{{ t('order.total') }}</span>
-                  <span class="text-xl font-bold text-blue-600 whitespace-nowrap tabular-nums shrink-0">{{ portalCurrency.formatThb(summaryPayable.toFixed(2)) }}</span>
+                  <span class="text-xl font-bold text-blue-600 whitespace-nowrap tabular-nums shrink-0">{{ portalCurrency.formatThb(summaryPayable) }}</span>
                 </div>
                 <!-- 报价失败：上面的金额只是本地估算，必须说清楚 -->
                 <p v-if="quoteFailed" class="mt-2 text-xs text-red-600 text-right leading-relaxed">
@@ -706,6 +706,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { formatAmount } from '../../../shared/money.js'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'
@@ -1005,7 +1006,7 @@ const formatCouponDate = (s) => (s ? new Date(s).toLocaleDateString() : '-')
 const couponMinSpendText = (c) => {
   const min = Number(c?.min_spend)
   if (Number.isFinite(min) && min > 0) {
-    return t('coupon.minSpend', { amount: portalCurrency.formatThb(min.toFixed(2)) })
+    return t('coupon.minSpend', { amount: portalCurrency.formatThb(min) })
   }
   return t('coupon.noMinSpend')
 }
@@ -1159,7 +1160,7 @@ const paymentModalThb = computed(() => {
 })
 
 const paymentModalThbDisplay = computed(() =>
-  Number.isFinite(Number(paymentModalThb.value)) ? Number(paymentModalThb.value).toFixed(2) : '0.00'
+  Number.isFinite(Number(paymentModalThb.value)) ? formatAmount(paymentModalThb.value) : '0.00'
 )
 
 // 计算USDT金额（支付弹窗以内用订单底价 THB；未建单前兜底购物车合计）

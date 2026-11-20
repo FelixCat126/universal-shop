@@ -1,4 +1,5 @@
 import { symbolForCurrencyCode } from '../../utils/exchangeRatesDisplay'
+import { formatAmount } from '../../shared/money.js'
 
 /**
  * 订单展示：按下单时币种（后端 total_amount + currency_code）
@@ -6,7 +7,7 @@ import { symbolForCurrencyCode } from '../../utils/exchangeRatesDisplay'
 export function formatRecordedOrderAmount (order) {
   const cc = order.currency_code || 'THB'
   const amt = parseFloat(order.total_amount)
-  const main = `${cc} ${symbolForCurrencyCode(cc)}${Number.isFinite(amt) ? amt.toFixed(2) : String(order.total_amount ?? '')}`
+  const main = `${cc} ${symbolForCurrencyCode(cc)}${Number.isFinite(amt) ? formatAmount(amt) : String(order.total_amount ?? '')}`
   const thb = order.total_amount_thb != null && order.total_amount_thb !== ''
     ? parseFloat(order.total_amount_thb)
     : null

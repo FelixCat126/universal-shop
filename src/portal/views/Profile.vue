@@ -860,6 +860,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
+import { formatAmount } from '../../shared/money.js'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatRecordedOrderAmount } from '../utils/orderBillingDisplay.js'
@@ -1021,7 +1022,7 @@ const onlinePayThbFormatted = computed(() => {
 const onlinePayUsdt = computed(() => {
   const thb = parseFloat(onlinePayThbFormatted.value)
   const t = Number.isFinite(thb) ? thb : 0
-  return (t * onlinePayExchangeRate.value).toFixed(2)
+  return (t * onlinePayExchangeRate.value)
 })
 
 const pointTransactions = ref([])
@@ -1259,7 +1260,7 @@ const usdtHint = (order) => {
   const thb = parseFloat(order.total_amount_thb)
   const r = parseFloat(order.exchange_rate)
   if (!(Number.isFinite(thb) && Number.isFinite(r))) return '0.00'
-  return (thb * r).toFixed(2)
+  return (thb * r)
 }
 
 // 工具方法

@@ -1,4 +1,5 @@
 /** 汇算键：USD 视同 USDT，另支持 CNY、MYR（相对泰铢标价） */
+import { roundMoney, convertMoney, formatAmount } from '../../shared/money.js'
 
 export const FX_KEYS = ['USD', 'CNY', 'MYR']
 
@@ -17,7 +18,7 @@ export function normalizeExchangeRates (raw) {
     const v = raw[k]
     const n = v == null || v === '' ? 0 : parseFloat(String(v))
     const num = Number.isFinite(n) ? Math.max(0, n) : 0
-    d[k] = num.toFixed(2)
+    d[k] = formatAmount(num)
   }
   return d
 }
@@ -26,7 +27,8 @@ export function normalizeExchangeRates (raw) {
 export function parseSingleRate (value) {
   const num = typeof value === 'number' ? value : parseFloat(String(value ?? '0'))
   if (!Number.isFinite(num) || num < 0) return 0
-  return Math.round(num * 100) / 100
+  // 统一走共享的 cents 舍入（原先用 Math.round(num*100)/100，与 toFixed 路径不一致）
+  return roundMoney(num)
 }
 
 /**
@@ -37,10 +39,15 @@ export function parseSingleRate (value) {
  */
 export function thbToBillingAmount (thbAmt, currency, rates) {
   const base = Number.isFinite(thbAmt) ? thbAmt : 0
-  if (currency === 'THB') return parseFloat(base.toFixed(2))
+  if (currency === 'THB') return roundMoney(base)
   const r = parseFloat(rates[currency] ?? '0')
   const rate = Number.isFinite(r) && r >= 0 ? r : 0
-  return parseFloat((base * rate).toFixed(2))
+  /**
+   * ⚠️ 原先是 `parseFloat((base * rate).toFixed(2))` —— toFixed 的二进制浮点陷阱
+   * 会让结算金额与前端显示差 1 分钱（2.675 → 2.67 而前端是 2.68）。
+   * 现在统一走共享的 cents 舍入。
+   */
+  return convertMoney(base, rate)
 }
 
 export function normalizeCheckoutCurrency (raw) {

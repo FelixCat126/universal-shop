@@ -259,6 +259,7 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import { formatAmount } from '../../../shared/money.js'
 /**
  * v-motion 指令**按需引入**（不全局注册 → 动画库只跟着本页的 chunk 走）。
  *
@@ -386,7 +387,7 @@ const getDiscountPrice = (prod) => {
     return prod.price
   }
   const discountPrice = prod.price * (1 - prod.discount / 100)
-  return discountPrice.toFixed(2)
+  return formatAmount(discountPrice)
 }
 
 // 获取库存状态样式

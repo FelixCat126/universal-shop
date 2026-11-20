@@ -70,6 +70,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { formatAmount } from '../../shared/money.js'
 import { useI18n } from 'vue-i18n'
 import config from '../../config/index.js'
 
@@ -102,7 +103,7 @@ function imgUrl (p) {
 const usdtAmount = computed(() => {
   const base = parseFloat(String(props.totalThb))
   const thb = Number.isFinite(base) ? base : 0
-  return (thb * (Number(props.exchangeRateUsd) || 0)).toFixed(2)
+  return formatAmount(thb * (Number(props.exchangeRateUsd) || 0))
 })
 
 function onBackdrop () {

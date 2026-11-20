@@ -444,7 +444,7 @@
 
             <div class="flex items-center justify-between">
               <dt class="text-sm text-gray-600">{{ t('cart.subtotal') }}</dt>
-              <dd class="text-sm font-medium text-gray-900">{{ portalCurrency.formatThb(cartStore.totalAmount.toFixed(2)) }}</dd>
+              <dd class="text-sm font-medium text-gray-900">{{ portalCurrency.formatThb(cartStore.totalAmount) }}</dd>
             </div>
 
             <div class="flex items-center justify-between">
@@ -454,7 +454,7 @@
 
             <div class="border-t border-gray-200 pt-4 flex items-center justify-between">
               <dt class="text-lg font-medium text-gray-900">{{ t('cart.total') }}</dt>
-              <dd class="text-lg font-bold text-blue-600">{{ portalCurrency.formatThb(cartStore.totalAmount.toFixed(2)) }}</dd>
+              <dd class="text-lg font-bold text-blue-600">{{ portalCurrency.formatThb(cartStore.totalAmount) }}</dd>
             </div>
           </div>
 
@@ -551,6 +551,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { formatAmount } from '../../../shared/money.js'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../../stores/cart.js'

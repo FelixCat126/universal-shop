@@ -1,4 +1,5 @@
 import SystemConfig from '../models/SystemConfig.js'
+import { formatAmount } from '../../shared/money.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { normalizeExchangeRates, FX_KEYS } from '../utils/exchangeRates.js'
 import multer from 'multer'
@@ -448,7 +449,7 @@ class SystemConfigController {
           })
         }
 
-        const formattedValue = numValue.toFixed(2)
+        const formattedValue = formatAmount(numValue)
         const merged = await SystemConfig.getConfig('exchange_rates')
         const base = merged && typeof merged === 'object' ? merged : {}
         const next = normalizeExchangeRates({ ...base, USD: formattedValue })
