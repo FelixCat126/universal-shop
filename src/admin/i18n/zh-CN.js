@@ -480,8 +480,6 @@ export default {
     passwordNeedsLetter: '密码须包含至少一个英文字母',
     passwordMismatch: '两次密码不一致',
     messages: {
-      updateSuccess: '操作员已更新',
-      updateFailed: '更新操作员失败',
       loadFailed: '加载列表失败',
       createSuccess: '创建成功',
       createFailed: '创建失败',

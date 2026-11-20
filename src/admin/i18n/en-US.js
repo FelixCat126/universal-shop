@@ -481,8 +481,6 @@ export default {
     passwordNeedsLetter: 'Password must contain at least one letter',
     passwordMismatch: 'Passwords do not match',
     messages: {
-      updateSuccess: 'Operator updated',
-      updateFailed: 'Failed to update the operator',
       loadFailed: 'Failed to load list',
       createSuccess: 'Created successfully',
       createFailed: 'Creation failed',

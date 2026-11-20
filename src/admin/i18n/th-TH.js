@@ -481,8 +481,6 @@ export default {
     passwordNeedsLetter: 'รหัสผ่านต้องมีตัวอักษรอย่างน้อยหนึ่งตัว',
     passwordMismatch: 'รหัสผ่านไม่ตรงกัน',
     messages: {
-      updateSuccess: 'อัปเดตผู้ดูแลระบบแล้ว',
-      updateFailed: 'อัปเดตผู้ดูแลระบบไม่สำเร็จ',
       loadFailed: 'โหลดรายการล้มเหลว',
       createSuccess: 'สร้างสำเร็จ',
       createFailed: 'สร้างล้มเหลว',
