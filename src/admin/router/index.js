@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { rememberScroll, restoreScroll, markRestored } from '../../shared/scrollMemory.js'
 import { useAdminStore } from '../stores/admin.js'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -35,67 +36,67 @@ const router = createRouter({
           path: '/products',
           name: 'Products',
           component: () => import('../views/Products.vue'),
-          meta: { title: '产品管理', requiresAuth: true, permission: 'products' }
+          meta: { title: '产品管理', requiresAuth: true, permission: 'products', keepScroll: true }
         },
         {
           path: '/product-categories',
           name: 'ProductCategories',
           component: () => import('../views/ProductCategories.vue'),
-          meta: { title: '类别管理', requiresAuth: true, permission: 'products' }
+          meta: { title: '类别管理', requiresAuth: true, permission: 'products', keepScroll: true }
         },
         {
           path: '/promotions',
           name: 'Promotions',
           component: () => import('../views/Promotions.vue'),
-          meta: { title: '促销管理', requiresAuth: true, permission: 'products' }
+          meta: { title: '促销管理', requiresAuth: true, permission: 'products', keepScroll: true }
         },
         {
           path: '/bundles',
           name: 'Bundles',
           component: () => import('../views/Bundles.vue'),
-          meta: { title: '组合套餐', requiresAuth: true, permission: 'products' }
+          meta: { title: '组合套餐', requiresAuth: true, permission: 'products', keepScroll: true }
         },
         {
           path: '/coupon-templates',
           name: 'CouponTemplates',
           component: () => import('../views/CouponTemplates.vue'),
-          meta: { title: '抵扣券管理', requiresAuth: true, permission: 'products' }
+          meta: { title: '抵扣券管理', requiresAuth: true, permission: 'products', keepScroll: true }
         },
         {
           path: '/orders',
           name: 'Orders',
           component: () => import('../views/Orders.vue'),
-          meta: { title: '订单管理', requiresAuth: true, permission: 'orders' }
+          meta: { title: '订单管理', requiresAuth: true, permission: 'orders', keepScroll: true }
         },
         {
           path: '/users',
           name: 'Users',
           component: () => import('../views/Users.vue'),
-          meta: { title: '用户管理', requiresAuth: true, permission: 'users' }
+          meta: { title: '用户管理', requiresAuth: true, permission: 'users', keepScroll: true }
         },
         {
           path: '/partners',
           name: 'Partners',
           component: () => import('../views/Partners.vue'),
-          meta: { title: '合作方账号', requiresAuth: true, permission: 'partners' }
+          meta: { title: '合作方账号', requiresAuth: true, permission: 'partners', keepScroll: true }
         },
         {
           path: '/partner-orders',
           name: 'PartnerOrders',
           component: () => import('../views/PartnerOrders.vue'),
-          meta: { title: '合作方订单', requiresAuth: true, permission: 'partners' }
+          meta: { title: '合作方订单', requiresAuth: true, permission: 'partners', keepScroll: true }
         },
         {
           path: '/operators',
           name: 'Operators',
           component: () => import('../views/Operators.vue'),
-          meta: { title: '操作员管理', requiresAuth: true, permission: 'administrators' }
+          meta: { title: '操作员管理', requiresAuth: true, permission: 'administrators', keepScroll: true }
         },
         {
           path: '/operation-logs',
           name: 'OperationLogs',
           component: () => import('../views/OperationLogs.vue'),
-          meta: { title: '操作日志', requiresAuth: true, requiresSuperAdmin: true }
+          meta: { title: '操作日志', requiresAuth: true, requiresSuperAdmin: true, keepScroll: true }
         },
         {
           path: '/system-config',
@@ -178,6 +179,25 @@ router.beforeEach((to, from, next) => {
   }
   
   next()
+})
+
+/**
+ * 滚动位置记忆（第 42 轮）：列表页 → 详情页 → 返回时，位置回到离开前的地方。
+ * 只对 meta.keepScroll 的路由生效（详情/结算页不恢复，用户要看到顶部）。
+ */
+router.beforeEach((to, from) => {
+  if (from.meta && from.meta.keepScroll) {
+    rememberScroll(from.fullPath, window.scrollY)
+  }
+  return true
+})
+
+router.afterEach((to) => {
+  if (to.meta && to.meta.keepScroll) {
+    // 先标记"刚恢复"，让列表页的无限滚动在恢复窗口内不要自动加载下一页
+    markRestored()
+    restoreScroll(to.fullPath)
+  }
 })
 
 export default router

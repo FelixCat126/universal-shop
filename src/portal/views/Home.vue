@@ -457,6 +457,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { inRestoreWindow } from '../../shared/scrollMemory.js'
 import { formatAmount } from '../../shared/money.js'
 /**
  * v-motion 指令**按需引入**（不全局注册 → 动画库只跟着本页的 chunk 走）。
@@ -847,6 +848,16 @@ const loadProducts = async ({ append = false } = {}) => {
 
 const loadNextPage = async () => {
   if (loadMoreBusy.value || loadingMore.value || isLoading.value || !hasMore.value) return
+  /**
+   * 刚恢复滚动位置时不要自动加载下一页。
+   *
+   * 返回列表页时页面只渲染了第一页，高度不够 → 恢复位置后"接近底部"判断成立
+   * → 无限滚动被误触发 → 列表莫名多出一倍商品（用户会觉得"列表怎么变了"）。
+   *
+   * 这里放在**入口**而不是各个触发点上：触发路径有两条
+   * （IntersectionObserver 与"滚动接近底部"），只挡一条会漏。
+   */
+  if (inRestoreWindow()) return
   loadMoreBusy.value = true
   try {
     currentPage.value += 1
@@ -892,7 +903,8 @@ const attachInfiniteScroll = () => {
   loadMoreObserver = new IntersectionObserver(
     (entries) => {
       const hit = entries.some((e) => e.isIntersecting)
-      if (hit) loadNextPage()
+      // 刚恢复滚动位置时不要自动加载下一页（否则列表会莫名多出一倍商品）
+      if (hit && !inRestoreWindow()) loadNextPage()
     },
     // 负值 bottom 缩小根矩形底部，需多滚一截才让哨兵算「进入视区」，避免过早加载
     { root: null, rootMargin: '0px 0px -72px 0px', threshold: 0 }

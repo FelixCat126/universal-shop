@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { rememberScroll, restoreScroll, markRestored } from '../shared/scrollMemory.js'
 import { usePartnerStore } from './stores/partner.js'
 
 const router = createRouter({
@@ -117,6 +118,25 @@ router.beforeEach((to, from, next) => {
     return
   }
   next()
+})
+
+/**
+ * 滚动位置记忆（第 42 轮）：列表页 → 详情页 → 返回时，位置回到离开前的地方。
+ * 只对 meta.keepScroll 的路由生效（详情/结算页不恢复，用户要看到顶部）。
+ */
+router.beforeEach((to, from) => {
+  if (from.meta && from.meta.keepScroll) {
+    rememberScroll(from.fullPath, window.scrollY)
+  }
+  return true
+})
+
+router.afterEach((to) => {
+  if (to.meta && to.meta.keepScroll) {
+    // 先标记"刚恢复"，让列表页的无限滚动在恢复窗口内不要自动加载下一页
+    markRestored()
+    restoreScroll(to.fullPath)
+  }
 })
 
 export default router
