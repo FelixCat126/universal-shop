@@ -83,8 +83,12 @@
             </el-table-column>
             <el-table-column :label="t('common.actions')" width="240" fixed="right">
               <template #default="{ row }">
-                <!-- 待审核：同意 / 驳回 -->
-                <template v-if="row.status === 'pending'">
+                <!--
+                  审核是**资损级写操作**（同意 = 订单取消 + 收积分 + 收券），
+                  后端要求 admin/super_admin（adminRoutes.js: requireAdminOnly）。
+                  操作员可以**看**列表（客服日常），但不能审核 → 按钮按角色隐藏。
+                -->
+                <template v-if="row.status === 'pending' && canReview">
                   <el-button size="small" type="primary" @click="openReview(row, 'approved')">
                     {{ t('afterSales.approve') }}
                   </el-button>
@@ -94,7 +98,7 @@
                 </template>
                 <!-- 已同意且是"退货退款"：货到了才能确认收货入库（回补库存） -->
                 <el-button
-                  v-else-if="row.status === 'approved' && row.type === 'return'"
+                  v-else-if="row.status === 'approved' && row.type === 'return' && canReview"
                   size="small"
                   type="success"
                   @click="openReview(row, 'received')"
@@ -145,8 +149,17 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { afterSaleAPI } from '../api/afterSales.js'
+import { useAdminStore } from '../stores/admin.js'
+
+const adminStore = useAdminStore()
 
 const { t } = useI18n()
+
+/**
+ * 能不能审核（第 47 轮）：与后端 requireAdminOnly 同一把尺子（admin/super_admin）。
+ * 操作员能看列表（客服日常），但审核按钮不出现 —— 避免"点了才知道没权限"。
+ */
+const canReview = computed(() => adminStore.isAdminOrAbove)
 
 const rows = ref([])
 const loading = ref(false)

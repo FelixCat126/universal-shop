@@ -29,6 +29,19 @@ export const useAdminStore = defineStore('admin', () => {
   const isLoggedIn = computed(() => !!token.value && !!adminInfo.value)
   const isSuperAdmin = computed(() => adminInfo.value?.role === 'super_admin')
   const isAdmin = computed(() => adminInfo.value?.role === 'admin')
+  /**
+   * 管理员级（admin **或** super_admin）—— 第 47 轮新增。
+   *
+   * 对应后端的两个守卫（adminRoutes.js）：
+   *   requireAdminOnly  —— 资损级写操作（售后审核）
+   *   requireUserAdmin  —— 账号级高危操作（重置客户密码、注销用户）
+   * 两者都是 `role === 'super_admin' || role === 'admin'`。
+   *
+   * 为什么需要它：界面原来**不拦**这些操作 → 操作员点了只得到一句
+   * "权限不足"，看起来像系统坏了。界面的门槛必须和后端一致。
+   */
+  const isAdminOrAbove = computed(() =>
+    ['admin', 'super_admin'].includes(adminInfo.value?.role))
   const isOperator = computed(() => adminInfo.value?.role === 'operator')
 
   // 权限检查
@@ -166,6 +179,7 @@ export const useAdminStore = defineStore('admin', () => {
     isLoggedIn,
     isSuperAdmin,
     isAdmin,
+    isAdminOrAbove,
     isOperator,
     hasPermission,
     

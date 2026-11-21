@@ -27,6 +27,7 @@ import PointTransaction from '../models/PointTransaction.js'
 import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import Product from '../models/Product.js'
+import AuditLog from '../models/AuditLog.js'
 import sequelize from '../config/database.js'
 import { restoreOrderResources } from '../controllers/orderController.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
@@ -84,6 +85,40 @@ async function sweepRetailPendingOrders (cutoff) {
 
           // 回补库存（pending 在线单未支付：不涉及积分退/收，restore 内部按字段自行跳过）
           await restoreOrderResources(order, transaction)
+
+          /**
+           * 删单**之前**先留一条审计（第 47 轮）。
+           *
+           * 为什么要留：客户扫码付款后如果没点「完成支付」，这单 10 分钟后会被清扫掉
+           * —— **钱可能已经到了商户账上，系统里却没有这单**。
+           * 之前删得干干净净，运营事后连"有没有过这单"都查不到，
+           * 只能去翻银行流水对金额（连订单号都没有）。
+           *
+           * 现在留一条系统审计（订单号 + 金额 + 下单时间 + 被清时间），
+           * 运营在「行为审计」页按事件就能筛出来，与银行流水对得上 ✓
+           * （根治还要支付回调/对账，那超出本项目范围）。
+           */
+          // ⚠️ 直接 create 而不是 AuditLog.record()：record() 另起连接写（不参与本事务），
+          // 事务回滚时审计行会残留 → 与实际是否删单对不上。
+          await AuditLog.create({
+            actor_type: 'system',
+            actor_id: null,
+            actor_label: 'order-timeout-sweep',
+            event: 'order.timeout.swept',
+            resource: 'order',
+            resource_id: orderId,
+            success: true,
+            detail: {
+              order_no: order.order_no,
+              total_amount: Number(order.total_amount) || 0,
+              total_amount_thb: Number(order.total_amount_thb) || 0,
+              currency_code: order.currency_code || 'THB',
+              user_id: order.user_id,
+              created_at: order.created_at,
+              swept_at: new Date().toISOString(),
+              reason: '超时未支付，订单被自动清理'
+            }
+          }, { transaction })
 
           // 先清积分流水：order_id FK 为 ON DELETE SET NULL，直接删单会断审计链
           await PointTransaction.destroy({ where: { order_id: orderId }, transaction })
@@ -165,6 +200,30 @@ async function sweepPartnerPendingPaymentOrders (cutoff) {
               { where: { id: item.product_id }, transaction, paranoid: false }
             )
           }
+
+          /**
+           * 删单**之前**先留一条审计（第 47 轮）：与零售同款理由 ——
+           * 合作方可能已付款但没点「完成付款」，这单被清掉后
+           * 运营就没有任何凭据去对账了。
+           */
+          await AuditLog.create({
+            actor_type: 'system',
+            actor_id: null,
+            actor_label: 'order-timeout-sweep',
+            event: 'partner_order.timeout.swept',
+            resource: 'partner_order',
+            resource_id: orderId,
+            success: true,
+            detail: {
+              order_no: order.order_no,
+              total_amount_thb: Number(order.total_amount_thb) || 0,
+              currency_code: order.currency_code || 'THB',
+              partner_id: order.partner_id,
+              created_at: order.created_at,
+              swept_at: new Date().toISOString(),
+              reason: '超时未支付，订单被自动清理'
+            }
+          }, { transaction })
 
           // 删行项目再删单（PartnerOrder/PartnerOrderItem 均未开 paranoid，物理删除）
           await PartnerOrderItem.destroy({ where: { partner_order_id: orderId }, transaction })

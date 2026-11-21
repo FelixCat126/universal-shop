@@ -226,7 +226,17 @@
                     <el-dropdown-item command="toggle" divided :disabled="scope.row.updating">
                       {{ scope.row.is_active ? t('users.ban') : t('users.unban') }}
                     </el-dropdown-item>
-                    <el-dropdown-item command="resetPassword" divided :disabled="!scope.row.is_active">
+                    <!--
+                      重置客户密码与注销账号都是**账号级高危操作**，后端要求 admin/super_admin
+                      （adminRoutes.js: requireUserAdmin）。原来界面不拦 → 操作员点了只得到
+                      "权限不足"。现在按后端同一把尺子隐藏。
+                    -->
+                    <el-dropdown-item
+                      v-if="adminStore.isAdminOrAbove"
+                      command="resetPassword"
+                      divided
+                      :disabled="!scope.row.is_active"
+                    >
                       {{ t('users.resetPassword') }}
                     </el-dropdown-item>
                     <!--
@@ -234,7 +244,12 @@
                       运营遇到"客户要求删号"只能手工改库。
                       这里是匿名化（历史订单/积分保留），不是物理删数据。
                     -->
-                    <el-dropdown-item command="delete" divided :disabled="!scope.row.is_active">
+                    <el-dropdown-item
+                      v-if="adminStore.isAdminOrAbove"
+                      command="delete"
+                      divided
+                      :disabled="!scope.row.is_active"
+                    >
                       {{ t('users.deleteAccount') }}
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -406,6 +421,7 @@
 </template>
 
 <script setup>
+import { useAdminStore } from '../stores/admin.js'
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -420,6 +436,9 @@ import api from '../api/index.js'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 import { useAutoSearch } from '../composables/useAutoSearch.js'
+
+// 管理端 store（模板里要用 adminStore.isAdminOrAbove 等权限判断）
+const adminStore = useAdminStore()
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -703,8 +722,6 @@ const deleteUserAccount = async (user) => {
     return // 用户取消
   }
   try {
-    const { useAdminStore } = await import('../stores/admin.js')
-    const adminStore = useAdminStore()
     const response = await adminStore.apiRequest(`/api/admin/users/${user.id}`, {
       method: 'DELETE'
     })
@@ -820,8 +837,6 @@ const toggleUserStatus = async (user) => {
     user.updating = true
     
     // 调用API更新用户状态
-    const { useAdminStore } = await import('../stores/admin.js')
-    const adminStore = useAdminStore()
     
     const response = await adminStore.apiRequest(`/api/admin/users/${user.id}/status`, {
       method: 'PUT',

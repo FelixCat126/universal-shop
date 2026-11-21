@@ -113,7 +113,7 @@ const router = createRouter({
           path: '/audit-logs',
           name: 'AuditLogs',
           component: () => import('../views/AuditLogs.vue'),
-          meta: { title: '行为审计', requiresAuth: true, keepScroll: true }
+          meta: { title: '行为审计', requiresAuth: true, keepScroll: true, requiresSuperAdmin: true }
         },
 {
           path: '/operation-logs',

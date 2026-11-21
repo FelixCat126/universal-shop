@@ -294,7 +294,14 @@
                     {{ t('orders.quickTo') }} {{ getStatusText(st) }}
                   </el-dropdown-item>
                   <el-dropdown-item command="detail" divided>{{ t('orders.viewDetails') }}</el-dropdown-item>
-                  <el-dropdown-item command="delete">{{ t('common.delete') }}</el-dropdown-item>
+                  <!--
+                    删除订单后端要求 super_admin（adminRoutes.js: DELETE /orders/:id）。
+                    原来界面**不拦** → 操作员点了只得到一句"权限不足"，
+                    看起来像系统坏了。现在按后端同一把尺子隐藏。
+                  -->
+                  <el-dropdown-item v-if="adminStore.isSuperAdmin" command="delete">
+                    {{ t('common.delete') }}
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
