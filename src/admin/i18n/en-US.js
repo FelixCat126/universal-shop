@@ -125,6 +125,7 @@ export default {
 
   // Navigation menu
   menu: {
+    auditLogs: 'Audit trail',
     toggleSidebar: 'Toggle sidebar',
     dashboard: 'Dashboard',
     productsMenu: 'Catalog',
@@ -136,6 +137,7 @@ export default {
     bundles: 'Bundle Deals',
     coupons: 'Coupon templates',
     users: 'User Management',
+    points: 'Points Management',
     partnerWholesale: 'Partner management',
     partnersAccounts: 'Partner accounts',
     partnerOrdersMenu: 'Partner orders',
@@ -148,6 +150,9 @@ export default {
   },
 
   partnersMgmt: {
+    initialPassword: 'Initial password',
+    usingInitialPassword: 'Still using',
+    passwordChanged: 'Changed',
     title: 'Partner accounts',
     refresh: 'Refresh',
     create: 'New partner',
@@ -182,6 +187,7 @@ export default {
   },
 
   partnerOrdersMgmt: {
+    paidAt: 'Paid at',
     title: 'Partner orders',
     export: 'Export Excel',
     orderNo: 'Order no.',
@@ -337,6 +343,11 @@ export default {
 
   // System configuration
   systemConfig: {
+    partnerMoq: 'Partner minimum order quantity',
+    partnerMoqSubtitle: 'Minimum quantity and step for wholesale orders',
+    partnerMoqUnit: 'Minimum quantity',
+    savePartnerMoq: 'Save',
+    partnerMoqTips: 'Applies to partner orders (same rule in the UI and the server-side check).',
     title: 'System Configuration',
     description: 'Configure global system settings, accessible only to super administrators',
     homeBanner: 'Homepage Banner Configuration',
@@ -414,6 +425,8 @@ export default {
       qrDisplay: '• QR code will be displayed in a popup when user selects "Online Payment"'
     },
     messages: {
+      partnerMoqSaveSuccess: 'Minimum order quantity saved',
+      partnerMoqSaveFailed: 'Failed to save the minimum order quantity',
       uploadSuccess: 'Upload successful',
       uploadFailed: 'Upload failed',
       deleteSuccess: 'Delete successful',
@@ -501,7 +514,33 @@ export default {
   },
 
   // Operation logs
+  auditLogs: {
+    title: 'Audit trail',
+    total: 'Total',
+    actorType: 'Actor',
+    allActorTypes: 'All actors',
+    actorUser: 'Customer',
+    actorPartner: 'Partner',
+    actorSystem: 'System',
+    actorAnonymous: 'Anonymous',
+    actor: 'Actor',
+    event: 'Event',
+    eventPlaceholder: 'Event name (partial match)',
+    resource: 'Resource',
+    resourcePlaceholder: 'Resource type, e.g. order',
+    dateRange: 'Date range',
+    result: 'Result',
+    success: 'Success',
+    failed: 'Failed',
+    ip: 'IP',
+    time: 'Time',
+    messages: {
+      loadFailed: 'Failed to load the audit trail'
+    }
+  },
+
   operationLogs: {
+    exportCsv: 'Export CSV',
     title: 'Operation Logs',
     refresh: 'Refresh',
     administrator: 'Administrator',
@@ -567,6 +606,8 @@ export default {
       payment_qrcode: 'Payment QR Code'
     },
     messages: {
+      exportSuccess: 'Operation logs exported',
+      exportFailed: 'Failed to export operation logs',
       loadFailed: 'Failed to load logs',
       noData: 'No Data'
     },
@@ -575,6 +616,12 @@ export default {
 
   // User management
   users: {
+    deleteAccount: 'Close account',
+    deleteAccountTitle: 'Close this user account',
+    deleteAccountConfirm: 'Close the account of "{nickname}"?\n\nAddresses and cart are cleared, the account is disabled and all devices are signed out; order and points history is kept but no longer linked to a real user.',
+    deleteAccountConfirmBtn: 'Close account',
+    deleteAccountSuccess: 'Account closed',
+    deleteAccountFailed: 'Failed to close the account',
     resetPassword: 'Reset password',
     resetPasswordTitle: 'Reset customer password',
     resetPasswordConfirm: 'Reset the password for "{name}"? Their existing sessions will be revoked and they must set a new password on first login.',
@@ -645,6 +692,57 @@ export default {
       unbanFailed: 'Failed to unban user',
       confirmBan: 'Are you sure you want to ban this user?',
       confirmUnban: 'Are you sure you want to unban this user?'
+    }
+  },
+
+  // Points management
+  points: {
+    title: 'Points Management',
+    totalCount: 'Total',
+    totalUsers: 'Users with points',
+    totalBalance: 'Total balance',
+    totalGranted: 'Total granted',
+    totalConsumed: 'Total consumed',
+    keyword: 'Keyword',
+    enterKeyword: 'User ID / phone / nickname',
+    minBalance: 'Min balance',
+    maxBalance: 'Max balance',
+    enterBalance: 'Enter balance',
+    search: 'Search',
+    reset: 'Reset',
+    userId: 'User ID',
+    nickname: 'Nickname',
+    phone: 'Phone',
+    balance: 'Points balance',
+    updateTime: 'Updated at',
+    viewTransactions: 'Transactions',
+    adjust: 'Adjust',
+    transactionsTitle: 'Points transactions',
+    type: 'Type',
+    delta: 'Change',
+    balanceAfter: 'Balance after',
+    note: 'Note',
+    time: 'Time',
+    adjustTitle: 'Adjust points manually',
+    adjustHint: 'A positive number grants points, a negative number deducts them. Deduction is rejected when the balance is insufficient — the balance never goes below zero. Every adjustment writes a points transaction and an operation log.',
+    adjustUser: 'User',
+    currentBalance: 'Current balance',
+    notePlaceholder: 'e.g. after-sales compensation / campaign bonus',
+    submitAdjust: 'Confirm adjustment',
+    types: {
+      earn_purchase: 'Earned by purchase',
+      redeem_order: 'Redeemed for order',
+      refund_cancel: 'Order cancelled refund',
+      revoke_cancel: 'Order cancelled revoke',
+      admin_adjust: 'Manual adjustment'
+    },
+    messages: {
+      overviewFailed: 'Failed to load points overview',
+      listFailed: 'Failed to load points balances',
+      transactionsFailed: 'Failed to load points transactions',
+      invalidDelta: 'Points change must be a non-zero integer',
+      adjustSuccess: 'Points adjusted successfully',
+      adjustFailed: 'Failed to adjust points'
     }
   },
 
@@ -789,6 +887,7 @@ export default {
     tip: 'Tip: export the CSV first to get your current data as a template, edit in Excel, then import it back.',
   },
   products: {
+    viewDetails: 'View details',
     csvHint: 'The first row must be a header. Supported columns: id / name / name_th / category / price / stock / points / description / image. Rows with an id update that product; rows without an id create a new one. The image column accepts a remote image URL (http/https) which is downloaded and stored locally; URLs pointing at internal addresses are rejected during preview.',
     bulkActivate: 'Activate',
     bulkDeactivate: 'Deactivate',
@@ -1100,6 +1199,21 @@ export default {
     edit: 'Edit',
     delete: 'Delete',
     instances: 'Instances',
+    grant: 'Grant coupons',
+    grantShort: 'Grant',
+    grantTitle: 'Grant coupons to users',
+    grantTemplate: 'Coupon template',
+    grantUserIds: 'User IDs',
+    grantUserIdsHint: 'Separate multiple IDs with commas, spaces or line breaks; issuance follows the template total and per-user limit, and nothing is issued when a limit is reached.',
+    grantNote: 'Note',
+    grantSubmit: 'Grant coupons',
+    grantResult: 'Result',
+    grantResultGranted: 'Granted',
+    grantResultFailed: 'Failed',
+    void: 'Void',
+    voidTitle: 'Void coupon',
+    voidReason: 'Reason',
+    voidHint: 'A voided coupon can no longer be used, and the user will see it as voided under "My coupons".',
     instancesTitle: 'Coupon instances - {name}',
     instanceUser: 'User',
     instanceCode: 'Code',
@@ -1109,12 +1223,17 @@ export default {
     instanceStatusUnused: 'Unused',
     instanceStatusUsed: 'Used',
     instanceStatusExpired: 'Expired',
+    instanceStatusVoid: 'Voided',
     listTotal: 'Total templates',
     noMinSpend: 'No minimum',
     placeholders: {
       enterName: 'Enter coupon name',
       selectCategories: 'Select categories (multiple)',
-      selectProducts: 'Select products (multiple, searchable)'
+      selectProducts: 'Select products (multiple, searchable)',
+      selectTemplate: 'Select a coupon template',
+      userIds: 'e.g. 12, 35, 48',
+      grantNote: 'Reason for issuing (recorded in the operation log)',
+      voidReason: 'Please enter the reason (required)'
     },
     validation: {
       nameRequired: 'Please enter the coupon name',
@@ -1124,7 +1243,10 @@ export default {
       perUserPositive: 'Limit per user must be an integer of at least 1',
       timeRangeRequired: 'Please select the validity period',
       timeRangeInvalid: 'Start time must be before end time',
-      scopeIdsRequired: 'Please select at least one item when not storewide'
+      scopeIdsRequired: 'Please select at least one item when not storewide',
+      templateRequired: 'Please select a coupon template',
+      userIdsRequired: 'Please enter at least one user ID',
+      voidReasonRequired: 'Please enter the reason for voiding'
     },
     messages: {
       loadFailed: 'Failed to load coupon templates',
@@ -1138,7 +1260,12 @@ export default {
       confirmUpdate: 'Update this coupon template?',
       statusUpdateSuccess: 'Status updated',
       statusUpdateFailed: 'Failed to update status',
-      instancesLoadFailed: 'Failed to load coupon instances'
+      instancesLoadFailed: 'Failed to load coupon instances',
+      grantSuccess: 'Granted {count} coupon(s)',
+      grantPartial: 'Granted {count} coupon(s), {failed} user(s) failed',
+      grantFailed: 'Failed to grant coupons',
+      voidSuccess: 'Coupon voided',
+      voidFailed: 'Failed to void coupon'
     }
   },
 

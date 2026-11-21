@@ -76,12 +76,10 @@ export const userAPI = {
   getPointTransactions: (params) => api.get(`${API_BASE_URL}/points/transactions`, { params }),
 
   /** 修改登录密码 body: { old_password, new_password } */
-  changePassword: (body) => api.put(`${API_BASE_URL}/profile/password`, body),
+  changePassword: (body) => api.put(`${API_BASE_URL}/profile/password`, body)
 
-  // 验证推荐码
-  verifyReferralCode: (code) => {
-    return api.get(`${API_BASE_URL}/verify-referral/${code}`)
-  }
+  // 第 46 轮：删掉无人调用的 verifyReferralCode
+  // （推荐码在注册/下单时直接提交，由服务端校验；前端不做预校验）
 }
 
 export default userAPI

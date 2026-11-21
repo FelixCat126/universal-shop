@@ -31,6 +31,14 @@ router.post('/jobs', requirePermission('orders'), exportLimiter, logOperation('e
 router.get('/jobs', requirePermission('orders'), ExportJobController.listJobs)
 router.get('/jobs/:id/download', requirePermission('orders'), exportLimiter, ExportJobController.downloadJob)
 router.delete('/jobs/:id', requirePermission('orders'), exportLimiter, ExportJobController.deleteJob)
+/**
+ * 手动清理过期导出任务与文件（第 46 轮补上路由）。
+ *
+ * `ExportJobController.cleanup` 早就写好了，但**没有路由** → 只能靠 retention 定时任务
+ * 清理（每天一次）。运营想"现在就把旧文件清掉"做不到。
+ * 清理本身是幂等的（按 keepDays 与文件 TTL 判定），手动触发没有风险。
+ */
+router.post('/jobs/cleanup', requirePermission('orders'), exportLimiter, logOperation('export_job_cleanup', 'export'), ExportJobController.cleanup)
 
 // 同步导出（保留：小数据量时更方便，浏览器直接下载）
 router.get('/users', requirePermission('users'), exportLimiter, logOperation('export', 'users'), ExportController.exportUsers)

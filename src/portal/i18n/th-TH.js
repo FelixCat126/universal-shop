@@ -270,6 +270,11 @@ export default {
 
   // 订单
   order: {
+    refresh: 'รีเฟรช',
+    editNotes: 'แก้ไข',
+    saveNotes: 'บันทึกหมายเหตุ',
+    notesUpdated: 'อัปเดตหมายเหตุแล้ว',
+    notesUpdateFailed: 'อัปเดตหมายเหตุไม่สำเร็จ',
     cancelOrder: 'ยกเลิกคำสั่งซื้อ',
     cancelConfirm: 'ยกเลิกคำสั่งซื้อนี้หรือไม่? สต็อกจะถูกปล่อยคืน และคูปอง/แต้มจะคืนกลับ',
     cancelled: 'ยกเลิกคำสั่งซื้อแล้ว',
@@ -493,6 +498,8 @@ export default {
   },
 
   profile: {
+    orderStatusFilter: 'สถานะคำสั่งซื้อ',
+    allTime: 'ทุกช่วงเวลา',
     passwordChangeNotice: 'บัญชีของคุณยังใช้รหัสผ่านชั่วคราวที่ระบบสร้างให้ แนะนำให้ตั้งรหัสผ่านของคุณเอง (กดปุ่มทางขวา)',
     defaultNickname: 'ผู้ใช้',
     phoneNotSet: 'ยังไม่ได้ตั้งค่าเบอร์โทรศัพท์',
@@ -679,6 +686,7 @@ export default {
     statusUnused: 'ยังไม่ได้ใช้',
     statusUsed: 'ใช้แล้ว',
     statusExpired: 'หมดอายุ',
+    statusVoid: 'ยกเลิกแล้ว',
     noAvailable: 'ยังไม่มีคูปองให้รับ',
     noMine: 'ยังไม่มีคูปอง',
     loadFailed: 'โหลดคูปองไม่สำเร็จ โปรดลองอีกครั้ง',

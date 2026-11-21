@@ -25,6 +25,15 @@ export const confirmOnlinePayment = (orderId) => {
 }
 
 /**
+ * 修改订单备注（第 46 轮）：之前只能在结算页下单时填，下单后改不了。
+ * @param {number|string} orderId
+ * @param {string} notes
+ */
+export const updateOrderNotes = (orderId, notes) => {
+  return api.put(`/orders/${orderId}/notes`, { notes })
+}
+
+/**
  * 用户自助取消订单（第 45 轮）。
  * 后端一直只有管理端能取消 → 客户想取消自己的订单只能联系运营，
  * 而积分退回 / 抵扣券退还也只有管理员能触发。
@@ -57,6 +66,7 @@ export default {
   getUserOrders,
   getOrderDetail,
   confirmOnlinePayment,
+  updateOrderNotes,
   cancelOrder,
   createAfterSale,
   getMyAfterSales

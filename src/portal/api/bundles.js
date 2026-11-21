@@ -43,10 +43,7 @@ export const bundleAPI = {
     return api.get('/bundles', { params })
   },
 
-  // 获取单个套餐详情
-  getBundle (id) {
-    return api.get(`/bundles/${id}`)
-  }
+  // 第 46 轮：删掉无人调用的 getBundle（门户只用列表）
 }
 
 export default api

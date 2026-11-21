@@ -246,6 +246,40 @@
         </div>
       </el-card>
 
+      <!--
+        合作方起订量（MOQ）第 46 轮新增：
+        之前这两个键（partner_order_moq_unit / partner_order_moq_multiplier）
+        **只能改数据库**（SystemConfig 的通用写接口没有界面入口）
+        → 运营要调整合作方的起订量，得找人跑 SQL。
+      -->
+      <el-card class="config-card" shadow="hover">
+        <template #header>
+          <div>
+            <h3>{{ t('systemConfig.partnerMoq') }}</h3>
+            <span class="card-subtitle">{{ t('systemConfig.partnerMoqSubtitle') }}</span>
+          </div>
+        </template>
+        <div class="config-item">
+          <label>{{ t('systemConfig.partnerMoqUnit') }}</label>
+          <el-input-number
+            v-model="partnerMoqUnit"
+            :min="1"
+            :step="1"
+            style="width: 200px"
+          />
+          <el-button
+            type="primary"
+            style="margin-left: 12px"
+            @click="savePartnerMoq"
+          >
+            {{ t('systemConfig.savePartnerMoq') }}
+          </el-button>
+          <div class="exchange-rate-tips" style="margin-top: 12px">
+            <p>{{ t('systemConfig.partnerMoqTips') }}</p>
+          </div>
+        </div>
+      </el-card>
+
       <!-- 业务时区：决定"今天 / 本地日历日"的边界（今日营收、趋势分桶、日期筛选） -->
       <el-card class="config-card" shadow="hover">
         <template #header>
@@ -315,6 +349,8 @@ const exchangeRatesCny = ref(0)
 const exchangeRatesMyr = ref(0)
 const currencyCode = ref('THB')
 const pointsEarnRate = ref(0.01)
+/** 合作方起订量（第 46 轮）：这两个键之前没有界面入口，只能改库 */
+const partnerMoqUnit = ref(50)
 
 /** 业务时区（IANA 名）：决定"今天 / 本地日历日"的边界 */
 const businessTimezone = ref('Asia/Bangkok')
@@ -387,6 +423,9 @@ const loadConfigs = async () => {
         mergeCurrencyCodeIntoLocales(mergeLocaleMessage, currencyCode.value)
         const per = parseFloat(configs.points_earn_rate?.value || '0.01')
         pointsEarnRate.value = Number.isFinite(per) && per >= 0 ? per : 0.01
+        // 合作方起订量（缺省 50 / 步长 1，与服务端 partnerMoq.js 的回退一致）
+        const moqUnit = parseInt(configs.partner_order_moq_unit?.value || '50', 10)
+        partnerMoqUnit.value = Number.isFinite(moqUnit) && moqUnit >= 1 ? moqUnit : 50
         businessTimezone.value = configs.business_timezone?.value || 'Asia/Shanghai'
       } else {
         ElMessage.error(data.message || t('systemConfig.messages.loadConfigFailed'))
@@ -697,6 +736,36 @@ const savePointsEarnRate = async () => {
   } catch (error) {
     console.error('保存积分获取比率失败:', error)
     ElMessage.error(t('systemConfig.messages.pointsEarnRateSaveFailed'))
+  }
+}
+
+/**
+ * 保存合作方起订量（第 46 轮）。
+ * 一次写两个键（单位 + 步长），避免"只改了一半"导致上下单校验口径不一致。
+ */
+const savePartnerMoq = async () => {
+  const unit = Math.max(1, Math.floor(Number(partnerMoqUnit.value) || 0))
+  try {
+    for (const [key, value, description] of [
+      ['partner_order_moq_unit', String(unit), '合作方订单起订量（每单至少多少件）'],
+      ['partner_order_moq_multiplier', '1', '合作方订单数量步长（每次加购的增量）']
+    ]) {
+      const response = await adminStore.apiRequest('/api/system-config/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value, type: 'text', description })
+      })
+      const data = await response.json()
+      if (!data.success) {
+        ElMessage.error(data.message || t('systemConfig.messages.partnerMoqSaveFailed'))
+        return
+      }
+    }
+    partnerMoqUnit.value = unit
+    ElMessage.success(t('systemConfig.messages.partnerMoqSaveSuccess'))
+  } catch (error) {
+    console.error('保存合作方起订量失败:', error)
+    ElMessage.error(t('systemConfig.messages.partnerMoqSaveFailed'))
   }
 }
 

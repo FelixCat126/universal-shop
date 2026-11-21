@@ -83,6 +83,13 @@ const router = createRouter({
           meta: { title: '用户管理', requiresAuth: true, permission: 'users', keepScroll: true }
         },
         {
+          // 积分管理：手工发放/扣减积分（补偿、纠错），与用户管理共用 users 权限
+          path: '/points',
+          name: 'Points',
+          component: () => import('../views/Points.vue'),
+          meta: { title: '积分管理', requiresAuth: true, permission: 'users', keepScroll: true }
+        },
+        {
           path: '/partners',
           name: 'Partners',
           component: () => import('../views/Partners.vue'),
@@ -100,7 +107,15 @@ const router = createRouter({
           component: () => import('../views/Operators.vue'),
           meta: { title: '操作员管理', requiresAuth: true, permission: 'administrators', keepScroll: true }
         },
-        {
+                {
+          // 行为审计日志（第 46 轮）：用户与合作方的行为（登录/下单/改密…）
+          // 之前 AuditLog 只写不读 → 合作方行为在运营侧完全无痕
+          path: '/audit-logs',
+          name: 'AuditLogs',
+          component: () => import('../views/AuditLogs.vue'),
+          meta: { title: '行为审计', requiresAuth: true, keepScroll: true }
+        },
+{
           path: '/operation-logs',
           name: 'OperationLogs',
           component: () => import('../views/OperationLogs.vue'),

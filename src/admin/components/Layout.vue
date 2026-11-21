@@ -102,6 +102,10 @@
             <el-icon><User /></el-icon>
             <span>{{ t('menu.users') }}</span>
           </el-menu-item>
+          <el-menu-item index="/points">
+            <el-icon><Coin /></el-icon>
+            <span>{{ t('menu.points') }}</span>
+          </el-menu-item>
           <el-sub-menu index="/partner-wholesale" v-if="adminStore.hasPermission('partners')">
             <template #title>
               <el-icon><OfficeBuilding /></el-icon>
@@ -119,6 +123,8 @@
                  此前菜单不隐藏、点击却被守卫拦下（next(false) + 弹权限不足） -->
             <el-menu-item index="/operators" v-if="adminStore.hasPermission('administrators')">{{ t('menu.operators') }}</el-menu-item>
             <el-menu-item index="/operation-logs" v-if="adminStore.isSuperAdmin">{{ t('menu.operationLogs') }}</el-menu-item>
+          <!-- 行为审计（第 46 轮）：用户与合作方的行为日志 -->
+          <el-menu-item index="/audit-logs" v-if="adminStore.isSuperAdmin">{{ t('menu.auditLogs') }}</el-menu-item>
             <el-menu-item index="/system-config" v-if="adminStore.isSuperAdmin">{{ t('menu.systemConfig') }}</el-menu-item>
           </el-sub-menu>
         </el-menu>
@@ -144,7 +150,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ensureLocale } from '../i18n/index.js'
-import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag, Tickets } from '@element-plus/icons-vue'
+import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag, Tickets, Coin } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { useAdminStore } from '../stores/admin.js'

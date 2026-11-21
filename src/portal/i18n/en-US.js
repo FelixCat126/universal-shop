@@ -272,6 +272,11 @@ export default {
 
   // 订单
   order: {
+    refresh: 'Refresh',
+    editNotes: 'Edit',
+    saveNotes: 'Save note',
+    notesUpdated: 'Note updated',
+    notesUpdateFailed: 'Failed to update the note',
     cancelOrder: 'Cancel order',
     cancelConfirm: 'Cancel this order? Stock is released and any coupon or points are returned.',
     cancelled: 'Order cancelled',
@@ -496,6 +501,8 @@ export default {
   },
 
   profile: {
+    orderStatusFilter: 'Order status',
+    allTime: 'All time',
     passwordChangeNotice: 'Your account still uses a system-generated temporary password. Set your own password so only you know it (button on the right).',
     defaultNickname: 'User',
     phoneNotSet: 'Phone not set',
@@ -683,6 +690,7 @@ export default {
     statusUnused: 'Unused',
     statusUsed: 'Used',
     statusExpired: 'Expired',
+    statusVoid: 'Voided',
     noAvailable: 'No coupons available to claim',
     noMine: 'No coupons here yet',
     loadFailed: 'Failed to load coupons. Please try again later',

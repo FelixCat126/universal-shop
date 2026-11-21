@@ -2,6 +2,7 @@ import sequelize from '../config/database.js'
 import CouponTemplate from '../models/CouponTemplate.js'
 import UserCoupon from '../models/UserCoupon.js'
 import User from '../models/User.js'
+import { grantCouponsToUsers } from '../services/couponService.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { logger } from '../utils/logger.js'
 import { parseId } from '../utils/params.js'
@@ -195,6 +196,109 @@ class CouponAdminController {
     } catch (e) {
       logger.error('list coupon instances', { err: e?.message, stack: e?.stack })
       return res.status(500).json({ success: false, message: '获取抵扣券实例列表失败' })
+    }
+  }
+
+  /**
+   * 定向发券：给指定用户发券（补偿 / 活动 / 老客户维护）。
+   *
+   * 发券的总量/限领/券码口径全部在 couponService.grantCouponsToUsers 里
+   * （与用户自助领券共用同一份判定），这里只做入参整理与结果整形。
+   */
+  static async grant (req, res) {
+    try {
+      const { template_id, user_ids, user_id, note } = req.body
+      const templateId = parseId(template_id)
+      if (!Number.isInteger(templateId)) {
+        return res.status(400).json({ success: false, message: '无效的券模板 ID' })
+      }
+      // user_ids 数组与单个 user_id 都接受（前端表单两种输入方式都可能出现）
+      const rawIds = Array.isArray(user_ids)
+        ? user_ids
+        : (user_id != null ? [user_id] : [])
+      const userIds = rawIds
+        .map(v => parseId(v))
+        .filter(v => Number.isInteger(v))
+      if (userIds.length === 0) {
+        return res.status(400).json({ success: false, message: '请至少填写一个用户 ID' })
+      }
+
+      const result = await grantCouponsToUsers({ templateId, userIds, note })
+
+      return res.json({
+        success: true,
+        data: {
+          granted_count: result.granted.length,
+          granted: result.granted,
+          failed: result.failed,
+          note: result.note || null
+        }
+      })
+    } catch (e) {
+      // 业务校验错误（模板停用 / 超总量 / 超限领）由服务层抛 400，原样回给运营
+      if (e && e.status === 400) {
+        return res.status(400).json({ success: false, message: e.message })
+      }
+      logger.error('grant coupon instances', { err: e?.message, stack: e?.stack })
+      return res.status(500).json({ success: false, message: '定向发券失败' })
+    }
+  }
+
+  /**
+   * 作废某一张已发出的券（误发 / 纠纷）。
+   *
+   * 只允许作废**未被使用**的券：已核销（used）的券一旦作废，
+   * 订单金额与账就已经按核销算过了，改券状态会让对账与退款失去依据。
+   */
+  static async voidInstance (req, res) {
+    try {
+      const id = parseId(req.params.id)
+      if (!Number.isInteger(id)) {
+        return res.status(400).json({ success: false, message: '无效的 ID' })
+      }
+      const reason = String(req.body?.reason || '').trim()
+      if (!reason) {
+        return res.status(400).json({ success: false, message: '请填写作废原因' })
+      }
+
+      const coupon = await UserCoupon.findByPk(id)
+      if (!coupon) {
+        return res.status(404).json({ success: false, message: '抵扣券实例不存在' })
+      }
+      if (coupon.status === 'used') {
+        return res.status(400).json({ success: false, message: '该抵扣券已使用，无法作废' })
+      }
+      if (coupon.status === 'void') {
+        return res.status(400).json({ success: false, message: '该抵扣券已作废，无需重复作废' })
+      }
+      if (coupon.status !== 'unused') {
+        return res.status(400).json({ success: false, message: '该抵扣券已过期，无需作废' })
+      }
+
+      // 条件 UPDATE：并发下只有一处能把 unused 改成 void，另一处 affected=0 → 409
+      const [affected] = await UserCoupon.update(
+        { status: 'void' },
+        { where: { id, status: 'unused' } }
+      )
+      if (!affected) {
+        return res.status(409).json({ success: false, message: '该抵扣券状态已变更，请刷新后重试' })
+      }
+
+      return res.json({
+        success: true,
+        message: '已作废',
+        data: {
+          id,
+          code: coupon.code,
+          template_id: coupon.template_id,
+          user_id: coupon.user_id,
+          status: 'void',
+          reason
+        }
+      })
+    } catch (e) {
+      logger.error('void coupon instance', { err: e?.message, stack: e?.stack })
+      return res.status(500).json({ success: false, message: '作废抵扣券失败' })
     }
   }
 }

@@ -7,8 +7,14 @@ import CouponTemplate from './CouponTemplate.js'
  * 用户抵扣券实例表（P2 营销体系）
  * 状态机：unused（未使用）→ used（下单核销，条件 UPDATE 占位防并发重用）
  *               → expired（惰性过期：查询时发现 expire_at 已过即置位）
+ *               → void（管理端作废：误发/纠纷，运营把某张已发出的券作废）
  *        used → unused：订单取消/删除/超时清扫时经 restoreOrderResources 释放
  * used_by_order_id 仅逻辑关联 orders.id：订单允许硬删，不建外键约束（释放先于删单完成）
+ *
+ * void 说明：作废是**管理端**的动作，只允许把 unused 的券置为 void；
+ * 已核销（used）的券不许作废 —— 订单金额已经按核销算过，改券状态会让对账与退款失去依据。
+ * 作废后的券在用户「我的优惠券」里可见（已作废页签），但计价引擎只认 unused，
+ * 所以作废的券不能用于下单（pricingEngine 对 status!=='unused' 一律拒用）。
  */
 const UserCoupon = sequelize.define('UserCoupon', {
   id: {
@@ -44,7 +50,7 @@ const UserCoupon = sequelize.define('UserCoupon', {
     type: DataTypes.STRING(16),
     allowNull: false,
     defaultValue: 'unused',
-    comment: '状态：unused-未使用 / used-已使用 / expired-已过期'
+    comment: '状态：unused-未使用 / used-已使用 / expired-已过期 / void-已作废（管理端）'
   },
   used_by_order_id: {
     type: DataTypes.INTEGER,

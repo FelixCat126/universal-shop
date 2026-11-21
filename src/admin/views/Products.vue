@@ -264,7 +264,8 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="edit">{{ t('products.edit') }}</el-dropdown-item>
+                  <el-dropdown-item command="view">{{ t('products.viewDetails') }}</el-dropdown-item>
+                  <el-dropdown-item command="edit" divided>{{ t('products.edit') }}</el-dropdown-item>
                   <el-dropdown-item command="stock">{{ t('products.adjustStock') }}</el-dropdown-item>
                   <el-dropdown-item v-if="!isDelisted(scope.row)" command="delete" divided>
                     {{ t('products.delete') }}
@@ -296,7 +297,9 @@
 
     <!-- 添加/编辑产品对话框 -->
     <el-dialog
-      :title="isEditing ? t('products.edit') + ' ' + t('products.name') : t('products.addProduct')"
+      :title="viewOnly
+        ? t('products.viewDetails')
+        : (isEditing ? t('products.edit') + ' ' + t('products.name') : t('products.addProduct'))"
       v-model="showProductDialog"
       width="800px"
       top="3vh"
@@ -308,6 +311,7 @@
           :model="productForm"
           :rules="productRules"
           ref="productFormRef"
+          :disabled="viewOnly"
           label-width="120px"
         >
         <el-form-item :label="t('products.name')" prop="name">
@@ -435,10 +439,16 @@
 
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showProductDialog = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" :loading="saving" @click="saveProduct">
-            {{ isEditing ? t('products.updateProduct') : t('products.addProduct') }}
-          </el-button>
+          <!-- 只读查看时只留"关闭"（不给误提交的入口） -->
+          <template v-if="viewOnly">
+            <el-button type="primary" @click="showProductDialog = false">{{ t('common.close') }}</el-button>
+          </template>
+          <template v-else>
+            <el-button @click="showProductDialog = false">{{ t('common.cancel') }}</el-button>
+            <el-button type="primary" :loading="saving" @click="saveProduct">
+              {{ isEditing ? t('products.updateProduct') : t('products.addProduct') }}
+            </el-button>
+          </template>
         </span>
       </template>
     </el-dialog>
@@ -636,7 +646,11 @@ export default {
     }
 
     // 操作列下拉菜单统一分发：窄列 + fixed 共存，避免宽操作列遮挡业务列
+    /** 只读查看（详情）第 46 轮：之前只能"编辑"（改东西）才能看到商品详情 */
+    const viewOnly = ref(false)
+
     const handleProductAction = (command, row) => {
+      if (command === 'view') return viewProduct(row)
       if (command === 'edit') return editProduct(row)
       if (command === 'stock') return showStockDialog(row)
       if (command === 'delete') return deleteProduct(row)
@@ -645,6 +659,7 @@ export default {
 
     const showAddDialog = () => {
       isEditing.value = false
+      viewOnly.value = false
       // 先清空表单数据
       resetProductForm()
       // 使用nextTick确保数据清空后再显示对话框
@@ -653,8 +668,40 @@ export default {
       }, 10)
     }
 
+    /**
+     * 只读查看商品详情（第 46 轮）。
+     *
+     * 之前管理端**没有"查看"** —— 想看某个商品的详情，只能点「编辑」，
+     * 而"编辑"意味着随时可能误改并提交。
+     * 这里用**只读模式**打开同一个弹窗：字段全禁用、只留"关闭"。
+     */
+    const viewProduct = async (product) => {
+      try {
+        const res = await productAPI.getProduct(product.id)
+        const detail = res.data?.data
+        if (!detail) {
+          ElMessage.error(t('products.messages.loadFailed'))
+          return
+        }
+        isEditing.value = true
+        viewOnly.value = true
+        Object.assign(productForm, {
+          ...detail,
+          category_id: detail.category?.id ?? detail.category_id,
+          points: detail.points != null ? Number(detail.points) : 0,
+          stock_prev: detail.stock,
+          imagePreview: detail.image || ''
+        })
+        showProductDialog.value = true
+      } catch (error) {
+        console.error('查看商品详情失败:', error)
+        ElMessage.error(t('products.messages.loadFailed'))
+      }
+    }
+
     const editProduct = (product) => {
       isEditing.value = true
+      viewOnly.value = false
       Object.assign(productForm, {
         ...product,
         category_id: product.category?.id ?? product.category_id,

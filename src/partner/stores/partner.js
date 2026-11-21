@@ -8,6 +8,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import config from '../../config/index.js'
+import i18n from '../i18n/index.js'
+
+/**
+ * 合作方端的文案要走 i18n —— 之前这些提示全是**硬编码中文**
+ * （MOQ / 库存 / 数量非法），英文与泰文用户看到的是中文。
+ */
+const t = (key, params) => i18n.global.t(key, params || {})
 
 const TOKEN_KEY = 'partner_token'
 const PROFILE_KEY = 'partner_profile'
@@ -62,8 +69,15 @@ export const usePartnerStore = defineStore('partner', () => {
     const normalized = path.startsWith('/') ? path : `/${path}`
     const url = config.buildApiUrl(`/api/partner${normalized}`)
     const res = await fetch(url, { ...options, headers })
-    if (res.status === 401) {
-      // token 过期/无效：清空合作方凭据并跳转登录页，避免用户卡死
+    if (res.status === 401 || res.status === 403) {
+      /**
+       * 401 = token 过期/无效；**403 = 账号被运营禁用**（partnerAuthMiddleware 返回
+       * "合作方账号不可用"）。
+       *
+       * 之前只处理 401 → 账号被禁用后，前端只在某一次请求弹个 toast，
+       * **人还停在旧页面上**，看着像"系统没反应"（其他接口全 403）。
+       * 两种情况都该直接登出 + 回登录页。
+       */
       logout()
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = `${import.meta.env.BASE_URL || '/'}login`
@@ -133,22 +147,22 @@ export const usePartnerStore = defineStore('partner', () => {
       }
     }
     const q = Math.floor(Number(quantity))
-    if (!q || q < 1) return { ok: false, message: '数量无效' }
+    if (!q || q < 1) return { ok: false, message: t('shop.qtyInvalid') }
     // 数量不得超过库存（否则界面金额失真；服务端仍会兜底拒绝）
     const stock = Number(product.stock)
     if (Number.isFinite(stock) && stock > 0 && q > stock) {
-      return { ok: false, message: `数量超出库存（最多 ${stock} 件）` }
+      return { ok: false, message: t('shop.stockExceeded', { count: stock }) }
     }
     const u = Math.max(1, Number(product.moq_unit) || 50)
     const m = Math.max(1, Number(product.moq_multiplier) || 1)
     if (q < u || (q - u) % m !== 0) {
-      return { ok: false, message: `数量须从 ${u} 起，并按步长 ${m} 增加（当前下限 ${u}）` }
+      return { ok: false, message: t('shop.moqWarn', { unit: u, step: m }) }
     }
     const existing = cart.value.find((c) => c.product_id === product.id)
     if (existing) {
       const nq = existing.quantity + q
       if (nq < u || (nq - u) % m !== 0) {
-        return { ok: false, message: `合并后须从 ${u} 起且按步长 ${m} 调整` }
+        return { ok: false, message: t('shop.moqMerged', { unit: u, step: m }) }
       }
       existing.quantity = nq
     } else {
@@ -187,11 +201,11 @@ export const usePartnerStore = defineStore('partner', () => {
     const q = Math.floor(Number(quantity))
     if (!Number.isFinite(q) || q < 1) {
       line.quantity = u
-      return { ok: false, message: `数量无效，已重置为 ${u}` }
+      return { ok: false, message: t('shop.qtyInvalidReset', { unit: u }) }
     }
     if (q < u || (q - u) % m !== 0) {
       line.quantity = u
-      return { ok: false, message: `须 ≥ ${u} 且步长 ${m}，已重置为 ${u}` }
+      return { ok: false, message: t('shop.moqReset', { unit: u, step: m }) }
     }
     line.quantity = q
     return { ok: true }

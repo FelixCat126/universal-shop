@@ -30,7 +30,7 @@ const PointTransaction = sequelize.define('PointTransaction', {
   type: {
     type: DataTypes.STRING(24),
     allowNull: false,
-    comment: 'earn_purchase | redeem_order | refund_cancel | revoke_cancel'
+    comment: 'earn_purchase | redeem_order | refund_cancel | revoke_cancel | admin_adjust（管理端手工发放/扣减）'
   },
   delta: {
     type: DataTypes.INTEGER,

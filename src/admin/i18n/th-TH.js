@@ -125,6 +125,7 @@ export default {
 
   // 导航菜单
   menu: {
+    auditLogs: 'บันทึกการตรวจสอบ',
     toggleSidebar: 'สลับแถบด้านข้าง',
     dashboard: 'สถิติภาพรวม',
     productsMenu: 'สินค้า',
@@ -136,6 +137,7 @@ export default {
     bundles: 'ชุดคอมโบ',
     coupons: 'จัดการคูปองส่วนลด',
     users: 'จัดการผู้ใช้',
+    points: 'จัดการแต้ม',
     partnerWholesale: 'การจัดการคู่ค้า',
     partnersAccounts: 'บัญชีคู่ค้า',
     partnerOrdersMenu: 'คำสั่งซื้อคู่ค้า',
@@ -148,6 +150,9 @@ export default {
   },
 
   partnersMgmt: {
+    initialPassword: 'รหัสผ่านเริ่มต้น',
+    usingInitialPassword: 'ยังใช้อยู่',
+    passwordChanged: 'เปลี่ยนแล้ว',
     title: 'บัญชีคู่ค้า',
     refresh: 'รีเฟรช',
     create: 'เพิ่มคู่ค้า',
@@ -182,6 +187,7 @@ export default {
   },
 
   partnerOrdersMgmt: {
+    paidAt: 'เวลาชำระเงิน',
     title: 'คำสั่งซื้อคู่ค้า',
     export: 'ส่งออก Excel',
     orderNo: 'เลขที่ออเดอร์',
@@ -337,6 +343,11 @@ export default {
 
   // 系统配置页面
   systemConfig: {
+    partnerMoq: 'จำนวนขั้นต่ำสำหรับคู่ค้า',
+    partnerMoqSubtitle: 'จำนวนขั้นต่ำและขั้นตอนของคำสั่งซื้อส่ง',
+    partnerMoqUnit: 'จำนวนขั้นต่ำ (ชิ้น)',
+    savePartnerMoq: 'บันทึก',
+    partnerMoqTips: 'ใช้กับคำสั่งซื้อของคู่ค้า (หน้าจอและเซิร์ฟเวอร์ใช้กฎเดียวกัน)',
     title: 'การตั้งค่าระบบ',
     description: 'กำหนดค่าการตั้งค่าระบบทั่วไป เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่เข้าถึงได้',
     homeBanner: 'การตั้งค่าแบนเนอร์หน้าแรก',
@@ -414,6 +425,8 @@ export default {
       qrDisplay: '• QR Code จะแสดงในป๊อปอัปเมื่อผู้ใช้เลือก "ชำระเงินออนไลน์"'
     },
     messages: {
+      partnerMoqSaveSuccess: 'บันทึกจำนวนขั้นต่ำแล้ว',
+      partnerMoqSaveFailed: 'บันทึกจำนวนขั้นต่ำไม่สำเร็จ',
       uploadSuccess: 'อัปโหลดสำเร็จ',
       uploadFailed: 'อัปโหลดล้มเหลว',
       deleteSuccess: 'ลบสำเร็จ',
@@ -501,7 +514,33 @@ export default {
   },
 
   // 操作日志页面
+  auditLogs: {
+    title: 'บันทึกการตรวจสอบ',
+    total: 'ทั้งหมด',
+    actorType: 'ประเภทผู้กระทำ',
+    allActorTypes: 'ทุกประเภท',
+    actorUser: 'ลูกค้า',
+    actorPartner: 'คู่ค้า',
+    actorSystem: 'ระบบ',
+    actorAnonymous: 'ไม่ระบุ',
+    actor: 'ผู้กระทำ',
+    event: 'เหตุการณ์',
+    eventPlaceholder: 'ชื่อเหตุการณ์ (ค้นบางส่วนได้)',
+    resource: 'ทรัพยากร',
+    resourcePlaceholder: 'ประเภททรัพยากร เช่น order',
+    dateRange: 'ช่วงวันที่',
+    result: 'ผลลัพธ์',
+    success: 'สำเร็จ',
+    failed: 'ล้มเหลว',
+    ip: 'IP',
+    time: 'เวลา',
+    messages: {
+      loadFailed: 'โหลดบันทึกการตรวจสอบไม่สำเร็จ'
+    }
+  },
+
   operationLogs: {
+    exportCsv: 'ส่งออก CSV',
     title: 'บันทึกการดำเนินการ',
     refresh: 'รีเฟรช',
     administrator: 'ผู้ดูแลระบบ',
@@ -567,6 +606,8 @@ export default {
       payment_qrcode: 'QR ชำระเงิน'
     },
     messages: {
+      exportSuccess: 'ส่งออกบันทึกการดำเนินการแล้ว',
+      exportFailed: 'ส่งออกบันทึกการดำเนินการไม่สำเร็จ',
       loadFailed: 'โหลดบันทึกล้มเหลว',
       noData: 'ไม่มีข้อมูล'
     },
@@ -575,6 +616,12 @@ export default {
 
   // 用户管理页面
   users: {
+    deleteAccount: 'ปิดบัญชี',
+    deleteAccountTitle: 'ปิดบัญชีผู้ใช้รายนี้',
+    deleteAccountConfirm: 'ต้องการปิดบัญชีของ "{nickname}" หรือไม่?\n\nที่อยู่และตะกร้าจะถูกล้าง บัญชีถูกปิดใช้งาน และทุกอุปกรณ์จะออกจากระบบ; ประวัติคำสั่งซื้อและคะแนนยังคงอยู่แต่ไม่ผูกกับผู้ใช้จริงแล้ว',
+    deleteAccountConfirmBtn: 'ยืนยันปิดบัญชี',
+    deleteAccountSuccess: 'ปิดบัญชีแล้ว',
+    deleteAccountFailed: 'ปิดบัญชีไม่สำเร็จ',
     resetPassword: 'รีเซ็ตรหัสผ่าน',
     resetPasswordTitle: 'รีเซ็ตรหัสผ่านลูกค้า',
     resetPasswordConfirm: 'รีเซ็ตรหัสผ่านของ "{name}" ใช่หรือไม่? เซสชันเดิมจะถูกยกเลิก และต้องตั้งรหัสผ่านใหม่เมื่อเข้าสู่ระบบครั้งแรก',
@@ -645,6 +692,57 @@ export default {
       unbanFailed: 'ยกเลิกระงับผู้ใช้ล้มเหลว',
       confirmBan: 'คุณแน่ใจหรือไม่ที่จะระงับผู้ใช้นี้?',
       confirmUnban: 'คุณแน่ใจหรือไม่ที่จะยกเลิกระงับผู้ใช้นี้?'
+    }
+  },
+
+  // หน้าจัดการแต้ม
+  points: {
+    title: 'การจัดการแต้ม',
+    totalCount: 'ทั้งหมด',
+    totalUsers: 'ผู้ใช้ที่มีแต้ม',
+    totalBalance: 'ยอดคงเหลือรวม',
+    totalGranted: 'ยอดแต้มที่แจก',
+    totalConsumed: 'ยอดแต้มที่ใช้',
+    keyword: 'คำค้นหา',
+    enterKeyword: 'รหัสผู้ใช้ / เบอร์โทร / ชื่อเล่น',
+    minBalance: 'ยอดขั้นต่ำ',
+    maxBalance: 'ยอดสูงสุด',
+    enterBalance: 'กรอกยอดแต้ม',
+    search: 'ค้นหา',
+    reset: 'รีเซ็ต',
+    userId: 'รหัสผู้ใช้',
+    nickname: 'ชื่อเล่น',
+    phone: 'เบอร์โทร',
+    balance: 'ยอดแต้ม',
+    updateTime: 'อัปเดตล่าสุด',
+    viewTransactions: 'ดูรายการแต้ม',
+    adjust: 'ปรับแต้ม',
+    transactionsTitle: 'รายการแต้ม',
+    type: 'ประเภท',
+    delta: 'การเปลี่ยนแปลง',
+    balanceAfter: 'ยอดหลังเปลี่ยนแปลง',
+    note: 'หมายเหตุ',
+    time: 'เวลา',
+    adjustTitle: 'ปรับแต้มด้วยตนเอง',
+    adjustHint: 'ตัวเลขบวกหมายถึงแจกแต้ม ตัวเลขลบหมายถึงหักแต้ม หากยอดไม่พอระบบจะปฏิเสธการหัก โดยยอดแต้มจะไม่ติดลบ และทุกการปรับจะถูกบันทึกไว้ในประวัติแต้มและบันทึกการดำเนินการ',
+    adjustUser: 'ผู้ใช้',
+    currentBalance: 'ยอดปัจจุบัน',
+    notePlaceholder: 'เช่น การชดเชยหลังการขาย / แต้มแคมเปญ',
+    submitAdjust: 'ยืนยันการปรับ',
+    types: {
+      earn_purchase: 'ได้จากการซื้อ',
+      redeem_order: 'ใช้แลกสินค้า',
+      refund_cancel: 'คืนเมื่อยกเลิกคำสั่งซื้อ',
+      revoke_cancel: 'เก็บคืนเมื่อยกเลิกคำสั่งซื้อ',
+      admin_adjust: 'ปรับด้วยตนเอง'
+    },
+    messages: {
+      overviewFailed: 'โหลดภาพรวมแต้มไม่สำเร็จ',
+      listFailed: 'โหลดรายการยอดแต้มไม่สำเร็จ',
+      transactionsFailed: 'โหลดรายการแต้มไม่สำเร็จ',
+      invalidDelta: 'การเปลี่ยนแปลงแต้มต้องเป็นจำนวนเต็มที่ไม่เป็นศูนย์',
+      adjustSuccess: 'ปรับแต้มสำเร็จ',
+      adjustFailed: 'ปรับแต้มไม่สำเร็จ'
     }
   },
 
@@ -789,6 +887,7 @@ export default {
     tip: 'แนะนำให้กด「ส่งออก CSV」เพื่อดูข้อมูลปัจจุบันเป็นแม่แบบ แก้ไขใน Excel แล้วนำเข้ากลับมา',
   },
   products: {
+    viewDetails: 'ดูรายละเอียด',
     csvHint: 'แถวแรกต้องเป็นชื่อคอลัมน์ รองรับ: id / name / name_th / category / price / stock / points / description / image แถวที่มี id จะอัปเดตสินค้านั้น แถวที่ไม่มี id จะสร้างสินค้าใหม่ คอลัมน์ image ใส่ลิงก์รูปภาพภายนอก (http/https) ได้ ระบบจะดาวน์โหลดมาเก็บไว้ในเครื่อง ส่วนลิงก์ที่ชี้เข้าสู่เครือข่ายภายในจะถูกบล็อกตั้งแต่ขั้นตรวจ',
     bulkActivate: 'เปิดขายทั้งหมด',
     bulkDeactivate: 'ปิดขายทั้งหมด',
@@ -1100,6 +1199,21 @@ export default {
     edit: 'แก้ไข',
     delete: 'ลบ',
     instances: 'อินสแตนซ์',
+    grant: 'แจกคูปอง',
+    grantShort: 'แจก',
+    grantTitle: 'แจกคูปองให้ผู้ใช้',
+    grantTemplate: 'เทมเพลตคูปอง',
+    grantUserIds: 'รหัสผู้ใช้',
+    grantUserIdsHint: 'แยกหลายรหัสด้วยเครื่องหมายจุลภาค ช่องว่าง หรือบรรทัดใหม่; การแจกคูปองเป็นไปตามจำนวนออกและจำนวนต่อคนของเทมเพลต และจะไม่แจกเลยหากแตะลิมิต',
+    grantNote: 'หมายเหตุ',
+    grantSubmit: 'ยืนยันการแจกคูปอง',
+    grantResult: 'ผลการแจกคูปอง',
+    grantResultGranted: 'สำเร็จ',
+    grantResultFailed: 'ไม่สำเร็จ',
+    void: 'ยกเลิก',
+    voidTitle: 'ยกเลิกคูปอง',
+    voidReason: 'เหตุผล',
+    voidHint: 'คูปองที่ถูกยกเลิกจะใช้ไม่ได้อีกต่อไป และผู้ใช้จะเห็นสถานะยกเลิกในคูปองของฉัน',
     instancesTitle: 'อินสแตนซ์คูปอง - {name}',
     instanceUser: 'ผู้ใช้',
     instanceCode: 'รหัสคูปอง',
@@ -1109,12 +1223,17 @@ export default {
     instanceStatusUnused: 'ยังไม่ได้ใช้',
     instanceStatusUsed: 'ใช้แล้ว',
     instanceStatusExpired: 'หมดอายุ',
+    instanceStatusVoid: 'ยกเลิกแล้ว',
     listTotal: 'จำนวนเทมเพลตทั้งหมด',
     noMinSpend: 'ไม่มีขั้นต่ำ',
     placeholders: {
       enterName: 'กรุณากรอกชื่อคูปอง',
       selectCategories: 'เลือกหมวดหมู่ (เลือกได้หลายรายการ)',
-      selectProducts: 'เลือกสินค้า (เลือกได้หลายรายการ, ค้นหาได้)'
+      selectProducts: 'เลือกสินค้า (เลือกได้หลายรายการ, ค้นหาได้)',
+      selectTemplate: 'กรุณาเลือกเทมเพลตคูปอง',
+      userIds: 'เช่น 12, 35, 48',
+      grantNote: 'เหตุผลที่แจกคูปอง (บันทึกลงบันทึกการดำเนินการ)',
+      voidReason: 'กรุณากรอกเหตุผล (จำเป็น)'
     },
     validation: {
       nameRequired: 'กรุณากรอกชื่อคูปอง',
@@ -1124,7 +1243,10 @@ export default {
       perUserPositive: 'จำกัดต่อคนต้องเป็นจำนวนเต็มไม่น้อยกว่า 1',
       timeRangeRequired: 'กรุณาเลือกระยะเวลาใช้งาน',
       timeRangeInvalid: 'เวลาเริ่มต้นต้องอยู่ก่อนเวลาสิ้นสุด',
-      scopeIdsRequired: 'เมื่อไม่ใช่ทั้งร้าน กรุณาเลือกอย่างน้อยหนึ่งรายการ'
+      scopeIdsRequired: 'เมื่อไม่ใช่ทั้งร้าน กรุณาเลือกอย่างน้อยหนึ่งรายการ',
+      templateRequired: 'กรุณาเลือกเทมเพลตคูปอง',
+      userIdsRequired: 'กรุณากรอกรหัสผู้ใช้อย่างน้อยหนึ่งรหัส',
+      voidReasonRequired: 'กรุณากรอกเหตุผลในการยกเลิก'
     },
     messages: {
       loadFailed: 'โหลดเทมเพลตคูปองล้มเหลว',
@@ -1138,7 +1260,12 @@ export default {
       confirmUpdate: 'ยืนยันอัปเดตเทมเพลตคูปองนี้หรือไม่?',
       statusUpdateSuccess: 'อัปเดตสถานะแล้ว',
       statusUpdateFailed: 'อัปเดตสถานะล้มเหลว',
-      instancesLoadFailed: 'โหลดอินสแตนซ์คูปองล้มเหลว'
+      instancesLoadFailed: 'โหลดอินสแตนซ์คูปองล้มเหลว',
+      grantSuccess: 'แจกคูปองสำเร็จ {count} ใบ',
+      grantPartial: 'แจกคูปองสำเร็จ {count} ใบ ผู้ใช้ {failed} รายไม่สำเร็จ',
+      grantFailed: 'แจกคูปองล้มเหลว',
+      voidSuccess: 'ยกเลิกคูปองแล้ว',
+      voidFailed: 'ยกเลิกคูปองล้มเหลว'
     }
   },
 

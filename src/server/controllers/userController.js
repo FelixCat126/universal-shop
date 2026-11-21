@@ -1,4 +1,6 @@
 import User from '../models/User.js'
+import { anonymizeUserAccount } from '../services/userAccountService.js'
+import { withDeadlockRetry } from '../utils/dbRetry.js'
 import Address from '../models/Address.js'
 import Cart from '../models/Cart.js'
 import sequelize from '../config/database.js'
@@ -768,58 +770,114 @@ class UserController {
 
   // 注销当前账号：匿名化资料并禁用，保留订单用于审计，旧 token 立即失效
   static async deleteAccount (req, res) {
-    const transaction = await sequelize.transaction()
+    const userId = req.user?.userId
+    if (!userId) {
+      return res.status(401).json({ success: false, message: '未登录' })
+    }
+    const { password } = req.body || {}
+    if (!password) {
+      return res.status(400).json({ success: false, message: '请输入当前密码以确认注销' })
+    }
+
+    /**
+     * 注销会锁**用户行**（FOR UPDATE）→ 必须放在 withDeadlockRetry 里：
+     * 与其它同样锁用户行的路径（地址写、后台注销）交叉时可能死锁，
+     * 没有重试就是一次 500（第 46 轮补）。
+     *
+     * 事务在 fn 内创建（重试时重建）；失败以 { ok:false, status, message } 返回，
+     * **不能**在事务里直接 res.status(...) —— 那会被 retry 当成正常返回。
+     */
     try {
-      const userId = req.user?.userId
-      if (!userId) {
-        await transaction.rollback()
-        return res.status(401).json({ success: false, message: '未登录' })
-      }
-      const { password } = req.body || {}
-      if (!password) {
-        await transaction.rollback()
-        return res.status(400).json({ success: false, message: '请输入当前密码以确认注销' })
-      }
-      const user = await User.findByPk(userId, { transaction, lock: transaction.LOCK.UPDATE })
-      if (!user) {
-        await transaction.rollback()
-        return res.status(404).json({ success: false, message: '用户不存在' })
-      }
-      const ok = await user.validatePassword(String(password))
-      if (!ok) {
-        await transaction.rollback()
-        return res.status(400).json({ success: false, message: '当前密码不正确' })
-      }
+      const result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          const user = await User.findByPk(userId, { transaction, lock: transaction.LOCK.UPDATE })
+          if (!user) {
+            await transaction.rollback()
+            return { ok: false, status: 404, message: '用户不存在' }
+          }
+          const ok = await user.validatePassword(String(password))
+          if (!ok) {
+            await transaction.rollback()
+            return { ok: false, status: 400, message: '当前密码不正确' }
+          }
 
-      await Address.destroy({ where: { user_id: userId }, transaction })
-      await Cart.destroy({ where: { user_id: userId }, transaction })
+          // 匿名化 + 停用（与运营在后台注销用户**共用同一份实现**）
+          await anonymizeUserAccount(userId, transaction)
+          await transaction.commit()
+          return { ok: true, user }
+        } catch (e) {
+          await transaction.rollback().catch(() => {})
+          throw e
+        }
+      })
 
-      user.is_active = false
-      user.country_code = '+86'
-      user.phone = `139${String(user.id).padStart(8, '0')}`
-      user.username = `deleted_${user.id}`
-      user.email = null
-      user.nickname = '已注销用户'
-      user.avatar_url = null
-      user.referral_code = null
-      user.referred_by_code = null
-      user.must_reset_password = false
-      await user.save({ transaction })
-      // 原子自增，避免并发下丢更新
-      await User.update(
-        { token_version: sequelize.literal('token_version + 1') },
-        { where: { id: userId }, transaction }
-      )
-      await transaction.commit()
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message })
+      }
 
       const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
       await invalidateAuthCache(userId)
-      AuditLog.logUser({ user, event: 'user.delete_account.success', req }).catch(() => {})
+      AuditLog.logUser({ user: result.user, event: 'user.delete_account.success', req }).catch(() => {})
       return res.json({ success: true, message: '账号已注销，个人资料已匿名化' })
     } catch (error) {
-      await transaction.rollback().catch(() => {})
       logger.error('注销账号失败', { err: error?.message, stack: error?.stack })
       return res.status(500).json({ success: false, message: '注销账号失败', code: 'INTERNAL_SERVER_ERROR' })
+    }
+  }
+
+  /**
+   * 管理端注销用户（第 46 轮）
+   *
+   * 之前**只有客户能自助注销**（要输密码），运营遇到"这个客户要求删号"时
+   * 只能手工改库 —— 而后台**没有这个按钮**。
+   *
+   * 语义与自助注销**完全一致**（共用 anonymizeUserAccount）：
+   * 匿名化 + 停用 + 会话立即失效；订单/积分等历史数据保留但对不上真人。
+   */
+  static async deleteUserByAdmin (req, res) {
+    const id = parseId(req.params.id)
+    if (!id) {
+      return res.status(400).json({ success: false, message: '无效的用户 ID' })
+    }
+    try {
+      // 锁用户行 → 必须有死锁重试（与地址写/自助注销交叉时可能成环）
+      const result = await withDeadlockRetry(async () => {
+        const transaction = await sequelize.transaction()
+        try {
+          const user = await anonymizeUserAccount(id, transaction)
+          await transaction.commit()
+          return { ok: true, user }
+        } catch (e) {
+          await transaction.rollback().catch(() => {})
+          throw e
+        }
+      })
+      const user = result.user
+
+      // 让该用户的所有会话立即失效
+      const { invalidateAuthCache } = await import('../middlewares/authMiddleware.js')
+      await invalidateAuthCache(id)
+
+      AuditLog.logAdmin({
+        admin: req.admin,
+        event: 'user.delete_account.admin',
+        resource: 'user',
+        resourceId: id,
+        req
+      }).catch(() => {})
+
+      return res.json({
+        success: true,
+        message: '账号已注销，个人资料已匿名化',
+        data: { id: user.id, nickname: user.nickname }
+      })
+    } catch (error) {
+      if (error?.status === 404) {
+        return res.status(404).json({ success: false, message: '用户不存在' })
+      }
+      logger.error('管理端注销用户失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '注销用户失败', code: 'INTERNAL_SERVER_ERROR' })
     }
   }
 
@@ -1029,13 +1087,26 @@ class UserController {
         })
       }
 
-      const user = await User.findOne({ where: { phone } })
-      
+      /**
+       * 唯一键是 **(country_code, phone)** —— 同一个号码在不同国家/区号下
+       * 是**不同的人**（+66 812345678 与 +86 812345678 毫不相干）。
+       *
+       * 之前这里只按 phone 查 → **同号不同区号互相误判"已注册"**：
+       * 游客用 +86 的号码下单，被一个用 +66 注册的账号挡住（白拦一单）。
+       *
+       * 带 country_code 时按 (country_code, phone) 精确匹配；
+       * 不带时保持旧行为（只按 phone 查），兼容旧调用方。
+       */
+      const countryCode = req.query.country_code ? String(req.query.country_code).trim() : ''
+      const where = countryCode ? { phone, country_code: countryCode } : { phone }
+      const user = await User.findOne({ where })
+
       res.json({
         success: true,
         data: {
           exists: !!user,
-          phone
+          phone,
+          country_code: countryCode || null
         }
       })
     } catch (error) {

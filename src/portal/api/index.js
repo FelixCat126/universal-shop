@@ -156,72 +156,13 @@ api.interceptors.response.use(
   }
 )
 
-// 认证相关API
-const authAPI = {
-  // 用户登录
-  login: (credentials) => api.post('/auth/login', credentials),
-  
-  // 用户注册
-  register: (userData) => api.post('/auth/register', userData),
-  
-  // 用户登出
-  logout: () => api.post('/auth/logout'),
-  
-  // 验证token
-  verify: () => api.get('/auth/verify')
-  // 注：曾有一个 refresh() 调 POST /api/auth/refresh ——
-  // 后端从来没有这个路由（全项目也没有调用方，JWT 无 refresh token 机制），
-  // 属于指向不存在接口的死代码，已删除（前后端接口契约测试会挡住再犯）。
-}
-
-// 请求方法封装
-const request = {
-  get: (url, config = {}) => api.get(url, config),
-  post: (url, data = {}, config = {}) => api.post(url, data, config),
-  put: (url, data = {}, config = {}) => api.put(url, data, config),
-  patch: (url, data = {}, config = {}) => api.patch(url, data, config),
-  delete: (url, config = {}) => api.delete(url, config)
-}
-
-// 文件上传方法
-const uploadFile = (url, file, onProgress = null) => {
-  const formData = new FormData()
-  formData.append('file', file)
-  
-  return api.post(url, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    },
-    onUploadProgress: onProgress
-  })
-}
-
-// 下载文件方法
-const downloadFile = async (url, filename) => {
-  try {
-    const response = await api.get(url, {
-      responseType: 'blob'
-    })
-    
-    const blob = new Blob([response.data])
-    const downloadUrl = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    
-    link.href = downloadUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(downloadUrl)
-    
-    return { success: true }
-  } catch (error) {
-    console.error('Download error:', error)
-    return { success: false, message: '下载失败' }
-  }
-}
-
-// 导出API实例和方法
+/**
+ * 第 46 轮：删掉本文件里**无人使用**的导出（authAPI / request / uploadFile / downloadFile）。
+ *
+ * 它们看起来是"通用能力"，但全项目没有任何调用方：
+ *   - authAPI：登录/注册/登出都走 stores/user.js 里的 api.post
+ *   - request / uploadFile / downloadFile：门户里没有用到
+ *
+ * 留着会让人以为"这些能力已经接好了"，实际是**从未接过的备用件**。
+ */
 export default api
-export { authAPI, request, uploadFile, downloadFile }

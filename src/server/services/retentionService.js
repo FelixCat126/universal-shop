@@ -157,12 +157,15 @@ export async function cleanupRetentionData ({
    *   - status='expired' ：按有效期（expire_at）判断 —— 券已过期即不可用，
    *                        不该因为用户最近才打开过就一直留着；
    *                        过期超过 30 天才清理，给用户一个「看到历史券」的窗口
+   *   - status='void'    ：管理端作废的券（误发/纠纷）同样不可用，
+   *                        按作废时间（updated_at）保留一年，之后清理
    */
   const expiredCouponCutoff = new Date(now - expiredCouponDays * day)
   const couponDeleted = await purgeInBatches(UserCoupon, {
     [Op.or]: [
       { status: 'used', updated_at: { [Op.lt]: couponCutoff } },
-      { status: 'expired', expire_at: { [Op.lt]: expiredCouponCutoff } }
+      { status: 'expired', expire_at: { [Op.lt]: expiredCouponCutoff } },
+      { status: 'void', updated_at: { [Op.lt]: couponCutoff } }
     ]
   }, batchSize)
 

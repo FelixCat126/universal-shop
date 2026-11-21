@@ -1613,6 +1613,49 @@ class OrderController {
     }
   }
 
+  /**
+   * 客户修改订单备注（第 46 轮）
+   *
+   * 之前备注**只能在结算页下单时填**，下单之后就没有任何修改入口
+   * （详情页只读，也没有对应接口）→ 客户填错了地址/规格，只能找客服。
+   *
+   * 规则：
+   *   - 只能改**自己的**订单（where 带 user_id）
+   *   - 订单进入终态（cancelled / completed）后不允许再改
+   *   - 备注最长 500 字（与下单时的字段长度一致）
+   */
+  static async updateOrderNotes (req, res) {
+    const id = parseId(req.params.id)
+    const userId = req.user?.userId
+    if (!id) {
+      return res.status(400).json({ success: false, message: '无效的订单 ID' })
+    }
+    if (!userId) {
+      return res.status(401).json({ success: false, message: '请先登录' })
+    }
+    const notes = String(req.body?.notes ?? '').trim()
+    if (notes.length > 500) {
+      return res.status(400).json({ success: false, message: '备注不能超过 500 个字符' })
+    }
+    try {
+      const order = await Order.findOne({
+        where: { id, user_id: userId },
+        attributes: ['id', 'status', 'notes']
+      })
+      if (!order) {
+        return res.status(404).json({ success: false, message: '订单不存在' })
+      }
+      if (['cancelled', 'completed'].includes(order.status)) {
+        return res.status(400).json({ success: false, message: '订单已结束，不能再修改备注' })
+      }
+      await order.update({ notes }, { where: { id: order.id } })
+      return res.json({ success: true, message: '备注已更新', data: { id: order.id, notes } })
+    } catch (error) {
+      logger.error('修改订单备注失败', { err: error?.message, stack: error?.stack })
+      return res.status(500).json({ success: false, message: '修改备注失败', code: 'INTERNAL_SERVER_ERROR' })
+    }
+  }
+
   static async getOrderDetail(req, res) {
     try {
       // 路径参数严格解析：非正整数会让 PG 抛 invalid input syntax（500）

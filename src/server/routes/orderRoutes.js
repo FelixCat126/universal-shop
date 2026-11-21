@@ -18,6 +18,8 @@ router.get('/', authenticateToken, OrderController.getUserOrders)
 router.post('/:id/confirm-online-payment', writeLimiter, authenticateToken, OrderController.confirmOnlinePayment)
 // 用户自助取消订单（第 45 轮）：让「取消 → 积分退回 / 券退还」这条链有客户的入口
 router.post('/:id/cancel', writeLimiter, authenticateToken, OrderController.cancelOrder)
+// 客户修改订单备注（第 46 轮）：之前只能在结算页下单时填，下单后改不了
+router.put('/:id/notes', writeLimiter, authenticateToken, OrderController.updateOrderNotes)
 router.get('/:id', authenticateToken, OrderController.getOrderDetail)
 
 export default router

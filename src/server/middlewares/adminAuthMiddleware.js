@@ -246,6 +246,8 @@ const SNAPSHOT_MODELS = {
   administrator: 'Administrator',
   bundle: 'Bundle',
   coupon_template: 'CouponTemplate',
+  // 券实例（作废券）：拍下作废前的状态，才能看出"这张券本来是能用还是已用"
+  coupon_instance: 'UserCoupon',
   partner: 'Partner',
   partner_order: 'PartnerOrder',
   product_category: 'ProductCategory',

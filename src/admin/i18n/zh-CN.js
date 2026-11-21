@@ -125,6 +125,7 @@ export default {
 
   // 导航菜单
   menu: {
+    auditLogs: '行为审计',
     toggleSidebar: '切换侧边栏',
     dashboard: '统计总览',
     productsMenu: '产品',
@@ -136,6 +137,7 @@ export default {
     bundles: '组合套餐',
     coupons: '抵扣券管理',
     users: '用户管理',
+    points: '积分管理',
     partnerWholesale: '合作方管理',
     partnersAccounts: '合作方账号',
     partnerOrdersMenu: '合作方订单',
@@ -148,6 +150,9 @@ export default {
   },
 
   partnersMgmt: {
+    initialPassword: '初始口令',
+    usingInitialPassword: '仍在使用',
+    passwordChanged: '已改密',
     title: '合作方账号',
     refresh: '刷新',
     create: '新建合作方',
@@ -182,6 +187,7 @@ export default {
   },
 
   partnerOrdersMgmt: {
+    paidAt: '付款时间',
     title: '合作方订单',
     export: '导出 Excel',
     orderNo: '订单号',
@@ -336,6 +342,11 @@ export default {
 
   // 系统配置页面
   systemConfig: {
+    partnerMoq: '合作方起订量',
+    partnerMoqSubtitle: '批发订单的最小起订件数与数量步长',
+    partnerMoqUnit: '起订量（件）',
+    savePartnerMoq: '保存起订量',
+    partnerMoqTips: '起订量与步长对合作方下单生效（前端提示与后端校验同口径）。',
     title: '系统配置',
     description: '配置系统全局设置，仅超级管理员可访问',
     homeBanner: '首页长图配置',
@@ -413,6 +424,8 @@ export default {
       qrDisplay: '• 二维码将在用户选择"在线付款"时弹窗显示'
     },
     messages: {
+      partnerMoqSaveSuccess: '起订量已保存',
+      partnerMoqSaveFailed: '保存起订量失败',
       uploadSuccess: '上传成功',
       uploadFailed: '上传失败',
       deleteSuccess: '删除成功',
@@ -500,7 +513,33 @@ export default {
   },
 
   // 操作日志页面
+  auditLogs: {
+    title: '行为审计日志',
+    total: '共',
+    actorType: '主体类型',
+    allActorTypes: '全部主体',
+    actorUser: '用户',
+    actorPartner: '合作方',
+    actorSystem: '系统',
+    actorAnonymous: '匿名',
+    actor: '操作主体',
+    event: '事件',
+    eventPlaceholder: '事件名（支持模糊匹配）',
+    resource: '资源',
+    resourcePlaceholder: '资源类型，如 order',
+    dateRange: '日期区间',
+    result: '结果',
+    success: '成功',
+    failed: '失败',
+    ip: 'IP',
+    time: '时间',
+    messages: {
+      loadFailed: '加载行为审计日志失败'
+    }
+  },
+
   operationLogs: {
+    exportCsv: '导出 CSV',
     title: '操作日志',
     refresh: '刷新',
     administrator: '管理员',
@@ -566,6 +605,8 @@ export default {
       payment_qrcode: '支付二维码'
     },
     messages: {
+      exportSuccess: '操作日志已导出',
+      exportFailed: '导出操作日志失败',
       loadFailed: '加载日志失败',
       noData: '暂无数据'
     },
@@ -574,6 +615,12 @@ export default {
 
   // 用户管理页面
   users: {
+    deleteAccount: '注销账号',
+    deleteAccountTitle: '注销该用户账号',
+    deleteAccountConfirm: '确定要注销「{nickname}」的账号吗？\n\n注销会清空其地址与购物车、停用账号并让所有设备立即退出登录；历史订单与积分记录会保留，但不再对应真实用户。',
+    deleteAccountConfirmBtn: '确认注销',
+    deleteAccountSuccess: '账号已注销',
+    deleteAccountFailed: '注销账号失败',
     resetPassword: '重置密码',
     resetPasswordTitle: '重置客户密码',
     resetPasswordConfirm: '确定要给「{name}」重置密码吗？客户的旧会话会全部失效，首次登录需自行改密。',
@@ -644,6 +691,57 @@ export default {
       unbanFailed: '解封用户失败',
       confirmBan: '确定要封禁此用户吗？',
       confirmUnban: '确定要解封此用户吗？'
+    }
+  },
+
+  // 积分管理页面
+  points: {
+    title: '积分管理',
+    totalCount: '共',
+    totalUsers: '积分用户数',
+    totalBalance: '总余额',
+    totalGranted: '总发放',
+    totalConsumed: '总消耗',
+    keyword: '关键字',
+    enterKeyword: '用户 ID / 手机号 / 昵称',
+    minBalance: '余额下限',
+    maxBalance: '余额上限',
+    enterBalance: '请输入余额',
+    search: '搜索',
+    reset: '重置',
+    userId: '用户 ID',
+    nickname: '昵称',
+    phone: '手机号',
+    balance: '积分余额',
+    updateTime: '更新时间',
+    viewTransactions: '查看流水',
+    adjust: '手工调整',
+    transactionsTitle: '积分流水',
+    type: '类型',
+    delta: '积分变动',
+    balanceAfter: '变动后余额',
+    note: '备注',
+    time: '时间',
+    adjustTitle: '手工调整积分',
+    adjustHint: '正数 = 发放积分，负数 = 扣减积分。扣减时余额不足会被拒绝，余额不会被扣成负数；每次调整都会留下积分流水与操作日志。',
+    adjustUser: '调整用户',
+    currentBalance: '当前余额',
+    notePlaceholder: '例如：订单售后补偿 / 活动补发',
+    submitAdjust: '确认调整',
+    types: {
+      earn_purchase: '购物获得',
+      redeem_order: '积分换购',
+      refund_cancel: '取消退回',
+      revoke_cancel: '取消收回',
+      admin_adjust: '手工调整'
+    },
+    messages: {
+      overviewFailed: '加载积分概览失败',
+      listFailed: '加载积分余额列表失败',
+      transactionsFailed: '加载积分流水失败',
+      invalidDelta: '积分变动必须是非零整数',
+      adjustSuccess: '积分调整成功',
+      adjustFailed: '积分调整失败'
     }
   },
 
@@ -788,6 +886,7 @@ export default {
     tip: '建议先「导出 CSV」拿到当前数据作为模板，在 Excel 里改完再导回来。',
   },
   products: {
+    viewDetails: '查看详情',
     csvHint: 'CSV 第一行必须是表头，支持的列：id / name / name_th / category / price / stock / points / description / image。带 id 的行会更新对应商品，不带 id 的行会新建。image 列可以填远程图片地址（http/https），系统会下载并转存到本地；指向内网的地址会在预览阶段被拦下。',
     bulkActivate: '批量上架',
     bulkDeactivate: '批量下架',
@@ -1099,6 +1198,21 @@ export default {
     edit: '编辑',
     delete: '删除',
     instances: '实例',
+    grant: '定向发券',
+    grantShort: '发券',
+    grantTitle: '定向发券',
+    grantTemplate: '券模板',
+    grantUserIds: '用户 ID',
+    grantUserIdsHint: '多个 ID 用逗号、空格或换行分隔；发放遵守模板的发行总量与每人限领规则，触顶时整批不发放',
+    grantNote: '备注',
+    grantSubmit: '确认发放',
+    grantResult: '发放结果',
+    grantResultGranted: '成功',
+    grantResultFailed: '失败',
+    void: '作废',
+    voidTitle: '作废抵扣券',
+    voidReason: '作废原因',
+    voidHint: '作废后该券不可再使用，用户可在「我的优惠券」里看到该券已作废。',
     instancesTitle: '券实例 - {name}',
     instanceUser: '用户',
     instanceCode: '券码',
@@ -1108,12 +1222,17 @@ export default {
     instanceStatusUnused: '未使用',
     instanceStatusUsed: '已使用',
     instanceStatusExpired: '已过期',
+    instanceStatusVoid: '已作废',
     listTotal: '券模板总数',
     noMinSpend: '无门槛',
     placeholders: {
       enterName: '请输入券名称',
       selectCategories: '请选择分类（可多选）',
-      selectProducts: '请选择商品（可多选，可搜索）'
+      selectProducts: '请选择商品（可多选，可搜索）',
+      selectTemplate: '请选择券模板',
+      userIds: '例如：12, 35, 48',
+      grantNote: '发放原因（记入操作日志）',
+      voidReason: '请填写作废原因（必填）'
     },
     validation: {
       nameRequired: '请输入券名称',
@@ -1123,7 +1242,10 @@ export default {
       perUserPositive: '每人限领须为不小于 1 的整数',
       timeRangeRequired: '请选择有效期',
       timeRangeInvalid: '开始时间必须早于结束时间',
-      scopeIdsRequired: '非全场通用时，请至少选择一项'
+      scopeIdsRequired: '非全场通用时，请至少选择一项',
+      templateRequired: '请选择券模板',
+      userIdsRequired: '请至少填写一个用户 ID',
+      voidReasonRequired: '请填写作废原因'
     },
     messages: {
       loadFailed: '加载券模板失败',
@@ -1137,7 +1259,12 @@ export default {
       confirmUpdate: '确定要更新该券模板吗？',
       statusUpdateSuccess: '状态已更新',
       statusUpdateFailed: '状态更新失败',
-      instancesLoadFailed: '加载券实例失败'
+      instancesLoadFailed: '加载券实例失败',
+      grantSuccess: '成功发放 {count} 张券',
+      grantPartial: '成功发放 {count} 张券，{failed} 个用户未发放成功',
+      grantFailed: '定向发券失败',
+      voidSuccess: '抵扣券已作废',
+      voidFailed: '作废抵扣券失败'
     }
   },
 

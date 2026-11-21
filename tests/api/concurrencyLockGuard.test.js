@@ -226,6 +226,11 @@ const MUST_BE_PROTECTED = [
     why: '领券：锁券模板行，防并发超发'
   },
   {
+    file: 'src/server/services/couponService.js',
+    fn: 'grantCouponsToUsers',
+    why: '管理端定向发券：锁券模板行（与自助领券同一把锁），防并发超发'
+  },
+  {
     file: 'src/server/services/orderTimeoutService.js',
     fn: 'sweepRetailPendingOrders',
     why: '超时清扫：Order 行 + 商品行 + 余额行'
@@ -288,9 +293,19 @@ const EXEMPT = [
     why: '锁用户行（第 44 轮新增）：调用方地址控制器已持同一把锁；游客下单在同一事务内 → 同一把锁，串行'
   },
   {
+    file: 'src/server/services/userAccountService.js',
+    fn: 'anonymizeUserAccount',
+    why: '锁辅助函数：两个调用方（自助注销 / 管理端注销）**都在 withDeadlockRetry 保护区内** ✓'
+  },
+  {
     file: 'src/server/services/pointsService.js',
     fn: 'lockOrCreateBalance',
     why: '积分余额行锁辅助函数：所有调用方都按全局顺序取这一把锁（Product → UserCoupon → UserPointBalance）'
+  },
+  {
+    file: 'src/server/services/couponService.js',
+    fn: 'lockTemplate',
+    why: '券模板行锁辅助函数：调用方 claimCouponForUser / grantCouponsToUsers **都在 retry 保护区内**，且都只锁同一把券模板行 → 串行，不成环'
   }
 ]
 

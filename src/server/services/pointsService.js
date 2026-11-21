@@ -10,7 +10,14 @@ export async function getBalance (userId) {
   return row ? Number(row.balance) || 0 : 0
 }
 
-async function lockOrCreateBalance (userId, transaction) {
+/**
+ * 加锁取得/创建用户余额行（FOR UPDATE）。
+ *
+ * 导出给管理端手工调整积分用 —— 调整余额必须与业务侧（发放/扣减）走**同一把锁**，
+ * 否则「运营手工发积分」与「用户下单返积分」并发时会互相覆盖余额（丢失更新）。
+ * 保持导出是向后兼容的：内部调用方行为不变。
+ */
+export async function lockOrCreateBalance (userId, transaction) {
   let row = await UserPointBalance.findOne({
     where: { user_id: userId },
     transaction,
@@ -178,4 +185,50 @@ export async function revokePurchasePoints (transaction, {
     note: note || '订单取消收回购物积分'
   }, { transaction })
   return { requested: n, revoked, truncated: n - revoked }
+}
+
+/**
+ * 管理端手工发放/扣减积分（补偿、纠错）。
+ *
+ * 与订单侧的差异：
+ *   - 没有关联订单（order_id = null），靠 note 说明原因；
+ *   - 流水类型 admin_adjust —— 与 earn_purchase/redeem_order 等业务类型区分开，
+ *     便于事后审计「这笔积分是运营手工发的，不是系统算出来的」；
+ *   - 余额不允许变成负数（余额不足直接抛错，由调用方转成 400）。
+ *
+ * 必须与调用方的事务一起用（余额行已加锁），所以**不自建事务**：
+ * 由控制器开事务 + withDeadlockRetry 包住，重试时整个事务重跑，语义安全。
+ *
+ * @param {import('sequelize').Transaction} transaction
+ * @param {{ userId: number, delta: number, note?: string }} params
+ * @returns {Promise<{ balance_before: number, balance_after: number, delta: number }>}
+ */
+export async function adjustPointsManually (transaction, { userId, delta, note = null }) {
+  const n = Number(delta)
+  if (!Number.isInteger(n) || n === 0) {
+    throw new Error('无效的积分调整值')
+  }
+  const row = await lockOrCreateBalance(userId, transaction)
+  const before = Number(row.balance) || 0
+  const after = before + n
+  if (after < 0) {
+    /**
+     * 余额不足：抛一个**可识别**的错误（而不是普通 Error），
+     * 让控制器能区分「业务拒绝（400）」与「系统故障（500）」。
+     */
+    const insufficient = new Error('POINTS_INSUFFICIENT')
+    insufficient.code = 'POINTS_INSUFFICIENT'
+    throw insufficient
+  }
+  row.balance = after
+  await row.save({ transaction })
+  await PointTransaction.create({
+    user_id: userId,
+    order_id: null,
+    type: 'admin_adjust',
+    delta: n,
+    balance_after: after,
+    note: note || '管理员手工调整积分'
+  }, { transaction })
+  return { balance_before: before, balance_after: after, delta: n }
 }

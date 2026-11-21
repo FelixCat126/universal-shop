@@ -99,6 +99,11 @@ export default {
     orderOk: '订单已提交',
     orderPendingPay: '订单已生成，请扫码付款并在弹窗内确认完成',
     moqWarn: '数量须从 {unit} 起，并可按步长 {step} 增加',
+    qtyInvalid: '数量无效',
+    stockExceeded: '数量超出库存（最多 {count} 件）',
+    moqMerged: '合并后须从 {unit} 起且按步长 {step} 调整',
+    qtyInvalidReset: '数量无效，已重置为 {unit}',
+    moqReset: '须 ≥ {unit} 且步长 {step}，已重置为 {unit}',
     confirmTitle: '确认提交订单',
     confirmHint: '请核对商品与收货信息，提交后由运营处理。',
     confirmAddress: '送货地址',
@@ -123,6 +128,7 @@ export default {
     qrCodeSaveTip: '提示：右键点击二维码可保存下载'
   },
   orders: {
+    notes: '备注',
     statusLabel: '按状态筛选',
     statusAll: '全部状态',
     reorder: '再来一单',

@@ -81,6 +81,15 @@
             <el-icon><RefreshLeft /></el-icon>
             {{ t('common.reset') }}
           </el-button>
+          <!--
+            导出 CSV（第 46 轮）：之前操作日志**只能看、不能导出** ——
+            出事要留证 / 交给审计时，运营只能截图（或者干脆没有）。
+            导出用当前这套筛选条件，口径与列表一致。
+          -->
+          <el-button @click="exportCsv" :loading="exporting">
+            <el-icon><Download /></el-icon>
+            {{ t('operationLogs.exportCsv') }}
+          </el-button>
         </div>
       </el-form>
     </el-card>
@@ -229,7 +238,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Refresh, RefreshLeft } from '@element-plus/icons-vue'
+import { Refresh, RefreshLeft, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { useI18n } from 'vue-i18n'
@@ -265,6 +274,39 @@ const pagination = reactive({
 })
 
 // 获取操作日志
+const exporting = ref(false)
+
+/** 导出当前筛选条件下的操作日志 CSV（第 46 轮） */
+const exportCsv = async () => {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const params = new URLSearchParams(
+      Object.fromEntries(Object.entries(filters).filter(([_, v]) => v))
+    )
+    const response = await adminStore.apiRequest(`/api/admin/operation-logs/export.csv?${params}`)
+    if (!response.ok) {
+      ElMessage.error(t('operationLogs.messages.exportFailed'))
+      return
+    }
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `operation-logs.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success(t('operationLogs.messages.exportSuccess'))
+  } catch (error) {
+    console.error('导出操作日志失败:', error)
+    ElMessage.error(t('operationLogs.messages.exportFailed'))
+  } finally {
+    exporting.value = false
+  }
+}
+
 const loadLogs = async () => {
   try {
     loading.value = true

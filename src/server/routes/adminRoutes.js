@@ -16,8 +16,9 @@ import PromotionController from '../controllers/promotionController.js'
 import CouponAdminController from '../controllers/couponAdminController.js'
 import BundleAdminController from '../controllers/bundleAdminController.js'
 import AfterSaleController from '../controllers/afterSaleController.js'
+import AdminPointsController from '../controllers/adminPointsController.js'
 import { getRuntimeMetrics } from '../middlewares/observability.js'
-import { validate, promotionPayloadSchema, promotionStatusSchema, couponTemplatePayloadSchema, couponTemplateStatusSchema, bundlePayloadSchema, bundleStatusSchema } from '../middlewares/validate.js'
+import { validate, promotionPayloadSchema, promotionStatusSchema, couponTemplatePayloadSchema, couponTemplateStatusSchema, couponGrantSchema, couponVoidSchema, bundlePayloadSchema, bundleStatusSchema } from '../middlewares/validate.js'
 
 const router = express.Router()
 
@@ -169,7 +170,28 @@ const requireUserAdmin = (req, res, next) => {
 router.put('/users/:id/password', requirePermission('users'), requireUserAdmin, logOperation('reset_user_password', 'user'), UserController.resetUserPassword)
 router.get('/users', requirePermission('users'), UserController.getAllUsers)
 router.put('/users/:id/status', requirePermission('users'), logOperation('update_user_status', 'user'), UserController.updateUserStatus)
+/**
+ * 管理端注销用户（第 46 轮）。
+ *
+ * 与「重置客户密码」同级 —— 账号级高危操作，收口到 admin/super_admin。
+ * 语义是**匿名化**（历史订单/积分保留），不是物理删数据。
+ */
+router.delete('/users/:id', requirePermission('users'), requireUserAdmin, logOperation('delete_user_account', 'user'), UserController.deleteUserByAdmin)
 router.get('/users/:userId/addresses', requirePermission('users'), AddressController.getAdminUserAddresses)
+
+/**
+ * 管理端积分管理（需要 users 权限）。
+ *
+ * 之前积分只能在用户侧查看自己的（/api/users/points/*），
+ * 运营要补偿/纠错时**没有任何入口** —— 只能找开发改库。
+ *
+ * 权限沿用 users：积分挂在用户资产上，与「看/改用户」是同一件事，
+ * 不另开一个权限位（角色表 ROLE_PERMISSIONS 里 operator/admin/super_admin 都有 users）。
+ */
+router.get('/points/overview', requirePermission('users'), AdminPointsController.getOverview)
+router.get('/points/users', requirePermission('users'), AdminPointsController.listUserBalances)
+router.get('/points/users/:userId/transactions', requirePermission('users'), AdminPointsController.listUserTransactions)
+router.post('/points/users/:userId/adjust', requirePermission('users'), logOperation('adjust_user_points', 'user_points'), AdminPointsController.adjustUserPoints)
 
 // 管理员管理路由（需要administrators权限）
 router.get('/administrators', requirePermission('administrators'), AdministratorController.getAllAdministrators)
@@ -198,6 +220,9 @@ router.put('/coupon-templates/:id', requirePermission('products'), logOperation(
 router.put('/coupon-templates/:id/status', requirePermission('products'), logOperation('update_coupon_template_status', 'coupon_template'), validate({ body: couponTemplateStatusSchema }), CouponAdminController.updateStatus)
 router.get('/coupon-templates/:id/instances', requirePermission('products'), CouponAdminController.instances)
 router.delete('/coupon-templates/:id', requirePermission('products'), logOperation('delete_coupon_template', 'coupon_template'), CouponAdminController.remove)
+// 定向发券 / 作废券（与券模板同权限、同属 P2 营销体系；发放口径见 couponService）
+router.post('/coupons/grant', requirePermission('products'), logOperation('grant_coupon_instance', 'coupon_instance'), validate({ body: couponGrantSchema }), CouponAdminController.grant)
+router.post('/coupons/instances/:id/void', requirePermission('products'), logOperation('void_coupon_instance', 'coupon_instance'), validate({ body: couponVoidSchema }), CouponAdminController.voidInstance)
 
 // 固定组合包（P4；与产品共用 products 权限）
 router.get('/bundles', requirePermission('products'), BundleAdminController.list)
@@ -208,6 +233,17 @@ router.delete('/bundles/:id', requirePermission('products'), logOperation('delet
 
 // 操作日志路由（仅超级管理员）
 router.get('/operation-logs', requireSuperAdmin, AdministratorController.getOperationLogs)
+/**
+ * 行为审计日志（第 46 轮）：用户与合作方的行为（登录/下单/改密…）。
+ * 之前 AuditLog 只写不读 → 合作方的行为在运营侧完全无痕。
+ * 权限与操作日志一致（super_admin —— 这是审计数据，含 IP 与 UA）。
+ */
+router.get('/audit-logs', requireSuperAdmin, AdministratorController.getAuditLogs)
+/**
+ * 导出操作日志 CSV（第 46 轮）：之前只能看不能导 —— 留证/交给审计时只能截图。
+ * 口径与列表一致（同一套筛选条件 → 同一批数据）。
+ */
+router.get('/operation-logs/export.csv', requireSuperAdmin, exportLimiter, AdministratorController.exportOperationLogs)
 router.get('/metrics', requireSuperAdmin, (req, res) => {
   res.json({ success: true, data: getRuntimeMetrics() })
 })

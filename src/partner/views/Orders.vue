@@ -95,6 +95,13 @@
               <p v-if="order.delivery_address" class="text-xs text-gray-600 whitespace-pre-wrap">
                 <span class="font-medium text-gray-500">{{ t('orders.delivery') }}：</span>{{ order.delivery_address }}
               </p>
+              <!--
+                备注（第 46 轮）：合作方下单时写的备注，**两端都看不见**
+                （管理端没有这列、这边也没显示）→ 备注等于没写。
+              -->
+              <p v-if="order.notes" class="text-xs text-gray-600 whitespace-pre-wrap">
+                <span class="font-medium text-gray-500">{{ t('orders.notes') }}：</span>{{ order.notes }}
+              </p>
             </div>
             <div class="text-right shrink-0 max-w-[40%]">
               <p class="text-base font-semibold text-primary-700 tabular-nums">฿{{ money(order.total_amount_thb) }}</p>

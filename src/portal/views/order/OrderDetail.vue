@@ -80,6 +80,19 @@
               >
                 {{ t('afterSale.apply') }}
               </button>
+              <!--
+                刷新（第 46 轮）：订单状态是**被别人推进的**（运营改状态、售后审核、
+                合作方那边发货）→ 页面停在旧状态，客户得手动重开页面才知道。
+                这里给一个显式刷新（不做轮询：轮询会在用户看详情时一直闪、耗流量）。
+              -->
+              <button
+                type="button"
+                class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                :disabled="loading"
+                @click="loadOrderDetail"
+              >
+                {{ t('order.refresh') }}
+              </button>
               <!-- 取消订单（第 45 轮）：客户自助取消（与后端状态机一致） -->
               <button
                 v-if="canCancelOrder"
@@ -143,9 +156,47 @@
             <span class="font-medium text-gray-700">{{ t('order.deliveryMode') }}:</span>
             <span class="ml-2 text-gray-900">{{ getDeliveryModeText(order.delivery_mode) }}</span>
           </div>
-          <div v-if="order.notes">
+          <!--
+            订单备注（第 46 轮）：之前只在结算页下单时能填，下单后**改不了** ——
+            客户填错了只能找客服。现在订单详情页可直接改（订单结束后不可改）。
+          -->
+          <div v-if="order.notes || canEditNotes">
             <span class="font-medium text-gray-700">{{ t('order.notes') }}:</span>
-            <span class="ml-2 text-gray-900">{{ order.notes }}</span>
+            <span v-if="!editingNotes" class="ml-2 text-gray-900">{{ order.notes || '-' }}</span>
+            <div v-else class="mt-2">
+              <textarea
+                v-model="notesDraft"
+                rows="3"
+                maxlength="500"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                :placeholder="t('order.notesPlaceholder')"
+              ></textarea>
+              <div class="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+                  :disabled="savingNotes"
+                  @click="saveNotes"
+                >
+                  {{ savingNotes ? t('common.submitting') : t('order.saveNotes') }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50"
+                  @click="cancelEditNotes"
+                >
+                  {{ t('common.cancel') }}
+                </button>
+              </div>
+            </div>
+            <button
+              v-if="!editingNotes && canEditNotes"
+              type="button"
+              class="ml-2 text-sm text-blue-600 hover:text-blue-800"
+              @click="startEditNotes"
+            >
+              {{ t('order.editNotes') }}
+            </button>
           </div>
         </div>
       </div>
@@ -365,7 +416,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { formatAmount } from '../../../shared/money.js'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi, createAfterSale, cancelOrder as cancelOrderApi } from '../../api/orders.js'
+import { getOrderDetail, confirmOnlinePayment as confirmOnlinePaymentApi, createAfterSale, cancelOrder as cancelOrderApi, updateOrderNotes } from '../../api/orders.js'
 import {
   ArrowLeftIcon,
   ShoppingBagIcon,
@@ -434,6 +485,45 @@ const afterSaleForm = reactive({ type: 'refund', reason: '' })
 
 /** 可申请售后的订单状态（与后端 afterSaleController 的 REQUESTABLE_STATUSES 一致） */
 const AFTER_SALE_REQUESTABLE = ['paid', 'shipping', 'shipped', 'delivered', 'completed']
+
+/**
+ * 订单备注可改（第 46 轮）：订单进入终态（已取消/已完成）后不可改。
+ */
+const editingNotes = ref(false)
+const notesDraft = ref('')
+const savingNotes = ref(false)
+
+const canEditNotes = computed(() =>
+  !!order.value && !['cancelled', 'completed'].includes(order.value.status))
+
+function startEditNotes () {
+  notesDraft.value = order.value?.notes || ''
+  editingNotes.value = true
+}
+
+function cancelEditNotes () {
+  editingNotes.value = false
+  notesDraft.value = ''
+}
+
+async function saveNotes () {
+  if (!order.value || savingNotes.value) return
+  savingNotes.value = true
+  try {
+    const res = await updateOrderNotes(order.value.id, notesDraft.value.trim())
+    if (res.data?.success) {
+      order.value.notes = res.data.data?.notes ?? notesDraft.value.trim()
+      editingNotes.value = false
+      showMessage(t('order.notesUpdated'), 'success')
+    } else {
+      showMessage(res.data?.message || t('order.notesUpdateFailed'), 'error')
+    }
+  } catch (e) {
+    showMessage(e?.response?.data?.message || t('order.notesUpdateFailed'), 'error')
+  } finally {
+    savingNotes.value = false
+  }
+}
 
 const canApplyAfterSale = computed(() =>
   !!order.value && AFTER_SALE_REQUESTABLE.includes(order.value.status))

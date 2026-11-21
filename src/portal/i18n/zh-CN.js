@@ -270,6 +270,11 @@ export default {
 
   // 订单
   order: {
+    refresh: '刷新',
+    editNotes: '修改',
+    saveNotes: '保存备注',
+    notesUpdated: '备注已更新',
+    notesUpdateFailed: '修改备注失败',
     cancelOrder: '取消订单',
     cancelConfirm: '确定取消这笔订单吗？取消后库存会释放，抵扣券与积分会退回。',
     cancelled: '订单已取消',
@@ -493,6 +498,8 @@ export default {
   },
 
   profile: {
+    orderStatusFilter: '订单状态',
+    allTime: '全部时间',
     passwordChangeNotice: '你的账号还在用系统生成的临时密码，建议现在就设置一个只有你知道的密码（点右边按钮即可）。',
     defaultNickname: '用户',
     phoneNotSet: '未设置手机号',
@@ -679,6 +686,7 @@ export default {
     statusUnused: '未使用',
     statusUsed: '已使用',
     statusExpired: '已过期',
+    statusVoid: '已作废',
     noAvailable: '暂无可领取的优惠券',
     noMine: '暂无相关优惠券',
     loadFailed: '优惠券加载失败，请稍后重试',

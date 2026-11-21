@@ -75,6 +75,17 @@ class CouponController {
         const issued = issuedMap.get(t.id) || 0
         const claimedByMe = mineMap.get(t.id) || 0
         const remaining = t.total == null ? null : Math.max(0, t.total - issued)
+        /**
+         * 这里过滤掉"已领完 / 我已领过"的模板 —— 是**既有契约**：
+         * `/api/coupons/available` 的语义是"**此刻能领的**券"
+         * （tests/api/couponContract.test.js CC-4 与
+         *   tests/integration/coupon.test.js CP-2 都断言这一点）。
+         *
+         * 第 46 轮一度改成"照常返回 + 带标记"，好让前端的「已领取/已领完」
+         * 按钮态不再不可达 —— 但那**破坏了既有契约**（两个老测试直接红）。
+         * 于是改为：保留契约，把前端那段不可达的分支**删掉**（死代码），
+         * 用户从「我的券」里看到自己领过的券（那里本来就是准的）。
+         */
         if (remaining !== null && remaining <= 0) continue
         if (claimedByMe >= (t.per_user || 1)) continue
         list.push({
@@ -120,8 +131,11 @@ class CouponController {
   }
 
   /**
-   * 我的券：?status=unused|used|expired 过滤；
+   * 我的券：?status=unused|used|expired|void 过滤；
    * 查询前惰性过期（expire_at 已过且仍 unused → 置 expired），无需定时任务
+   *
+   * void（已作废）也要能查出来：管理端作废是人工动作，用户必须能在「我的券」里
+   * 看到自己的券被作废了（否则用户只会以为券丢了，去投诉）。
    */
   static async mine (req, res) {
     try {
@@ -140,7 +154,7 @@ class CouponController {
       )
 
       const where = { user_id: userId }
-      if (['unused', 'used', 'expired'].includes(req.query.status)) {
+      if (['unused', 'used', 'expired', 'void'].includes(req.query.status)) {
         where.status = req.query.status
       }
 

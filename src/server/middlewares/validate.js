@@ -192,6 +192,27 @@ export const couponTemplateStatusSchema = Joi.object({
   status: Joi.string().valid('active', 'inactive').required()
 })
 
+/**
+ * 管理端定向发券（POST /api/admin/coupons/grant）
+ *
+ * user_ids 与 user_id 二选一：前端表单既可能给数组，也可能给单个 id。
+ * 上限 500 人一批 —— 再多就该分批（单事务里几百次插入会长时间持锁）。
+ */
+export const couponGrantSchema = Joi.object({
+  template_id: Joi.number().integer().min(1).required(),
+  user_ids: Joi.array().items(Joi.number().integer().min(1)).max(500).optional(),
+  user_id: Joi.number().integer().min(1).optional(),
+  note: Joi.string().max(500).allow('').optional()
+}).xor('user_ids', 'user_id')
+
+/**
+ * 管理端作废券（POST /api/admin/coupons/instances/:id/void）
+ * reason 必填 —— 作废是人工动作，没有原因就无从追溯是谁、为什么作废的
+ */
+export const couponVoidSchema = Joi.object({
+  reason: Joi.string().trim().min(1).max(500).required()
+})
+
 // 组合包组件（P4）：同一组合包内 product_id 不可重复（见 bundlePayloadSchema 的 custom）
 const bundleItemInputSchema = Joi.object({
   product_id: Joi.number().integer().positive().required(),

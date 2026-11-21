@@ -1307,8 +1307,16 @@ const selectAddress = (address) => {
 }
 
 // 去添加地址
+/**
+ * 去个人中心新增地址。
+ *
+ * `from=checkout` 告诉对方"我是从结算页来的" ——
+ * 保存完地址要**自动跳回结算页**（结算页的文案就是这么承诺的：
+ * 「添加地址后将自动返回结算页面」）。之前只跳过去、不回来，
+ * 用户得自己再点一次"返回"，与文案不符。
+ */
 const goToAddAddress = () => {
-  router.push('/profile?tab=addresses')
+  router.push('/profile?tab=addresses&from=checkout')
 }
 
 // 验证表单
@@ -1396,7 +1404,12 @@ const handleSubmitOrder = async () => {
   // 游客下单：检查手机号是否已注册
   if (!userStore.isLoggedIn) {
     try {
-      const response = await api.get(`/users/check-phone/${orderForm.contact_phone}`)
+      // 带上国家区号：唯一键是 (country_code, phone)，
+      // 只按号码查会把"同号不同区号"的另一个账号误判成已注册 → 白拦游客下单
+      const response = await api.get(
+        `/users/check-phone/${encodeURIComponent(orderForm.contact_phone.trim())}`,
+        { params: { country_code: orderForm.contact_country_code } }
+      )
       if (response.data.success && response.data.data.exists) {
         showMessage(t('user.phoneRegisteredLoginFirst'), 'error')
         // 可以选择跳转到登录页面

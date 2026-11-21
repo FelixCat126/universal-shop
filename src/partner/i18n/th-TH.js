@@ -99,6 +99,11 @@ export default {
     orderOk: 'ส่งคำสั่งซื้อแล้ว',
     orderPendingPay: 'สร้างคำสั่งซื้อแล้ว — สแกนชำระเงินแล้วกดยืนยันในหน้าต่างนี้',
     moqWarn: 'เริ่มขั้นต่ำที่ {unit} ชิ้น เพิ่มครั้งละ {step}',
+    qtyInvalid: 'จำนวนไม่ถูกต้อง',
+    stockExceeded: 'จำนวนเกินสต็อก (สูงสุด {count} ชิ้น)',
+    moqMerged: 'หลังรวมแล้ว จำนวนต้องเริ่มที่ {unit} และเพิ่มทีละ {step}',
+    qtyInvalidReset: 'จำนวนไม่ถูกต้อง รีเซ็ตเป็น {unit}',
+    moqReset: 'ต้อง ≥ {unit} และเป็นขั้นละ {step} รีเซ็ตเป็น {unit}',
     confirmTitle: 'ยืนยันคำสั่งซื้อ',
     confirmHint: 'ตรวจสินค้าและที่อยู่ให้ครบก่อนยืนยัน',
     confirmAddress: 'จัดส่งไปที่',
@@ -123,6 +128,7 @@ export default {
     qrCodeSaveTip: 'เคล็ดลับ: คลิกขวาที่คิวอาร์เพื่อบันทึก/ดาวน์โหลด'
   },
   orders: {
+    notes: 'หมายเหตุ',
     statusLabel: 'กรองตามสถานะ',
     statusAll: 'ทุกสถานะ',
     reorder: 'สั่งซื้ออีกครั้ง',

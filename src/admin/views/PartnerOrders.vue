@@ -65,7 +65,19 @@
             </el-table>
           </template>
         </el-table-column>
-        <el-table-column prop="order_no" :label="t('partnerOrdersMgmt.orderNo')" width="130" />
+                <!--
+          付款时间（第 46 轮）：运营之前**看不到**合作方什么时候确认付款
+          （字段在库里、接口也返回了，只是表格没这一列）→ 催款、核对全靠问。
+        -->
+        <el-table-column :label="t('partnerOrdersMgmt.paidAt')" width="170">
+          <template #default="{ row }">
+            <span v-if="row.online_paid_at">{{ formatTime(row.online_paid_at) }}</span>
+            <span v-else class="text-xs text-gray-400">-</span>
+          </template>
+        </el-table-column>
+        <!-- 备注（第 46 轮）：合作方下单写的备注两端都看不见（只在导出里有） -->
+        <el-table-column prop="notes" :label="t('partnerOrdersMgmt.notes')" min-width="160" show-overflow-tooltip />
+<el-table-column prop="order_no" :label="t('partnerOrdersMgmt.orderNo')" width="130" />
         <el-table-column :label="t('partnerOrdersMgmt.partner')" width="110">
           <template #default="{ row }">{{ row.partner?.login }} {{ row.partner?.display_name ? `（${row.partner.display_name}）` : '' }}</template>
         </el-table-column>
@@ -129,7 +141,15 @@ import 'element-plus/es/components/message/style/css'
 import config from '../../config/index.js'
 import { useAdminStore } from '../stores/admin.js'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/** 时间格式化（与管理端其它页面一致：按当前语言显示） */
+const formatTime = (dateString) => {
+  if (!dateString) return '-'
+  const d = new Date(dateString)
+  if (Number.isNaN(d.getTime())) return String(dateString)
+  return d.toLocaleString(locale.value)
+}
 const adminStore = useAdminStore()
 
 const statusOptions = ['pending_payment', 'submitted', 'processing', 'shipped', 'settled', 'cancelled']

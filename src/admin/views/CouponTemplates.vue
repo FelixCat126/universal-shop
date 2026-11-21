@@ -34,6 +34,10 @@
         <el-icon><Plus /></el-icon>
         {{ t('coupons.addTemplate') }}
       </el-button>
+      <el-button @click="openGrantDialog()">
+        <el-icon><Ticket /></el-icon>
+        {{ t('coupons.grant') }}
+      </el-button>
     </div>
 
     <div class="table-section">
@@ -114,11 +118,14 @@
               </template>
             </el-table-column>
 
-            <el-table-column :label="t('coupons.actions')" width="160" fixed="right">
+            <el-table-column :label="t('coupons.actions')" width="290" fixed="right">
               <template #default="scope">
                 <div class="action-buttons">
                   <el-button size="small" @click="showInstances(scope.row)">
                     {{ t('coupons.instances') }}
+                  </el-button>
+                  <el-button size="small" @click="openGrantDialog(scope.row)">
+                    {{ t('coupons.grantShort') }}
                   </el-button>
                   <el-button size="small" @click="editTemplate(scope.row)">
                     {{ t('coupons.edit') }}
@@ -307,11 +314,114 @@
       </template>
     </el-dialog>
 
+    <!-- 定向发券对话框 -->
+    <el-dialog
+      :title="t('coupons.grantTitle')"
+      v-model="showGrantDialog"
+      width="640px"
+      top="5vh"
+      class="coupon-dialog"
+    >
+      <div class="dialog-content">
+        <el-form :model="grantForm" label-width="110px">
+          <el-form-item :label="t('coupons.grantTemplate')" required>
+            <el-select v-model="grantForm.templateId" :placeholder="t('coupons.placeholders.selectTemplate')">
+              <el-option
+                v-for="opt in grantTemplateOptions"
+                :key="opt.id"
+                :label="`${opt.name}（${formatAmount(opt.amount)}）`"
+                :value="opt.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item :label="t('coupons.grantUserIds')" required>
+            <el-input
+              v-model="grantForm.userIdsText"
+              type="textarea"
+              :rows="4"
+              :placeholder="t('coupons.placeholders.userIds')"
+            />
+            <p class="field-hint">{{ t('coupons.grantUserIdsHint') }}</p>
+          </el-form-item>
+
+          <el-form-item :label="t('coupons.grantNote')">
+            <el-input
+              v-model="grantForm.note"
+              :placeholder="t('coupons.placeholders.grantNote')"
+              maxlength="500"
+            />
+          </el-form-item>
+        </el-form>
+
+        <!-- 发放结果：成功/失败明细（失败的用户要能让运营一眼看到） -->
+        <div v-if="grantResult" class="grant-result">
+          <p class="grant-result-title">
+            {{ t('coupons.grantResult') }}：
+            <span class="grant-result-count">{{ t('coupons.grantResultGranted') }} {{ grantResult.granted_count }}</span>
+            <span v-if="grantResult.failed?.length" class="grant-result-failed">
+              {{ t('coupons.grantResultFailed') }} {{ grantResult.failed.length }}
+            </span>
+          </p>
+          <el-table v-if="grantResult.failed?.length" :data="grantResult.failed" border size="small">
+            <el-table-column prop="user_id" :label="t('coupons.grantUserIds')" width="120" />
+            <el-table-column prop="message" :label="t('coupons.grantResultFailed')" />
+          </el-table>
+        </div>
+      </div>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showGrantDialog = false">{{ t('common.close') }}</el-button>
+          <el-button type="primary" :loading="granting" @click="submitGrant">
+            {{ t('coupons.grantSubmit') }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 作废券对话框 -->
+    <el-dialog
+      :title="t('coupons.voidTitle')"
+      v-model="showVoidDialog"
+      width="480px"
+      top="8vh"
+      class="coupon-dialog"
+    >
+      <div class="dialog-content">
+        <el-form :model="voidForm" label-width="90px">
+          <el-form-item :label="t('coupons.instanceCode')">
+            <span class="validity-text">{{ voidForm.code }}</span>
+          </el-form-item>
+          <el-form-item :label="t('coupons.voidReason')" required>
+            <el-input
+              v-model="voidForm.reason"
+              type="textarea"
+              :rows="3"
+              maxlength="500"
+              show-word-limit
+              :placeholder="t('coupons.placeholders.voidReason')"
+            />
+          </el-form-item>
+        </el-form>
+        <p class="field-hint">{{ t('coupons.voidHint') }}</p>
+      </div>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showVoidDialog = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="danger" :loading="voiding" @click="submitVoid">
+            {{ t('coupons.void') }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <!-- 券实例弹窗 -->
     <el-dialog
       :title="t('coupons.instancesTitle', { name: instancesTemplate?.name || '' })"
       v-model="showInstancesDialog"
-      width="760px"
+      width="860px"
       top="5vh"
       class="coupon-dialog"
     >
@@ -327,7 +437,7 @@
           <template #default="scope">
             <el-tag
               size="small"
-              :type="scope.row.status === 'unused' ? 'success' : scope.row.status === 'used' ? 'info' : 'danger'"
+              :type="instanceStatusTagType(scope.row.status)"
             >{{ instanceStatusText(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
@@ -339,6 +449,19 @@
         <el-table-column :label="t('coupons.instanceUsedAt')" min-width="150">
           <template #default="scope">
             <span class="validity-text">{{ scope.row.used_at || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('coupons.actions')" width="100" align="center" fixed="right">
+          <template #default="scope">
+            <el-button
+              v-if="scope.row.status === 'unused'"
+              size="small"
+              type="danger"
+              @click="openVoidDialog(scope.row)"
+            >
+              {{ t('coupons.void') }}
+            </el-button>
+            <span v-else class="muted-text">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -367,7 +490,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
-import { Plus, Search, Refresh } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Ticket } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { couponAPI } from '../api/coupons.js'
 import { productAPI } from '../api/products.js'
@@ -425,6 +548,26 @@ const instancesPage = ref(1)
 const instancesPageSize = ref(10)
 const instancesTemplate = ref(null)
 
+// 定向发券对话框
+const showGrantDialog = ref(false)
+const granting = ref(false)
+const grantForm = reactive({
+  templateId: null,
+  userIdsText: '',
+  note: ''
+})
+const grantTemplateOptions = ref([])
+const grantResult = ref(null)
+
+// 作废券对话框
+const showVoidDialog = ref(false)
+const voiding = ref(false)
+const voidForm = reactive({
+  id: null,
+  code: '',
+  reason: ''
+})
+
 // scope 在服务端可能是对象或 JSON 字符串，编辑/展示前统一归一
 const parseMaybeJson = (val, fallback) => {
   if (val == null) return fallback
@@ -470,7 +613,16 @@ const instanceUserText = (row) => {
 const instanceStatusText = (status) => {
   if (status === 'used') return t('coupons.instanceStatusUsed')
   if (status === 'expired') return t('coupons.instanceStatusExpired')
+  if (status === 'void') return t('coupons.instanceStatusVoid')
   return t('coupons.instanceStatusUnused')
+}
+
+// 状态标签配色：作废单独用 warning，与「已过期」的 danger 区分开
+const instanceStatusTagType = (status) => {
+  if (status === 'unused') return 'success'
+  if (status === 'used') return 'info'
+  if (status === 'void') return 'warning'
+  return 'danger'
 }
 
 // 切换范围类型时清空已选项，避免残留上一类型的 id
@@ -783,6 +935,115 @@ const loadInstances = async () => {
   }
 }
 
+// 解析用户 ID 输入：支持逗号/顿号/分号/空格/换行分隔（运营粘贴多个 id 的常见场景）
+const parseUserIds = (text) => {
+  return [...new Set(
+    String(text || '')
+      .split(/[\s,，;；、]+/)
+      .map(v => v.trim())
+      .filter(v => /^\d+$/.test(v))
+      .map(Number)
+  )]
+}
+
+// 打开定向发券对话框：row 传入时默认选中该模板
+const openGrantDialog = async (row) => {
+  grantForm.templateId = row?.id ?? null
+  grantForm.userIdsText = ''
+  grantForm.note = ''
+  grantResult.value = null
+  showGrantDialog.value = true
+  await loadGrantTemplateOptions(row)
+}
+
+// 发券模板下拉：只列启用中的模板（停用的模板后端会拒发，前端就别让人选）
+const loadGrantTemplateOptions = async (row) => {
+  try {
+    const res = await couponAPI.list({ page: 1, pageSize: 100, status: 'active' })
+    const list = Array.isArray(res.data?.data?.list) ? res.data.data.list : []
+    const options = [...list]
+    // 停用模板不在列表里，但运营可能正是要给某个已停用模板发券 → 补进去，后端会给明确报错
+    if (row && !options.some(o => o.id === row.id)) {
+      options.unshift(row)
+    }
+    grantTemplateOptions.value = options
+  } catch (error) {
+    console.error('加载可发券模板失败:', error)
+    grantTemplateOptions.value = row ? [row] : []
+  }
+}
+
+const submitGrant = async () => {
+  if (!grantForm.templateId) {
+    ElMessage.error(t('coupons.validation.templateRequired'))
+    return
+  }
+  const userIds = parseUserIds(grantForm.userIdsText)
+  if (userIds.length === 0) {
+    ElMessage.error(t('coupons.validation.userIdsRequired'))
+    return
+  }
+
+  granting.value = true
+  try {
+    const response = await couponAPI.grant({
+      template_id: grantForm.templateId,
+      user_ids: userIds,
+      note: grantForm.note.trim() || undefined
+    })
+    if (response.data?.success) {
+      grantResult.value = response.data.data
+      const failedCount = response.data.data.failed?.length || 0
+      if (failedCount > 0) {
+        ElMessage.warning(t('coupons.messages.grantPartial', {
+          count: response.data.data.granted_count,
+          failed: failedCount
+        }))
+      } else {
+        ElMessage.success(t('coupons.messages.grantSuccess', { count: response.data.data.granted_count }))
+      }
+      loadTemplates()
+    } else {
+      ElMessage.error(response.data?.message || t('coupons.messages.grantFailed'))
+    }
+  } catch (error) {
+    ElMessage.error(t('coupons.messages.grantFailed') + ': ' + (error.response?.data?.message || error.message))
+  } finally {
+    granting.value = false
+  }
+}
+
+const openVoidDialog = (row) => {
+  voidForm.id = row.id
+  voidForm.code = row.code
+  voidForm.reason = ''
+  showVoidDialog.value = true
+}
+
+const submitVoid = async () => {
+  const reason = voidForm.reason.trim()
+  if (!reason) {
+    ElMessage.error(t('coupons.validation.voidReasonRequired'))
+    return
+  }
+  voiding.value = true
+  try {
+    const response = await couponAPI.voidInstance(voidForm.id, reason)
+    if (response.data?.success) {
+      ElMessage.success(t('coupons.messages.voidSuccess'))
+      showVoidDialog.value = false
+      loadInstances()
+      loadTemplates()
+    } else {
+      ElMessage.error(response.data?.message || t('coupons.messages.voidFailed'))
+    }
+  } catch (error) {
+    ElMessage.error(t('coupons.messages.voidFailed') + ': ' + (error.response?.data?.message || error.message))
+  } finally {
+    voiding.value = false
+  }
+}
+
 const loadCategoryOptions = async () => {
   try {
     const res = await productAPI.getProductCategories()
@@ -892,6 +1153,30 @@ onMounted(async () => {
   font-size: 12px;
   color: #909399;
   line-height: 1.45;
+}
+
+.grant-result {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 4px;
+  background: #f5f7fa;
+}
+
+.grant-result-title {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #303133;
+}
+
+.grant-result-count {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.grant-result-failed {
+  color: #f56c6c;
+  font-weight: 600;
+  margin-left: 12px;
 }
 
 .coupon-dialog .el-select {

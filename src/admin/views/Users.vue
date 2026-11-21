@@ -229,6 +229,14 @@
                     <el-dropdown-item command="resetPassword" divided :disabled="!scope.row.is_active">
                       {{ t('users.resetPassword') }}
                     </el-dropdown-item>
+                    <!--
+                      注销账号（第 46 轮）：之前**只有客户能自助注销**（要输密码），
+                      运营遇到"客户要求删号"只能手工改库。
+                      这里是匿名化（历史订单/积分保留），不是物理删数据。
+                    -->
+                    <el-dropdown-item command="delete" divided :disabled="!scope.row.is_active">
+                      {{ t('users.deleteAccount') }}
+                    </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -630,6 +638,7 @@ const handleUserAction = (command, row) => {
   if (command === 'orders') return goUserOrders(row)
   if (command === 'toggle') return toggleUserStatus(row)
   if (command === 'resetPassword') return resetUserPassword(row)
+  if (command === 'delete') return deleteUserAccount(row)
 }
 
 /**
@@ -675,6 +684,42 @@ const copyResetPassword = async () => {
 }
 
 // 查看用户详情
+/**
+ * 注销用户（第 46 轮）：匿名化 + 停用 + 会话立即失效。
+ * 二次确认，且必须打"注销"两个字，避免误点。
+ */
+const deleteUserAccount = async (user) => {
+  try {
+    await ElMessageBox.confirm(
+      t('users.deleteAccountConfirm', { nickname: user.nickname || user.username || user.id }),
+      t('users.deleteAccountTitle'),
+      {
+        confirmButtonText: t('users.deleteAccountConfirmBtn'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning'
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    const { useAdminStore } = await import('../stores/admin.js')
+    const adminStore = useAdminStore()
+    const response = await adminStore.apiRequest(`/api/admin/users/${user.id}`, {
+      method: 'DELETE'
+    })
+    const data = await response.json()
+    if (data.success) {
+      ElMessage.success(t('users.deleteAccountSuccess'))
+      await loadUsers()
+    } else {
+      ElMessage.error(data.message || t('users.deleteAccountFailed'))
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || t('users.deleteAccountFailed'))
+  }
+}
+
 const viewUserDetail = async (user) => {
   selectedUser.value = user
   showUserDialog.value = true

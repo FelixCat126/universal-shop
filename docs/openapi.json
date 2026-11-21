@@ -1606,7 +1606,7 @@
           "type": {
             "type": "string",
             "maxLength": 24,
-            "description": "earn_purchase | redeem_order | refund_cancel | revoke_cancel"
+            "description": "earn_purchase | redeem_order | refund_cancel | revoke_cancel | admin_adjust（管理端手工发放/扣减）"
           },
           "delta": {
             "type": "integer",
@@ -1658,7 +1658,7 @@
           "status": {
             "type": "string",
             "maxLength": 16,
-            "description": "状态：unused-未使用 / used-已使用 / expired-已过期"
+            "description": "状态：unused-未使用 / used-已使用 / expired-已过期 / void-已作废（管理端）"
           },
           "used_by_order_id": {
             "type": "integer",
@@ -1728,6 +1728,117 @@
           "created_at",
           "updated_at"
         ]
+      },
+      "AdminPointOverview": {
+        "type": "object",
+        "description": "积分全局概览",
+        "properties": {
+          "totalUsers": {
+            "type": "integer",
+            "description": "有积分账户的用户数"
+          },
+          "totalBalance": {
+            "type": "integer",
+            "description": "余额合计"
+          },
+          "totalGranted": {
+            "type": "integer",
+            "description": "累计发放积分"
+          },
+          "totalConsumed": {
+            "type": "integer",
+            "description": "累计消耗积分"
+          },
+          "transactionCount": {
+            "type": "integer",
+            "description": "现存积分流水条数"
+          }
+        }
+      },
+      "AdminPointBalanceItem": {
+        "type": "object",
+        "description": "用户积分余额行（含用户基础信息）",
+        "properties": {
+          "user_id": {
+            "type": "integer"
+          },
+          "balance": {
+            "type": "integer",
+            "description": "当前可用积分"
+          },
+          "archived_delta": {
+            "type": "integer",
+            "description": "已被清理流水的净额"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "nickname": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "country_code": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "AdminPointAdjustRequest": {
+        "type": "object",
+        "description": "手工发放/扣减积分请求体",
+        "properties": {
+          "delta": {
+            "type": "integer",
+            "description": "积分变动值（正数发放，负数扣减，不得为 0）",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "调整原因（备注）"
+          }
+        },
+        "required": [
+          "delta"
+        ]
+      },
+      "AdminPointAdjustResult": {
+        "type": "object",
+        "description": "手工调整积分结果",
+        "properties": {
+          "user_id": {
+            "type": "integer"
+          },
+          "delta": {
+            "type": "integer"
+          },
+          "balance_before": {
+            "type": "integer",
+            "description": "调整前余额"
+          },
+          "balance_after": {
+            "type": "integer",
+            "description": "调整后余额"
+          }
+        }
       },
       "AdministrativeRegion": {
         "type": "object",
@@ -3570,6 +3681,62 @@
         "x-generated-from": "express-route-table"
       }
     },
+    "/api/admin/audit-logs": {
+      "get": {
+        "summary": "GET /api/admin/audit-logs",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
+        "x-generated-from": "express-route-table"
+      }
+    },
     "/api/admin/bundles": {
       "get": {
         "summary": "GET /api/admin/bundles",
@@ -4809,6 +4976,302 @@
         "x-generated-from": "express-route-table"
       }
     },
+    "/api/admin/coupons/grant": {
+      "post": {
+        "summary": "POST /api/admin/coupons/grant",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "template_id": {
+                    "type": "integer",
+                    "description": "券模板 id"
+                  },
+                  "user_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "目标用户 id 列表（与 user_id 二选一）"
+                  },
+                  "user_id": {
+                    "type": "integer",
+                    "description": "单个目标用户 id（与 user_ids 二选一）"
+                  },
+                  "note": {
+                    "type": "string",
+                    "description": "发放备注（记入操作日志）"
+                  }
+                },
+                "required": [
+                  "template_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "定向发券结果",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "granted_count": {
+                          "type": "integer",
+                          "description": "成功发放张数"
+                        },
+                        "granted": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "user_id": {
+                                "type": "integer"
+                              },
+                              "coupon_id": {
+                                "type": "integer"
+                              },
+                              "code": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "failed": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "user_id": {
+                                "type": "integer"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "note": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/coupons/instances/{id}/void": {
+      "post": {
+        "summary": "POST /api/admin/coupons/instances/:id/void",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "作废原因"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "作废结果",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "template_id": {
+                          "type": "integer"
+                        },
+                        "user_id": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "void"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
     "/api/admin/export/jobs": {
       "get": {
         "summary": "导出任务列表（前端每 3s 轮询）",
@@ -5161,6 +5624,62 @@
           }
         },
         "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/export/jobs/cleanup": {
+      "post": {
+        "summary": "POST /api/admin/export/jobs/cleanup",
+        "tags": [
+          "导出任务"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
         "x-generated-from": "express-route-table"
       }
     },
@@ -5863,6 +6382,62 @@
           }
         },
         "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/operation-logs/export.csv": {
+      "get": {
+        "summary": "GET /api/admin/operation-logs/export.csv",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
         "x-generated-from": "express-route-table"
       }
     },
@@ -7474,6 +8049,475 @@
         "x-generated-from": "express-route-table"
       }
     },
+    "/api/admin/points/overview": {
+      "get": {
+        "summary": "GET /api/admin/points/overview",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "统一响应信封",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AdminPointOverview"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/points/users": {
+      "get": {
+        "summary": "GET /api/admin/points/users",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "按用户 ID 精确筛选"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "手机号 / 昵称 / 用户名 模糊匹配"
+          },
+          {
+            "name": "min_balance",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "余额下限"
+          },
+          {
+            "name": "max_balance",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "余额上限"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "分页列表",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AdminPointBalanceItem"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "总条数"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "当前页码"
+                        },
+                        "pageSize": {
+                          "type": "integer",
+                          "description": "每页条数"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "总页数"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/points/users/{userId}/adjust": {
+      "post": {
+        "summary": "POST /api/admin/points/users/:userId/adjust",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPointAdjustRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "统一响应信封",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AdminPointAdjustResult"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/points/users/{userId}/transactions": {
+      "get": {
+        "summary": "GET /api/admin/points/users/:userId/transactions",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "分页列表",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "是否成功"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "提示信息"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "错误码（失败时可选）"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PointTransaction"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "总条数"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "当前页码"
+                        },
+                        "pageSize": {
+                          "type": "integer",
+                          "description": "每页条数"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "总页数"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
     "/api/admin/product-categories": {
       "get": {
         "summary": "GET /api/admin/product-categories",
@@ -8894,6 +9938,71 @@
           }
         },
         "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/admin/users/{id}": {
+      "delete": {
+        "summary": "DELETE /api/admin/users/:id",
+        "tags": [
+          "管理端"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
         "x-generated-from": "express-route-table"
       }
     },
@@ -12729,6 +13838,71 @@
           }
         },
         "x-schema": "defined",
+        "x-generated-from": "express-route-table"
+      }
+    },
+    "/api/orders/{id}/notes": {
+      "put": {
+        "summary": "PUT /api/orders/:id/notes",
+        "tags": [
+          "订单"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
         "x-generated-from": "express-route-table"
       }
     },

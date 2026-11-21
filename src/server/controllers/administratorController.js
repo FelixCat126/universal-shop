@@ -11,6 +11,11 @@ import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { likeContains } from '../utils/likeSearch.js'
 import { respondDbError } from '../utils/dbInputError.js'
+import { csvCell } from '../utils/csvExporter.js'
+import { getBusinessTimezone, localDateKey } from '../utils/businessTimezone.js'
+
+/** CSV 导出行数上限（与用户/合作方导出同口径） */
+const CSV_EXPORT_ROW_LIMIT = 50000
 
 class AdministratorController {
   // 管理员登录
@@ -511,6 +516,103 @@ class AdministratorController {
   }
 
   // 获取操作日志
+  /**
+   * 行为审计日志（第 46 轮）
+   *
+   * AuditLog 与 OperationLog 是**两张表**：
+   *   - OperationLog：管理员在后台的写操作（改状态、改配置…）
+   *   - AuditLog：用户与合作方的行为（登录、下单、改密、取消…）
+   *
+   * 之前 AuditLog **只写不读**（全库没有一处 AuditLog.findAll）→
+   * 合作方登录/下单/改密在运营界面**完全无痕**：
+   * 合作方说"我没下过这单"、"我没改过密码"，运营查不出来。
+   *
+   * 现在开放只读查询（含分页与筛选），供运营排查纠纷与核对行为。
+   */
+  static async getAuditLogs (req, res) {
+    try {
+      const { actor_type, event, resource, start_date, end_date } = req.query
+      const { page, pageSize, limit, offset } = resolvePagination(req.query, { defaultPageSize: 50 })
+      const where = {}
+      if (actor_type) where.actor_type = actor_type
+      if (event) where.event = { [Op.like]: likeContains(event) }
+      if (resource) where.resource = resource
+      if (start_date && end_date) {
+        where.created_at = { [Op.between]: [new Date(start_date), new Date(end_date)] }
+      }
+      const { count, rows } = await AuditLog.findAndCountAll({
+        where,
+        limit,
+        offset,
+        order: [['created_at', 'DESC']]
+      })
+      return res.json({
+        success: true,
+        data: {
+          logs: rows,
+          total: count,
+          page,
+          pageSize,
+          totalPages: Math.ceil(count / pageSize)
+        }
+      })
+    } catch (e) {
+      logger.error('读取行为审计日志失败', { err: e?.message, stack: e?.stack })
+      return res.status(500).json({ success: false, message: '读取行为审计日志失败' })
+    }
+  }
+
+  /**
+   * 导出操作日志 CSV（第 46 轮）
+   *
+   * 之前操作日志**只能看、不能导出** —— 出了事要留证/交给审计，
+   * 运营只能截图（或者干脆没有）。
+   *
+   * 口径与列表一致（同一套筛选条件 → 同一批数据），行数上限同其它 CSV 导出。
+   */
+  static async exportOperationLogs (req, res) {
+    try {
+      const { admin_id, action, resource, start_date, end_date } = req.query
+      const where = {}
+      if (admin_id) where.admin_id = admin_id
+      if (action) where.action = { [Op.like]: likeContains(action) }
+      if (resource) where.resource = resource
+      if (start_date && end_date) {
+        where.created_at = { [Op.between]: [new Date(start_date), new Date(end_date)] }
+      }
+      const rows = await OperationLog.findAll({
+        where,
+        order: [['created_at', 'DESC']],
+        limit: CSV_EXPORT_ROW_LIMIT
+      })
+      const header = ['id', 'admin_id', 'admin_username', 'action', 'resource', 'resource_id', 'created_at']
+      const lines = [header.join(',')]
+      for (const row of rows) {
+        const raw = row.toJSON()
+        lines.push(header.map(col => {
+          switch (col) {
+            case 'id': return String(raw.id ?? '')
+            case 'admin_id': return String(raw.admin_id ?? '')
+            case 'admin_username': return csvCell(raw.admin_username)
+            case 'action': return csvCell(raw.action)
+            case 'resource': return csvCell(raw.resource)
+            case 'resource_id': return raw.resource_id == null ? '' : String(raw.resource_id)
+            case 'created_at': return csvCell(raw.created_at)
+            default: return ''
+          }
+        }).join(','))
+      }
+      const tz = await getBusinessTimezone()
+      const filename = `operation-logs-${localDateKey(tz, new Date())}.csv`
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+      return res.send('\ufeff' + lines.join('\r\n'))
+    } catch (e) {
+      logger.error('导出操作日志 CSV 失败', { err: e?.message, stack: e?.stack })
+      return res.status(500).json({ success: false, message: '导出失败' })
+    }
+  }
+
   static async getOperationLogs(req, res) {
     try {
       const { admin_id, action, resource, start_date, end_date } = req.query

@@ -99,6 +99,11 @@ export default {
     orderOk: 'Order submitted',
     orderPendingPay: 'Order created — scan to pay, then confirm in this dialog',
     moqWarn: 'Qty must start at {unit}, then steps of {step}',
+    qtyInvalid: 'Invalid quantity',
+    stockExceeded: 'Quantity exceeds stock (max {count})',
+    moqMerged: 'After merging, qty must start at {unit} in steps of {step}',
+    qtyInvalidReset: 'Invalid quantity, reset to {unit}',
+    moqReset: 'Must be ≥ {unit} in steps of {step}, reset to {unit}',
     confirmTitle: 'Confirm order',
     confirmHint: 'Check items and address before submitting.',
     confirmAddress: 'Ship to',
@@ -123,6 +128,7 @@ export default {
     qrCodeSaveTip: 'Tip: right-click the QR code to save/download.'
   },
   orders: {
+    notes: 'Notes',
     statusLabel: 'Filter by status',
     statusAll: 'All statuses',
     reorder: 'Order again',

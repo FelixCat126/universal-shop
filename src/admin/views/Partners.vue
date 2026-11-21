@@ -57,6 +57,19 @@
             <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? t('partnersMgmt.active') : t('partnersMgmt.inactive') }}</el-tag>
           </template>
         </el-table-column>
+        <!--
+          初始口令状态（第 46 轮）：账号被建出来时密码是系统随机生成的，
+          运营没告诉合作方 → 合作方登录时会被强制改密。
+          运营**看不到**哪些账号还停在"初始口令"状态，只能一个个问。
+        -->
+        <el-table-column :label="t('partnersMgmt.initialPassword')" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="row.must_reset_password" type="warning" size="small">
+              {{ t('partnersMgmt.usingInitialPassword') }}
+            </el-tag>
+            <span v-else class="text-xs text-gray-400">{{ t('partnersMgmt.passwordChanged') }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="last_login_at" :label="t('partnersMgmt.lastLogin')" min-width="160">
           <template #default="{ row }">{{ formatDateTime(row.last_login_at) }}</template>
         </el-table-column>

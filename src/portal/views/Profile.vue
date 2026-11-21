@@ -182,12 +182,22 @@
             <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
               <h3 class="text-lg font-medium text-gray-900">{{ t('profile.myOrders') }}</h3>
               <div class="flex flex-wrap items-end gap-3">
+                <!--
+                  「全部时间」（第 46 轮）：默认只看最近 3 个月，
+                  早于 3 个月的订单**默认看不见** → 客户会以为记录丢了。
+                  给一个"全部时间"的开关（后端空日期=不过滤 ✓）。
+                -->
+                <label class="flex items-center gap-1.5 text-xs text-gray-600 self-end pb-2">
+                  <input v-model="ordersAllTime" type="checkbox" class="rounded border-gray-300" />
+                  {{ t('profile.allTime') }}
+                </label>
                 <div class="flex flex-col">
                   <label class="text-xs text-gray-500">{{ t('profile.dateFrom') }}</label>
                   <input
                     v-model="ordersDateFrom"
                     type="date"
-                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    :disabled="ordersAllTime"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
                   />
                 </div>
                 <div class="flex flex-col">
@@ -195,8 +205,30 @@
                   <input
                     v-model="ordersDateTo"
                     type="date"
-                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    :disabled="ordersAllTime"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
                   />
+                </div>
+                <!--
+                  订单状态筛选（第 46 轮）：后端早就支持 ?status=（逗号分隔多状态），
+                  但前端**只有日期筛选** → 客户想看"我的退款中/已完成"只能靠日期硬筛。
+                -->
+                <div class="flex flex-col min-w-[200px]">
+                  <label class="text-xs text-gray-500">{{ t('profile.orderStatusFilter') }}</label>
+                  <div class="flex flex-wrap gap-1">
+                    <button
+                      v-for="opt in ORDER_STATUS_FILTERS"
+                      :key="opt.value"
+                      type="button"
+                      class="px-2 py-1 rounded-full text-xs border transition-colors"
+                      :class="ordersStatusFilter.includes(opt.value)
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'"
+                      @click="toggleOrderStatus(opt.value)"
+                    >
+                      {{ opt.label }}
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -356,12 +388,18 @@
             <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
               <h3 class="text-lg font-medium text-gray-900">{{ t('profile.pointsLedgerTab') }}</h3>
               <div class="flex flex-wrap items-end gap-3">
+                <!-- 「全部时间」（第 46 轮）：积分流水同理，早于 3 个月的默认看不见 -->
+                <label class="flex items-center gap-1.5 text-xs text-gray-600 self-end pb-2">
+                  <input v-model="pointsAllTime" type="checkbox" class="rounded border-gray-300" />
+                  {{ t('profile.allTime') }}
+                </label>
                 <div class="flex flex-col">
                   <label class="text-xs text-gray-500">{{ t('profile.dateFrom') }}</label>
                   <input
                     v-model="pointsDateFrom"
                     type="date"
-                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    :disabled="pointsAllTime"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
                   />
                 </div>
                 <div class="flex flex-col">
@@ -369,7 +407,8 @@
                   <input
                     v-model="pointsDateTo"
                     type="date"
-                    class="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    :disabled="pointsAllTime"
+                    class="rounded border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
                   />
                 </div>
                 <button
@@ -460,14 +499,11 @@
                   <div class="flex items-center pr-3">
                     <button
                       type="button"
-                      class="rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                      :class="couponClaimState(tpl) === 'claim' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400'"
-                      :disabled="couponClaimState(tpl) !== 'claim' || claimingCouponId === tpl.id"
+                      class="rounded-md px-3 py-1.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="claimingCouponId === tpl.id"
                       @click="handleClaimCoupon(tpl)"
                     >
                       <span v-if="claimingCouponId === tpl.id">{{ t('coupon.claiming') }}</span>
-                      <span v-else-if="couponClaimState(tpl) === 'claimed'">{{ t('coupon.claimed') }}</span>
-                      <span v-else-if="couponClaimState(tpl) === 'soldOut'">{{ t('coupon.soldOut') }}</span>
                       <span v-else>{{ t('coupon.claim') }}</span>
                     </button>
                   </div>
@@ -485,7 +521,7 @@
               <h3 class="text-lg font-medium text-gray-900 mb-3">{{ t('coupon.myCoupons') }}</h3>
               <div class="flex space-x-2 mb-4">
                 <button
-                  v-for="s in ['unused', 'used', 'expired']"
+                  v-for="s in ['unused', 'used', 'expired', 'void']"
                   :key="s"
                   type="button"
                   class="rounded-full px-3 py-1 text-sm border"
@@ -532,7 +568,8 @@
                         :class="{
                           'bg-green-100 text-green-700': c.status === 'unused',
                           'bg-gray-200 text-gray-500': c.status === 'used',
-                          'bg-gray-200 text-gray-400': c.status === 'expired'
+                          'bg-gray-200 text-gray-400': c.status === 'expired',
+                          'bg-red-100 text-red-600': c.status === 'void'
                         }"
                       >{{ couponStatusLabel(c.status) }}</span>
                     </div>
@@ -1066,6 +1103,24 @@ const orders = ref([])
 const loadingOrders = ref(false)
 const ordersDateFrom = ref(range0.start)
 const ordersDateTo = ref(range0.end)
+/** 订单状态筛选（第 46 轮）：空数组 = 全部 */
+const ordersStatusFilter = ref([])
+/** 「全部时间」开关（第 46 轮）：勾上后不传日期 = 不按时间过滤 */
+const ordersAllTime = ref(false)
+const pointsAllTime = ref(false)
+/** 可选状态（文案复用 order.status.*，与列表里的状态标签同一套） */
+const ORDER_STATUS_VALUES = ['pending', 'paid', 'shipping', 'shipped', 'delivered', 'completed', 'cancelled']
+const ORDER_STATUS_FILTERS = computed(() =>
+  ORDER_STATUS_VALUES.map(value => ({ value, label: t(`order.status.${value}`) })))
+
+/** 点一下切换某个状态的选中（空 = 全部） */
+function toggleOrderStatus (value) {
+  const list = ordersStatusFilter.value
+  const idx = list.indexOf(value)
+  if (idx >= 0) list.splice(idx, 1)
+  else list.push(value)
+  applyOrderFilters()
+}
 const ordersPage = ref(1)
 const ordersPageSize = 15
 const ordersTotal = ref(0)
@@ -1518,18 +1573,23 @@ const loadOrders = async ({ reset = false, append = false } = {}) => {
   // 快照本次请求的页码与筛选条件，响应回来后校验一致才允许写入
   const seq = ++ordersLoadSeq
   const reqPage = ordersPage.value
-  const reqFrom = ordersDateFrom.value
-  const reqTo = ordersDateTo.value
+  const reqFrom = ordersAllTime.value ? '' : ordersDateFrom.value
+  const reqTo = ordersAllTime.value ? '' : ordersDateTo.value
+  const reqStatus = ordersStatusFilter.value.join(',')
   try {
     const response = await getUserOrders({
       page: reqPage,
       limit: ordersPageSize,
       created_from: reqFrom,
-      created_to: reqTo
+      created_to: reqTo,
+      // 空 = 不传（后端不过滤）；多状态用逗号分隔（后端已支持）
+      ...(reqStatus ? { status: reqStatus } : {})
     })
     // 过期响应直接丢弃：既防止旧结果覆盖新筛选，也防止旧页被追加到新列表
     if (seq !== ordersLoadSeq) return false
-    if (ordersDateFrom.value !== reqFrom || ordersDateTo.value !== reqTo) return false
+    if ((ordersAllTime.value ? '' : ordersDateFrom.value) !== reqFrom ||
+        (ordersAllTime.value ? '' : ordersDateTo.value) !== reqTo) return false
+    if (ordersStatusFilter.value.join(',') !== reqStatus) return false
     if (!response.data?.success) {
       if (!append) orders.value = []
       showError(response.data?.message || t('profile.loadOrdersFailed'))
@@ -1611,12 +1671,13 @@ const loadPointTransactions = async ({ reset = false, append = false } = {}) => 
     const res = await userAPI.getPointTransactions({
       page: pointsTxPage.value,
       limit: pointsTxPageSize,
-      created_from: pointsDateFrom.value,
-      created_to: pointsDateTo.value
+      // 「全部时间」时不传日期（后端空日期 = 不过滤）
+      created_from: pointsAllTime.value ? '' : pointsDateFrom.value,
+      created_to: pointsAllTime.value ? '' : pointsDateTo.value
     })
     if (!res.data?.success) {
       if (!append) pointTransactions.value = []
-      return
+      return false
     }
     const d = res.data.data
     const items = d.items || []
@@ -1628,10 +1689,12 @@ const loadPointTransactions = async ({ reset = false, append = false } = {}) => 
     }
     await nextTick()
     setupPointsIntersection()
+    return true
   } catch (e) {
     console.error(e)
     if (!append) pointTransactions.value = []
     showError(t('profile.loadPointsLedgerFailed'))
+    return false
   } finally {
     busy.value = false
   }
@@ -1640,8 +1703,15 @@ const loadPointTransactions = async ({ reset = false, append = false } = {}) => 
 const loadMorePointsTx = async () => {
   if (loadingPointsTx.value || loadingMorePointsTx.value) return
   if (!pointsHasMore.value) return
+  const prevPage = pointsTxPage.value
   pointsTxPage.value += 1
-  await loadPointTransactions({ append: true })
+  const ok = await loadPointTransactions({ append: true })
+  /**
+   * 失败时页码必须**回退**（与订单侧同一个道理，第 46 轮补上）：
+   * 否则网络抖动一次，页码停在 2，下次滚动直接取第 3 页
+   * → **第 2 页的积分流水永久缺失**，再也不会补回来。
+   */
+  if (!ok) pointsTxPage.value = prevPage
 }
 
 const applyPointsFilters = () => {
@@ -1714,17 +1784,24 @@ const couponRemainingText = (tpl) => {
 const couponStatusLabel = (status) => {
   if (status === 'used') return t('coupon.statusUsed')
   if (status === 'expired') return t('coupon.statusExpired')
+  // 已作废（管理端把误发的券作废）：用户必须能看到自己的券被作废了
+  if (status === 'void') return t('coupon.statusVoid')
   return t('coupon.statusUnused')
 }
 
 // 领取按钮态：已领（达到每人限领）> 已领完 > 可领取
-const couponClaimState = (tpl) => {
-  const perUser = Number(tpl?.per_user) || 1
-  const claimed = Number(tpl?.claimed_by_me) || 0
-  if (claimed >= perUser) return 'claimed'
-  if (tpl?.remaining != null && Number(tpl.remaining) <= 0) return 'soldOut'
-  return 'claim'
-}
+/**
+ * 领券按钮（第 46 轮简化）。
+ *
+ * 原来这里有三个态：claim / claimed（我已领过）/ soldOut（已领完），
+ * 但服务端 `/api/coupons/available` 的语义是"**此刻能领的**券" ——
+ * 已领完的和我已领过的**根本不会出现在这个列表里**（既有契约，
+ * 见 tests/api/couponContract.test.js CC-4 与 tests/integration/coupon.test.js CP-2），
+ * 所以后两种态**永远不可达** → 是死代码。
+ *
+ * 现在列表里的券**都能领** → 按钮只需要"领取中禁用"这一个状态。
+ * 用户想看自己领过哪些券，去「我的券」里看（那里本来就是准的）。
+ */
 
 const loadAvailableCoupons = async () => {
   loadingAvailableCoupons.value = true
@@ -1771,7 +1848,6 @@ const loadCouponsTab = async () => {
 
 const handleClaimCoupon = async (tpl) => {
   if (!tpl?.id || claimingCouponId.value === tpl.id) return
-  if (couponClaimState(tpl) !== 'claim') return
   claimingCouponId.value = tpl.id
   try {
     const res = await claimCoupon(tpl.id)
@@ -2039,6 +2115,14 @@ const saveAddress = async () => {
       success(editingAddress.value ? t('profile.addressUpdated') : t('profile.addressAdded'))
       showAddressModal.value = false
       await loadAddresses() // 重新加载地址列表
+      /**
+       * 从结算页过来新增地址的 → **自动跳回结算页**（第 46 轮）。
+       * 结算页的文案「添加地址后将自动返回结算页面」一直承诺着这件事，
+       * 但之前保存完只停在个人中心，用户得自己再点一次"返回"。
+       */
+      if (!editingAddress.value && route.query.from === 'checkout') {
+        router.push('/checkout')
+      }
     } else {
       showError(response.data.message || t('profile.saveAddressFailed'))
     }

@@ -427,6 +427,53 @@ export interface UserPointBalance {
 }
 
 /**
+ * 积分全局概览
+ */
+export interface AdminPointOverview {
+  totalUsers?: number
+  totalBalance?: number
+  totalGranted?: number
+  totalConsumed?: number
+  transactionCount?: number
+}
+
+/**
+ * 用户积分余额行（含用户基础信息）
+ */
+export interface AdminPointBalanceItem {
+  user_id?: number
+  balance?: number
+  archived_delta?: number
+  updated_at?: string
+  user?: {
+    id?: number
+    nickname?: string
+    username?: string
+    phone?: string
+    country_code?: string
+    email?: string
+  } | null
+}
+
+/**
+ * 手工发放/扣减积分请求体
+ */
+export interface AdminPointAdjustRequest {
+  delta: number
+  note?: string
+}
+
+/**
+ * 手工调整积分结果
+ */
+export interface AdminPointAdjustResult {
+  user_id?: number
+  delta?: number
+  balance_before?: number
+  balance_after?: number
+}
+
+/**
  * 行政区划
  */
 export interface AdministrativeRegion {

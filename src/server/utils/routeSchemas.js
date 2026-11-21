@@ -172,6 +172,65 @@ export const COMPONENT_SCHEMAS = {
     name: 'UserPointBalance',
     extra: { description: '用户积分余额' }
   }),
+
+  // 管理端积分管理（/api/admin/points/*）
+  AdminPointOverview: {
+    type: 'object',
+    description: '积分全局概览',
+    properties: {
+      totalUsers: { type: 'integer', description: '有积分账户的用户数' },
+      totalBalance: { type: 'integer', description: '余额合计' },
+      totalGranted: { type: 'integer', description: '累计发放积分' },
+      totalConsumed: { type: 'integer', description: '累计消耗积分' },
+      transactionCount: { type: 'integer', description: '现存积分流水条数' }
+    }
+  },
+  AdminPointBalanceItem: {
+    type: 'object',
+    description: '用户积分余额行（含用户基础信息）',
+    properties: {
+      user_id: { type: 'integer' },
+      balance: { type: 'integer', description: '当前可用积分' },
+      archived_delta: { type: 'integer', description: '已被清理流水的净额' },
+      updated_at: { type: 'string', format: 'date-time' },
+      user: {
+        type: 'object',
+        nullable: true,
+        properties: {
+          id: { type: 'integer' },
+          nickname: { type: 'string' },
+          username: { type: 'string' },
+          phone: { type: 'string' },
+          country_code: { type: 'string' },
+          email: { type: 'string' }
+        }
+      }
+    }
+  },
+  AdminPointAdjustRequest: {
+    type: 'object',
+    description: '手工发放/扣减积分请求体',
+    properties: {
+      delta: {
+        type: 'integer',
+        description: '积分变动值（正数发放，负数扣减，不得为 0）',
+        minimum: -1000000,
+        maximum: 1000000
+      },
+      note: { type: 'string', maxLength: 255, description: '调整原因（备注）' }
+    },
+    required: ['delta']
+  },
+  AdminPointAdjustResult: {
+    type: 'object',
+    description: '手工调整积分结果',
+    properties: {
+      user_id: { type: 'integer' },
+      delta: { type: 'integer' },
+      balance_before: { type: 'integer', description: '调整前余额' },
+      balance_after: { type: 'integer', description: '调整后余额' }
+    }
+  },
   AdministrativeRegion: modelToSchema(AdministrativeRegion, {
     name: 'AdministrativeRegion',
     extra: { description: '行政区划' }
@@ -393,6 +452,22 @@ function pagedAs (name, key, extraProps = {}) {
   }, '分页列表')
 }
 
+/**
+ * 自定义 key 的分页信封（items 形状：管理端积分列表用）
+ */
+function pagedItems (name) {
+  return envelopeSchema({
+    type: 'object',
+    properties: {
+      items: arrayOf(name),
+      total: { type: 'integer', description: '总条数' },
+      page: { type: 'integer', description: '当前页码' },
+      pageSize: { type: 'integer', description: '每页条数' },
+      totalPages: { type: 'integer', description: '总页数' }
+    }
+  }, '分页列表')
+}
+
 export const ROUTE_SCHEMAS = {
   /* ---------------- 商品 ---------------- */
   'GET /api/products': { response: pagedAs('Product', 'products') },
@@ -524,6 +599,25 @@ export const ROUTE_SCHEMAS = {
   // 注：GET/PUT /api/users/profile 的完整定义在下方「用户认证」区块（含 request schema），此处不重复登记
   'GET /api/admin/users': { response: pagedList('User') },
   'GET /api/admin/users/:userId/addresses': { response: envArray('Address') },
+
+  /* ---------------- 管理端积分管理 ---------------- */
+  'GET /api/admin/points/overview': { response: env('AdminPointOverview') },
+  'GET /api/admin/points/users': {
+    query: [
+      { name: 'user_id', schema: { type: 'integer' }, description: '按用户 ID 精确筛选' },
+      { name: 'keyword', schema: { type: 'string' }, description: '手机号 / 昵称 / 用户名 模糊匹配' },
+      { name: 'min_balance', schema: { type: 'integer' }, description: '余额下限' },
+      { name: 'max_balance', schema: { type: 'integer' }, description: '余额上限' },
+      { name: 'page', schema: { type: 'integer' } },
+      { name: 'pageSize', schema: { type: 'integer' } }
+    ],
+    response: pagedItems('AdminPointBalanceItem')
+  },
+  'GET /api/admin/points/users/:userId/transactions': { response: pagedItems('PointTransaction') },
+  'POST /api/admin/points/users/:userId/adjust': {
+    request: ref('AdminPointAdjustRequest'),
+    response: env('AdminPointAdjustResult')
+  },
   'GET /api/addresses': { response: envArray('Address') },
   'POST /api/addresses': { response: env('Address') },
   'PUT /api/addresses/:id': { response: env('Address') },
@@ -683,6 +777,68 @@ export const ROUTE_SCHEMAS = {
   },
   'GET /api/admin/coupon-templates/:id/instances': {
     response: pagedList('UserCoupon')
+  },
+  'POST /api/admin/coupons/grant': {
+    request: {
+      type: 'object',
+      properties: {
+        template_id: { type: 'integer', description: '券模板 id' },
+        user_ids: {
+          type: 'array',
+          items: { type: 'integer' },
+          description: '目标用户 id 列表（与 user_id 二选一）'
+        },
+        user_id: { type: 'integer', description: '单个目标用户 id（与 user_ids 二选一）' },
+        note: { type: 'string', description: '发放备注（记入操作日志）' }
+      },
+      required: ['template_id']
+    },
+    response: envelopeSchema({
+      type: 'object',
+      properties: {
+        granted_count: { type: 'integer', description: '成功发放张数' },
+        granted: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              user_id: { type: 'integer' },
+              coupon_id: { type: 'integer' },
+              code: { type: 'string' }
+            }
+          }
+        },
+        failed: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              user_id: { type: 'integer' },
+              message: { type: 'string' }
+            }
+          }
+        },
+        note: { type: 'string', nullable: true }
+      }
+    }, '定向发券结果')
+  },
+  'POST /api/admin/coupons/instances/:id/void': {
+    request: {
+      type: 'object',
+      properties: { reason: { type: 'string', description: '作废原因' } },
+      required: ['reason']
+    },
+    response: envelopeSchema({
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        code: { type: 'string' },
+        template_id: { type: 'integer' },
+        user_id: { type: 'integer' },
+        status: { type: 'string', enum: ['void'] },
+        reason: { type: 'string' }
+      }
+    }, '作废结果')
   },
   'POST /api/admin/promotions': {
     request: {

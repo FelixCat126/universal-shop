@@ -327,7 +327,14 @@ async function download (row) {
 
 async function retry (row) {
   try {
-    await createExportJob(row.type, { ...props.params })
+    /**
+     * 重试要用**这个失败任务自己的筛选条件**（row.params），
+     * 而不是当前页面的筛选（props.params）——
+     * 后者会生成一个"参数完全不同的新任务"：
+     * 运营看到"订单导出失败"，点重试 → 出来的却是"用户导出"，
+     * 而且失败任务还在列表里（状态不会变），越看越糊涂。
+     */
+    await createExportJob(row.type, { ...(row.params || {}) })
     ElMessage.success(t('exportTasks.submitSuccess'))
     await load()
     startPolling()

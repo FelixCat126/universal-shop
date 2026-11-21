@@ -23,6 +23,17 @@ export const couponAPI = {
   },
   instances (id, params = {}) {
     return api.get(`/admin/coupon-templates/${id}/instances`, { params })
+  },
+  /**
+   * 定向发券（补偿 / 活动 / 老客户维护）
+   * @param {{ template_id: number, user_ids?: number[], user_id?: number, note?: string }} data
+   */
+  grant (data) {
+    return api.post('/admin/coupons/grant', data)
+  },
+  /** 作废某一张已发出的券（只能作废未被使用的券） */
+  voidInstance (id, reason) {
+    return api.post(`/admin/coupons/instances/${id}/void`, { reason })
   }
 }
 
