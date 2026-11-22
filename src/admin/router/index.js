@@ -86,6 +86,17 @@ const router = createRouter({
           meta: { title: '售后管理', requiresAuth: true, permission: 'orders', keepScroll: true }
         },
         {
+          // 支付对账台账（第 51 轮）：
+          // 超时未支付被清扫掉的订单，单据在服务端留了完整快照，
+          // 运营在这里逐单核对"这笔钱到底收没收到"。
+          // 权限是**独立的 reconciliation 资源**（operator 看不到）——
+          // 标记「已收款」是财务动作，误标会让财务对账失真。
+          path: '/payment-reconciliation',
+          name: 'PaymentReconciliation',
+          component: () => import('../views/PaymentReconciliation.vue'),
+          meta: { title: '支付对账', requiresAuth: true, permission: 'reconciliation', keepScroll: true }
+        },
+        {
           path: '/users',
           name: 'Users',
           component: () => import('../views/Users.vue'),

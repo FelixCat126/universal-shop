@@ -89,6 +89,11 @@
             <el-icon><Tickets /></el-icon>
             {{ t('menu.afterSales') }}
           </el-menu-item>
+          <!-- 支付对账（第 51 轮）：独立权限 reconciliation，operator 不给 -->
+          <el-menu-item index="/payment-reconciliation" v-if="adminStore.hasPermission('reconciliation')">
+            <el-icon><Money /></el-icon>
+            {{ t('menu.reconciliation') }}
+          </el-menu-item>
           <el-sub-menu index="/marketing" v-if="adminStore.hasPermission('products')">
             <template #title>
               <el-icon><PriceTag /></el-icon>
@@ -150,7 +155,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ensureLocale } from '../i18n/index.js'
-import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag, Tickets, Coin } from '@element-plus/icons-vue'
+import { User, ArrowDown, DataAnalysis, Goods, Document, UserFilled, OfficeBuilding, PriceTag, Tickets, Coin, Money } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import { useAdminStore } from '../stores/admin.js'

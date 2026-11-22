@@ -49,7 +49,7 @@ export const useAdminStore = defineStore('admin', () => {
     if (!adminInfo.value) return false
     const rolePermissions = {
       super_admin: ['*'],
-      admin: ['orders', 'users', 'products', 'administrators', 'partners'],
+      admin: ['orders', 'users', 'products', 'administrators', 'partners', 'reconciliation'],
       operator: ['orders', 'users', 'products']
     }
     const permissions = rolePermissions[adminInfo.value.role] || []

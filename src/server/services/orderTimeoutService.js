@@ -17,6 +17,18 @@
  * 积分流水：point_transactions.order_id 的 FK 是 ON DELETE SET NULL，
  * 直接删订单会把流水的 order_id 静默置 NULL、审计链断掉；
  * 因此删单前先显式 PointTransaction.destroy 清理该单流水。
+ *
+ * 支付对账台账（第 51 轮）：删单**之前**在**同一事务**里写一份完整快照到
+ * `payment_reconciliation_records`（单号/金额/明细/地址/备注/下单人/时间），
+ * 运营据此去银行或收款码流水里逐单核对"这笔钱到底收没收到"。
+ *
+ * 为什么必须同事务：这里写失败 → 事务回滚 → 订单**不被删**。
+ * 宁可订单留着（运营看到"有单没清掉"）也不能出现"钱收了、系统里没这单" ——
+ * 那是本服务最坏的一种失败模式。
+ *
+ * 为什么需要它：本系统**没有支付网关**（静态收款二维码 + 人工点「完成付款」），
+ * "钱到账"系统无从知晓，所以"自动对账"做不到自动；
+ * 能做的是把单据完整留存下来，交给人工核对。
  */
 
 import { Op } from 'sequelize'
@@ -28,10 +40,17 @@ import PartnerOrder from '../models/PartnerOrder.js'
 import PartnerOrderItem from '../models/PartnerOrderItem.js'
 import Product from '../models/Product.js'
 import AuditLog from '../models/AuditLog.js'
+import PaymentReconciliationRecord from '../models/PaymentReconciliationRecord.js'
 import sequelize from '../config/database.js'
 import { restoreOrderResources } from '../controllers/orderController.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { logger } from '../utils/logger.js'
+import {
+  buildRetailItemsSnapshot,
+  buildPartnerItemsSnapshot,
+  resolveRetailUserLabel,
+  resolvePartnerLabel
+} from '../utils/reconciliationSnapshot.js'
 
 /** 单次清扫最多处理的订单数，防止积压时一轮扫太久 */
 const SWEEP_BATCH_LIMIT = 200
@@ -83,6 +102,39 @@ async function sweepRetailPendingOrders (cutoff) {
 
           order.items = await OrderItem.findAll({ where: { order_id: orderId }, transaction })
 
+          /**
+           * 写对账台账（第 51 轮）：删单**之前**把完整快照留下来。
+           *
+           * 为什么必须在删单之前：订单是**物理删除**（未开 paranoid），
+           * 删掉之后商品名/单价/地址这些只有订单上才有的快照值**再也回捞不到**。
+           *
+           * 为什么必须**同事务**：这里写失败 → 事务回滚 → 订单**不被删**。
+           * 这样"快照写不进去"永远不会退化成"单子消失、无处回捞" ——
+           * 宁可订单留着让运营看到"有单没清掉"，也不能出现"钱收了系统里没这单"。
+           *
+           * 快照内容：单号/金额/币种/明细（含组合包分摊后的权威行小计）/
+           * 地址/备注/下单人脱敏标识/下单时间。
+           */
+          const userLabel = await resolveRetailUserLabel(order.user_id, transaction)
+          const reconciliation = await PaymentReconciliationRecord.create({
+            order_type: 'retail',
+            order_id: order.id,
+            order_no: order.order_no,
+            amount: Number(order.total_amount) || 0,
+            currency_code: order.currency_code || 'THB',
+            total_amount_thb: Number(order.total_amount_thb) || 0,
+            items_snapshot: buildRetailItemsSnapshot(order.items),
+            contact_name: order.contact_name || null,
+            contact_phone: order.contact_phone || null,
+            delivery_address: order.delivery_address || null,
+            notes: order.notes || null,
+            user_id: order.user_id || null,
+            user_label: userLabel,
+            order_created_at: order.created_at || null,
+            swept_at: new Date(),
+            reconcile_status: 'pending'
+          }, { transaction })
+
           // 回补库存（pending 在线单未支付：不涉及积分退/收，restore 内部按字段自行跳过）
           await restoreOrderResources(order, transaction)
 
@@ -116,7 +168,9 @@ async function sweepRetailPendingOrders (cutoff) {
               user_id: order.user_id,
               created_at: order.created_at,
               swept_at: new Date().toISOString(),
-              reason: '超时未支付，订单被自动清理'
+              reason: '超时未支付，订单被自动清理',
+              // 第 51 轮：串起对账台账那一行（审计 ↔ 台账互相可追）
+              reconciliation_id: reconciliation.id
             }
           }, { transaction })
 
@@ -187,6 +241,33 @@ async function sweepPartnerPendingPaymentOrders (cutoff) {
             transaction
           })
 
+          /**
+           * 写对账台账（第 51 轮）：与零售同款理由 ——
+           * 删单**之前**留完整快照，**同事务**（写失败 → 回滚 → 单不被删）。
+           *
+           * 合作方单金额比零售大（批发），"钱收了系统里没这单"的后果更重，
+           * 所以合作方路径同样要能对账。
+           */
+          const partnerLabel = await resolvePartnerLabel(order.partner_id, transaction)
+          const reconciliation = await PaymentReconciliationRecord.create({
+            order_type: 'partner',
+            order_id: order.id,
+            order_no: order.order_no,
+            amount: null, // 合作方单只有 THB 总额，没有原币金额
+            currency_code: order.currency_code || 'THB',
+            total_amount_thb: Number(order.total_amount_thb) || 0,
+            items_snapshot: buildPartnerItemsSnapshot(items),
+            contact_name: order.contact_name || null,
+            contact_phone: order.contact_phone || null,
+            delivery_address: order.delivery_address || null,
+            notes: order.notes || null,
+            partner_id: order.partner_id || null,
+            user_label: partnerLabel,
+            order_created_at: order.created_at || null,
+            swept_at: new Date(),
+            reconcile_status: 'pending'
+          }, { transaction })
+
           // 回补库存：按 product_id 升序逐行回补，与下单扣减/admin 取消回补的
           // 加锁顺序一致，消除 AB-BA 死锁
           const itemsByProductId = [...items].sort((a, b) => a.product_id - b.product_id)
@@ -221,7 +302,9 @@ async function sweepPartnerPendingPaymentOrders (cutoff) {
               partner_id: order.partner_id,
               created_at: order.created_at,
               swept_at: new Date().toISOString(),
-              reason: '超时未支付，订单被自动清理'
+              reason: '超时未支付，订单被自动清理',
+              // 第 51 轮：串起对账台账那一行（审计 ↔ 台账互相可追）
+              reconciliation_id: reconciliation.id
             }
           }, { transaction })
 

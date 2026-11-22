@@ -151,7 +151,9 @@ Administrator.prototype.toSafeJSON = function() {
  */
 export const ROLE_PERMISSIONS = {
   super_admin: ['*'], // 所有权限
-  admin: ['orders', 'users', 'products', 'administrators', 'partners'], // 除了操作日志
+  // 'reconciliation'（支付对账台账，第 51 轮）：admin 有、operator 没有 ——
+  // 标记「已收款」是财务动作，普通操作员不该有权标（误标会让财务对账失真）
+  admin: ['orders', 'users', 'products', 'administrators', 'partners', 'reconciliation'],
   operator: ['orders', 'users', 'products'] // 批发合作方仅限 admin/super_admin
 }
 

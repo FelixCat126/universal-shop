@@ -17,6 +17,7 @@ import CouponAdminController from '../controllers/couponAdminController.js'
 import BundleAdminController from '../controllers/bundleAdminController.js'
 import AfterSaleController from '../controllers/afterSaleController.js'
 import AdminPointsController from '../controllers/adminPointsController.js'
+import ReconciliationController from '../controllers/reconciliationController.js'
 import { getRuntimeMetrics } from '../middlewares/observability.js'
 import { validate, promotionPayloadSchema, promotionStatusSchema, couponTemplatePayloadSchema, couponTemplateStatusSchema, couponGrantSchema, couponVoidSchema, bundlePayloadSchema, bundleStatusSchema } from '../middlewares/validate.js'
 
@@ -239,6 +240,22 @@ router.get('/operation-logs', requireSuperAdmin, AdministratorController.getOper
  * 权限与操作日志一致（super_admin —— 这是审计数据，含 IP 与 UA）。
  */
 router.get('/audit-logs', requireSuperAdmin, AdministratorController.getAuditLogs)
+/**
+ * 支付对账台账（第 51 轮）
+ * =========================
+ *
+ * 超时未支付被清扫掉的订单，单据在 `payment_reconciliation_records` 留了完整快照，
+ * 运营在这里逐单核对"这笔钱到底收没收到"。
+ *
+ * 权限用**独立的 reconciliation 资源**（不给 operator）：
+ * 标记「已收款」是财务动作，普通操作员不该有权标 —— 误标会让财务对账失真。
+ *
+ * ⚠️ 静态路径 `export` 必须排在 `/:id` 之前 —— 否则会被当成 id 解析掉。
+ */
+router.get('/reconciliation/export', requirePermission('reconciliation'), exportLimiter, logOperation('export', 'reconciliation'), ReconciliationController.exportRecords)
+router.get('/reconciliation', requirePermission('reconciliation'), ReconciliationController.list)
+router.get('/reconciliation/:id', requirePermission('reconciliation'), ReconciliationController.detail)
+router.put('/reconciliation/:id', requirePermission('reconciliation'), writeLimiter, logOperation('review_reconciliation', 'payment_reconciliation_record'), ReconciliationController.update)
 /**
  * 导出操作日志 CSV（第 46 轮）：之前只能看不能导 —— 留证/交给审计时只能截图。
  * 口径与列表一致（同一套筛选条件 → 同一批数据）。
