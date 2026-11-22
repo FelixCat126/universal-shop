@@ -244,6 +244,8 @@ router.get('/audit-logs', requireSuperAdmin, AdministratorController.getAuditLog
  * 口径与列表一致（同一套筛选条件 → 同一批数据）。
  */
 router.get('/operation-logs/export.csv', requireSuperAdmin, exportLimiter, AdministratorController.exportOperationLogs)
+// 第 49 轮：单条详情（带 old_data/new_data 快照）—— 列表不再带这两个大字段
+router.get('/operation-logs/:id', requireSuperAdmin, AdministratorController.getOperationLogDetail)
 router.get('/metrics', requireSuperAdmin, (req, res) => {
   res.json({ success: true, data: getRuntimeMetrics() })
 })

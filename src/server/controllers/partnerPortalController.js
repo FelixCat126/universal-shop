@@ -123,16 +123,34 @@ class PartnerPortalController {
       }
 
       const partner = await Partner.findOne({ where: { login } })
-      if (!partner || !partner.is_active) {
+      if (!partner) {
         await recordLoginFailure(req, login)
         AuditLog.logPartner({
-          partner: partner || { id: null, code: login },
+          partner: { id: null, code: login },
           event: 'partner.login.fail',
           success: false,
-          detail: { reason: partner ? 'inactive' : 'not_found' },
+          detail: { reason: 'not_found' },
           req
         }).catch(() => {})
         return res.status(401).json({ success: false, message: '登录名或密码错误' })
+      }
+      // 第 48 轮：账号被停用要**明确说**（与"登录名或密码错误"分开）——
+      // 之前一律回"登录名或密码错误" → 被停用的合作方会一直以为自己密码错了。
+      if (!partner.is_active) {
+        await recordLoginFailure(req, login)
+        AuditLog.logPartner({
+          partner,
+          event: 'partner.login.fail',
+          success: false,
+          detail: { reason: 'inactive' },
+          req
+        }).catch(() => {})
+        return res.status(403).json({
+          success: false,
+          message: '账号已被停用，请联系管理员',
+          // 前端据此用**自己语言**说这句话（后端消息只有中文）
+          code: 'ACCOUNT_DISABLED'
+        })
       }
       const ok = await partner.validatePassword(password)
       if (!ok) {
@@ -482,7 +500,8 @@ class PartnerPortalController {
             const product = map.get(productId)
             if (!product) {
               await transaction.rollback()
-              return { ok: false, status: 400, message: `商品不存在或已下架: ${productId}` }
+              // 第 48 轮：不给合作方看内部商品 ID（那是系统内部编号，对他没有意义）
+              return { ok: false, status: 400, message: '商品不存在或已下架' }
             }
 
             const pj = product.toJSON()
@@ -582,7 +601,7 @@ class PartnerPortalController {
               return {
                 ok: false,
                 status: 400,
-                message: `商品库存不足（商品 ID ${line.product_id}）`
+                message: '商品库存不足，请调整数量或稍后再试'
               }
             }
           }

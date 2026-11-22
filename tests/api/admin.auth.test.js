@@ -39,12 +39,19 @@ describe('P3.admin.auth', () => {
     expect(res.status).toBe(401)
   })
 
-  it('AA-3 被禁用 → 401', async () => {
+  /**
+   * 第 48 轮：被禁用 → **403 + ACCOUNT_DISABLED**（原来回 401「用户名或密码错误」，
+   * 被停用的管理员会一直以为是自己密码错，反复重试）。
+   * code 让前端能用**自己语言**说这句话。
+   */
+  it('AA-3 被禁用 → 403 + ACCOUNT_DISABLED（与密码错误区分开）', async () => {
     const admin = await TestHelpers.createAdminUser({ password: PWD, is_active: false })
     const res = await request(app).post('/api/admin/login').send({
       username: admin.username, password: PWD
     })
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(403)
+    expect(res.body.code).toBe('ACCOUNT_DISABLED')
+    expect(res.body.message).not.toMatch(/密码错误/)
   })
 
   it('AA-4 缺用户名 → 400', async () => {

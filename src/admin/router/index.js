@@ -3,6 +3,15 @@ import { rememberScroll, restoreScroll, markRestored } from '../../shared/scroll
 import { useAdminStore } from '../stores/admin.js'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
+import i18n from '../i18n/index.js'
+
+/**
+ * 路由守卫里的提示走 i18n（第 48 轮）。
+ *
+ * 原来这里硬编码中文「需要超级管理员权限」「权限不足」——
+ * 英文/泰文管理员看到的是中文，而且只说了"不行"，没说该找谁。
+ */
+const t = (key, params) => i18n.global.t(key, params || {})
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL || '/'),
@@ -189,14 +198,14 @@ router.beforeEach((to, from, next) => {
   
   // 如果需要超级管理员权限
   if (to.meta.requiresSuperAdmin && !adminStore.isSuperAdmin) {
-    ElMessage.error('需要超级管理员权限')
+    ElMessage.error(t('router.superAdminOnly'))
     next(false)
     return
   }
   
   // 如果需要特定权限
   if (to.meta.permission && !adminStore.hasPermission(to.meta.permission)) {
-    ElMessage.error('权限不足')
+    ElMessage.error(t('router.permissionDenied'))
     next(false)
     return
   }

@@ -957,6 +957,29 @@ const errors = reactive({
   detail_address: ''
 })
 
+/**
+ * 把服务端的**字段级**校验错误映射到本地表单字段（第 48 轮）。
+ *
+ * 后端现在会返回 `details: [{ field, message }]`（field = 字段路径），
+ * 这里按字段名对上号 → 红框直接标到那一栏，
+ * 而不是弹一条"这里错了"的 toast 让用户自己找。
+ *
+ * 对不上的字段（前端没有这一栏）忽略 —— 那些仍走顶部提示。
+ */
+const applyServerFieldErrors = (details) => {
+  if (!Array.isArray(details)) return false
+  let applied = false
+  for (const item of details) {
+    const field = String(item?.field || '').split('.').pop()
+    if (!field) continue
+    if (Object.prototype.hasOwnProperty.call(errors, field)) {
+      errors[field] = item.message || ''
+      applied = true
+    }
+  }
+  return applied
+}
+
 // 消息提示
 const message = reactive({
   show: false,
@@ -1560,13 +1583,26 @@ const submitOrder = async () => {
       }
     } else {
       // 提交失败保持同一幂等键：用户点重试时被后端幂等去重，避免产生重复订单（设计意图）
-      showMessage(response.data.message || t('order.submitFailed'), 'error')
+      /**
+       * 第 48 轮：服务端返回字段级错误时，**标到对应表单项**，
+       * 并且提示语说清楚是哪个字段（而不是笼统一句"提交失败"）。
+       */
+      if (applyServerFieldErrors(response.data?.details)) {
+        showMessage(t('order.fixHighlightedFields'), 'error')
+      } else {
+        showMessage(response.data.message || t('order.submitFailed'), 'error')
+      }
     }
 
   } catch (error) {
     // 网络/服务器错误同样保持幂等键不变，重试才会被后端去重
     console.error('提交订单失败:', error)
-    const errorMessage = error.response?.data?.message || t('order.submitFailedRetry')
+    const serverMessage = error.response?.data?.message
+    /**
+     * 第 48 轮：不要把 axios 的原文（"Network Error" / "timeout of 10000ms exceeded"）
+     * 甩给用户 —— 那不是他能处理的信息。统一成"网络不稳，请重试"这类可执行的说法。
+     */
+    const errorMessage = serverMessage || t('order.submitFailedRetry')
     showMessage(errorMessage, 'error')
   } finally {
     submitting.value = false

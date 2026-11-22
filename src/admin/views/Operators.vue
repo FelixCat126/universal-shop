@@ -26,7 +26,8 @@
         table-layout="fixed"
         style="width: 100%"
         class="operators-table"
-      >
+      
+            :empty-text="t('common.noData')">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" :label="t('operators.username')" min-width="120" />
         <el-table-column :label="t('operators.role')" width="120">

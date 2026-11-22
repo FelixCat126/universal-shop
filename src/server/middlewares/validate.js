@@ -4,6 +4,7 @@
  * 失败统一返回 400 + VALIDATION_ERROR
  */
 import Joi from 'joi'
+import { validationErrorBody } from '../utils/validationMessages.js'
 
 /**
  * @param {{ body?: Joi.Schema, query?: Joi.Schema, params?: Joi.Schema }} schemas
@@ -19,11 +20,17 @@ export function validate (schemas) {
         convert: true
       })
       if (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.details.map((d) => d.message).join('; '),
-          code: 'VALIDATION_ERROR'
-        })
+        /**
+         * 第 48 轮：校验失败改成"可读中文 + 字段级 details"。
+         *
+         * 原来直接把 joi 原文拼给用户：
+         *   "phone" with value "12" fails to match the required pattern: /^[1-9]\d{7,14}$/
+         * —— 英文 + 正则，看不出是哪个字段、也看不出该怎么做。
+         *
+         * 现在 details[i].field 是**字段路径**（前端据此把红框标到那一栏），
+         * message 是中文兜底（前端认得这个字段时会用自己的语言说这句话）。
+         */
+        return res.status(400).json(validationErrorBody(error))
       }
       req[part] = value
     }

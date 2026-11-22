@@ -26,6 +26,7 @@ import UserPointBalance from '../models/UserPointBalance.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
+import { statusText } from '../utils/orderStatusText.js'
 import { logger } from '../utils/logger.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { revenueStatusSql, revenueWhere } from '../constants/revenueStatus.js'
@@ -278,7 +279,7 @@ async function performOrderCancel (order, transaction) {
     return {
       ok: false,
       status: 400,
-      message: `订单状态不允许从「${fromStatus}」变更为「cancelled」`
+      message: `订单状态不允许从「${statusText(fromStatus)}」变更为「已取消」`
     }
   }
 
@@ -1478,7 +1479,8 @@ class OrderController {
       if (invalidStatus) {
         return res.status(400).json({
           success: false,
-          message: `无效的订单状态：${invalidStatus}（合法值：${ORDER_STATUS_VALUES.join('/')}）`
+          // 第 48 轮：状态用中文名 + 说明，别把内部枚举值甩给用户
+          message: `无效的订单状态「${statusText(invalidStatus)}」（合法值：${ORDER_STATUS_VALUES.map(v => statusText(v)).join(' / ')}）`
         })
       }
 
@@ -1489,8 +1491,25 @@ class OrderController {
       // 日历日按业务时区切（business_timezone 配置）
       where = applyCreatedBetween(where, req.query, { timezone: await getBusinessTimezone() })
 
+      /**
+       * 第 49 轮：**只取列表真正用到的列**，并且**不下发 `admin_note`**。
+       *
+       * 原来这里是整行 Order：
+       *   - `discount_snapshot`（JSONB 折扣快照）、`client_order_key`（幂等键）、
+       *     `pricing_version` 等宽字段白下载 —— 列表根本不用
+       *   - **`admin_note` 是"运营内部备注"**（模型注释写明"用户看不到"），
+       *     却在整行返回里**原样下发给客户**了 ✗
+       *
+       * 门户列表实际用到：order_no / status / payment_method / currency_code /
+       * total_amount / total_amount_thb / created_at / notes / delivery_address / postal_code
+       */
       const { count, rows: orders } = await Order.findAndCountAll({
         where,
+        attributes: [
+          'id', 'order_no', 'status', 'payment_method', 'currency_code',
+          'total_amount', 'total_amount_thb', 'created_at',
+          'notes', 'delivery_address', 'postal_code'
+        ],
         order: [['created_at', 'DESC']],
         limit: safeLimit,
         offset
@@ -1705,8 +1724,16 @@ class OrderController {
           }
         }
       } else if (userId) {
+        /**
+         * 第 49 轮：**客户看到的订单详情不包含 `admin_note`**（运营内部备注）。
+         *
+         * 原来这里整行返回 → 客户在订单详情页能看到运营写的内部备注
+         * （模型注释明确写"用户看不到"，但接口把它带出去了）。
+         * 列表接口已裁剪，这里也要一起裁。
+         */
         order = await Order.findOne({
           where: { id, user_id: userId },
+          attributes: { exclude: ['admin_note'] },
           include: detailIncludes
         })
         if (!order) {
@@ -1770,7 +1797,8 @@ class OrderController {
       if (invalidStatus) {
         return res.status(400).json({
           success: false,
-          message: `无效的订单状态：${invalidStatus}（合法值：${ORDER_STATUS_VALUES.join('/')}）`,
+          // 第 48 轮：状态用中文名 + 说明，别把内部枚举值甩给用户
+          message: `无效的订单状态「${statusText(invalidStatus)}」（合法值：${ORDER_STATUS_VALUES.map(v => statusText(v)).join(' / ')}）`,
           code: 'INVALID_STATUS'
         })
       }
@@ -1890,8 +1918,23 @@ class OrderController {
         return result
       })()
 
+      /**
+       * 第 49 轮：裁剪列。
+       *
+       * 管理端列表用的是 order_no / user / payment_method / currency_code /
+       * total_amount / total_amount_thb / status / contact_name / contact_phone / created_at，
+       * 而整行还带着 `discount_snapshot`（JSONB）、`admin_note`、`notes`、
+       * `delivery_address`、`client_order_key` 等 —— 每页 20 行、每 30 秒自动刷新一次，
+       * 这些宽字段是白下载的。
+       */
       const { count, rows: orders } = await Order.findAndCountAll({
         where,
+        attributes: [
+          'id', 'order_no', 'status', 'payment_method', 'currency_code',
+          'total_amount', 'total_amount_thb', 'created_at',
+          'contact_name', 'contact_phone', 'notes', 'admin_note',
+          'delivery_address', 'postal_code', 'tracking_number'
+        ],
         include: [
           {
             model: User,
@@ -2072,7 +2115,7 @@ class OrderController {
               skipped.push({
                 id: order.id,
                 status: order.status,
-                reason: `不允许从「${order.status}」变更为「${status}」`
+                reason: `不允许从「${statusText(order.status)}」变更为「${statusText(status)}」`
               })
               continue
             }
@@ -2190,7 +2233,7 @@ class OrderController {
             return {
               ok: false,
               status: 400,
-              message: `订单状态不允许从「${fromStatus}」变更为「${status}」`
+              message: `订单状态不允许从「${statusText(fromStatus)}」变更为「${statusText(status)}」`
             }
           }
 

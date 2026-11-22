@@ -19,7 +19,7 @@
  * 自助领券（claimCouponForUser）与定向发券（grantCouponsToUsers）都走它们。
  */
 
-import { Op } from 'sequelize'
+import { Op, fn, col } from 'sequelize'
 import crypto from 'crypto'
 import sequelize from '../config/database.js'
 import CouponTemplate from '../models/CouponTemplate.js'
@@ -243,13 +243,42 @@ export async function grantCouponsToUsers ({ templateId, userIds, note }) {
         }
       }
 
-      // 预检：任一用户触碰到量/限领 → 整批失败（此阶段不产生任何写入）
+      /**
+       * 预检：任一用户触碰到量/限领 → 整批失败（此阶段不产生任何写入）。
+       *
+       * 第 49 轮：把 **2N 次 COUNT 压成 2 次**。
+       * 原来每个用户都要查一次"他领过几张"+"模板总共发了几张"（N=100 就是 200 次 COUNT，
+       * 全在一个事务里串行跑）。
+       * 现在：一次 GROUP BY 拿到每个用户的已领数，一次 COUNT 拿到模板已发总数 ✓
+       */
+      const [mineRows, issuedCount] = await Promise.all([
+        targets.length > 0
+          ? UserCoupon.findAll({
+            attributes: ['user_id', [fn('COUNT', col('id')), 'cnt']],
+            where: { template_id: template.id, user_id: { [Op.in]: targets } },
+            group: ['user_id'],
+            transaction,
+            raw: true
+          })
+          : [],
+        UserCoupon.count({ where: { template_id: template.id }, transaction })
+      ])
+      const mineCountMap = new Map(mineRows.map(r => [Number(r.user_id), Number(r.cnt) || 0]))
+      const perUser = Number(template.per_user) || 1
       for (let i = 0; i < targets.length; i++) {
         const userId = targets[i]
-        try {
-          await assertIssuable({ template, userId, transaction, batchIssued: i })
-        } catch (err) {
-          throw toGrantLimitError(err, { userId, template, count: targets.length })
+        const mine = mineCountMap.get(userId) || 0
+        if (mine >= perUser) {
+          throw toGrantLimitError(
+            Object.assign(new Error('您已达到该抵扣券的领取上限'), { code: COUPON_LIMIT_PER_USER }),
+            { userId, template, count: targets.length }
+          )
+        }
+        if (issuedCount + i >= template.total) {
+          throw toGrantLimitError(
+            Object.assign(new Error('该抵扣券已被领完'), { code: COUPON_LIMIT_TOTAL }),
+            { userId, template, count: targets.length }
+          )
         }
       }
 

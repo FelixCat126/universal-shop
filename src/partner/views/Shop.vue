@@ -121,7 +121,22 @@
                 </div>
               </div>
             </li>
-            <li v-if="!products.length" class="text-center py-14 text-gray-500 text-sm">{{ t('shop.noProducts') }}</li>
+            <!--
+              第 48 轮：加载失败与"没有商品"分开 ——
+              说清楚是加载失败并给一个重试入口，别让运营以为自己筛错了。
+            -->
+            <li v-if="loadError" class="text-center py-14 text-gray-500 text-sm">
+              <p class="mb-3">{{ t('common.loadFailed') }}</p>
+              <p class="mb-3 text-xs">{{ loadError }}</p>
+              <button
+                type="button"
+                class="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+                @click="loadProducts"
+              >
+                {{ t('common.retry') }}
+              </button>
+            </li>
+            <li v-else-if="!products.length" class="text-center py-14 text-gray-500 text-sm">{{ t('shop.noProducts') }}</li>
           </ul>
 
           <div v-if="total > pageSize" class="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -309,6 +324,8 @@ const toast = useToast()
 const loading = ref(false)
 const submitting = ref(false)
 const products = ref([])
+/** 加载失败（第 48 轮）：与"没有商品"分开 */
+const loadError = ref('')
 const keyword = ref('')
 const page = ref(1)
 const pageSize = ref(10)
@@ -494,7 +511,8 @@ async function load () {
     const json = await res.json()
     if (seq !== productLoadSeq) return // 已有更新的请求在途，丢弃过期响应
     if (!json.success) {
-      toast.error(json.message || t('common.error'))
+      loadError.value = json.message || t('common.loadFailed')
+      toast.error(json.message || t('common.loadFailed'))
       return
     }
     products.value = (json.data.products || []).map((p) => ({
@@ -502,6 +520,7 @@ async function load () {
       _qty: moqU(p)
     }))
     total.value = json.data.pagination?.total ?? 0
+    loadError.value = ''
   } catch (err) {
     /**
      * 之前这里**没有 catch**：partnerStore.api() 用 fetch，网络异常时
@@ -511,7 +530,9 @@ async function load () {
      * 运营会以为是自己筛选条件写错了，反复点搜索。
      */
     console.error('[partner] 加载商品失败:', err)
-    toast.error(t('common.error') || '加载失败')
+    // 第 48 轮：统一成可执行的说法（不甩 fetch 原文），并让列表区显示"加载失败 + 重试"
+    loadError.value = t('common.networkUnstable')
+    toast.error(t('common.networkUnstable'))
   } finally {
     if (seq === productLoadSeq) loading.value = false
   }
@@ -644,7 +665,17 @@ async function doSubmit () {
       toast.success(t('shop.orderPendingPay'))
       return
     }
-    toast.success(t('shop.orderOk'))
+    /**
+     * 第 48 轮：下单成功后**给一个"去订单列表"的入口**。
+     *
+     * 之前只有一句"订单已提交"，用户还停在订货页 ——
+     * 不知道订单去哪了、要不要再点一次（怕重复下单）。
+     * 提示带上出口，路径就闭合了。
+     */
+    toast.success(t('shop.orderOk'), 6000, {
+      label: t('shop.viewOrders'),
+      onClick: () => router.push('/orders')
+    })
   } catch (err) {
     // 网络/服务器错误同样保持幂等键不变，重试才会被后端去重
     console.error('[partner-shop] submit order failed:', err)

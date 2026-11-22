@@ -57,7 +57,8 @@
             border
             stripe
             table-layout="fixed"
-          >
+          
+            :empty-text="t('common.noData')">
             <el-table-column prop="id" label="ID" width="70" />
 
             <el-table-column prop="name" :label="t('coupons.name')" min-width="140" show-overflow-tooltip />
@@ -264,6 +265,9 @@
 
           <el-form-item v-if="templateForm.scopeType === 'product'" :label="t('coupons.scopeProduct')">
             <el-select
+              remote
+              :remote-method="searchProductOptions"
+              :loading="productOptionsLoading"
               v-model="templateForm.scopeIds"
               multiple
               filterable
@@ -496,6 +500,7 @@ import { couponAPI } from '../api/coupons.js'
 import { productAPI } from '../api/products.js'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 import { useAutoSearch } from '../composables/useAutoSearch.js'
+import { useProductOptions } from '../composables/useProductOptions.js'
 
 const { t } = useI18n()
 
@@ -537,7 +542,7 @@ const templateRules = {
 
 const templates = ref([])
 const categoryOptions = ref([])
-const productOptions = ref([])
+const { productOptions, productOptionsLoading, loadProductOptions, searchProductOptions } = useProductOptions()
 
 // 券实例弹窗
 const showInstancesDialog = ref(false)
@@ -1055,16 +1060,6 @@ const loadCategoryOptions = async () => {
   }
 }
 
-const loadProductOptions = async () => {
-  try {
-    const res = await productAPI.getProducts({ page: 1, pageSize: 200 })
-    if (res.data?.success) {
-      productOptions.value = res.data.data?.products || []
-    }
-  } catch (e) {
-    console.error('加载商品列表失败:', e)
-  }
-}
 
 onMounted(async () => {
   // 弹窗选项（分类/商品）改为首次打开对话框时懒加载，见 ensureDialogOptions

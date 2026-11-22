@@ -11,6 +11,7 @@ export default {
 
   // 通用
   common: {
+    networkUnstable: 'การเชื่อมต่อไม่เสถียร กรุณาลองใหม่อีกครั้ง',
     somethingWentWrong: 'เกิดข้อผิดพลาดบางอย่าง',
     tryAgainHint: 'โดยปกติการรีเฟรชช่วยแก้ได้ หากยังเกิดปัญหา กรุณาส่งข้อความแสดงข้อผิดพลาดให้เราทราบ',
     reload: 'โหลดหน้าใหม่',
@@ -270,6 +271,7 @@ export default {
 
   // 订单
   order: {
+    fixHighlightedFields: 'กรุณาแก้ไขช่องที่ถูกทำเครื่องหมายแล้วแล้วส่งอีกครั้ง',
     refresh: 'รีเฟรช',
     editNotes: 'แก้ไข',
     saveNotes: 'บันทึกหมายเหตุ',
@@ -498,6 +500,7 @@ export default {
   },
 
   profile: {
+    passwordChangedRelogin: 'อัปเดตรหัสผ่านแล้ว กรุณาเข้าสู่ระบบอีกครั้ง',
     orderStatusFilter: 'สถานะคำสั่งซื้อ',
     allTime: 'ทุกช่วงเวลา',
     passwordChangeNotice: 'บัญชีของคุณยังใช้รหัสผ่านชั่วคราวที่ระบบสร้างให้ แนะนำให้ตั้งรหัสผ่านของคุณเอง (กดปุ่มทางขวา)',

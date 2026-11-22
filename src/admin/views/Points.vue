@@ -107,7 +107,8 @@
             style="width: 100%"
             table-layout="fixed"
             class="points-table"
-          >
+          
+            :empty-text="t('common.noData')">
             <el-table-column prop="user_id" :label="t('points.userId')" width="90" align="center" />
 
             <el-table-column :label="t('points.nickname')" min-width="160">

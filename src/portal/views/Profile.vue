@@ -1306,8 +1306,22 @@ const submitPasswordChange = async () => {
       new_password: String(passwordForm.value.new)
     })
     if (res.data?.success) {
-      success(res.data.message || t('profile.passwordChanged'))
+      /**
+       * 第 48 轮：改密后**明确告诉用户"要重新登录"**并主动登出。
+       *
+       * 之前：服务端自增了 token_version（当前 token 立刻失效），
+       * 但前端只弹一句"密码已更新"就继续留在页面上 →
+       * 用户下一次随便点个什么 → 401 → 被**静默**踢回登录页，
+       * 不知道发生了什么，还可能以为密码没改成功。
+       *
+       * 现在：提示 + 立刻登出并回登录页（带上说明），
+       * 行为与后台一致（后台的文案就是"密码修改成功，请重新登录"）。
+       */
+      success(t('profile.passwordChangedRelogin'))
       closePasswordModal()
+      userStore.clearAuth()
+      await nextTick()
+      router.push({ path: '/login', query: { notice: 'password-changed' } })
     } else {
       showError(res.data?.message || t('profile.passwordChangeFailed'))
     }

@@ -130,7 +130,8 @@
         class="product-table"
         :row-class-name="tableRowClassName"
         @selection-change="onSelectionChange"
-      >
+      
+            :empty-text="t('common.noData')">
         <!-- reserve-selection：刷新列表时保住勾选（同订单页的理由） -->
         <el-table-column type="selection" width="46" reserve-selection :selectable="row => !isDelisted(row)" />
         <el-table-column prop="id" label="ID" width="60" />

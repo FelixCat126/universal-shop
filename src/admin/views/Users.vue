@@ -140,7 +140,8 @@
           :default-sort="{ prop: 'created_at', order: 'descending' }"
           table-layout="fixed"
           class="user-table"
-        >
+        
+            :empty-text="t('common.noData')">
           <el-table-column prop="id" :label="t('users.id')" width="60" align="center" />
 
           <el-table-column :label="t('users.nickname')" width="165" min-width="145">

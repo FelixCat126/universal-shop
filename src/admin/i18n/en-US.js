@@ -1,5 +1,10 @@
 export default {
   // 页面标题
+  router: {
+    superAdminOnly: 'This page is for super administrators only. Please ask a super administrator for help.',
+    permissionDenied: 'Your account does not have access to this page. Please ask an administrator to grant it.'
+  },
+
   title: {
     main: 'Mall Management System',
     login: 'Login - Mall Management System',
@@ -71,6 +76,7 @@ export default {
 
   // Login
   login: {
+    accountDisabled: 'This account has been disabled. Please contact a super administrator.',
     title: 'Mall Management System',
     subtitle: 'Please login with administrator account',
     username: 'Username',
@@ -1297,6 +1303,8 @@ export default {
   },
 
   exportTasks: {
+    colError: 'Error',
+    emptyHint: 'No export records yet. Use the button above to create one.',
     typePartnerOrders: 'Partner orders',
     typeProducts: 'Products',
     typePartners: 'Partners',

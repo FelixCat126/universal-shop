@@ -95,7 +95,10 @@ class CartController {
             }]
           }
         ],
-        order: [['created_at', 'DESC']]
+        order: [['created_at', 'DESC']],
+        // 第 49 轮：购物车行数会随用户一直累积（加了不删就一直留着），
+        // 原来没有上限 → 一个老用户一次把整个购物车拉出来。200 行足够。
+        limit: 200
       })
 
       // 转换数据格式，添加 image_url 字段

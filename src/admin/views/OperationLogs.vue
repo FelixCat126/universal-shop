@@ -110,7 +110,8 @@
         style="width: 100%"
         class="operation-logs-table"
         :default-sort="{ prop: 'created_at', order: 'descending' }"
-      >
+      
+            :empty-text="t('common.noData')">
         <el-table-column prop="admin_username" :label="t('operationLogs.admin')" width="120" />
         
         <el-table-column prop="action" :label="t('operationLogs.operation')" width="120">
@@ -206,6 +207,8 @@
         </el-descriptions>
 
         <!-- 数据变更详情 -->
+        <!-- 第 49 轮：详情按需取（列表不再带快照），取回前显示加载态 -->
+        <div v-loading="detailLoading" class="log-detail-body">
         <div v-if="currentLog.old_data || currentLog.new_data" class="data-changes">
           <h4>数据变更详情</h4>
           <el-row :gutter="20">
@@ -231,6 +234,7 @@
             </el-col>
           </el-row>
         </div>
+        </div>
       </div>
     </el-dialog>
   </div>
@@ -254,6 +258,8 @@ const logs = ref([])
 const administrators = ref([])
 const dialogVisible = ref(false)
 const currentLog = ref(null)
+/** 详情加载中（第 49 轮：按需取详情） */
+const detailLoading = ref(false)
 const dateRange = ref([])
 
 // 筛选条件
@@ -350,9 +356,27 @@ const loadAdministrators = async () => {
 }
 
 // 显示日志详情
-const showLogDetail = (log) => {
+/**
+ * 查看详情（第 49 轮）：**按需取**详情。
+ *
+ * 列表接口现在不再带 `old_data` / `new_data`（两个 JSONB 快照，每页 50 行全带是纯浪费），
+ * 所以点开某一行时单独取一次详情 ✓
+ */
+const showLogDetail = async (log) => {
   currentLog.value = log
   dialogVisible.value = true
+  detailLoading.value = true
+  try {
+    const res = await adminStore.apiRequest(`/api/admin/operation-logs/${log.id}`)
+    const data = await res.json()
+    if (data.success && data.data) {
+      currentLog.value = { ...currentLog.value, ...data.data }
+    }
+  } catch (error) {
+    console.error('读取操作日志详情失败:', error)
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 // 处理筛选条件变更

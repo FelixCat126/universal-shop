@@ -65,7 +65,8 @@
             border
             stripe
             table-layout="fixed"
-          >
+          
+            :empty-text="t('common.noData')">
             <el-table-column prop="id" label="ID" width="70" />
 
             <el-table-column prop="name" :label="t('promotions.name')" min-width="150" show-overflow-tooltip />
@@ -237,6 +238,9 @@
                 </div>
               </div>
               <el-select
+              remote
+              :remote-method="searchProductOptions"
+              :loading="productOptionsLoading"
                 v-model="promotionForm.buyGet.giftProductId"
                 filterable
                 :placeholder="t('promotions.placeholders.selectGiftProduct')"
@@ -286,6 +290,9 @@
 
           <el-form-item v-if="promotionForm.scopeType === 'product'" :label="t('promotions.scopeProduct')">
             <el-select
+              remote
+              :remote-method="searchProductOptions"
+              :loading="productOptionsLoading"
               v-model="promotionForm.scopeIds"
               multiple
               filterable
@@ -366,6 +373,7 @@ import { promotionAPI } from '../api/promotions.js'
 import { productAPI } from '../api/products.js'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 import { useAutoSearch } from '../composables/useAutoSearch.js'
+import { useProductOptions } from '../composables/useProductOptions.js'
 
 const { t } = useI18n()
 
@@ -411,7 +419,7 @@ const promotionRules = {
 
 const promotions = ref([])
 const categoryOptions = ref([])
-const productOptions = ref([])
+const { productOptions, productOptionsLoading, loadProductOptions, searchProductOptions } = useProductOptions()
 
 // rules/scope 在服务端可能是对象或 JSON 字符串，编辑/展示前统一归一
 const parseMaybeJson = (val, fallback) => {
@@ -826,16 +834,6 @@ const loadCategoryOptions = async () => {
   }
 }
 
-const loadProductOptions = async () => {
-  try {
-    const res = await productAPI.getProducts({ page: 1, pageSize: 200 })
-    if (res.data?.success) {
-      productOptions.value = res.data.data?.products || []
-    }
-  } catch (e) {
-    console.error('加载商品列表失败:', e)
-  }
-}
 
 onMounted(async () => {
   // 弹窗选项（分类/商品）改为首次打开对话框时懒加载，见 ensureDialogOptions

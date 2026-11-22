@@ -10,6 +10,7 @@ import { assertPasswordPolicy } from '../utils/passwordPolicy.js'
 import { logger } from '../utils/logger.js'
 import { resolvePagination } from '../utils/pagination.js'
 import { likeContains } from '../utils/likeSearch.js'
+import { parseId } from '../utils/params.js'
 import { respondDbError } from '../utils/dbInputError.js'
 import { csvCell } from '../utils/csvExporter.js'
 import { getBusinessTimezone, localDateKey } from '../utils/businessTimezone.js'
@@ -30,14 +31,21 @@ class AdministratorController {
         })
       }
 
-      // 查找管理员
+      /**
+       * 查找管理员（第 48 轮：**不**在这里过滤 is_active）。
+       *
+       * 原来把 `is_active: true` 混在查询条件里 → 账号被停用时查不到 →
+       * 一律回"用户名或密码错误" → 被停用的管理员会一直以为是自己密码打错，
+       * 反复重试（还可能触发失败次数限制）。
+       *
+       * 现在分开判定：查得到但被停用 → 明确告诉他"账号已停用，请联系超级管理员"。
+       */
       const admin = await Administrator.findOne({
         where: {
           [Op.or]: [
             { username },
             { email: username }
-          ],
-          is_active: true
+          ]
         }
       })
 
@@ -47,12 +55,29 @@ class AdministratorController {
           admin: { username },
           event: 'admin.login.fail',
           success: false,
-          detail: { reason: 'not_found_or_inactive' },
+          detail: { reason: 'not_found' },
           req
         }).catch(() => {})
         return res.status(401).json({
           success: false,
           message: '用户名或密码错误'
+        })
+      }
+
+      if (!admin.is_active) {
+        await recordLoginFailure(req, username)
+        AuditLog.logAdmin({
+          admin: { username },
+          event: 'admin.login.fail',
+          success: false,
+          detail: { reason: 'inactive' },
+          req
+        }).catch(() => {})
+        return res.status(403).json({
+          success: false,
+          message: '账号已被停用，请联系超级管理员',
+          // 前端据此用**自己语言**说这句话（后端消息只有中文）
+          code: 'ACCOUNT_DISABLED'
         })
       }
 
@@ -540,8 +565,14 @@ class AdministratorController {
       if (start_date && end_date) {
         where.created_at = { [Op.between]: [new Date(start_date), new Date(end_date)] }
       }
+      /**
+       * 第 49 轮：裁掉 `user_agent`（没人看、很长）。
+       * `detail` 保留 —— 它才是审计日志的**内容**（超时删单的订单号/金额/原因就在里面），
+       * 配套把 detail 做成看得见的一列（见 admin/views/AuditLogs.vue）。
+       */
       const { count, rows } = await AuditLog.findAndCountAll({
         where,
+        attributes: { exclude: ['user_agent'] },
         limit,
         offset,
         order: [['created_at', 'DESC']]
@@ -613,6 +644,28 @@ class AdministratorController {
     }
   }
 
+  /**
+   * 单条操作日志详情（第 49 轮）：带 `old_data` / `new_data` 快照。
+   *
+   * 列表不再带这两个大字段（每页 50 行），点开某一行时再按需取 ✓
+   */
+  static async getOperationLogDetail (req, res) {
+    try {
+      const id = parseId(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, message: '无效的日志 ID' })
+      }
+      const row = await OperationLog.findByPk(id)
+      if (!row) {
+        return res.status(404).json({ success: false, message: '日志不存在' })
+      }
+      return res.json({ success: true, data: row })
+    } catch (e) {
+      logger.error('读取操作日志详情失败', { err: e?.message, stack: e?.stack })
+      return res.status(500).json({ success: false, message: '读取日志详情失败' })
+    }
+  }
+
   static async getOperationLogs(req, res) {
     try {
       const { admin_id, action, resource, start_date, end_date } = req.query
@@ -629,8 +682,13 @@ class AdministratorController {
         }
       }
 
+      /**
+       * 第 49 轮：列表**不带** `old_data` / `new_data`（两个 JSONB 快照，
+       * 每页 50 行全带是纯浪费），详情**按需取**（GET /operation-logs/:id）。
+       */
       const { count, rows } = await OperationLog.findAndCountAll({
         where,
+        attributes: { exclude: ['old_data', 'new_data'] },
         limit,
         offset,
         order: [['created_at', 'DESC']]

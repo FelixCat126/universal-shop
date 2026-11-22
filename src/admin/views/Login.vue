@@ -217,7 +217,16 @@ const handleLogin = async (captcha) => {
       return
     }
 
-    // 不使用后端返回的中文消息，统一使用国际化文本
+    /**
+     * 第 48 轮：账号被停用要说清楚（而不是笼统的"登录失败"）。
+     * 后端给 code，前端用**自己语言**说这句话（后端消息只有中文）。
+     */
+    if (result.code === 'ACCOUNT_DISABLED') {
+      ElMessage.error(t('login.accountDisabled'))
+      return
+    }
+
+    // 其余情况不使用后端返回的中文消息，统一使用国际化文本
     ElMessage.error(t('login.loginFailed'))
 
   } catch (error) {

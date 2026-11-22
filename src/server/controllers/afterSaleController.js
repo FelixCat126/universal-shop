@@ -118,7 +118,10 @@ class AfterSaleController {
       const rows = await AfterSale.findAll({
         where: { user_id: userId },
         include: [{ model: Order, as: 'order', attributes: ['id', 'order_no', 'status'] }],
-        order: [['created_at', 'DESC']]
+        order: [['created_at', 'DESC']],
+        // 第 49 轮：原来**没有 limit** —— 售后记录会随时间无限增长，
+        // 一个老客户的列表把所有记录都查出来。留最近 200 条足够（更早的可找客服）。
+        limit: 200
       })
       return res.json({ success: true, data: rows })
     } catch (error) {

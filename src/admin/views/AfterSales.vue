@@ -48,7 +48,8 @@
             border
             stripe
             table-layout="fixed"
-          >
+          
+            :empty-text="t('common.noData')">
             <el-table-column prop="id" label="ID" width="70" />
             <el-table-column prop="order_id" :label="t('afterSales.orderId')" width="90" />
             <el-table-column

@@ -40,7 +40,7 @@
     </el-card>
 
     <el-card style="margin-top: 16px">
-      <el-table v-loading="loading" :data="orders" stripe border style="width: 100%">
+      <el-table v-loading="loading" :data="orders" stripe border style="width: 100%" :empty-text="t('common.noData')">
         <el-table-column type="expand">
           <template #default="{ row }">
             <el-table :data="row.items || []" size="small" border style="margin: 8px 24px;">

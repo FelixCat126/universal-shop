@@ -49,7 +49,8 @@
             stripe
             style="width: 100%; min-width: 640px"
             table-layout="fixed"
-          >
+          
+            :empty-text="t('common.noData')">
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="name" :label="t('categories.name')" min-width="200" />
             <el-table-column prop="sort_order" :label="t('categories.sortOrder')" width="120" />

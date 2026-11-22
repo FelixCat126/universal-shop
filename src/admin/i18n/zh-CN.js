@@ -1,5 +1,10 @@
 export default {
   // 页面标题
+  router: {
+    superAdminOnly: '该页面仅超级管理员可访问，请联系超级管理员协助',
+    permissionDenied: '当前账号没有该页面的权限，请联系管理员开通'
+  },
+
   title: {
     main: '商城管理系统',
     login: '登录 - 商城管理系统',
@@ -71,6 +76,7 @@ export default {
 
   // 登录相关
   login: {
+    accountDisabled: '账号已被停用，请联系超级管理员',
     title: '商城管理系统',
     subtitle: '请使用管理员账户登录',
     username: '用户名',
@@ -1296,6 +1302,8 @@ export default {
   },
 
   exportTasks: {
+    colError: '失败原因',
+    emptyHint: '还没有导出记录，点击上方按钮开始',
     typePartnerOrders: '合作方订单',
     typeProducts: '商品数据',
     typePartners: '合作方名单',

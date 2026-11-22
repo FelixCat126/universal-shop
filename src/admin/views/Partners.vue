@@ -39,7 +39,7 @@
     </div>
 
     <el-card class="table-section">
-      <el-table v-loading="loading" :data="rows" stripe border style="width: 100%">
+      <el-table v-loading="loading" :data="rows" stripe border style="width: 100%" :empty-text="t('common.noData')">
         <el-table-column prop="id" label="ID" width="72" />
         <el-table-column prop="login" :label="t('partnersMgmt.login')" min-width="110" />
         <el-table-column prop="display_name" :label="t('partnersMgmt.displayName')" min-width="110" />

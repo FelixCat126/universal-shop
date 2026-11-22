@@ -18,6 +18,7 @@ export default {
     th: 'ไทย'
   },
   login: {
+    accountDisabled: 'This account has been disabled. Please contact the administrator.',
     title: 'Partner sign in',
 
   subtitle: 'Wholesale ordering · Contract pricing',
@@ -68,6 +69,7 @@ export default {
     backHome: 'Back to home'
   },
   shop: {
+    viewOrders: 'View orders',
     title: 'Catalog',
     priceNoteThb: 'All prices are wholesale base prices in THB',
     search: 'Search product name',
@@ -223,6 +225,8 @@ export default {
     postalCodeAuto: 'Filled after sub-district'
   },
   common: {
+    networkUnstable: 'The connection looks unstable. Please try again.',
+    retry: 'Try again',
     somethingWentWrong: 'Something went wrong',
     tryAgainHint: 'A refresh usually fixes it. If it keeps happening, please send us the error below.',
     reload: 'Reload page',

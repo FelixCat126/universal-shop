@@ -18,6 +18,7 @@ export default {
     th: 'ไทย'
   },
   login: {
+    accountDisabled: '账号已被停用，请联系管理员',
     title: '合作方登录',
 
   subtitle: '批发订货 · 专属价格与账期',
@@ -68,6 +69,7 @@ export default {
     backHome: '返回首页'
   },
   shop: {
+    viewOrders: '查看订单',
     title: '商品目录',
     priceNoteThb: '价格均为泰铢（THB）批发底价',
     search: '搜索商品名称',
@@ -223,6 +225,8 @@ export default {
     postalCodeAuto: '选好子区后自动填入'
   },
   common: {
+    networkUnstable: '网络不太稳定，请稍后重试',
+    retry: '重试',
     somethingWentWrong: '页面出了点问题',
     tryAgainHint: '刷新一下通常就能恢复。如果一直这样，请把下面的错误信息告诉我们。',
     reload: '刷新页面',

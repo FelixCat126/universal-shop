@@ -338,7 +338,9 @@ class UserController {
 
       return res.json({
         success: true,
-        message: '密码已更新'
+        // 第 48 轮：说清楚"接下来要做什么"——
+        // token_version 已自增（当前会话已失效），不提示的话用户会被静默踢回登录页。
+        message: '密码已更新，请重新登录'
       })
     } catch (error) {
       logger.error('修改密码失败', { err: error?.message, stack: error?.stack })

@@ -217,6 +217,18 @@ const showPassword = ref(false)
 const showMessage = ref(false)
 const message = ref('')
 const messageType = ref('success')
+
+/**
+ * 改密后被登出 → 登录页要说明原因（第 48 轮）。
+ *
+ * 之前改密成功只是静默清 token，下一次请求 401 才被踢回登录页，
+ * 用户看到的就是"莫名其妙被登出"。
+ */
+if (route.query.notice === 'password-changed') {
+  message.value = t('profile.passwordChangedRelogin')
+  messageType.value = 'info'
+  showMessage.value = true
+}
 // 表单数据
 const formData = ref({
   countryCode: '+66',

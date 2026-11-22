@@ -378,7 +378,24 @@
         <svg class="mx-auto h-24 w-24 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
         </svg>
-        <template v-if="searchQuery">
+        <!--
+          加载失败（第 48 轮）：与"没有商品"分开 ——
+          说清楚是加载失败，并给一个"重试"的动作，别让用户反复刷新。
+        -->
+        <template v-if="loadError">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">
+            {{ t('common.loadFailed') }}
+          </h3>
+          <p class="text-gray-500 mb-5">{{ loadError }}</p>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            @click="loadProducts({ append: false })"
+          >
+            {{ t('common.retry') }}
+          </button>
+        </template>
+        <template v-else-if="searchQuery">
           <h3 class="text-lg font-medium text-gray-900 mb-2">
             {{ t('product.noSearchResult', { keyword: searchQuery }) }}
           </h3>
@@ -513,6 +530,8 @@ const { showError } = useToast()
 const isLoading = ref(false)
 const loadingMore = ref(false)
 const products = ref([])
+/** 加载失败（第 48 轮）：要和"确实没有商品"区分开 */
+const loadError = ref('')
 const searchQuery = ref('')
 /** 搜索中（用于输入框转圈 + 结果数置灰） */
 const searching = ref(false)
@@ -850,9 +869,11 @@ const loadProducts = async ({ append = false } = {}) => {
       } else {
         products.value = list
       }
+      loadError.value = ''
     } else {
       console.error('加载产品失败:', response.data.message)
-      showError('加载产品失败: ' + response.data.message)
+      loadError.value = response.data.message || t('common.loadFailed')
+      showError(t('common.loadFailed'))
     }
   } catch (error) {
     // 被新的搜索中止的请求：**不是错误**，静默丢弃（用户已经在搜下一个词了）
@@ -860,11 +881,12 @@ const loadProducts = async ({ append = false } = {}) => {
       return
     }
     console.error('加载产品失败:', error)
-    if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
-      showError('无法连接到服务器，请确保后端服务已启动 (npm run dev:server)')
-    } else {
-      showError('加载产品失败: ' + (error.response?.data?.message || error.message))
-    }
+    /**
+     * 第 48 轮：不再把 axios 原文（"Network Error" / "timeout of 10000ms exceeded"）
+     * 甩给用户 —— 那不是他能处理的信息。统一成"网络不稳，请重试"。
+     */
+    loadError.value = t('common.networkUnstable')
+    showError(t('common.networkUnstable'))
   } finally {
     if (seq === productLoadSeq) {
       isLoading.value = false

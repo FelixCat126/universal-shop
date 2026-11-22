@@ -11,6 +11,7 @@ export default {
 
   // 通用
   common: {
+    networkUnstable: 'The connection looks unstable. Please try again.',
     somethingWentWrong: 'Something went wrong',
     tryAgainHint: 'A refresh usually fixes it. If it keeps happening, please send us the error below.',
     reload: 'Reload page',
@@ -272,6 +273,7 @@ export default {
 
   // 订单
   order: {
+    fixHighlightedFields: 'Please fix the highlighted fields and submit again',
     refresh: 'Refresh',
     editNotes: 'Edit',
     saveNotes: 'Save note',
@@ -501,6 +503,7 @@ export default {
   },
 
   profile: {
+    passwordChangedRelogin: 'Password updated. Please sign in again.',
     orderStatusFilter: 'Order status',
     allTime: 'All time',
     passwordChangeNotice: 'Your account still uses a system-generated temporary password. Set your own password so only you know it (button on the right).',

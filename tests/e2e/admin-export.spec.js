@@ -36,7 +36,9 @@ test.describe('管理端异步导出', () => {
     // 订单页 → 打开导出任务对话框
     await page.goto('/admin/orders')
     await page.getByRole('button', { name: /导出/ }).first().click()
-    await expect(page.getByText('导出任务')).toBeVisible({ timeout: 15_000 })
+    // 定位到**对话框标题**（第 48 轮）：空状态文案里也可能出现"导出"字样，
+    // 用 getByText 会命中多个元素（strict mode violation）。
+    await expect(page.getByRole('heading', { name: '导出任务' })).toBeVisible({ timeout: 15_000 })
 
     // 选「订单数据」并提交
     await page.getByRole('button', { name: '提交导出' }).click()

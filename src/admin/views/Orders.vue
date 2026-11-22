@@ -194,7 +194,8 @@
             table-layout="fixed"
             class="order-table"
             @selection-change="onSelectionChange"
-          >
+          
+            :empty-text="t('common.noData')">
         <!--
           ⚠️ reserve-selection 必须开。
           不开的话，30 秒自动刷新会用新数组替换 orders → Element Plus 判定

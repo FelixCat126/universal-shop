@@ -1,4 +1,15 @@
 <template>
+  <!--
+    账号被停用/会话失效时，上一页把服务端的原因存到了 sessionStorage（第 48 轮），
+    这里显示出来 —— 别让用户看着"莫名被登出"。
+  -->
+  <div
+    v-if="loginNotice"
+    class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+  >
+    {{ loginNotice }}
+  </div>
+
   <div class="relative min-h-[100dvh] overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 text-white">
     <div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
       <div class="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary-500/25 blur-3xl" />
@@ -145,6 +156,18 @@ const showPassword = ref(false)
 const showCaptcha = ref(false)
 const captchaRef = ref(null)
 
+/**
+ * 上一页留下的登出原因（第 48 轮）。
+ *
+ * 账号被运营停用时，服务端 403 会说明原因；合作方端的请求层把它存到
+ * sessionStorage，这里读出来显示 —— 否则用户只看到登录页，不知道发生了什么。
+ */
+const loginNotice = ref('')
+try {
+  loginNotice.value = sessionStorage.getItem('partner_login_notice') || ''
+  if (loginNotice.value) sessionStorage.removeItem('partner_login_notice')
+} catch { /* 隐私模式下没有 sessionStorage，忽略 */ }
+
 async function runLogin (captcha) {
   loading.value = true
   try {
@@ -167,6 +190,11 @@ async function runLogin (captcha) {
       // token 一次性：已展示验证码时先换新，未展示则挂载组件（onMounted 自动加载）
       if (showCaptcha.value && captchaRef.value) captchaRef.value.refresh()
       showCaptcha.value = true
+      return
+    }
+    // 第 48 轮：账号被停用要说清楚（后端给 code，前端用自己语言说这句话）
+    if (r.code === 'ACCOUNT_DISABLED') {
+      toast.error(t('login.accountDisabled'))
       return
     }
     toast.error(r.message || t('login.loginFail'))

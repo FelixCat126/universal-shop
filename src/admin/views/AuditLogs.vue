@@ -85,7 +85,8 @@
         stripe
         style="width: 100%"
         row-key="id"
-      >
+      
+            :empty-text="t('common.noData')">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column :label="t('auditLogs.actor')" min-width="150">
           <template #default="{ row }">

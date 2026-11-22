@@ -11,6 +11,7 @@ export default {
 
   // 通用
   common: {
+    networkUnstable: '网络不太稳定，请稍后重试',
     somethingWentWrong: '页面出了点问题',
     tryAgainHint: '刷新一下通常就能恢复。如果一直这样，请把下面的错误信息告诉我们。',
     reload: '刷新页面',
@@ -270,6 +271,7 @@ export default {
 
   // 订单
   order: {
+    fixHighlightedFields: '请修正标红的字段后再提交',
     refresh: '刷新',
     editNotes: '修改',
     saveNotes: '保存备注',
@@ -498,6 +500,7 @@ export default {
   },
 
   profile: {
+    passwordChangedRelogin: '密码已更新，请重新登录',
     orderStatusFilter: '订单状态',
     allTime: '全部时间',
     passwordChangeNotice: '你的账号还在用系统生成的临时密码，建议现在就设置一个只有你知道的密码（点右边按钮即可）。',

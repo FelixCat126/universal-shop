@@ -78,6 +78,19 @@ export const usePartnerStore = defineStore('partner', () => {
        * **人还停在旧页面上**，看着像"系统没反应"（其他接口全 403）。
        * 两种情况都该直接登出 + 回登录页。
        */
+      /**
+       * 第 48 轮：**把服务端说的原因带过去**，别让用户看着一个"莫名登出"。
+       *
+       * 服务端在 403 时会说明原因（"合作方账号不可用，请联系管理员"），
+       * 之前直接丢掉 → 用户只看到登录页，不知道是账号被停用了还是自己操作错了。
+       * 现在把原因存到 sessionStorage，登录页读出来显示 ✓
+       */
+      try {
+        const body = await res.clone().json()
+        if (body?.message) {
+          sessionStorage.setItem('partner_login_notice', body.message)
+        }
+      } catch { /* 响应体不是 JSON 就跳过，不影响登出流程 */ }
       logout()
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = `${import.meta.env.BASE_URL || '/'}login`

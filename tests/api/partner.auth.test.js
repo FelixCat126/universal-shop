@@ -44,12 +44,15 @@ describe('P2.partner.auth', () => {
     expect(res.status).toBe(401)
   })
 
-  it('PA-3 被禁用 → 401', async () => {
+  /** 第 48 轮：被禁用 → 403 + ACCOUNT_DISABLED（与"密码错误"区分开） */
+  it('PA-3 被禁用 → 403 + ACCOUNT_DISABLED（与密码错误区分开）', async () => {
     const p = await makePartner({ is_active: false })
     const res = await request(app).post('/api/partner/login').send({
       login: p.login, password: PWD
     })
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(403)
+    expect(res.body.code).toBe('ACCOUNT_DISABLED')
+    expect(res.body.message).not.toMatch(/密码错误/)
   })
 
   it('PA-4 缺登录名 → 400', async () => {

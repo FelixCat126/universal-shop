@@ -53,7 +53,8 @@
             border
             stripe
             table-layout="fixed"
-          >
+          
+            :empty-text="t('common.noData')">
             <el-table-column prop="id" label="ID" width="70" />
 
             <el-table-column prop="name" :label="t('bundles.name')" min-width="150" show-overflow-tooltip />
@@ -281,6 +282,7 @@ import { bundleAPI } from '../api/bundles.js'
 import { productAPI } from '../api/products.js'
 import { usePersistentFilters } from '../composables/usePersistentFilters.js'
 import { useAutoSearch } from '../composables/useAutoSearch.js'
+import { useProductOptions } from '../composables/useProductOptions.js'
 
 const { t } = useI18n()
 
@@ -319,7 +321,7 @@ const bundleRules = {
 }
 
 const bundles = ref([])
-const productOptions = ref([])
+const { productOptions, productOptionsLoading, loadProductOptions, searchProductOptions } = useProductOptions()
 
 // items 在服务端可能是数组或 JSON 字符串，编辑/展示前统一归一
 const parseMaybeJson = (val, fallback) => {
@@ -688,16 +690,6 @@ const loadBundles = async () => {
   }
 }
 
-const loadProductOptions = async () => {
-  try {
-    const res = await productAPI.getProducts({ page: 1, pageSize: 200 })
-    if (res.data?.success) {
-      productOptions.value = res.data.data?.products || []
-    }
-  } catch (e) {
-    console.error('加载商品列表失败:', e)
-  }
-}
 
 onMounted(async () => {
   // 弹窗商品选项改为首次打开对话框时懒加载，见 ensureDialogOptions

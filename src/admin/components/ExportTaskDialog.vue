@@ -42,7 +42,16 @@
     />
 
     <!-- 任务列表 -->
-    <el-table v-loading="loading" :data="jobs" size="small" empty-text=" ">
+    <!--
+      第 48 轮：空态不再"什么都不显示"（empty-text=" " 是空白）——
+      运营会以为功能坏了。给出明确说法 + 一个"新建导出"的方向。
+    -->
+    <el-table
+      v-loading="loading"
+      :data="jobs"
+      size="small"
+      :empty-text="t('exportTasks.emptyHint')"
+    >
       <el-table-column :label="t('exportTasks.colType')" width="100">
         <template #default="{ row }">
           {{ typeLabel(row.type) }}
@@ -53,6 +62,17 @@
           <el-tag :type="statusType(row.status)" size="small">
             {{ t(`exportTasks.status.${row.status}`) }}
           </el-tag>
+        </template>
+      </el-table-column>
+      <!--
+        失败原因（第 48 轮）：后端其实一直返回 error_message，
+        但表格里**没有这一列** → 运营只看到一个红色「失败」，
+        不知道为什么失败，只能反复重试。
+      -->
+      <el-table-column :label="t('exportTasks.colError')" min-width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.error_message" class="text-xs text-red-600">{{ row.error_message }}</span>
+          <span v-else class="text-xs text-gray-400">-</span>
         </template>
       </el-table-column>
       <el-table-column :label="t('exportTasks.colRows')" width="100">
