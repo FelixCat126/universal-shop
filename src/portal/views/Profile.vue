@@ -99,11 +99,22 @@
       <!-- 标签导航 -->
       <div class="bg-white rounded-lg shadow">
         <div class="border-b border-gray-200">
-          <nav class="flex space-x-8 px-6">
+          <!--
+            横向可滚动（第 50 轮）：
+            标签从 4 个加到 5 个（第 45 轮加了「我的售后」），
+            再加上 `space-x-8`（32px 间隔）+ 图标 + 文案，
+            在 393px 的手机上**必然排不下** → 整个页面被撑到 500px 宽 →
+            连带把地址弹窗也推出屏幕（弹窗里的「添加」按钮点不到）。
+
+            改成 `overflow-x-auto` + 标签 `shrink-0`：
+            标签排不下时**标签条自己横向滚**，页面宽度不再被撑开。
+            （`scrollbar-width: none` 是为了不显示滚动条；仍可滑动。）
+          -->
+          <nav class="flex space-x-8 px-6 overflow-x-auto" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
             <button 
               @click="activeTab = 'orders'" 
               :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center shrink-0 whitespace-nowrap',
                 activeTab === 'orders' 
                   ? 'border-blue-500 text-blue-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -116,7 +127,7 @@
             <button
               @click="activeTab = 'afterSales'"
               :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center shrink-0 whitespace-nowrap',
                 activeTab === 'afterSales'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -128,7 +139,7 @@
             <button 
               @click="activeTab = 'addresses'" 
               :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center shrink-0 whitespace-nowrap',
                 activeTab === 'addresses' 
                   ? 'border-blue-500 text-blue-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -140,7 +151,7 @@
             <button
               @click="activeTab = 'points'"
               :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center shrink-0 whitespace-nowrap',
                 activeTab === 'points'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -152,7 +163,7 @@
             <button
               @click="activeTab = 'coupons'"
               :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center shrink-0 whitespace-nowrap',
                 activeTab === 'coupons'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -164,7 +175,7 @@
             <button 
               @click="activeTab = 'profile'" 
               :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm flex items-center',
+                'py-4 px-1 border-b-2 font-medium text-sm flex items-center shrink-0 whitespace-nowrap',
                 activeTab === 'profile' 
                   ? 'border-blue-500 text-blue-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -881,7 +892,15 @@
             <label class="ml-2 inline-flex items-center min-h-[44px] text-sm text-gray-700">{{ t('profile.setAsDefault') }}</label>
           </div>
 
-          <div class="flex justify-end space-x-3 pt-4">
+          <!-- 按钮区 sticky（第 50 轮）：移动端这个弹窗比视口高（内容 ~980px，
+               视口只有 ~730px），容器是 max-h-[90vh] overflow-y-auto →
+               按钮在滚动区之外，用户填完表还得自己往下滚才看得见「添加」——
+               而这是唯一的提交入口。改成 sticky 底栏：按钮永远贴在弹窗底部可见。
+               （与同文件的「修改密码」弹窗一致 —— 它的标题就是 sticky 的。） -->
+          <div
+            class="sticky bottom-0 -mx-6 -mb-6 mt-4 flex justify-end space-x-3 border-t border-gray-100 bg-white px-6 py-3"
+            style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px))"
+          >
             <button
               type="button"
               @click="showAddressModal = false"
@@ -2346,6 +2365,17 @@ onMounted(async () => {
     await loadMyAfterSales()
   } else if (activeTab.value === 'orders') {
     setupOrdersIntersection()
+  }
+
+  /**
+   * 从结算页过来新增地址的（第 50 轮）：**直接打开地址表单**。
+   *
+   * 原来：从结算页点「添加地址」→ 跳到个人中心的地址列表 → 用户还要**再点一次**
+   * 「添加收货地址」才能填 —— 明明就是"来添加地址的"，却先落到一个列表页。
+   * （结算页的文案还写着"添加地址后将自动返回结算页面"，用户会以为点一下就到了。）
+   */
+  if (activeTab.value === 'addresses' && route.query.from === 'checkout') {
+    handleAddAddress()
   }
 })
 

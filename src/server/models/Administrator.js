@@ -1,6 +1,7 @@
 import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
 import bcrypt from 'bcrypt'
+import { normalizeOptionalEmail } from '../utils/emptyToNull.js'
 
 const Administrator = sequelize.define('Administrator', {
   id: {
@@ -103,6 +104,20 @@ const Administrator = sequelize.define('Administrator', {
   createdAt: 'created_at',
   updatedAt: 'updated_at',
   hooks: {
+    /**
+     * 邮箱是**选填**字段，但前端表单不填时提交的是空字符串 `''`。
+     *
+     * Sequelize 的 `isEmail` 校验只跳过 `null`/`undefined`，空字符串照样被拒
+     * → 运营不填邮箱就建不了操作员，还被提示"邮箱格式不正确"（指向错误的字段）。
+     *
+     * 归一化成 `null` 后：校验被正确跳过，且**不占 email 的唯一键**
+     * （多个"没填邮箱"的操作员互不冲突）。
+     */
+    beforeValidate: async (admin) => {
+      if (admin.email !== undefined) {
+        admin.email = normalizeOptionalEmail(admin.email)
+      }
+    },
     // 保存前自动加密密码
     beforeCreate: async (admin) => {
       if (admin.password) {

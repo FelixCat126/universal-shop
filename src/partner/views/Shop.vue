@@ -43,17 +43,27 @@
           <div
             class="flex gap-2 overflow-x-auto overflow-y-hidden pb-1 -mx-1 px-1 touch-pan-x [scrollbar-width:thin]"
           >
+            <!--
+              「全部」是第一个 tab（id=null = 不筛选）——
+              与零售门户首页一致（第 43 轮门户就是这么修的）。
+
+              原来这里**直接自动选中第一个分类**并按它筛选：
+              合作方一进商品页就被锁死在某个分类上，
+              那个分类下**一个商品都没有**的话 → 页面只剩一句
+              「暂无商品，请换个关键词试试」→ **一个商品都看不到** ✗
+              （运营建了个新分类、还没来得及挂商品，合作方就"看不到货"了）
+            -->
             <button
-              v-for="c in categories"
-              :key="c.id"
+              v-for="c in categoryTabs"
+              :key="c.id === null ? 'all' : c.id"
               type="button"
               class="shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors whitespace-nowrap touch-manipulation min-h-[44px]"
-              :class="Number(selectedCategoryId) === Number(c.id)
+              :class="selectedCategoryId === c.id
                 ? 'bg-primary-600 text-white border-primary-600 shadow'
                 : 'bg-white text-gray-700 border-gray-300 hover:border-primary-400'"
               @click="selectCategory(c.id)"
             >
-              {{ categoryTabLabel(c) }}
+              {{ c.name }}
             </button>
           </div>
         </div>
@@ -417,9 +427,13 @@ async function loadCategories () {
     categories.value = json.data
     const ids = categories.value.map((c) => Number(c.id)).filter((n) => Number.isFinite(n))
     if (!ids.length) return
+    // ⚠️ 原来这里会**自动选中第一个分类**（`selectedCategoryId.value = ids[0]`）：
+    // 合作方进商品页就被锁死在某个分类上，那个分类下没商品 → 列表是空的。
+    // 现在默认「全部」（selectedCategoryId = null = 不筛选）；
+    // 只有当已选分类**不存在了**（被删掉）才需要回落 —— 回落到「全部」而不是第一个。
     const cur = selectedCategoryId.value
-    if (cur == null || !ids.includes(Number(cur))) {
-      selectedCategoryId.value = ids[0]
+    if (cur != null && !ids.includes(Number(cur))) {
+      selectedCategoryId.value = null
     }
   } catch {
     /* ignore */
@@ -430,9 +444,17 @@ function categoryTabLabel (c) {
   return c?.name != null ? String(c.name) : ''
 }
 
+/** 分类 tab 列表：第一个是「全部」（id=null = 不按分类筛选） */
+const categoryTabs = computed(() => [
+  { id: null, name: t('shop.allCategories') },
+  ...categories.value.map((c) => ({ id: Number(c.id), name: categoryTabLabel(c) }))
+])
+
 async function selectCategory (id) {
-  const n = Number(id)
-  if (!Number.isFinite(n) || selectedCategoryId.value === n) return
+  // id=null = 「全部」（不筛选）
+  const n = id === null ? null : Number(id)
+  if (n !== null && !Number.isFinite(n)) return
+  if (selectedCategoryId.value === n) return
   selectedCategoryId.value = n
   page.value = 1
   await load()
@@ -445,18 +467,19 @@ const onProductAreaTouchStart = (e) => {
 }
 
 const onProductAreaTouchEnd = (e) => {
-  if (categories.value.length < 2 || selectedCategoryId.value == null) return
+  if (categoryTabs.value.length < 2) return
   const touch = e.changedTouches?.[0]
   if (!touch) return
   const dx = touch.clientX - productSwipeStart.value.x
   const dyAbs = Math.abs(touch.clientY - productSwipeStart.value.y)
   if (Math.abs(dx) < 52 || dyAbs > 90) return
-  const idx = categories.value.findIndex((c) => Number(c.id) === Number(selectedCategoryId.value))
+  // 基于 categoryTabs（含「全部」）—— 与门户首页第 43 轮的做法一致
+  const idx = categoryTabs.value.findIndex((c) => c.id === selectedCategoryId.value)
   if (idx < 0) return
-  if (dx < 0 && idx < categories.value.length - 1) {
-    selectCategory(categories.value[idx + 1].id)
+  if (dx < 0 && idx < categoryTabs.value.length - 1) {
+    selectCategory(categoryTabs.value[idx + 1].id)
   } else if (dx > 0 && idx > 0) {
-    selectCategory(categories.value[idx - 1].id)
+    selectCategory(categoryTabs.value[idx - 1].id)
   }
 }
 

@@ -284,14 +284,21 @@ export const registerSchema = Joi.object({
   country_code: countryCodeSchema,
   phone: phoneSchema,
   // 上界与 DB 列宽一致（users.email 为 STRING(100)）
-  email: Joi.string().email().max(100).optional(),
+  /**
+   * 邮箱是**选填**字段：前端表单不填时提交的是空字符串 `''`，
+   * 而 `Joi.string().email()` 会把 `''` 判成"不是合法邮箱" → 400。
+   *
+   * `.empty(['', null])` 把这两种值视作"没填"（与 referral_code / user_coupon_id 同一口径）。
+   */
+  email: Joi.string().email().max(100).empty(['', null]).optional(),
   password: Joi.string().min(6).max(128).required(),
   referral_code: Joi.string().alphanum().min(4).max(32).empty(['', null]).optional()
 })
 
 export const loginSchema = Joi.object({
   // 上界与 DB 列宽一致（users.email 为 STRING(100)）
-  email: Joi.string().email().max(100).optional(),
+  // 邮箱选填：'' / null 视作"没填邮箱"（只按手机号登录），不当成非法格式
+  email: Joi.string().email().max(100).empty(['', null]).optional(),
   country_code: Joi.string().valid('+86', '+66', '+60').optional(),
   phone: Joi.string().pattern(/^[1-9]\d{7,14}$/).optional(),
   password: Joi.string().min(1).max(128).required()

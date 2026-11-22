@@ -209,6 +209,16 @@ class AdministratorController {
       }
 
       /**
+       * 邮箱是**选填**字段：前端不填时提交的是空字符串 `''`。
+       *
+       * 这里显式归一化成 `null`，让**唯一性预检查**与**入库**用同一个口径
+       * （否则预检查拿 `''` 去查、入库拿 `null` 存，两边对不上）。
+       * 模型层（Administrator 的 beforeValidate）也做了同样的归一化，
+       * 覆盖更新路径 —— 两处都在是有意的：控制器这层管"查"，模型那层管"存"。
+       */
+      const normalizedEmail = email ? String(email).trim() : null
+
+      /**
        * 密码强度与用户侧/合作方侧**同一把尺子**（assertPasswordPolicy）。
        *
        * 管理端是权限最高的 realm：管理端令牌能看到全部订单、客户资料、
@@ -239,7 +249,7 @@ class AdministratorController {
         where: {
           [Op.or]: [
             { username },
-            ...(email ? [{ email }] : [])
+            ...(normalizedEmail ? [{ email: normalizedEmail }] : [])
           ]
         }
       })
@@ -254,7 +264,7 @@ class AdministratorController {
       // 创建管理员
       const newAdmin = await Administrator.create({
         username,
-        email,
+        email: normalizedEmail,
         password,
         role: role || 'operator',
         real_name,
@@ -317,7 +327,8 @@ class AdministratorController {
         admin.username = username
       }
 
-      if (email !== undefined) admin.email = email
+      // 邮箱选填：不填 = 清空（存 null，不存 ''）—— 见 createAdministrator 里的说明
+      if (email !== undefined) admin.email = email ? String(email).trim() : null
       if (role && role !== admin.role) {
         if (role === 'super_admin' && currentAdmin.role !== 'super_admin') {
           return res.status(403).json({

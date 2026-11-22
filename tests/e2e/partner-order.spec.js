@@ -50,11 +50,22 @@ test.describe('合作方订货', () => {
     // 提示条上的「去下单」这类动作按钮会造成 strict mode 命中多个
     await page.getByRole('button', { name: '提交订单', exact: true }).click()
 
-    // 可能出现「确认提交」二次确认
+    /**
+     * 「确认提交」二次确认。
+     *
+     * ⚠️ 原来写的是 `if (await confirmBtn.count() > 0) { click() }` ——
+     * 那是**竞态**：弹窗是点「提交订单」之后由 Vue 渲染的，
+     * `count()` 在渲染完成前会返回 0 → **跳过点击** → 弹窗一直开着 →
+     * 后面等「订单已提交」自然等不到。
+     *
+     * 这个坑平时不显（渲染够快），但只要页面上多几个元素
+     * （比如别的用例刚建了商品/分类，列表变长）就会翻车。
+     *
+     * 正确写法：**等它出现**再点。
+     */
     const confirmBtn = page.getByRole('button', { name: '确认提交' })
-    if (await confirmBtn.count() > 0) {
-      await confirmBtn.first().click()
-    }
+    await confirmBtn.waitFor({ state: 'visible', timeout: 15_000 })
+    await confirmBtn.first().click()
 
     // 提交结果
     await expect(

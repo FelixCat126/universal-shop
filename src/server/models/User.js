@@ -2,6 +2,7 @@ import { DataTypes } from 'sequelize'
 import sequelize from '../config/database.js'
 import bcrypt from 'bcrypt'
 import { registerModelStatsInvalidation } from '../utils/statsCache.js'
+import { normalizeOptionalEmail } from '../utils/emptyToNull.js'
 
 const User = sequelize.define('User', {
   id: {
@@ -173,6 +174,20 @@ const User = sequelize.define('User', {
     }
   ],
   hooks: {
+    /**
+     * 邮箱是**选填**字段，但前端表单不填时提交的是空字符串 `''`。
+     *
+     * Sequelize 的 `isEmail` 校验只跳过 `null`/`undefined`，空字符串照样被拒
+     * → 用户不填邮箱就注册不了，还被提示"邮箱格式不正确"。
+     *
+     * 归一化成 `null` 后：校验被正确跳过，且**不占 email 的唯一键**
+     * （多个"没填邮箱"的用户互不冲突 —— 否则第二个会撞 23505 唯一约束）。
+     */
+    beforeValidate: async (user) => {
+      if (user.email !== undefined) {
+        user.email = normalizeOptionalEmail(user.email)
+      }
+    },
     // 保存前自动加密密码
     beforeCreate: async (user) => {
       if (user.password) {

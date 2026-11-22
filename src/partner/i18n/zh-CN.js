@@ -74,6 +74,7 @@ export default {
     priceNoteThb: '价格均为泰铢（THB）批发底价',
     search: '搜索商品名称',
     searchBtn: '搜索',
+    allCategories: '全部',
     loading: '加载中…',
     noImage: '无图',
     qty: '数量',

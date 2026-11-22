@@ -74,6 +74,7 @@ export default {
     priceNoteThb: 'ราคาทั้งหมดเป็นราคาขายส่งสกุลบาท (THB)',
     search: 'ค้นหาชื่อสินค้า',
     searchBtn: 'ค้นหา',
+    allCategories: 'ทั้งหมด',
     loading: 'กำลังโหลด…',
     noImage: 'ไม่มีรูป',
     qty: 'จำนวน',

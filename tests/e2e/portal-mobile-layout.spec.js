@@ -30,6 +30,9 @@ import { test, expect } from '@playwright/test'
  * 第 32 轮的教训：第 31 轮的护栏只查首页，于是"详情页/购物车的返回按钮只有 32px"
  * 这类问题一个都没被覆盖到 —— 护栏覆盖面不够，等于只守了大门。
  */
+const USER_PHONE = '812345678'
+const USER_PASS = 'Portal#2026'
+
 const PORTAL_PAGES = [
   '/portal/',
   '/portal/products/2',   // 真实商品（id=1 是软删商品，详情页会显示"不存在"）
@@ -56,6 +59,21 @@ test.describe('门户移动端布局', () => {
     await page.setViewportSize({ width: 390, height: 844 })
   })
 
+  /**
+   * 横向溢出的**正确判据**（第 50 轮修正）
+   *
+   * 原来判的是 `scrollWidth <= window.innerWidth` —— 这在移动端**永远成立**：
+   * 移动模拟下，页面一旦比屏幕宽，浏览器会把**布局视口一起撑宽**
+   * （`window.innerWidth` 跟着内容变），于是 scrollWidth === innerWidth → 判定"没溢出"。
+   *
+   * 实测（第 50 轮）：个人中心的标签导航撑到 738px，
+   * `window.innerWidth` 也变成 738 → 旧判据给绿 ✗，
+   * 而真实可见宽度 `visualViewport.width` 只有 390 → 实际溢出 348px。
+   *
+   * 正确基准是 **`visualViewport.width`**（用户真正能看到的宽度），
+   * 拿它跟 scrollWidth 比。桌面 project 里 visualViewport 也有，
+   * 于是同一条判据在两个 project 下都成立。
+   */
   test('ML-1 各页面无横向溢出', async ({ page }) => {
     for (const p of PORTAL_PAGES) {
       await page.goto(p)
@@ -63,10 +81,87 @@ test.describe('门户移动端布局', () => {
       await page.waitForTimeout(700)
       const m = await page.evaluate(() => ({
         scrollW: document.documentElement.scrollWidth,
-        innerW: window.innerWidth
+        innerW: window.innerWidth,
+        // 真实可见宽度（移动端下 innerWidth 会跟着内容撑宽，不能用它当基准）
+        visibleW: window.visualViewport
+          ? Math.round(window.visualViewport.width)
+          : window.innerWidth
       }))
-      expect(m.scrollW, `${p} 横向溢出：scrollWidth=${m.scrollW} > innerWidth=${m.innerW}`).toBeLessThanOrEqual(m.innerW + 1)
+      expect(
+        m.scrollW,
+        `${p} 横向溢出：scrollWidth=${m.scrollW} > 可见宽度 ${m.visibleW}（innerWidth=${m.innerW}，移动端下它会跟着内容撑宽，不能当基准）`
+      ).toBeLessThanOrEqual(m.visibleW + 1)
     }
+  })
+
+  /**
+   * ML-1b 个人中心不横向溢出（第 50 轮）
+   *
+   * 个人中心**不在** ML-1 的页面列表里 —— 于是它的横向溢出一直没被发现：
+   * 标签导航（订单 / 售后 / 地址 / 积分 / 资料，5 个标签 + 32px 间隔 + 图标）
+   * 在 393px 的手机上排不下 → 整页被撑到 500px →
+   * 连带把「新增地址」弹窗也推出屏幕（弹窗里的「添加」按钮点不到）。
+   *
+   * 个人中心要登录，所以单独一条用例（先登录再查）。
+   */
+  test('ML-1b 个人中心（登录后）不横向溢出', async ({ page }) => {
+    await page.goto('/portal/login')
+    await page.getByPlaceholder(/手机号/).fill(USER_PHONE)
+    await page.getByPlaceholder(/密码/).fill(USER_PASS)
+    await page.getByRole('button', { name: '登录' }).click()
+    await page.waitForURL(/\/portal\/?(\?.*)?$/, { timeout: 30_000 })
+
+    await page.goto('/portal/profile')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(1000)
+
+    const m = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      innerW: window.innerWidth,
+      visibleW: window.visualViewport ? Math.round(window.visualViewport.width) : window.innerWidth
+    }))
+    expect(
+      m.scrollW,
+      `个人中心横向溢出：scrollWidth=${m.scrollW} > 可见宽度 ${m.visibleW}（标签导航排不下时应该自己横向滚，而不是把页面撑宽）`
+    ).toBeLessThanOrEqual(m.visibleW + 1)
+  })
+
+  /**
+   * ML-1c 新增地址弹窗的提交按钮**必须在视口内**（第 50 轮）
+   *
+   * 这个弹窗在移动端比视口高（内容 ~980px / 视口 ~730px），
+   * 容器是 `max-h-[90vh] overflow-y-auto` →
+   * 「添加」按钮原本在**滚动区之外**（y≈1053，屏高只有 727）：
+   * 用户填完整个表单，**看不到唯一的提交入口**。
+   *
+   * 修法是把按钮区做成 sticky 底栏。这条用例守住它 ——
+   * 一旦有人把 sticky 去掉（或再加几个表单字段把弹窗撑得更高），
+   * 它立刻变红。
+   */
+  test('ML-1c 新增地址弹窗的提交按钮在视口内（不用先滚动就能提交）', async ({ page }) => {
+    await page.goto('/portal/login')
+    await page.getByPlaceholder(/手机号/).fill(USER_PHONE)
+    await page.getByPlaceholder(/密码/).fill(USER_PASS)
+    await page.getByRole('button', { name: '登录' }).click()
+    await page.waitForURL(/\/portal\/?(\?.*)?$/, { timeout: 30_000 })
+
+    // 直接打开新增地址弹窗
+    await page.goto('/portal/profile?tab=addresses')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(800)
+    const addBtn = page.getByRole('button', { name: /新增收货地址|添加收货地址|新增地址|Add address/i }).first()
+    await addBtn.click()
+    await page.waitForTimeout(800)
+
+    const submit = page.locator('div.fixed.inset-0').getByRole('button', { name: /^(添加|保存|Add|Save)$/ }).last()
+    await expect(submit).toBeVisible({ timeout: 10_000 })
+    const box = await submit.boundingBox()
+    const vh = page.viewportSize().height
+    expect(box, '新增地址弹窗里找不到提交按钮').toBeTruthy()
+    expect(
+      box.y + box.height,
+      `提交按钮在视口外（底边 y=${Math.round(box.y + box.height)} > 视口高 ${vh}）—— 用户填完表看不到提交入口`
+    ).toBeLessThanOrEqual(vh + 1)
   })
 
   test('ML-2 顶栏不溢出容器', async ({ page }) => {

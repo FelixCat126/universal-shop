@@ -74,6 +74,7 @@ export default {
     priceNoteThb: 'All prices are wholesale base prices in THB',
     search: 'Search product name',
     searchBtn: 'Search',
+    allCategories: 'All',
     loading: 'Loading…',
     noImage: 'No image',
     qty: 'Qty',
