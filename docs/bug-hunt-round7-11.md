@@ -4434,6 +4434,27 @@ sharp 升级后验证：
 - Node 切换：`/root/node22-upgrade-20261123-120907/`
 - 旧 Node 18 保留在 `/usr/bin/node`；旧 sharp 版本可通过 git + lockfile 回滚
 
+### 53.6 生产验证与回归
+
+| 项 | 结果 |
+|---|---|
+| sharp | **0.35.5**；libvips 8.18.7 / libheif 1.23.5 / librsvg 2.63.2 |
+| 生产依赖审计 | `npm audit --omit=dev --audit-level=high` → **0 vulnerabilities** |
+| universal-shop 实际运行时 | `/opt/node-v22.23.5/bin/node`（Node 22.23.5） |
+| 其它两个 PM2 项目 | robot-cockpit / aether-gateway 仍为 `/usr/bin/node`（Node 18），未受影响 |
+| PM2 持久化 | dump 的 `exec_interpreter = /usr/local/bin/node`，已 `pm2 save` |
+| 生产真实图片处理 | PNG 1200×1800 → WebP 主图 1067×1600、缩略图 267×400、中图 534×800 ✓ |
+| 临时文件 | 已清理，未留下测试数据 |
+| 端口 | 公网仍只有 22 / 80 / 443，3002 / 3306 / 8080 保持收口 |
+| 站点 | 7 个域名的状态码 / HTTP 版本 / 响应体积保持一致 |
+| **数据不变量** | 生产库 **25 项全部通过** |
+| CI | 最新提交未触发 run，启用中的 workflow 为 0 |
+
+本地回归：vitest **193 文件 / 1425 用例**、Vue **203 用例**、Playwright **138 用例**全过，lint 0 error。
+
+GitHub HTTPS 在部署后一度网络超时；已改用 SSH 成功推送，
+远端 main 为 `ac229d4`。这不影响生产部署（部署走独立 SSH/rsync 通道）。
+
 ### 这轮的方法论收获
 
 1. **“改完现在是安全的”不够，要验证“重启/重部署后仍然安全”**：
