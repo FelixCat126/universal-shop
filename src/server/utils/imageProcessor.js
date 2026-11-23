@@ -26,7 +26,8 @@ import path from 'node:path'
  * sharp **懒加载**（且失败不致命）。
  *
  * 为什么不能顶层 import：sharp 是原生模块，运行时版本要求很硬
- * （sharp 0.35 要求 Node ≥ 20.9，而生产机是 Node 18）——
+ * （sharp 0.35 要求 Node ≥ 20.9；生产只给 universal-shop 配了 Node 22，
+ * 同机的其它项目仍在 Node 18）——
  * 顶层 import 一旦不满足，**整个服务起不来**。
  * 图像压缩是"锦上添花"的能力，不该有能力就让服务挂掉。
  *

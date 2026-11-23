@@ -28,7 +28,7 @@ universal-shop/
 | 层级 | 技术 |
 |---|---|
 | 前端 | Vue 3, Vite, Pinia, vue-i18n, Tailwind CSS, Element Plus |
-| 后端 | Node.js ≥ 18, Express 4, Sequelize 6, JWT, Helmet, express-rate-limit |
+| 后端 | Node.js ≥ 20.9（生产使用 22 LTS）, Express 4, Sequelize 6, JWT, Helmet, express-rate-limit |
 | 数据库 | **PostgreSQL 16**（Docker Compose 一键起） |
 | 测试 | Vitest, Supertest, @vue/test-utils, happy-dom |
 | 部署 | PM2 + Nginx + 自签/正签 SSL，阿里云一键脚本 |

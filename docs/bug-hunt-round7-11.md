@@ -4336,3 +4336,118 @@ CDN 是第二层保险。**如果暂时不打算买 CDN，现在这套已经把�
 6. **不在版本控制里的运维配置 = 没有回滚能力**：
    `/etc/nginx` 管着 6 个站点却只有服务器上一份 →
    快照进仓库 + 明确标注"服务器才是权威"，是最低成本的止血。
+
+---
+
+## 第 53 轮：生产安全收口、凭据清理与 Node 22 / sharp 升级
+
+### 53.1 端口收口完成：公网只剩 22 / 80 / 443
+
+第 52 轮盘点出的三个公网直连端口全部收掉：
+
+| 端口 | 归属 | 收口方式 |
+|---|---|---|
+| 3306 | cider-bar MySQL | compose 绑定 `127.0.0.1:3306`（用户先完成） |
+| 3002 | cider_web | compose 改 `127.0.0.1:3002` + 重建容器 |
+| 8080 | robot-cockpit | `.env` 的 `HOST` 改 `127.0.0.1`，PM2 用新 env 重启并 `pm2 save` |
+
+**从外部黑盒复核**：3000 / 3002 / 3306 / 6379 / 5432 / 8080 / 8787 / 13100 全部不可达；
+公网只保留 SSH、HTTP、HTTPS。7 个域名的「状态码 / HTTP 版本 / 响应体积」与收口前完全一致。
+
+#### 收口的难点不是改配置，是防止它悄悄反弹
+
+找到了两条会把 8080 重新暴露的路径：
+
+1. `deploy/pm2-ecosystem.config.js` **硬编码** `HOST: '0.0.0.0'` ——
+   将来用 ecosystem 启动就前功尽弃 → 改为 `127.0.0.1`
+2. `deploy-config.env` 的 `FIREWALL_PORTS="22,8080"` ——
+   当前没有脚本使用，但一旦启用防火墙就会重新放开 → 改为 `"22"`
+
+**持久性验证**：主动执行 `pm2 reload deploy/pm2-ecosystem.config.js --update-env`
+模拟将来的重部署，监听地址仍是 `127.0.0.1`，dump 里的 HOST 也保持正确 ✓
+
+另一个坑：robot-cockpit **不加载 dotenv**，只读进程环境变量。
+所以仅改 `.env` 后 `pm2 restart` 没用（第一次实测仍监听 0.0.0.0）；
+必须 `set -a && . ./.env && set +a && pm2 restart --update-env`，再 `pm2 save`。
+
+### 53.2 明文凭据与文件权限
+
+- 删除 robot-cockpit 两份 `deploy-config.env` 里的 `REMOTE_PASSWORD` 行，
+  并清掉本次备份目录里的旧副本。
+  先确认过：该密码只存在于这两个文件、**不是当前 root 密码**、没有脚本读取它。
+- `docker-compose.dev.yml` 的 3306 / 6379 也改为回环绑定，
+  避免开发者在本机起 dev 时把数据库暴露到局域网。
+
+**扫面时发现的更大问题**：所有 `.env` 都是 **644（world-readable）**，
+机器上的 `admin`(uid 1000) 用户能读到 JWT 密钥与数据库密码。
+已把 12 个敏感文件收紧为 **600 root:root**（含配置、SECRETS.md、备份/恢复脚本）。
+
+改前确认：非 root 进程只有 postgres / nginx / redis / containerd，均不需要读这些文件；
+读取它们的服务与部署脚本都以 root 运行。改后 PM2、容器、nginx、7 个站点与部署脚本读取均正常。
+
+**查实的误报 / 非问题**：
+- cider-bar 目录**不是 git 仓库** → 那些 `.env` / `SECRETS.md` 未进版本控制
+- `MemberCenter.tsx` 的 `const TOKEN = "ctime_web_token"` 是 localStorage 键名，不是密钥
+
+### 53.3 停用 GitHub Actions
+
+用户持续收到每次 push 的 CI 失败邮件。把 `ci.yml` 从 `.github/workflows/`
+移到 `.github/workflows-disabled/`（GitHub 只识别前者），
+配置和原因留在该目录 README 中；保留本地与部署门禁。
+
+停用后验证：最新提交未触发 run，`gh workflow list --all` 无启用 workflow ✓
+
+CI 一直红的两个原因都不是业务代码回归：
+
+1. **test**：官方 `postgres:16-alpine` 不含 `pg_trgm`，迁移按设计跳过建索引，
+   `orderUserSearchIndex` 的 3 个索引断言失败；本地库有 pg_trgm，1425 个用例全绿。
+2. **security-scan**：`sharp` 的 libvips/libheif/librsvg 传递依赖 1 个 high 漏洞。
+
+### 53.4 sharp 0.33.5 → 0.35.5：先升级运行时，不硬闯
+
+`sharp@0.35.5` 要求 **Node ≥20.9**，生产原来是 Node 18.20.8。
+直接 `npm audit fix --force` 会让生产依赖不兼容，所以没有这么做。
+
+采用**旁路 Node 22**：
+
+1. 下载 Node 22 LTS（v22.23.5）并校验官方 SHA256
+2. 安装到 `/opt/node-v22.23.5`，保留 `/usr/bin/node` 的 Node 18
+3. 切换前实测：全部生产依赖可加载、bcrypt 原生哈希、sharp WebP、
+   robot-cockpit 的 puppeteer、aether-gateway 入口语法检查
+4. **只把 universal-shop 的 PM2 interpreter 切到 `/usr/local/bin/node`（Node 22）**；
+   robot-cockpit 与 aether-gateway 保持 Node 18，缩小影响面
+5. 用 `/proc/<pid>/exe` 核实三个进程实际使用的运行时
+
+运行时拓扑与回滚方式写入 `deploy/RUNTIME.md`；
+`package.json engines` 同步为 Node ≥20.9，README 与部署脚本注释一并更新。
+
+sharp 升级后验证：
+
+- `npm audit --omit=dev --audit-level=high` → **0 vulnerabilities**
+- JPEG / PNG / WebP 三种格式的真实图片处理通过：
+  主图最长边 1600、缩略图 400、中图 800，尺寸与格式均正确
+- 上传/头像/远程图片相关测试 48 个全过
+
+### 53.5 备份与回滚
+
+- 端口与凭据变更：`/root/port-lockdown-20261123-104021/`（密码行已清）
+- Node 切换：`/root/node22-upgrade-20261123-120907/`
+- 旧 Node 18 保留在 `/usr/bin/node`；旧 sharp 版本可通过 git + lockfile 回滚
+
+### 这轮的方法论收获
+
+1. **“改完现在是安全的”不够，要验证“重启/重部署后仍然安全”**：
+   8080 的运行态已收口，但 ecosystem 硬编码与 dump 旧值都会让它反弹；
+   主动模拟一次重部署才算真的完成。
+
+2. **改环境变量不生效时先看应用是否读它**：
+   robot-cockpit 不加载 dotenv，`.env` 只是部署时 source 进 PM2 的配置来源；
+   直接重启不会重新读文件。
+
+3. **修原生依赖漏洞先看运行时要求**：
+   sharp 修复版要求 Node ≥20.9；在生产 Node 18 上强升，
+   会把“1 个 high 漏洞”变成“服务起不来”。旁路安装 + 实测 + 单项目切换，
+   比直接 `npm audit fix --force` 安全得多。
+
+4. **敏感信息治理不能只删密码**：文件权限 644 让本机任意用户读到所有密钥，
+   影响面比一份死配置里的旧 SSH 密码更大。扫面要连权限一起看。
