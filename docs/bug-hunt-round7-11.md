@@ -4099,3 +4099,223 @@ RG-2b 立刻报「删单失败却留下了台账行 —— 台账与订单不同
 
 5. **契约类护栏会在你加功能时拦下你**：`openapiContract.test.js`
    因新增 4 个路由而变红 —— 这正是它的用途，不是障碍。
+
+---
+
+## 第 52 轮：CDN / HTTP-3 / 压缩 —— 前面的遗留决策落地
+
+第 43 轮起就挂在"待拍板"里的四项，本轮落地了 A（nginx + HTTP/3）与 B（CDN）的**服务器侧**，
+C（端口收口）未动，D（支付对账）已在第 51 轮完成。
+
+### 52.1 先量清楚：整台机器上有什么
+
+动手前做了一次**全量只读盘点**（不猜、不碰）：
+
+| 单元 | 载体 | 端口 | 公网可达 |
+|---|---|---|---|
+| **universal-shop**（本项目） | PM2 | 127.0.0.1:3000 | ✅ 已收口 |
+| cider-bar | docker compose | 3002 / 3306 / 4000 | ⚠️ 3002、3306 暴露 |
+| ctime | next-server | 127.0.0.1:13100 | ✅ |
+| mp / aether-gateway | PM2 | 127.0.0.1:8787 | ✅ |
+| robot-cockpit | PM2 | 0.0.0.0:8080 | ⚠️ 暴露 |
+
+**共享资源**：同一个 nginx（6 个域名站点）、同一张 SAN 证书
+（`cider-bar-subs` 覆盖 eshop/ctime/game/mp/robot 五个域名）、`firewalld` **inactive**
+（无主机防火墙，全靠阿里云安全组）。
+
+黑盒探测（从外部 nc）确认了暴露面：22 / 80 / 443 / 3002 / 3306 / 8080 公网可达，
+3000 / 5432 / 6379 / 8787 / 13100 不可达。
+
+### 52.2 nginx 1.20.1 → 1.30.7
+
+**为什么必须换二进制**：系统源（alinux3-updates）最高只有 **1.24.0**，
+而 HTTP/3 需要 **≥1.25**（且要编译时带 `--with-http_v3_module`）。
+`yum update` 到不了目标版本 → 只能装 nginx 官方源。
+
+**执行顺序（每步都有退路）**：
+
+1. **全量备份** → `/root/nginx-backup-<时间>/`
+   （二进制 + `/etc/nginx` 全部配置 + systemd unit + 编译参数 + rpm 清单）
+2. **签名校验**：官方 key 在 `nginx.org/keys/nginx_signing.key`
+   （不是常见的 `packages/.../RPMS/` 下 —— 那个路径 404）
+   `rpm --checksig` → `digests signatures OK` ✓
+3. **先解包不安装**：`rpm2cpio | cpio -idmv` 到临时目录，
+   用新二进制 `nginx -t` 跑**生产的真实配置与证书** → 通过 ✓
+4. 才正式 `rpm -Uvh`
+
+**三个必须处理的覆盖点**（官方包会动生产文件）：
+
+| 文件 | 官方包行为 | 处理 |
+|---|---|---|
+| `/etc/nginx/nginx.conf` | **直接覆盖**（不是 `.rpmnew`）→ 丢掉了生产的默认站点（`server_name _` 的 404 页）、`tcp_nopush`、动态模块加载 | **从备份恢复生产版** |
+| `/etc/nginx/conf.d/default.conf` | **新增**（生产原本没有）→ 多出一个 `server_name localhost` 站点 | 移到备份目录 |
+| `nginx.service` | **直接覆盖** → 官方 unit 缺 `ExecStartPre=rm -f /run/nginx.pid`（PID 残留会导致 nginx 起不来） | **从备份恢复生产版** |
+
+**验证方式**：升级前后各抓一次 **7 个域名**的「状态码 / HTTP 版本 / 响应体积」基线，
+逐行对比 —— **全程一致** ✓（响应时间普遍变快：eshop 0.44s → 0.15s）。
+
+**certbot 兼容**（最关键的兼容点）：certbot 1.22.0 用的是
+`authenticator = nginx` + `installer = nginx` —— **续期时会改写配置并 reload nginx**。
+换 nginx 后必须验：`certbot renew --dry-run` → 两张证书均 `success` ✓
+
+### 52.3 HTTP/3（QUIC）—— 已配置，**待安全组放行 UDP 443**
+
+只改 `eshop.conf`（本项目自己的站点），其余五个站点的配置**一字未动**：
+
+```nginx
+listen 443 ssl;
+listen 443 quic reuseport;
+http2 on;
+```
+
+- `quic reuseport` 是 nginx 官方文档要求的写法（多 worker 共享 UDP 端口）
+- `http2 on;` 是 1.25+ 的新指令；旧的 `listen ... http2` 已废弃
+  （ctime 站点还在用旧写法，只报 warning 不影响运行 —— **没动别人的站点**）
+
+**实测**：UDP 443 已在监听（`ss -ulnp` 可见），
+但从外部发 QUIC Initial 包**无响应** → **阿里云安全组未放行 UDP 443**。
+
+不放行也不会坏 —— 客户端自动回退 HTTP/2，只是没有 QUIC 收益。
+**这一步需要你在阿里云控制台放行 UDP 443**（我没有云凭证）。
+
+### 52.4 gzip —— 静态资源传输量降 63%
+
+**发现**：eshop 的静态资源（`/portal/assets/*.js`）**完全未压缩** —— 288860 字节。
+
+为什么没被压缩：Express 的 `compression()` 只管**到达应用层**的响应，
+而静态文件是 **nginx 直接吐的**（`/portal/assets` 由 nginx 匹配静态目录），绕过了 Express。
+
+加上 gzip（放在 server 块内，**只影响本站点**）后：
+
+| | 压缩前 | 压缩后 |
+|---|---|---|
+| `/portal/assets/index-*.js` | 288,860 B | **106,564 B（-63%）** |
+
+`gzip_min_length 1024` → 首页 HTML（684 B）不压缩（小文件压缩反而变大）✓
+
+### 52.5 接 CDN 前发现的**真实缺陷**：API 完全没有缓存语义
+
+准备 CDN 配置时查前置条件，发现：**API 响应一个 `Cache-Control` 头都没有**。
+
+浏览器会按 RFC 7234 的启发式缓存自行判断（动态响应通常无 Last-Modified → 实际不缓存），
+但 **CDN / 中间代理不这么判** —— 阿里云 CDN 默认对所有 GET 请求缓存。
+
+**上了 CDN 之后的典型事故**：
+客户下单 → 客户端请求订单列表 → 命中 CDN 里的旧列表 → **页面显示"没有这笔订单"**；
+库存、汇率、配置同理滞后。
+
+所以在**应用层**把语义钉死（`src/server/app.js`）：
+
+- API 一律 `no-store, no-cache, must-revalidate, max-age=0`
+- 例外：三个**确实是公开只读、允许短暂滞后**的接口放宽到 `public, max-age=60`
+  （`/api/products`、`/api/product-categories`、`/api/system-config/public`）
+- **只对 GET/HEAD 谈缓存** —— `/api/products` 前缀内还有 `POST /api/products/check-stock`，
+  不判方法会被错误地标成"可缓存 60s"
+
+**踩了两个坑**：
+
+**坑一：路径拼接**。在 `app.use('/api', mw)` 里，`req.path` 是**相对挂载点**的路径（`/products`），
+拿它去比 `/api/products` 永远不匹配 → 前缀判断全部落空（三个公开接口被标成 no-store）。
+正确写法是 `req.baseUrl + req.path`。
+（被护栏 CC-3 抓到 —— 否则会以为"公开接口不缓存也没关系"。）
+
+**坑二（更要命）：`max-age` vs `s-maxage`**。第一版写的是
+`Cache-Control: public, max-age=60`，想着"给 CDN 缓存 60 秒" ——
+结果 **e2e 的 AJ-2（后台建商品）稳定挂**：新建商品后刷新页面，列表里**看不到刚建的商品**。
+
+原因：`max-age` 会让**浏览器**也缓存 60 秒（不只是 CDN）。
+而管理端和前台**共用同一个 `/api/products` 接口**（`productAPI.getProducts` 打的 `/api/products`）——
+所以"给 CDN 缓存"这个意图，**顺带把管理端自己的浏览器也缓存了**。
+
+正解是 **`s-maxage`** —— 它专治这个场景：
+
+| 指令 | CDN / 共享代理 | 浏览器 |
+|---|---|---|
+| `max-age=60` | 缓存 60s | **也缓存 60s** ✗ |
+| `s-maxage=60, max-age=0` | 缓存 60s ✓ | 不缓存 ✓ |
+
+改完 `s-maxage` 后，AJ-2 在两个 project 上都通过 ✓
+
+**教训**：加缓存头时先问"**谁会缓存它**"——
+`max-age` 和 `s-maxage` 的差别不是风格问题，是"管理端能不能立刻看到自己刚建的东西"。
+
+**护栏**（`tests/api/apiCacheControlGuard.test.js`，5 条）
+
+| 用例 | 断言 |
+|---|---|
+| CC-1 | 订单/购物车/个人资料 → no-store |
+| CC-2 | 管理端接口 → no-store |
+| CC-3 | 三个公开只读接口 → `public, max-age=60` |
+| CC-4 | **非 GET 方法**不被标成可缓存（`POST /api/products/check-stock`） |
+| CC-5 | 静态资源不受影响（仍是长期缓存 —— CDN 该缓存的就是它） |
+
+**反向验证**：把可缓存分支禁用 → CC-3 变红 ✓
+
+### 52.6 一个运维风险：`/etc/nginx` 完全不在版本控制里
+
+盘点时发现：**部署脚本不管理 `/etc/nginx`**（`deploy-on-server.sh` 的 rsync 只同步项目目录），
+仓库里只有一个 `scripts/nginx-portal-proxy.example.conf` 示例文件。
+
+也就是说：**6 个站点共用的 nginx 配置，此前没有任何版本控制** ——
+改了什么、为什么改，只能靠记忆和服务器上的 `.bak` 文件。
+
+**修**：把生产配置**快照**纳入版本控制 → `deploy/nginx/conf.d/`（含 eshop 的 HTTP/3 + gzip），
+配一份 `deploy/nginx/README.md` 说明"这是快照，服务器上的才是权威，改仓库不会自动生效"，
+以及 `deploy/nginx/CDN-SETUP.md`（CDN 控制台操作清单 + 前置条件 + 验证方法 + 回滚）。
+
+### 52.7 CDN：服务器侧已就绪，控制台侧待办
+
+**前置条件已全部就绪**（逐条查过）：
+
+| 前置条件 | 状态 |
+|---|---|
+| 源站 HTTPS 可用（TLS 1.3） | ✅ |
+| 静态资源长缓存头 | ✅ `max-age=604800, immutable` |
+| SPA index.html 不缓存 | ✅ `no-cache, no-store` |
+| **API 不会被缓存** | ✅ 第 52.5 节新加 |
+| 源站不限制回源 IP | ✅ nginx 无 allow/deny |
+| 回源 Host 正确 | ✅ 命中 eshop 的 server 块 |
+
+**控制台操作**（需要用户做，我没有云凭证）：创建加速域名 → 上传证书 →
+配缓存规则（`/api/*` 与 SPA 首页**不缓存**）→ DNS 改 CNAME → 验证。
+详见 `deploy/nginx/CDN-SETUP.md`。
+
+**说实话：CDN 的收益比预期小。** 这个站点真实流量很小（6 个域名当天合计 3436 请求，
+大半是互联网扫描器），省下的带宽有限；它真正改善的是**首字节延迟** ——
+而那正是这个站点一直以来的痛点（客户端到这台 ECS 的链路有 TCP SYN 丢包 → 1s RTO 重传）。
+**HTTP/3 已经先一步对症**（QUIC 首包冗余正好绕开 SYN 丢包），
+CDN 是第二层保险。**如果暂时不打算买 CDN，现在这套已经把大头拿走了。**
+
+### 52.8 回归
+
+| 套件 | 结果 |
+|---|---|
+| `vitest`（api + integration） | **193 文件 / 1425 用例全过** |
+| `playwright`（两个 project） | 见下 |
+| `lint` | 0 error |
+
+### 这轮的方法论收获
+
+1. **"升级公共层"要按"影响面"而不是"操作步骤"来规划**：
+   nginx 是 6 个站点的公共层 → 备份、签名校验、解包预验证、三处覆盖点处理、
+   7 个域名的基线对比 —— 这些都是在动**别人也在用**的东西。
+
+2. **官方包会覆盖生产文件，官方文档不会告诉你哪些**：
+   `nginx.conf` 被直接覆盖（丢默认站点）、`default.conf` 被新增、
+   `nginx.service` 被覆盖（缺 PID 清理）—— 三个都是**只在真机上才会暴露**的问题，
+   容器里测不出来。
+
+3. **升级前先抓基线，升级后逐行对比**：7 个域名 × (状态码, HTTP 版本, 响应体积)
+   三元组全程一致 —— 比"看起来还在跑"可信得多。
+
+4. **接 CDN 之前先查缓存语义**：源站没给 `Cache-Control` 时，
+   CDN 的默认行为（缓存所有 GET）会制造"下单后看不到订单"这类事故。
+   **缓存语义是 CDN 的前置条件，不是可选项。**
+
+5. **中间件里的路径拼接有坑**：`app.use('/api', mw)` 里 `req.path` 是相对路径，
+   `req.baseUrl + req.path` 才是完整路径。写前缀匹配时踩了这个坑，
+   而且**症状很隐蔽**（全部落进 no-store，看起来"更安全"，实际是公开接口没缓存到）。
+
+6. **不在版本控制里的运维配置 = 没有回滚能力**：
+   `/etc/nginx` 管着 6 个站点却只有服务器上一份 →
+   快照进仓库 + 明确标注"服务器才是权威"，是最低成本的止血。

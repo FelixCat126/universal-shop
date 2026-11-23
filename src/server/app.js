@@ -179,6 +179,75 @@ app.use(cors(buildCorsOptions()))
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 
+/**
+ * API 响应明确标「不可缓存」（第 52 轮）
+ * ========================================
+ *
+ * ## 为什么现在要加
+ *
+ * 此前 API 响应**完全没有 Cache-Control 头** ——
+ * 浏览器会按 RFC 7234 的「启发式缓存」自行判断（无 Last-Modified 时通常不缓存），
+ * 但**CDN / 中间代理不是这么判的**：阿里云 CDN 这类默认对所有 GET 请求缓存，
+ * 不看源站有没有给 Cache-Control。
+ *
+ * 上了 CDN 之后的典型事故：
+ *   客户下单 → 客户端请求订单列表 → 命中 CDN 缓存的旧列表 →
+ *   **页面显示"没有这笔订单"**；库存、汇率、配置同理滞后。
+ *
+ * 所以这里在**应用层**就把语义钉死：API 一律 `no-store`，
+ * 不给任何中间层"顺手缓存"的机会。
+ *
+ * ## 静态资源不受影响
+ *
+ * 静态资源（/portal/assets 等）走的是 `express.static` 的
+ * `immutable: true, maxAge: '7d'`，**不经过 /api** ✓
+ * 它们的缓存头是应用自己设的，`Cache-Control: public, max-age=604800, immutable` ——
+ * 那正是 CDN 该缓存的东西。
+ *
+ * ## 可缓存的公开只读接口
+ *
+ * 少数**确实是公开只读、且允许短暂滞后**的接口（商品目录、分类、公开配置）
+ * 单独放宽到 60s —— 它们变更极少，而每次都回源对源站是无谓消耗。
+ * 订单 / 购物车 / 用户 / 管理端接口一律 no-store。
+ */
+const CACHEABLE_API_PREFIXES = [
+  '/api/products',
+  '/api/product-categories',
+  '/api/system-config/public'
+]
+
+app.use('/api', (req, res, next) => {
+  // ⚠️ 只对 GET/HEAD 谈缓存：POST/PUT/DELETE 的响应**绝不能**被缓存。
+  // （/api/products 前缀会覆盖 /api/products/check-stock —— 那是 POST，
+  //   如果不判方法，它会被错误地标成"可缓存 60s"。）
+  const isReadOnly = req.method === 'GET' || req.method === 'HEAD'
+  // ⚠️ 在 app.use('/api', ...) 里 req.path 是**相对挂载点**的路径（'/products'），
+  //    不是完整路径 —— 拿它去比 '/api/products' 永远不匹配（前缀判断会全部落空）。
+  //    完整路径要用 req.baseUrl + req.path。
+  const fullPath = req.baseUrl + req.path
+  const isCacheable = isReadOnly && CACHEABLE_API_PREFIXES.some(
+    (p) => fullPath === p || fullPath.startsWith(p + '/')
+  )
+  if (isCacheable) {
+    /**
+     * 公开只读：**只给共享缓存（CDN）**缓存 60s。
+     *
+     * ⚠️ 用 `s-maxage` 而不是 `max-age` —— 两者差别很大：
+     *   - `max-age=60`  → **浏览器也缓存 60 秒** → 管理端新建商品后
+     *     刷新页面仍看到**旧列表**（AJ-2 就是这么挂的）
+     *   - `s-maxage=60` → **只有 CDN / 共享代理缓存**，浏览器每次都回源
+     *
+     * 加上 `max-age=0` 是为了明确表达"浏览器别缓存"（避免浏览器把
+     * max-age 当缺省值自行推断）。
+     */
+    res.setHeader('Cache-Control', 'public, s-maxage=60, max-age=0')
+  } else {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+    res.setHeader('Pragma', 'no-cache')
+  }
+  next()
+})
+
 /** 全站兜底限流（CC/扫描时拦截爆点；正常用户无感知） */
 app.use('/api', globalLimiter)
 /** 登录类聚焦限流（先 narrow 再放行） */
