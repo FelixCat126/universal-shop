@@ -4567,6 +4567,21 @@ canonical / OG / Twitter 卡片（同名标签先删后写，保持幂等）。
 | `moneyConsistency` MC-5 | 金额舍入统一走 `shared/money.js`（本轮真的拦住了我） |
 | `i18n.keyParity` / `alignment` / `adminPartner` | 语言包彼此一致（原有） |
 
+### 54.6b 生产验证（第 54 轮上线）
+
+| 项 | 结果 |
+|---|---|
+| `/robots.txt` | 已上线：`Allow: /portal/`、`Disallow: /admin/ /partner/ /api/`、`Sitemap:` 绝对地址 ✓ |
+| `/sitemap.xml` | 已上线，**24 条**（18 商品 + 4 分类 + 首页 + 隐私政策 + 服务条款）✓ |
+| 商品页 title | `ZAPPLE-MBAR 9K · ฿330.00 - Universal Shop`（**不再是全站一个值**）✓ |
+| description / canonical / og | 全部按商品数据生成，og:image 用商品主图 ✓ |
+| 首页商品链接 | DOM 里有 **8 个真 `<a href>`**（原来 0 个）✓ |
+| soft 404 | 不存在的商品 → **404**；存在的 → 200；404 响应带 `X-Robots-Tag: noindex` ✓ |
+| 分类 URL | `/portal/?category=N` 可直接打开对应分类 ✓ |
+| 7 个域名 | 状态码 / HTTP 版本 / 响应体积与改动前一致 ✓ |
+| **数据不变量** | 生产库 **25 项全部通过** ✓ |
+| 生产数据 | 未造任何测试数据 ✓ |
+
 ### 54.7 仍未解决、需要继续做的（本轮已记录，未实施）
 
 **合规红线（优先级最高）**：
