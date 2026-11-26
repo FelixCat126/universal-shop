@@ -21,6 +21,7 @@
  *   CJ-2 注册 → 加购 → 结算 → 新建地址 → 下单 → 进订单详情页看到商品与金额
  */
 import { test, expect } from '@playwright/test'
+import { acceptConsent } from './helpers/consent.js'
 
 const PASSWORD = 'Journey#2026'
 const NICKNAME = '流程测试客户'
@@ -50,6 +51,8 @@ async function register (page, phone) {
   await page.getByPlaceholder(/手机号|Phone/i).fill(phone)
   await page.getByPlaceholder(/^请输入.*密码$|Password/i).first().fill(PASSWORD)
   await page.getByPlaceholder(/再次输入密码|Confirm/i).fill(PASSWORD)
+  // 第 54 轮：注册页新增「条款 + 年龄」确认（服务端强制，不勾就 400）
+  await acceptConsent(page)
   await page.getByRole('button', { name: /创建|注册|Create|Register/i }).click()
   await page.waitForURL(/\/portal\/?(\?.*)?$/, { timeout: 30_000 })
   return phone
@@ -140,6 +143,8 @@ test.describe('客户端业务流', () => {
     await addToCart(page)
     await ensureAddressAtCheckout(page)
 
+    // 第 54 轮：结算页新增「条款 + 年龄」确认（服务端强制）
+    await acceptConsent(page)
     await page.getByRole('button', { name: /提交订单|Submit|Place order/i }).first().click()
     await page.waitForURL(/\/profile\?tab=orders/, { timeout: 40_000 })
 
@@ -155,6 +160,8 @@ test.describe('客户端业务流', () => {
     await addToCart(page)
     await ensureAddressAtCheckout(page)
 
+    // 第 54 轮：结算页新增「条款 + 年龄」确认（服务端强制）
+    await acceptConsent(page)
     await page.getByRole('button', { name: /提交订单|Submit|Place order/i }).first().click()
     await page.waitForURL(/\/profile\?tab=orders/, { timeout: 40_000 })
 

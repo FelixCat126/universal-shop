@@ -69,6 +69,7 @@ import couponRoutes from './routes/couponRoutes.js'
 import bundleRoutes from './routes/bundleRoutes.js'
 import securityRoutes from './routes/securityRoutes.js'
 import seoRoutes from './routes/seoRoutes.js'
+import notificationRoutes from './routes/notificationRoutes.js'
 import Product from './models/Product.js'
 import { startOrderTimeoutSweeper } from './services/orderTimeoutService.js'
 import { startGuestAccountCleanup } from './services/guestAccountCleanup.js'
@@ -363,6 +364,8 @@ app.use('/api/partner', partnerRoutes)
 app.use('/api/coupons', couponRoutes)
 app.use('/api/bundles', bundleRoutes)
 app.use('/api/security', securityRoutes)
+// 站内通知（第 54 轮）：全部需要登录
+app.use('/api/notifications', notificationRoutes)
 
 console.log('✅ API路由注册完成')
 

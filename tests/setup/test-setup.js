@@ -92,6 +92,41 @@ const TEST_SCHEMA = `t_${process.pid}_${crypto.randomBytes(6).toString('hex')}`
 }
 
 /**
+ * 第 54 轮：给注册/下单请求**默认补上**条款与年龄确认标记。
+ *
+ * 背景：这两个字段是**必填**（服务端强制，防 curl 绕过），但它们对
+ * 每一个"正常路径"用例都是**同一个固定值** —— 128 处调用点逐个改不现实，
+ * 也会让"业务断言"被"合规字段"淹没。
+ *
+ * 这里在 supertest 的 send 层统一补：**只在字段缺失时补**，
+ * 显式传 `terms_accepted: false` 的用例（专门测"缺确认被拒"）不受影响。
+ *
+ * 语义：测试默认模拟"一个已阅读条款、已确认年龄的正常用户"。
+ */
+{
+  const supertest = (await import('supertest')).default
+  const Test = supertest?.Test
+  const CONSENT_DEFAULTS = {
+    terms_accepted: true,
+    age_confirmed: true
+  }
+  if (Test && !Test.prototype.__shopConsentPatched) {
+    const originalSend = Test.prototype.send
+    Test.prototype.send = function (data) {
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const needsConsent =
+          !('terms_accepted' in data) || !('age_confirmed' in data)
+        if (needsConsent) {
+          data = { ...CONSENT_DEFAULTS, ...data }
+        }
+      }
+      return originalSend.call(this, data)
+    }
+    Test.prototype.__shopConsentPatched = true
+  }
+}
+
+/**
  * PROBE：把服务端错误打到 stdout。
  *
  * 测试环境里 logger 是 silent 的（没有 transport），所以接口返回 500 时

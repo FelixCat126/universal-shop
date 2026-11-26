@@ -19,6 +19,7 @@
  *   AS-E3 审核后客户侧看到"已同意"与处理说明
  */
 import { test, expect } from '@playwright/test'
+import { acceptConsent } from './helpers/consent.js'
 
 const USER_PHONE = '812345678'
 const USER_PASS = 'Portal#2026'
@@ -51,6 +52,8 @@ async function placeOrder (page) {
   const addressCard = page.getByText('E2E 登录用户').first()
   await expect(addressCard).toBeVisible({ timeout: 20_000 })
   await addressCard.click()
+  // 第 54 轮：结算页新增「条款 + 年龄」确认（服务端强制）
+  await acceptConsent(page)
   await page.getByRole('button', { name: '提交订单' }).click()
   await page.waitForURL(/\/profile\?tab=orders/, { timeout: 30_000 })
 }

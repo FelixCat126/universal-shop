@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js'
 import { parseId } from '../utils/params.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { httpError } from '../utils/httpError.js'
+import { notifyUser } from '../services/notificationService.js'
 
 const REQUESTABLE_STATUSES = ['paid', 'shipping', 'shipped', 'delivered', 'completed']
 
@@ -231,6 +232,14 @@ class AfterSaleController {
         throw e
       }
       })
+      /**
+       * 站内通知（第 54 轮）：售后结论用户**必须知道**。
+       *
+       * 原来只有运营看得到"已通过/已驳回"，用户只能反复刷"我的售后" ——
+       * 被驳回了还在等，以为系统没处理。
+       */
+      await notifyAfterSaleReviewed(result, status)
+
       return res.json({ success: true, message: '售后状态已更新', data: result })
     } catch (error) {
       // 事务在 withDeadlockRetry 内层已 rollback，这里不能再引用
@@ -243,5 +252,29 @@ class AfterSaleController {
 
 AfterSale.belongsTo(Order, { foreignKey: 'order_id', as: 'order' })
 Order.hasMany(AfterSale, { foreignKey: 'order_id', as: 'afterSales' })
+
+/**
+ * 售后审核结论 → 站内通知（第 54 轮）
+ *
+ * best-effort：失败不影响审核结果（审核已经提交了）。
+ */
+async function notifyAfterSaleReviewed (afterSale, status) {
+  try {
+    if (!afterSale?.user_id) return
+    await notifyUser({
+      userId: afterSale.user_id,
+      type: 'after_sale',
+      data: {
+        after_sale_id: afterSale.id,
+        order_id: afterSale.order_id,
+        status,
+        type: afterSale.type || null
+      },
+      link: afterSale.order_id ? `/portal/orders/${afterSale.order_id}` : null
+    })
+  } catch (error) {
+    logger.error('发售后审核通知失败（不影响业务）', { afterSaleId: afterSale?.id, err: error?.message })
+  }
+}
 
 export default AfterSaleController

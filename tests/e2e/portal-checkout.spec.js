@@ -11,6 +11,7 @@
  *   PU-2 登录用户下单 → 订单出现在个人中心，状态为 shipping
  */
 import { test, expect } from '@playwright/test'
+import { acceptConsent } from './helpers/consent.js'
 
 const USER_PHONE = '812345678'
 const USER_PASS = 'Portal#2026'
@@ -50,6 +51,8 @@ test.describe('Portal 登录用户下单', () => {
     await expect(addressCard).toBeVisible({ timeout: 20_000 })
     await addressCard.click()
 
+    // 第 54 轮：结算页新增「条款 + 年龄」确认（服务端强制）
+    await acceptConsent(page)
     await page.getByRole('button', { name: '提交订单' }).click()
     await page.waitForURL(/\/profile\?tab=orders/, { timeout: 30_000 })
 

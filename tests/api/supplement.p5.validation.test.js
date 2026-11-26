@@ -115,7 +115,10 @@ describe('P5-Supplement.validate', () => {
       contact_name: 'X',
       contact_phone: '13800000000',
       delivery_address: 'A',
-      referral_code: ''
+      referral_code: '',
+      // 条款与年龄确认（第 54 轮）：schema 必填，直接调 schema 的用例要自己带上
+      terms_accepted: true,
+      age_confirmed: true
     })
     expect(r.error).toBeUndefined()
     expect(r.value.referral_code).toBeUndefined()

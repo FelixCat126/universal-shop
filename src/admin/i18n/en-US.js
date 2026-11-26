@@ -896,6 +896,12 @@ export default {
     tip: 'Tip: export the CSV first to get your current data as a template, edit in Excel, then import it back.',
   },
   products: {
+    nameTh: 'Thai name',
+    nameThHint: 'The name Thai customers see in the Thai interface. Leave empty to use the name above.',
+    content: {
+      missingNameTh: 'Missing Thai name',
+      missingDescription: 'Missing description'
+    },
     viewDetails: 'View details',
     csvHint: 'The first row must be a header. Supported columns: id / name / name_th / category / price / stock / points / description / image. Rows with an id update that product; rows without an id create a new one. The image column accepts a remote image URL (http/https) which is downloaded and stored locally; URLs pointing at internal addresses are rejected during preview.',
     bulkActivate: 'Activate',
@@ -979,6 +985,7 @@ export default {
     },
     // Form placeholders
     placeholders: {
+      enterNameTh: 'Enter the Thai name',
       enterName: 'Please enter product name',
       enterAlias: 'Please enter product alias (optional)',
       enterDescription: 'Please enter product description',

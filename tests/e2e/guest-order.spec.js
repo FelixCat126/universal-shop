@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { acceptConsent } from './helpers/consent.js'
 
 test.beforeEach(async ({ page }) => {
   if (process.env.E2E_DEBUG) {
@@ -43,6 +44,8 @@ async function fillGuestForm (page, phone) {
 }
 
 async function submitAndExpectProfile (page) {
+  // 第 54 轮：结算页新增「条款 + 年龄」确认（服务端强制；游客也必须勾）
+  await acceptConsent(page)
   await page.getByRole('button', { name: '提交订单' }).click()
   await page.waitForURL(/\/profile\?tab=orders/, { timeout: 30_000 })
   await expect(page.getByText('个人中心').first()).toBeVisible()
@@ -78,6 +81,8 @@ test.describe('游客下单真实浏览器 E2E', () => {
       await route.continue()
     })
 
+    // 第 54 轮：同样要先勾确认（否则请求会被 400 挡掉，测不到重试逻辑）
+    await acceptConsent(page)
     const submit = page.getByRole('button', { name: '提交订单' })
     await submit.click()
     await expect(page.getByText(/订单提交失败/).first()).toBeVisible()

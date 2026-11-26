@@ -124,6 +124,8 @@ export interface User {
   last_login_at?: string | null
   must_reset_password: boolean
   token_version: number
+  terms_accepted_at?: string | null
+  age_confirmed_at?: string | null
 }
 
 /**

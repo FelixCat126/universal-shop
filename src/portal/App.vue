@@ -90,6 +90,31 @@
             
             <!-- 用户操作 -->
             <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+              <!--
+                通知铃铛（第 54 轮）
+
+                之前订单发货、售后结论、积分到账，用户**完全不知情** ——
+                只能自己反复刷订单页。现在顶栏常驻一个铃铛 + 未读角标。
+
+                仅登录后显示（通知是**个人**的）。
+                点击直接进通知页 —— 移动端顶栏已经很挤，不做下拉面板。
+              -->
+              <router-link
+                v-if="userStore.isAuthenticated"
+                to="/notifications"
+                class="relative inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-md hover:bg-gray-50 shrink-0"
+                :aria-label="t('notifications.title')"
+              >
+                <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1A7 7 0 0112 8a7 7 0 00-6.95 7L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span
+                  v-if="unreadCount > 0"
+                  class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center"
+                  aria-hidden="true"
+                >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+              </router-link>
+
               <!-- 购物车 -->
               <router-link 
                 to="/cart"
@@ -202,11 +227,16 @@
         <router-link to="/terms" class="inline-flex items-center min-h-[44px] px-2 hover:text-blue-600">{{ t('legal.termsLink') }}</router-link>
         <span aria-hidden="true" class="self-center">·</span>
         <router-link to="/privacy" class="inline-flex items-center min-h-[44px] px-2 hover:text-blue-600">{{ t('legal.privacyLink') }}</router-link>
+        <span aria-hidden="true" class="self-center">·</span>
+        <router-link to="/returns" class="inline-flex items-center min-h-[44px] px-2 hover:text-blue-600">{{ t('legal.returnsLink') }}</router-link>
       </div>
     </footer>
     
     <!-- Toast 提示容器 -->
     <ToastContainer />
+
+    <!-- Cookie / 本地存储告知横幅（第 54 轮） -->
+    <CookieBanner />
   </div>
 </template>
 
@@ -218,8 +248,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { fatalError, reportFatalError } from '../utils/fatalError.js'
 import { useRoutePrefetch } from '../utils/routePrefetch.js'
 import { useCartStore } from './stores/cart.js'
+import { notificationAPI } from './api/notifications.js'
 import { useUserStore } from './stores/user.js'
 import ToastContainer from './components/ui/Toast/ToastContainer.vue'
+import CookieBanner from './components/CookieBanner.vue'
 import i18n from './i18n'
 import { fetchAndApplyCurrencyUnit } from '../utils/currencyI18n.js'
 import { ensureLocale } from './i18n/index.js'
@@ -237,6 +269,29 @@ useRoutePrefetch(router)
 // 状态管理
 const cartStore = useCartStore()
 const userStore = useUserStore()
+
+/**
+ * 未读通知数（第 54 轮）：顶栏铃铛的角标。
+ *
+ * 拉取时机：登录后 + 每 60 秒（页面可见时才拉）。
+ * 不用轮询通知列表本身 —— 角标只要一个数字，走轻量的 /unread-count。
+ */
+const unreadCount = ref(0)
+let unreadTimer = null
+
+async function loadUnreadCount () {
+  if (!userStore.isLoggedIn) {
+    unreadCount.value = 0
+    return
+  }
+  try {
+    const res = await notificationAPI.unreadCount()
+    unreadCount.value = Number(res.data?.data?.unread) || 0
+  } catch {
+    // 角标拉不到不影响主流程（顶栏照常显示，只是没数字）
+    unreadCount.value = 0
+  }
+}
 
 const portalCurrency = usePortalCurrencyStore()
 
@@ -275,6 +330,10 @@ const onScroll = () => {
 onUnmounted(() => {
   window.removeEventListener('app:password-change-required', onPasswordChangeRequired)
   window.removeEventListener('scroll', onScroll)
+  if (unreadTimer) {
+    clearInterval(unreadTimer)
+    unreadTimer = null
+  }
 })
 
 // 更新页面标题
@@ -370,6 +429,8 @@ watch(() => userStore.isLoggedIn, async (newValue, oldValue) => {
     } catch (error) {
       console.error('❌ 购物车合并失败:', error)
     }
+    // 登录后拉一次未读通知数（第 54 轮）
+    loadUnreadCount()
   }
 
   // 从已登录变为未登录：清理购物车状态
@@ -429,6 +490,16 @@ watch(() => userStore.user?.id, async (newId, oldId) => {
 
 // 初始化
 onMounted(async () => {
+  /**
+   * 未读通知轮询（第 54 轮）：每 60 秒拉一次角标数字。
+   *
+   * 页面不可见时跳过（省流量，也避免后台标签页空转）。
+   */
+  loadUnreadCount()
+  unreadTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') loadUnreadCount()
+  }, 60_000)
+
   window.addEventListener('app:password-change-required', onPasswordChangeRequired)
   // 顶栏滚动监听
   window.addEventListener('scroll', onScroll, { passive: true })

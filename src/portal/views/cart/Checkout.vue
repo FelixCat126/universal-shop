@@ -587,6 +587,45 @@
               </div>
             </div>
 
+            <!--
+              条款与年龄确认（第 54 轮）
+
+              ⚠️ 放在**结算页**而不是只在注册页 ——
+              游客的账号是**下单那一刻**由服务端自动创建的（createUserForOrder），
+              注册页根本不会被触发 → 只加注册页 = 游客 100% 绕过。
+
+              所以这里对所有人（登录 + 游客）都要求勾选，
+              服务端在**建号之前**校验（否则会留下"号建好了、订单没成"的垃圾账号）。
+            -->
+            <div class="space-y-2">
+              <label class="flex items-start gap-2 min-h-[44px] py-1 text-sm text-gray-700 cursor-pointer">
+                <input
+                  v-model="orderForm.ageConfirmed"
+                  type="checkbox"
+                  class="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                >
+                <span>
+                  {{ t('consent.ageCheckbox') }}
+                  <span class="block mt-0.5 text-xs text-gray-500">{{ t('consent.ageNotice') }}</span>
+                </span>
+              </label>
+
+              <label class="flex items-start gap-2 min-h-[44px] py-1 text-sm text-gray-700 cursor-pointer">
+                <input
+                  v-model="orderForm.termsAccepted"
+                  type="checkbox"
+                  class="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                >
+                <span>
+                  {{ t('consent.termsLabel') }}
+                  <router-link to="/terms" class="inline-flex items-center min-h-[32px] text-blue-600 underline hover:text-blue-700">{{ t('consent.termsLink') }}</router-link> ·
+                  <router-link to="/returns" class="inline-flex items-center min-h-[32px] text-blue-600 underline hover:text-blue-700">{{ t('consent.returnsLink') }}</router-link> ·
+                  <router-link to="/privacy" class="inline-flex items-center min-h-[32px] text-blue-600 underline hover:text-blue-700">{{ t('consent.privacyLink') }}</router-link>
+                  <span class="block mt-0.5 text-xs text-gray-500">{{ t('consent.identityNotice') }}</span>
+                </span>
+              </label>
+            </div>
+
             <!-- 提交按钮 -->
             <div class="mt-6 space-y-3">
               <button
@@ -841,7 +880,10 @@ const orderForm = reactive({
   delivery_address: '', // 用于向后兼容，会自动组合生成
   payment_method: 'cod', // cod: 货到付款, online: 在线付款
   notes: '',
-  referral_code: '' // 推荐码（可选）
+  referral_code: '', // 推荐码（可选）
+  // 条款与年龄确认（第 54 轮）：自我声明（系统无法核实身份/年龄）
+  termsAccepted: false,
+  ageConfirmed: false
 })
 
 // 结算页面三级联动地址选择器数据
@@ -1400,6 +1442,21 @@ const validateForm = () => {
 const handleSubmitOrder = async () => {
   if (submitting.value) return
 
+  /**
+   * 条款与年龄确认（第 54 轮）：**下单前必须确认**。
+   *
+   * 这是对**所有人**的要求（含登录用户）——
+   * 游客的账号是下单时才自动创建的，所以注册页的勾选框覆盖不到他们。
+   */
+  if (!orderForm.termsAccepted) {
+    showMessage(t('consent.termsRequired'), 'error')
+    return
+  }
+  if (!orderForm.ageConfirmed) {
+    showMessage(t('consent.ageRequired'), 'error')
+    return
+  }
+
   // 登录用户必须选择地址
   if (userStore.isLoggedIn && !selectedAddress.value) {
     showMessage(t('address.pleaseAddFirst'), 'error')
@@ -1487,6 +1544,9 @@ const submitOrder = async () => {
       notes: orderForm.notes.trim(),
       clear_cart: true, // 提交订单后清空购物车
       client_order_key: clientOrderKey.value, // 幂等键：失败重试保持同 key 才能被后端去重
+      // 条款与年龄确认（第 54 轮）：服务端会强制这两个为 true
+      terms_accepted: true,
+      age_confirmed: true,
       // 登录用户传递地址ID，游客用户传递省市区信息
       ...(userStore.isLoggedIn ? {
         address_id: selectedAddress.value?.id // 传递选中的地址ID

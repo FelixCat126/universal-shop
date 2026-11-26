@@ -709,7 +709,68 @@ export default {
     discountLine: 'Coupon discount',
     notEnough: 'Minimum spend not reached'
   },
+  cookie: {
+    title: 'About cookies and local storage',
+    body: 'This site uses browser local storage (localStorage) to keep you signed in and remember your language and currency preferences. It is not used for advertising tracking and your personal information is never shared with third parties. Clearing your browser data will sign you out.',
+    accept: 'Got it',
+    learnMore: 'Learn more'
+  },
+
+  consent: {
+    termsRequired: 'Please confirm that you have read and accept the Terms of Service and the Return & Refund Policy',
+    ageRequired: 'Please confirm that you are at least 20 years old',
+    termsLabel: 'I have read and accept the',
+    termsLink: 'Terms of Service',
+    returnsLink: 'Return & Refund Policy',
+    privacyLink: 'Privacy Policy',
+    ageNotice: 'Products sold here contain nicotine and are **not sold to anyone under 20**.',
+    ageCheckbox: 'I confirm that I am at least 20 years old',
+    identityNotice: 'This site cannot verify your identity through official documents; your confirmation is all we are able to record.'
+  },
+
+  notifications: {
+    title: 'Notifications',
+    empty: 'No notifications yet',
+    unreadCount: 'You have {count} unread notification(s)',
+    markAllRead: 'Mark all read',
+    markAllReadFailed: 'Action failed',
+    loadFailed: 'Failed to load notifications',
+    viewDetail: 'View details',
+    orderStatus: {
+      shipping: 'Order {order_no} has shipped',
+      shipped: 'Order {order_no} has been delivered',
+      delivered: 'Order {order_no} is complete',
+      completed: 'Order {order_no} is complete',
+      cancelled: 'Order {order_no} was cancelled',
+      tracking: 'Tracking number: {tracking}'
+    },
+    afterSale: {
+      approved: 'Your after-sales request was approved (order {order_no})',
+      rejected: 'Your after-sales request was declined (order {order_no})',
+      received: 'Return received and checked in (order {order_no})',
+      hint: 'See the details under "After-sales" in your profile'
+    },
+    points: {
+      title: '+{points} points credited',
+      hint: 'The points have been added to your account'
+    },
+    coupon: {
+      title: 'Coupon received: {name}',
+      hint: 'You can find it under "Coupons" in your profile'
+    },
+    payment: {
+      title: 'Payment confirmed for order {order_no}',
+      hint: 'We have received your payment and will process the order shortly'
+    },
+    system: {
+      title: 'System notice'
+    }
+  },
+
   legal: {
+    returnsTitle: 'Return & Refund Policy',
+    returnsLink: 'Return & Refund Policy',
+    returnsBody: '[This policy is a general template — please adjust it to your actual business before publishing]\n\n1. Return window\nYou may request a return within 7 calendar days from the day the order is delivered. Requests made after this window cannot be accepted.\n\n2. Condition requirements\nReturned items must be unused, unwashed, with tags and packaging intact, and resaleable. Unless the reason is a defect, return shipping costs are borne by the buyer.\n\n3. Items that cannot be returned\n(1) Coils, pods and other hygiene products that come into direct contact with the body cannot be returned once opened, for health and safety reasons;\n(2) Devices that have been activated or whose seal has been broken;\n(3) Customised items;\n(4) Items damaged by improper use.\n\n4. Refunds\nOnce we receive and inspect the returned item, we will refund via the original payment method. The time it takes to appear depends on your payment provider, usually 3 to 7 business days.\n\n5. How to request a return\nPlease submit a request from the order detail page, or contact our customer service team. We will confirm the return address and packing instructions with you.',
     termsLink: 'Terms of Use',
     privacyLink: 'Privacy Policy',
     termsTitle: 'Terms of Use',

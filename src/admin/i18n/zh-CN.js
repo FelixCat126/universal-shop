@@ -895,6 +895,12 @@ export default {
     tip: '建议先「导出 CSV」拿到当前数据作为模板，在 Excel 里改完再导回来。',
   },
   products: {
+    nameTh: '泰文名',
+    nameThHint: '泰国顾客在泰语界面上看到的名字。留空则显示上面的商品名称。',
+    content: {
+      missingNameTh: '缺泰文名',
+      missingDescription: '缺描述'
+    },
     viewDetails: '查看详情',
     csvHint: 'CSV 第一行必须是表头，支持的列：id / name / name_th / category / price / stock / points / description / image。带 id 的行会更新对应商品，不带 id 的行会新建。image 列可以填远程图片地址（http/https），系统会下载并转存到本地；指向内网的地址会在预览阶段被拦下。',
     bulkActivate: '批量上架',
@@ -978,6 +984,7 @@ export default {
     },
     // 表单占位符
     placeholders: {
+      enterNameTh: '输入泰文名称',
       enterName: '请输入产品名称',
       enterAlias: '请输入产品别名（可选）',
       enterDescription: '请输入产品描述',

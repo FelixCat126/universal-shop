@@ -13,6 +13,14 @@ process.env.RATE_LIMIT_DISABLED = '1'
 // E2E 要验真实链路：导出任务必须由后台 worker 真的跑起来
 // （单元测试里默认关闭，worker 会和用例抢任务）
 process.env.EXPORT_WORKER_ENABLED = '1'
+// worker 轮询间隔调小（第 54 轮）
+//
+// 原来用默认的 15000ms，而 AE-2 只等 60s 下载 —— 余量只有 4 个轮询周期。
+// 全量并发跑时（多个测试文件抢 PG 连接与 CPU）worker 处理更慢，
+// 就可能超过 60s → **既有 flake**（与本轮改动无关，第一次全量跑时就出现过）。
+//
+// 调成 2s 后，任务几秒内就被处理完，用例不再依赖"worker 恰好在第 N 个周期醒"的时序。
+process.env.EXPORT_WORKER_INTERVAL_MS = '2000'
 
 await TestDatabase.initialize()
 await TestDatabase.syncModels()

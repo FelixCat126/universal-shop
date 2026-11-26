@@ -161,10 +161,31 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.name')" width="150" min-width="140">
+        <el-table-column :label="t('products.name')" width="180" min-width="150">
           <template #default="scope">
             <div class="product-name-container">
               <div class="product-name" :title="scope.row.name">{{ scope.row.name }}</div>
+              <!--
+                内容完整度标记（第 54 轮）
+
+                生产上 **18 个商品全部没有泰文名、16 个没有描述** ——
+                泰国用户在泰语界面看到的是中文/英文商品名，商品页也没有任何卖点。
+                运营此前**没有任何入口**知道哪些商品缺内容（只有 CSV 导入能填 name_th，
+                管理端表单连这个字段都没有）。
+
+                这里把"缺什么"直接标在列表上 → 运营一眼看到要补哪些。
+              -->
+              <div v-if="missingContent(scope.row).length" class="mt-1 flex flex-wrap gap-1">
+                <el-tag
+                  v-for="m in missingContent(scope.row)"
+                  :key="m"
+                  size="small"
+                  type="info"
+                  class="!h-5 !text-[10px] !leading-4 !px-1.5"
+                >
+                  {{ t(`products.content.${m}`) }}
+                </el-tag>
+              </div>
             </div>
           </template>
         </el-table-column>
@@ -317,6 +338,23 @@
         >
         <el-form-item :label="t('products.name')" prop="name">
           <el-input v-model="productForm.name" :placeholder="t('products.placeholders.enterName')" />
+        </el-form-item>
+
+        <!--
+          泰文名（第 54 轮）：泰国顾客看到的名字。
+
+          之前**只有 CSV 导入**能填 name_th，管理端表单没有这个字段 ——
+          运营想补泰文名都补不了（生产 18 个商品**全部**没有泰文名，
+          泰国用户在泰语界面上看到的是中文/英文商品名）。
+
+          标了 * 是因为它是**内容完整度**的一部分（见列表页的标记）。
+        -->
+        <el-form-item :label="t('products.nameTh')" prop="name_th">
+          <el-input
+            v-model="productForm.name_th"
+            :placeholder="t('products.placeholders.enterNameTh')"
+          />
+          <p class="mt-1 text-xs text-gray-500">{{ t('products.nameThHint') }}</p>
         </el-form-item>
 
         <el-form-item :label="t('products.alias')" prop="alias">
@@ -549,6 +587,7 @@ export default {
     const productForm = reactive({
       id: null,
       name: '',
+      name_th: '', // 泰文名（第 54 轮）
       alias: '', // 产品别名
       description: '',
       category_id: '',
@@ -615,6 +654,21 @@ export default {
       const c = row.category
       if (c && typeof c === 'object' && c.name) return c.name
       return '-'
+    }
+
+    /**
+     * 这个商品缺哪些内容（第 54 轮）。
+     *
+     * 缺泰文名 → 泰国顾客看到的是中文/英文名；
+     * 缺描述 → 商品详情页没有任何卖点（对 SEO 也同样不利）。
+     *
+     * @returns {string[]} 缺失项的 i18n key 片段（空数组 = 完整）
+     */
+    const missingContent = (row) => {
+      const out = []
+      if (!row?.name_th) out.push('missingNameTh')
+      if (!row?.description) out.push('missingDescription')
+      return out
     }
 
     // 计算折扣价格
@@ -729,6 +783,7 @@ export default {
       // 深度清空所有表单数据
       productForm.id = null
       productForm.name = ''
+      productForm.name_th = '' // 泰文名（第 54 轮）
       productForm.alias = ''
       productForm.description = ''
       productForm.category_id = categoryOptions.value[0]?.id ?? ''
@@ -1208,6 +1263,7 @@ export default {
       
       // 方法
       getCategoryLabel,
+      missingContent,   // 内容完整度标记（第 54 轮）
       getDiscountPrice,
       formatDate,
       isDelisted,

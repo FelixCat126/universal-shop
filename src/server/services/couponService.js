@@ -26,6 +26,7 @@ import CouponTemplate from '../models/CouponTemplate.js'
 import UserCoupon from '../models/UserCoupon.js'
 import User from '../models/User.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
+import { notifyUser, notifyUsers } from './notificationService.js'
 import { logger } from '../utils/logger.js'
 
 /** 券码字母表：大写字母+数字（10 位空间 36^10，碰撞概率极低，唯一约束+重试兜底） */
@@ -289,6 +290,29 @@ export async function grantCouponsToUsers ({ templateId, userIds, note }) {
       }
 
       await transaction.commit()
+
+      /**
+       * 站内通知（第 54 轮）：券到账了，用户**必须知道**。
+       *
+       * 原来发券只写库 —— 用户不主动去"我的优惠券"页就完全不知道，
+       * 营销动作等于没做（券只对"本来就会逛券页"的人生效）。
+       */
+      try {
+        await notifyUsers({
+          userIds: granted.map((g) => g.user_id),
+          type: 'coupon',
+          data: {
+            coupon_id: granted[0]?.coupon_id || null,
+            template_id: template.id,
+            template_name: template.name,
+            count: granted.length
+          },
+          link: '/portal/profile?tab=coupons'
+        })
+      } catch (notifyError) {
+        logger.error('发优惠券到账通知失败（不影响发券）', { err: notifyError?.message })
+      }
+
       return { granted, failed, note: note || null }
     } catch (err) {
       await transaction.rollback().catch(() => {})
@@ -337,6 +361,17 @@ export async function grantRegisterGiftCoupons (userId) {
   for (const template of templates) {
     try {
       await claimCouponForUser({ templateId: template.id, userId, checkPerUser: false })
+      // 站内通知（第 54 轮）：注册赠券到账
+      await notifyUser({
+        userId,
+        type: 'coupon',
+        data: {
+          template_id: template.id,
+          template_name: template.name,
+          source: 'register_gift'
+        },
+        link: '/portal/profile?tab=coupons'
+      })
     } catch (err) {
       logger.warn('注册赠券发放失败（已跳过该模板）', {
         userId,

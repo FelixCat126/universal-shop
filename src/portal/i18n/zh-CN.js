@@ -705,7 +705,68 @@ export default {
     discountLine: '优惠券优惠',
     notEnough: '未满使用门槛'
   },
+  cookie: {
+    title: '关于 Cookie 与本地存储',
+    body: '本站使用浏览器本地存储（localStorage）来保持你的登录状态、语言与币种偏好，不用于广告追踪，也不会向第三方共享你的个人信息。清理浏览器数据会使你退出登录。',
+    accept: '我知道了',
+    learnMore: '了解更多'
+  },
+
+  consent: {
+    termsRequired: '请确认已阅读并同意服务条款与退换货政策',
+    ageRequired: '请确认您已满 20 周岁',
+    termsLabel: '我已阅读并同意',
+    termsLink: '服务条款',
+    returnsLink: '退换货政策',
+    privacyLink: '隐私政策',
+    ageNotice: '本店所售商品含尼古丁成分，**不向未满 20 周岁者销售**。',
+    ageCheckbox: '我确认已满 20 周岁',
+    identityNotice: '本站无法通过证件核验身份；您的确认是我们能够记录的全部信息。'
+  },
+
+  notifications: {
+    title: '我的通知',
+    empty: '暂时没有通知',
+    unreadCount: '你有 {count} 条未读通知',
+    markAllRead: '全部已读',
+    markAllReadFailed: '操作失败',
+    loadFailed: '加载通知失败',
+    viewDetail: '查看详情',
+    orderStatus: {
+      shipping: '订单 {order_no} 已发货',
+      shipped: '订单 {order_no} 已送达',
+      delivered: '订单 {order_no} 已完成',
+      completed: '订单 {order_no} 已完成',
+      cancelled: '订单 {order_no} 已取消',
+      tracking: '物流单号：{tracking}'
+    },
+    afterSale: {
+      approved: '售后申请已通过（订单 {order_no}）',
+      rejected: '售后申请被驳回（订单 {order_no}）',
+      received: '退货已入库（订单 {order_no}）',
+      hint: '详情请在「我的售后」中查看'
+    },
+    points: {
+      title: '积分到账 +{points}',
+      hint: '积分已记入你的账户'
+    },
+    coupon: {
+      title: '优惠券已到账：{name}',
+      hint: '请在「我的优惠券」中查看'
+    },
+    payment: {
+      title: '订单 {order_no} 支付已确认',
+      hint: '我们已收到你的付款，订单将尽快处理'
+    },
+    system: {
+      title: '系统通知'
+    }
+  },
+
   legal: {
+    returnsTitle: '退换货政策',
+    returnsLink: '退换货政策',
+    returnsBody: '【本政策为通用模板，请按本店实际经营情况调整后使用】\n\n1. 退货期限\n自商品签收之日起 7 个自然日内可申请退货，逾期恕难受理。\n\n2. 商品状态要求\n退货商品须保持未使用、未洗涤、吊牌与包装完整，且不影响二次销售。因个人喜好以外的客观原因产生的退货，运费由卖方承担。\n\n3. 以下情形不接受退货\n（1）已拆封的雾化芯、烟弹等直接接触人体的卫生类商品，出于健康与安全原因一经拆封即不支持退货；\n（2）已激活或已更换封口的设备；\n（3）定制类商品；\n（4）因使用不当造成损坏的商品。\n\n4. 退款方式与到账时间\n我们收到并核验退货商品后，将按原支付渠道退款。退款处理时长以支付渠道的实际到账时间为准，通常为 3 至 7 个工作日。\n\n5. 售后申请方式\n请通过订单详情页提交售后申请，或联系我们的客服团队。受理后我们会向你确认退货地址与寄回要求。',
     termsLink: '用户协议',
     privacyLink: '隐私政策',
     termsTitle: '用户协议',

@@ -289,6 +289,7 @@ import SkeletonDetail from '../../components/ui/SkeletonDetail.vue'
 import ImageFade from '../../components/ui/ImageFade.vue'
 import { imageSrcSet } from '../../../utils/imageVariants.js'
 import { setPageSeo, buildProductSeo } from '../../utils/seo.js'
+import getCurrentLanguageValue from '../../utils/language.js'
 import { softSpring, subtleSpring } from '../../composables/useSpring.js'
 import { useReducedMotion } from '../../composables/useReducedMotion.js'
 
@@ -298,7 +299,7 @@ const reducedMotion = useReducedMotion()
 // 路由和状态
 const route = useRoute()
 const router = useRouter()
-const { locale, t } = useI18n()
+const { t } = useI18n()
 const cartStore = useCartStore()
 const userStore = useUserStore()
 
@@ -416,15 +417,6 @@ async function loadRelatedProducts (current) {
     // 推荐失败不影响详情页本身
     console.warn('加载相关推荐失败', e)
   }
-}
-
-// 获取当前语言的值
-const getCurrentLanguageValue = (item, field) => {
-  const currentLang = locale.value
-  if (currentLang === 'th-TH' && item[`${field}_th`]) {
-    return item[`${field}_th`]
-  }
-  return item[field] || ''
 }
 
 // 计算折扣价格

@@ -34,6 +34,7 @@ import BundleItem from './BundleItem.js'
 import AfterSale from './AfterSale.js'
 import ExportJob from './ExportJob.js'
 import PaymentReconciliationRecord from './PaymentReconciliationRecord.js'
+import Notification from './Notification.js'
 import { logger } from '../utils/logger.js'
 
 // 注意：关联关系已在各个模型文件中定义，无需重复定义
@@ -68,6 +69,7 @@ export {
   AfterSale,
   ExportJob,
   PaymentReconciliationRecord,
+  Notification,
   // ⚠️ 这两个之前**只 import 没有导出** —— 别的模块（自证脚本、运维工具）
   // 从这里拿模型时会拿到 undefined，是个容易踩的坑。
   UserPointBalance,
@@ -102,6 +104,7 @@ export default {
   AfterSale,
   ExportJob,
   PaymentReconciliationRecord,
+  Notification,
   UserPointBalance,
   PointTransaction
 }

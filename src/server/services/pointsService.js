@@ -1,6 +1,7 @@
 import sequelize from '../config/database.js'
 import UserPointBalance from '../models/UserPointBalance.js'
 import PointTransaction from '../models/PointTransaction.js'
+import { notifyUser } from './notificationService.js'
 
 /**
  * 读取当前余额（无记录视为 0）
@@ -112,6 +113,25 @@ export async function grantPurchasePoints (userId, orderId, points, options = {}
   } else {
     await sequelize.transaction(run)
   }
+
+  /**
+   * 站内通知（第 54 轮）：积分到账了，用户**必须知道**。
+   *
+   * 积分体系在没有通知的情况下等于"看不见的账"——
+   * 用户不知道自己积了多少、为什么突然多出来。
+   *
+   * 放在事务**之后**：通知失败不影响积分入账（notifyUser 内部吞异常）。
+   */
+  await notifyUser({
+    userId,
+    type: 'points',
+    data: {
+      delta: n,
+      reason: 'earn_purchase',
+      order_id: orderId || null
+    },
+    link: orderId ? `/portal/orders/${orderId}` : '/portal/profile?tab=points'
+  })
 }
 
 /**

@@ -84,7 +84,17 @@ export const createOrderSchema = Joi.object({
   // 客户端幂等键（可选）：同用户同 key 重复提交只成单一次；''/null 统一视作未填
   client_order_key: Joi.string().max(64).empty(['', null]).optional(),
   clear_cart: Joi.boolean().optional(),
-  user_info: Joi.object().unknown(true).optional()
+  user_info: Joi.object().unknown(true).optional(),
+  /**
+   * 条款与年龄确认（第 54 轮）：**必填且必须为 true**。
+   *
+   * 为什么在 schema 层强制（而不是只在前端放勾选框）：
+   * 只做前端勾选框的话，任何人 curl 直接 POST 就能绕过 —— 留痕就失去意义了。
+   *
+   * `valid(true)` 而不是 `boolean()`：传 false / 0 / 'false' 都要被拒。
+   */
+  terms_accepted: Joi.boolean().valid(true).required(),
+  age_confirmed: Joi.boolean().valid(true).required()
 })
 
 export const createPartnerOrderSchema = Joi.object({
@@ -283,6 +293,9 @@ export const registerSchema = Joi.object({
   nickname: Joi.string().min(1).max(50).required(),
   country_code: countryCodeSchema,
   phone: phoneSchema,
+  // 条款与年龄确认（第 54 轮）：见 createOrderSchema 里的说明（schema 层强制，防 curl 绕过）
+  terms_accepted: Joi.boolean().valid(true).required(),
+  age_confirmed: Joi.boolean().valid(true).required(),
   // 上界与 DB 列宽一致（users.email 为 STRING(100)）
   /**
    * 邮箱是**选填**字段：前端表单不填时提交的是空字符串 `''`，

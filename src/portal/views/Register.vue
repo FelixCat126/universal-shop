@@ -142,6 +142,47 @@
             </div>
           </div>
 
+          <!--
+            条款与年龄确认（第 54 轮）
+
+            ⚠️ 系统**无法核实身份与年龄**（没有证件验证、没有实名，
+            连手机号都不是短信验证的）—— 所以这里做的是**自我声明**，
+            并如实告诉用户"我们只能记录你的确认"。
+
+            这不是形式主义：泰国的含尼古丁产品销售有 20 岁年龄限制，
+            而本项目的主力品类正是这类商品。
+          -->
+          <div class="space-y-2">
+            <label class="flex items-start gap-2 min-h-[44px] py-1 text-sm text-gray-700 cursor-pointer">
+              <input
+                v-model="form.ageConfirmed"
+                type="checkbox"
+                class="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+              >
+              <span>
+                {{ t('consent.ageCheckbox') }}
+                <span class="block mt-0.5 text-xs text-gray-500">{{ t('consent.ageNotice') }}</span>
+              </span>
+            </label>
+            <p v-if="errors.ageConfirmed" class="text-xs text-red-600">{{ errors.ageConfirmed }}</p>
+
+            <label class="flex items-start gap-2 min-h-[44px] py-1 text-sm text-gray-700 cursor-pointer">
+              <input
+                v-model="form.termsAccepted"
+                type="checkbox"
+                class="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+              >
+              <span>
+                {{ t('consent.termsLabel') }}
+                <router-link to="/terms" class="inline-flex items-center min-h-[32px] text-blue-600 underline hover:text-blue-700">{{ t('consent.termsLink') }}</router-link> ·
+                <router-link to="/returns" class="inline-flex items-center min-h-[32px] text-blue-600 underline hover:text-blue-700">{{ t('consent.returnsLink') }}</router-link> ·
+                <router-link to="/privacy" class="inline-flex items-center min-h-[32px] text-blue-600 underline hover:text-blue-700">{{ t('consent.privacyLink') }}</router-link>
+                <span class="block mt-0.5 text-xs text-gray-500">{{ t('consent.identityNotice') }}</span>
+              </span>
+            </label>
+            <p v-if="errors.termsAccepted" class="text-xs text-red-600">{{ errors.termsAccepted }}</p>
+          </div>
+
           <!-- 提交按钮 -->
           <div>
             <button
@@ -188,7 +229,10 @@ const form = reactive({
   email: '',
   password: '',
   confirmPassword: '',
-  referralCode: ''
+  referralCode: '',
+  // 条款与年龄确认（第 54 轮）：自我声明（系统无法核实身份/年龄）
+  termsAccepted: false,
+  ageConfirmed: false
 })
 
 // 表单错误
@@ -226,6 +270,20 @@ const handleCountryChange = (country) => {
 // 表单验证
 const validateForm = () => {
   const newErrors = {}
+
+  /**
+   * 条款与年龄确认（第 54 轮）
+   *
+   * 不用原生 input 的 `required` 属性 —— 原生会弹浏览器默认提示，
+   * 与本页其它字段的自定义错误样式**双弹**，观感不一致。
+   * 这里统一走 errors 提示。
+   */
+  if (!form.termsAccepted) {
+    newErrors.termsAccepted = t('consent.termsRequired')
+  }
+  if (!form.ageConfirmed) {
+    newErrors.ageConfirmed = t('consent.ageRequired')
+  }
 
   // 昵称验证
   if (!form.nickname) {
@@ -294,7 +352,10 @@ const handleSubmit = async () => {
       phone: form.phone,
       email: form.email || undefined,
       password: form.password,
-      referral_code: form.referralCode || undefined
+      referral_code: form.referralCode || undefined,
+      // 条款与年龄确认（第 54 轮）：服务端会强制这两个为 true
+      terms_accepted: true,
+      age_confirmed: true
     }
 
     const response = await userAPI.register(userData)

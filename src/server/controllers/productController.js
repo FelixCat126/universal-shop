@@ -303,6 +303,7 @@ class ProductController {
     try {
       const {
         name,
+        name_th: nameTh,        // 泰文名（第 54 轮）：泰国顾客看到的名字
         alias,
         description,
         category_id: category_id_raw,
@@ -384,6 +385,7 @@ class ProductController {
 
       const product = await Product.create({
         name,
+        name_th: nameTh || null,   // 泰文名（第 54 轮）
         alias: alias || null,
         description,
         category_id: cid,
@@ -436,6 +438,7 @@ class ProductController {
       const { id } = req.params
       const {
         name,
+        name_th: nameTh,        // 泰文名（第 54 轮）
         alias,
         description,
         category_id: patchCidRaw,
@@ -577,6 +580,8 @@ class ProductController {
 
       await product.update({
         name: name || product.name,
+        // 泰文名（第 54 轮）：运营录入；传空串视为"清空泰文名"
+        name_th: nameTh !== undefined ? (nameTh || null) : product.name_th,
         alias: alias !== undefined ? (alias || null) : product.alias,
         description: description !== undefined ? description : product.description,
         category_id: nextCategoryId,

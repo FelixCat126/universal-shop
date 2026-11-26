@@ -16,6 +16,7 @@ import { createUserAddress } from '../services/addressService.js'
 import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
 import * as pointsService from '../services/pointsService.js'
+import { notifyUser, notifyUsers } from '../services/notificationService.js'
 import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates, PRICING_ENGINE_VERSION } from '../services/pricingEngine.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import { getBusinessTimezone, startOfBusinessDay } from '../utils/businessTimezone.js'
@@ -485,7 +486,10 @@ class OrderController {
         postal_code = '',
         checkout_currency: checkoutCurrencyRaw,
         client_order_key: clientOrderKey, // 客户端幂等键（可选；joi 已把 ''/null 裁成 undefined）
-        user_coupon_id: userCouponId // 抵扣券（P2，可选；joi 已把 ''/null 裁成 undefined）
+        user_coupon_id: userCouponId, // 抵扣券（P2，可选；joi 已把 ''/null 裁成 undefined）
+        // 条款与年龄确认（第 54 轮）：自我声明，joi 已强制为 true
+        terms_accepted: termsAccepted,
+        age_confirmed: ageConfirmed
       } = req.body
 
       // 轻量入参校验前置：避免为畸形请求白白创建游客账号（此时事务尚未开启，直接返回即可）
@@ -511,6 +515,32 @@ class OrderController {
 
       // 标准化处理推荐码（在所有分支之前定义）
       const normalizedReferralCode = referral_code && typeof referral_code === 'string' && referral_code.trim() ? referral_code.trim() : null
+
+      /**
+       * 条款与年龄确认（第 54 轮）：**必须在建号之前**校验。
+       *
+       * 为什么位置这么关键：游客下单会**自动创建账号**（下面的 createUserForOrder），
+       * 而建号发生在业务校验（商品/库存/计价）**之前** ——
+       * 如果确认校验放在建号之后，就会留下"账号建好了、订单却没成"的垃圾账号。
+       *
+       * 登录用户也在这里校验（同一个入口，一处覆盖两种人）。
+       *
+       * 系统**无法核实身份与年龄**（无证件验证/无实名），
+       * 所以这是**自我声明**：用户确认已阅读条款、已满最低购买年龄。
+       */
+      const terms_accepted = termsAccepted === true
+      const age_confirmed = ageConfirmed === true
+      if (!terms_accepted || !age_confirmed) {
+        return res.status(400).json({
+          success: false,
+          message: '请先确认已阅读服务条款与退换货政策，并确认已满最低购买年龄',
+          code: 'CONSENT_REQUIRED',
+          details: [
+            ...(terms_accepted ? [] : [{ field: 'terms_accepted', message: '请确认已阅读服务条款与退换货政策' }]),
+            ...(age_confirmed ? [] : [{ field: 'age_confirmed', message: '请确认已满最低购买年龄' }])
+          ]
+        })
+      }
 
       // 如果用户未登录，检查是否为游客下单
       if (!userId) {
@@ -564,7 +594,7 @@ class OrderController {
         
         // 调用统一的用户创建服务
         try {
-          const newUser = await UserController.createUserForOrder(contact_phone, contact_name, normalizedReferralCode)
+          const newUser = await UserController.createUserForOrder(contact_phone, contact_name, normalizedReferralCode, { terms_accepted, age_confirmed })
           userId = newUser.id
           isGuestOrder = true
           guestUserCreated = newUser.__created === true
@@ -2181,6 +2211,16 @@ class OrderController {
 
       await clearResponseCache()
 
+      /**
+       * 站内通知（第 54 轮）：批量改状态同样要通知用户。
+       *
+       * 批量路径的结果结构与单条不同：这里是 `result.changed`（订单 id 数组）。
+       *
+       * ⚠️ 必须**一次查完**而不是逐单查：逐单查会让 N 单 = N 次额外查询
+       * （bulkCancelResources 门禁实测 10 单就多 10 条 → 查询数从 80 涨到 98）。
+       */
+      await notifyOrderStatusChangedBatch(result.changed || [], status)
+
       const skippedCount = result.skipped.length
       return res.json({
         success: true,
@@ -2313,6 +2353,16 @@ class OrderController {
       if (!result.ok) {
         return res.status(result.status).json({ success: false, message: result.message })
       }
+
+      /**
+       * 站内通知（第 54 轮）：订单状态变了，用户**必须知道**。
+       *
+       * 原来只写操作日志（给运营看），用户端完全零感知 ——
+       * "我付了钱，货发出去了吗"只能反复刷订单页。
+       *
+       * 放在事务 commit **之后**：通知失败绝不能影响业务（notifyUser 内部吞异常）。
+       */
+      await notifyOrderStatusChanged(result.orderId, status)
 
       // 返回更新后的订单（含 items）
       const updatedOrder = await Order.findByPk(result.orderId, {
@@ -2571,6 +2621,83 @@ class OrderController {
         message: '导出订单失败'
       })
     }
+  }
+}
+
+/**
+ * 批量订单状态变更 → 站内通知（第 54 轮）
+ *
+ * 一次查询拿全部订单，再批量写通知 —— 逐单查会让查询数随订单数线性膨胀。
+ */
+async function notifyOrderStatusChangedBatch (orderIds, status) {
+  try {
+    const ids = (orderIds || []).map(Number).filter(Number.isInteger)
+    if (!ids.length) return
+
+    const NOTIFIABLE = new Set(['shipping', 'shipped', 'delivered', 'completed', 'cancelled'])
+    if (!NOTIFIABLE.has(status)) return
+
+    // 一次查完（不是 N 次）
+    const orders = await Order.findAll({
+      where: { id: { [Op.in]: ids } },
+      attributes: ['id', 'order_no', 'user_id', 'total_amount_thb', 'tracking_number'],
+      paranoid: false
+    })
+
+    await notifyUsers({
+      userIds: orders.map((o) => o.user_id).filter(Boolean),
+      type: 'order_status',
+      data: {
+        order_no: orders[0]?.order_no || '',
+        status,
+        amount: Number(orders[0]?.total_amount_thb) || 0,
+        currency: 'THB'
+      },
+      link: orders[0] ? `/portal/orders/${orders[0].id}` : null
+    })
+  } catch (error) {
+    logger.error('批量发订单状态通知失败（不影响业务）', { count: orderIds?.length, status, err: error?.message })
+  }
+}
+
+/**
+ * 订单状态变更 → 站内通知（第 54 轮）
+ *
+ * 为什么单独抽出来：单条改状态与批量改状态都要发，抽出来避免两处逻辑漂移。
+ *
+ * 只通知**对用户有意义**的状态变化（发货/送达/完成/取消），
+ * 其余中间状态不发，避免通知变成噪音。
+ *
+ * 注意：**用户自己取消订单**（cancelOrder）不发通知 —— 他刚点的取消，
+ * 再弹一条"您的订单已取消"只是噪音。删单（deleteOrder）同样不发。
+ *
+ * 失败不影响业务：notifyUser 内部吞异常（best-effort）。
+ */
+async function notifyOrderStatusChanged (orderId, status) {
+  try {
+    const NOTIFIABLE = new Set(['shipping', 'shipped', 'delivered', 'completed', 'cancelled'])
+    if (!NOTIFIABLE.has(status)) return
+
+    const order = await Order.findByPk(orderId, {
+      attributes: ['id', 'order_no', 'user_id', 'status', 'total_amount_thb', 'tracking_number'],
+      paranoid: false
+    })
+    if (!order || !order.user_id) return
+
+    await notifyUser({
+      userId: order.user_id,
+      type: 'order_status',
+      data: {
+        order_no: order.order_no,
+        status,
+        tracking_number: order.tracking_number || null,
+        amount: Number(order.total_amount_thb) || 0,
+        currency: 'THB'
+      },
+      link: `/portal/orders/${order.id}`
+    })
+  } catch (error) {
+    logger.error('发订单状态通知失败（不影响业务）', { orderId, status, err: error?.message })
   }
 }
 

@@ -87,6 +87,11 @@ router.get('/sitemap.xml', async (req, res) => {
       changefreq: 'yearly',
       priority: '0.3'
     }))
+    entries.push(urlEntry({
+      loc: `${SITE_URL}/portal/returns`,
+      changefreq: 'yearly',
+      priority: '0.3'
+    }))
 
     // 3) 分类（前端暂无独立分类路由 → 指向首页；列表页路由落地后改成 /portal/products?category_id=）
     const categories = await ProductCategory.findAll({

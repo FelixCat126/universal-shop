@@ -17,7 +17,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
-  kind: { type: String, required: true, validator: (v) => ['privacy', 'terms'].includes(v) }
+  kind: { type: String, required: true, validator: (v) => ['privacy', 'terms', 'returns'].includes(v) }
 })
 
 const { t } = useI18n()

@@ -503,6 +503,8 @@ import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../stores/cart.js'
 import { useUserStore } from '../stores/user.js'
 import { productAPI } from '../api/products.js'
+// 多语言取值统一到这一份（第 54 轮：此前 Home/ProductDetail 各有一份实现，行为已漂移）
+import getCurrentLanguageValue from '../utils/language.js'
 import { bundleAPI } from '../api/bundles.js'
 import config from '../../config/index.js'
 import { useToast } from '../composables/useToast.js'
@@ -639,14 +641,6 @@ const messageAction = ref(null)
 const currentLanguage = ref('zh-CN')
 
 // 获取当前语言的值
-const getCurrentLanguageValue = (item, field) => {
-  const currentLang = currentLanguage.value
-  if (currentLang === 'th-TH' && item[`${field}_th`]) {
-    return item[`${field}_th`]
-  }
-  return item[field] || ''
-}
-
 // 获取完整的图片URL - 使用配置管理器
 const getImageUrl = (imagePath) => {
   return config.buildStaticUrl(imagePath)

@@ -65,6 +65,13 @@ const router = createRouter({
       meta: { title: '个人中心', requiresAuth: true }
     },
     {
+      // 站内通知（第 54 轮）：独立页面（Profile 的 tab 已有 6 个，再加会更挤）
+      path: '/notifications',
+      name: 'Notifications',
+      component: () => import('../views/Notifications.vue'),
+      meta: { title: '我的通知', requiresAuth: true }
+    },
+    {
       path: '/privacy',
       name: 'Privacy',
       component: () => import('../views/LegalPage.vue'),
@@ -77,6 +84,15 @@ const router = createRouter({
       component: () => import('../views/LegalPage.vue'),
       props: { kind: 'terms' },
       meta: { title: '用户协议' }
+    },
+    {
+      // 退换货政策（第 54 轮）：可商用商城的必备页面 ——
+      // 原来只有「用户协议」里一句"退款退货以订单记录为准"，没有可执行的政策。
+      path: '/returns',
+      name: 'Returns',
+      component: () => import('../views/LegalPage.vue'),
+      props: { kind: 'returns' },
+      meta: { title: '退换货政策' }
     },
     {
       path: '/:pathMatch(.*)*',

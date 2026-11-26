@@ -28,7 +28,10 @@ class UserController {
   // 用户注册
   static async register(req, res) {
     try {
-      const { nickname, country_code = '+66', phone, email, password, referral_code } = req.body
+      // terms_accepted / age_confirmed（第 54 轮）：条款与年龄的**自我声明**。
+      // 系统无法核实身份/年龄，所以这里只做"用户确认过"的留痕。
+      // Joi 层已强制这两个字段为 true（防 curl 绕过），这里只是把它们带进建号。
+      const { nickname, country_code = '+66', phone, email, password, referral_code, terms_accepted, age_confirmed } = req.body
 
       // 验证必填字段
       if (!nickname || !phone || !password) {
@@ -109,7 +112,9 @@ class UserController {
         phone,
         password,
         email,
-        referral_code
+        referral_code,
+        terms_accepted,
+        age_confirmed
       }, false) // false表示是正常注册
 
       // 注册赠券：仅在注册真正成功后发放（失败只记日志，不影响注册主流程）
@@ -920,7 +925,13 @@ class UserController {
    * 复用语义：手机号已存在且为游客自动创建账号（must_reset_password=true）时
    *   直接复用该账号（首单失败重试/并发同手机号均安全）；正常注册账号仍拒绝。
    */
-  static async createUserForOrder(fullPhoneWithCode, contactName, referralCode = null) {
+  /**
+   * 游客下单时自动建号（第 54 轮：把条款/年龄确认也带上）。
+   *
+   * ⚠️ 游客是**下单那一刻**才建号的，注册页根本不会被触发 ——
+   * 所以条款/年龄确认必须在结算页勾选，并由这里透传留痕。
+   */
+  static async createUserForOrder(fullPhoneWithCode, contactName, referralCode = null, consent = {}) {
     try {
       let countryCode = '+66'
       let phoneNumber = fullPhoneWithCode
@@ -943,7 +954,9 @@ class UserController {
         password: defaultPassword,
         email: null,
         referral_code: referralCode,
-        must_reset_password: true
+        must_reset_password: true,
+        terms_accepted: consent.terms_accepted === true,
+        age_confirmed: consent.age_confirmed === true
       }, true)
     } catch (error) {
       logger.error('createUserForOrder 执行失败', { err: error?.message, stack: error?.stack })
@@ -953,7 +966,7 @@ class UserController {
   
   // 统一的用户创建核心逻辑
   static async _createUserCore(userData, isAutoRegister = false) {
-    const { nickname, country_code, phone, password, email, referral_code, must_reset_password } = userData
+    const { nickname, country_code, phone, password, email, referral_code, must_reset_password, terms_accepted, age_confirmed } = userData
     
     // 验证手机号格式 - 使用统一的验证逻辑
     const phoneValidation = UserController._validatePhoneNumber(phone, country_code)
@@ -1024,7 +1037,18 @@ class UserController {
       phone,
       password,
       referred_by_code: validReferralCode,
-      must_reset_password: must_reset_password === true
+      must_reset_password: must_reset_password === true,
+      /**
+       * 条款与年龄确认留痕（第 54 轮）。
+       *
+       * 两条路径（自助注册 / 游客下单自动注册）**共用这一个建号出口**，
+       * 所以在这里写一次就都覆盖了。
+       *
+       * 传 true 时记当前时间；历史账号（迁移前注册的）没有这些字段 → 保持 null，
+       * 不因为"没勾过"就让他们无法下单。
+       */
+      terms_accepted_at: terms_accepted === true ? new Date() : null,
+      age_confirmed_at: age_confirmed === true ? new Date() : null
     }
 
     let user
