@@ -25,10 +25,12 @@
             size="small"
             style="width: 80px; margin-right: 16px"
           >
-            <!-- 暂不提供泰文界面选项（语言包仍保留，localStorage 为 th-TH 时仍可使用） -->
-            <!-- <el-option value="th-TH" :label="t('language.thai')">
+            <!-- 第 54 轮放开泰语：th-TH 语言包（1166 个 key）一直完整维护着，
+                 却是**完全不可达**的（选项被注释）—— 泰国运营只能看中文或英文。
+                 本地存储里已是 th-TH 的用户（早期手动设过）现在也能从界面切回来。 -->
+            <el-option value="th-TH" :label="t('language.thai')">
               <span>ไทย</span>
-            </el-option> -->
+            </el-option>
             <el-option value="zh-CN" :label="t('language.chinese')">
               <span>中文</span>
             </el-option>

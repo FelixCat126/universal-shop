@@ -38,6 +38,8 @@ export default {
 
   // 通用
   common: {
+    noData: 'ไม่มีข้อมูล',
+    copySuccess: 'คัดลอกสำเร็จ',
     somethingWentWrong: 'เกิดข้อผิดพลาดบางอย่าง',
     tryAgainHint: 'โดยปกติการรีเฟรชช่วยแก้ได้ หากยังเกิดปัญหา กรุณาส่งข้อความแสดงข้อผิดพลาดให้เราทราบ',
     reload: 'โหลดหน้าใหม่',
@@ -986,6 +988,7 @@ export default {
     },
     // 消息提示
     messages: {
+      loadFailed: 'โหลดข้อมูลสินค้าไม่สำเร็จ',
       addSuccess: 'เพิ่มสินค้าสำเร็จ',
       updateSuccess: 'อัปเดตสินค้าสำเร็จ',
       deleteSuccess: 'ถอดสินค้าออกจากการขายสำเร็จ',

@@ -226,6 +226,7 @@ export default {
     postalCodeAuto: '选好子区后自动填入'
   },
   common: {
+    loadFailed: '加载失败',
     networkUnstable: '网络不太稳定，请稍后重试',
     retry: '重试',
     somethingWentWrong: '页面出了点问题',

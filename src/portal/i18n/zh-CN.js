@@ -1,6 +1,7 @@
 export default {
   // 页面标题
   title: {
+    productDetail: '商品详情 - 您身边的购物优选专家',
     main: '您身边的购物优选专家',
     home: '首页 - 您身边的购物优选专家',
     products: '商品 - 您身边的购物优选专家',
@@ -11,6 +12,10 @@ export default {
 
   // 通用
   common: {
+    incompleteAddress: '地址信息不完整',
+    autoRegisterFailed: '自动注册失败，请手动注册后再下单',
+    phoneInputPlaceholder: '请输入手机号',
+    loadFailed: '加载失败',
     networkUnstable: '网络不太稳定，请稍后重试',
     somethingWentWrong: '页面出了点问题',
     tryAgainHint: '刷新一下通常就能恢复。如果一直这样，请把下面的错误信息告诉我们。',

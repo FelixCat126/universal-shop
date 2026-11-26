@@ -298,6 +298,20 @@ const updatePageTitle = () => {
     case 'Orders':
       titleKey = 'title.orders'
       break
+    case 'ProductDetail':
+      /**
+       * 商品页的 title 由**商品数据**决定（商品名 + 价格），在 ProductDetail.vue
+       * 数据加载完成后由 setPageSeo 写入。
+       *
+       * 这里**故意不覆盖**：原来这里落到 default 分支 → title 被改成
+       * `title.main`（"您身边的购物优选专家"）→ **所有商品页共用同一个 title**，
+       * 搜索引擎判定为重复页，且完全丢掉「商品名 + 价格」的长尾词流量。
+       *
+       * 但路由切走时仍要恢复默认标题 —— 否则从商品页跳到别的页会留着商品名。
+       * 这里给一个通用占位（商品页真正的 title 会在数据到位后被覆盖）。
+       */
+      titleKey = 'title.productDetail'
+      break
     default:
       titleKey = 'title.main'
   }

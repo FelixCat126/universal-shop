@@ -38,6 +38,8 @@ export default {
 
   // Common
   common: {
+    noData: 'No data',
+    copySuccess: 'Copied',
     somethingWentWrong: 'Something went wrong',
     tryAgainHint: 'A refresh usually fixes it. If it keeps happening, please send us the error below.',
     reload: 'Reload page',
@@ -986,6 +988,7 @@ export default {
     },
     // Messages
     messages: {
+      loadFailed: 'Failed to load products',
       addSuccess: 'Product added successfully',
       updateSuccess: 'Product updated successfully',
       deleteSuccess: 'Product delisted successfully',

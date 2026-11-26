@@ -256,7 +256,7 @@
                         type="tel"
                         class="block w-full h-10 px-3 border border-gray-300 rounded-md text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="{ 'border-red-500': errors.contact_phone }"
-                        :placeholder="`请输入手机号`"
+                        :placeholder="t('common.phoneInputPlaceholder')"
                       />
                       <p v-if="errors.contact_phone" class="text-red-500 text-xs mt-1">
                         {{ errors.contact_phone }}
@@ -746,7 +746,7 @@ const formatAddress = (address) => {
     }
   }
   
-  return regionPart || '地址信息不完整'
+  return regionPart || t('common.incompleteAddress')
 }
 import {
   ArrowLeftIcon,
@@ -1573,7 +1573,7 @@ const submitOrder = async () => {
           if (router.currentRoute.value.name === 'Checkout') router.push('/login')
         }, 2000))
       } else if (!userStore.isLoggedIn) {
-        showMessage('自动注册失败，请手动注册后再下单', 'error')
+        showMessage(t('common.autoRegisterFailed'), 'error')
         trackTimer(setTimeout(() => {
           if (router.currentRoute.value.name === 'Checkout') router.push('/register')
         }, 2000))

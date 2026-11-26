@@ -226,6 +226,7 @@ export default {
     postalCodeAuto: 'เลือกตำบลแล้วระบุอัตโนมัติ'
   },
   common: {
+    loadFailed: 'โหลดไม่สำเร็จ',
     networkUnstable: 'การเชื่อมต่อไม่เสถียร กรุณาลองใหม่อีกครั้ง',
     retry: 'ลองใหม่',
     somethingWentWrong: 'เกิดข้อผิดพลาดบางอย่าง',

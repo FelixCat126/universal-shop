@@ -226,6 +226,7 @@ export default {
     postalCodeAuto: 'Filled after sub-district'
   },
   common: {
+    loadFailed: 'Failed to load',
     networkUnstable: 'The connection looks unstable. Please try again.',
     retry: 'Try again',
     somethingWentWrong: 'Something went wrong',

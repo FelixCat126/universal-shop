@@ -68,6 +68,8 @@ import partnerRoutes from './routes/partnerRoutes.js'
 import couponRoutes from './routes/couponRoutes.js'
 import bundleRoutes from './routes/bundleRoutes.js'
 import securityRoutes from './routes/securityRoutes.js'
+import seoRoutes from './routes/seoRoutes.js'
+import Product from './models/Product.js'
 import { startOrderTimeoutSweeper } from './services/orderTimeoutService.js'
 import { startGuestAccountCleanup } from './services/guestAccountCleanup.js'
 import { startRetentionCleanup } from './services/retentionService.js'
@@ -427,6 +429,14 @@ app.get('/api/portal-build', authenticateAdmin, requireSuperAdmin, (req, res) =>
   }
 })
 
+/**
+ * SEO 路由（第 54 轮）：/sitemap.xml 与 /robots.txt
+ *
+ * 挂在 API 兜底之前、SPA 兜底之前 —— 两者都在**根路径**，
+ * 不能被 /api/* 或 /portal/* 的兜底吃掉。
+ */
+app.use(seoRoutes)
+
 // API 404处理
 app.use('/api/*', (req, res) => {
   console.log('❌ API 404:', req.originalUrl)
@@ -537,11 +547,40 @@ app.use('/partner', express.static(partnerDir, {
 
 
 // SPA路由处理
-app.get('/portal/*', (req, res, next) => {
+app.get('/portal/*', async (req, res, next) => {
   
   if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$/)) {
     console.log('📄 静态资源，跳过SPA处理')
     return next()
+  }
+
+  /**
+   * 商品详情页：**先确认商品存在**，不存在就真正返回 404（第 54 轮）。
+   *
+   * 原来不管商品存不存在，一律返回 index.html + HTTP 200（soft 404）：
+   * 爬虫看到的是「200 + 一个空壳页面」→ 判定为垃圾页并**降权**，
+   * 还会把大量不存在的 URL 收进索引，拉低整站质量评分。
+   *
+   * 商品页是商城**唯一的可索引内容页**，所以只对这一类做存在性校验
+   * （其余路径仍走 SPA 兜底：分类/搜索等参数化 URL 不做校验，避免误伤）。
+   */
+  // ⚠️ app.get('/portal/*', ...) 里 req.path 是**完整路径**（/portal/products/12），
+  //    不是去掉挂载前缀后的路径 —— 用 originalUrl 去掉 query 更稳。
+  const productMatch = (req.originalUrl || req.path).split('?')[0].match(/^\/portal\/products\/(\d+)$/)
+  if (productMatch) {
+    try {
+      const product = await Product.findByPk(parseInt(productMatch[1], 10), {
+        attributes: ['id'],
+        paranoid: true
+      })
+      if (!product) {
+        // 真正的不存在 → 404（带 noindex，避免被索引）
+        res.setHeader('X-Robots-Tag', 'noindex')
+        return res.status(404).sendFile(path.join(portalDir, 'index.html'))
+      }
+    } catch (e) {
+      logger.error('商品存在性校验失败，按存在处理', { err: e?.message })
+    }
   }
   
   console.log('📱 返回Portal index.html')

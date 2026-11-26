@@ -1,6 +1,7 @@
 export default {
   // 页面标题
   title: {
+    productDetail: 'Product Details - Your Shopping Expert Next Door',
     main: 'Your Shopping Expert Next Door',
     home: 'Home - Your Shopping Expert Next Door',
     products: 'Products - Your Shopping Expert Next Door',
@@ -11,6 +12,10 @@ export default {
 
   // 通用
   common: {
+    incompleteAddress: 'Incomplete address information',
+    autoRegisterFailed: 'Automatic registration failed. Please register manually before checking out.',
+    phoneInputPlaceholder: 'Enter your phone number',
+    loadFailed: 'Failed to load',
     networkUnstable: 'The connection looks unstable. Please try again.',
     somethingWentWrong: 'Something went wrong',
     tryAgainHint: 'A refresh usually fixes it. If it keeps happening, please send us the error below.',

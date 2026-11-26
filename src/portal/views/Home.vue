@@ -63,7 +63,7 @@
             :tap="{ scale: 0.97, transition: bouncySpring }"
             class="bg-white rounded-xl shadow-sm hover:shadow-lg flex flex-col h-full min-h-0 transition-shadow duration-300"
           >
-            <div class="aspect-w-1 aspect-h-1 w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
+            <div class="aspect-square w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
               <span class="absolute left-2 top-2 z-10 px-2 py-0.5 text-xs font-medium bg-purple-600 text-white rounded">
                 {{ t('bundle.badge') }}
               </span>
@@ -224,9 +224,20 @@
         v-else-if="products.length > 0"
         class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch"
       >
-        <div
+        <!--
+          商品卡用真 <a href> 而不是 <div @click>（第 54 轮）。
+          原因：爬虫靠 DOM 里的 <a href> 构建链接图。原来这里是 <div @click>，
+          **整个首页 DOM 里一个商品链接都没有** → 爬虫无法发现任何商品页
+          （唯一入链是其它商品详情页的"相关推荐"，索引库空时连第一个都发现不了）。
+
+          @click.prevent 保留 SPA 跳转（不整页刷新），
+          而 JS 禁用时 <a href> 依然可用 —— 渐进增强。
+        -->
+        <a
           v-for="(product, idx) in products"
           :key="product.id"
+          :href="`/portal/products/${product.id}`"
+          @click.prevent="goToProductDetail(product.id)"
           v-motion
           :initial="shouldAnimateCard(idx) ? { opacity: 0, y: 20, scale: 0.96 } : undefined"
           :enter="shouldAnimateCard(idx) ? {
@@ -241,9 +252,8 @@
             'bg-white rounded-xl shadow-sm hover:shadow-lg cursor-pointer flex flex-col h-full min-h-0 transition-shadow duration-300',
             shouldAnimateCard(idx) ? '' : 'css-card-fade-in'
           ]"
-          @click="goToProductDetail(product.id)"
         >
-          <div class="aspect-w-1 aspect-h-1 w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
+          <div class="aspect-square w-full bg-gray-200 rounded-t-xl overflow-hidden relative shrink-0">
             <div
               v-if="product.points > 0"
               class="pointer-events-none absolute right-0 top-0 z-10 h-16 w-16 select-none overflow-visible"
@@ -370,7 +380,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </a>
       </div>
       
       <!-- 空状态：区分"搜不到"与"没有商品"，并给出下一步动作 -->
@@ -488,7 +498,7 @@ import { formatAmount } from '../../shared/money.js'
  */
 import { MotionDirective } from '@vueuse/motion'
 const vMotion = MotionDirective()
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore } from '../stores/cart.js'
 import { useUserStore } from '../stores/user.js'
@@ -522,6 +532,7 @@ const { t, locale } = useI18n()
 
 // 路由和状态管理
 const router = useRouter()
+const route = useRoute()
 const cartStore = useCartStore()
 const userStore = useUserStore()
 const { showError } = useToast()
@@ -760,11 +771,38 @@ const loadCategories = async () => {
      */
     if (selectedCategoryId.value != null &&
         !categories.value.some((c) => c.id === selectedCategoryId.value)) {
+      /**
+       * 第 54 轮：分类可能来自 **URL 参数**（可分享的分类链接）。
+       * 如果 URL 里的分类 id 不存在，除了置空，还得**重新加载商品** ——
+       * 否则首屏那次商品请求带着无效 category_id 发出去了，返回空列表，
+       * 页面会一直停在"没有商品"。
+       */
+      const hadInvalid = selectedCategoryId.value != null
       selectedCategoryId.value = null
+      if (hadInvalid) {
+        await loadProducts({ append: false })
+      }
     }
   } catch (e) {
     console.warn('加载分类失败', e)
   }
+}
+
+/**
+ * 把当前分类同步到 URL（第 54 轮）。
+ *
+ * 为什么需要：分类筛选原来只存在于组件内部 state，
+ * **URL 不变** → 分类页不可分享、不可收藏、搜索引擎也发现不了
+ * （sitemap 里给了 /portal/?category=40，但如果首页不读这个参数，那个 URL 就是无效的）。
+ *
+ * 用 replace 而不是 push：切换分类是"筛选"不是"导航"，
+ * 不该在浏览器历史里堆一长串。
+ */
+const syncCategoryToUrl = (id) => {
+  const query = { ...route.query }
+  if (id == null) delete query.category
+  else query.category = String(id)
+  router.replace({ query }).catch(() => {})
 }
 
 const selectCategory = async (id) => {
@@ -773,6 +811,7 @@ const selectCategory = async (id) => {
   if (n != null && Number.isNaN(n)) return
   if (selectedCategoryId.value === n) return
   selectedCategoryId.value = n
+  syncCategoryToUrl(n)
   currentPage.value = 1
   loadMoreObserver?.disconnect()
   products.value = []
@@ -1151,6 +1190,20 @@ onMounted(async () => {
    * 实测（生产）：首屏 API 阶段从 187ms 降到 ~70ms；
    * 链路差（每次建连 100~1000ms）时省得更多 —— 每少一个串行往返就少挨一次网络抖动。
    */
+  /**
+   * 先从 URL 读初始分类（第 54 轮）：`/portal/?category=40` 直接打开就是该分类。
+   *
+   * 放在 Promise.all **之前**是必须的：商品请求要带 category_id，
+   * 等分类接口回来再改就晚了（会多发一次请求，还闪一下空列表）。
+   *
+   * 分类 id 是否有效由 loadCategories 校验（无效会置空并重新加载商品）。
+   */
+  const catParam = route.query.category
+  if (catParam != null && catParam !== '') {
+    const n = Number(catParam)
+    if (Number.isFinite(n)) selectedCategoryId.value = n
+  }
+
   await Promise.all([
     loadSystemConfig(),
     loadBundles(),

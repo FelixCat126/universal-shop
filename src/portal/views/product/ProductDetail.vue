@@ -34,7 +34,7 @@
         <div class="flex flex-col-reverse">
           <!-- 主图片（点击进 modal + fade-in；hover 弹簧缩放） -->
           <div
-            class="aspect-w-1 aspect-h-1 w-full cursor-zoom-in"
+            class="aspect-square w-full cursor-zoom-in"
             v-motion
             :hovered="{ scale: 1.02, transition: subtleSpring }"
             @click="showImageModal = true"
@@ -288,6 +288,7 @@ import { usePortalCurrencyStore } from '../../stores/portalCurrency.js'
 import SkeletonDetail from '../../components/ui/SkeletonDetail.vue'
 import ImageFade from '../../components/ui/ImageFade.vue'
 import { imageSrcSet } from '../../../utils/imageVariants.js'
+import { setPageSeo, buildProductSeo } from '../../utils/seo.js'
 import { softSpring, subtleSpring } from '../../composables/useSpring.js'
 import { useReducedMotion } from '../../composables/useReducedMotion.js'
 
@@ -350,6 +351,20 @@ const loadProduct = async () => {
       } else {
         loadRelatedProducts(response.data.data)
       }
+
+      /**
+       * 商品页 SEO（第 54 轮）：**数据到位后**才写 title/description/canonical。
+       *
+       * 为什么必须放在这里而不是路由变化时：
+       *   - 商品名与价格只有拿到数据才有；
+       *   - 路由级 title 只能给出"商品详情"这种通用词，
+       *     丢掉了「商品名 + 价格」这批电商长尾词流量。
+       *
+       * App.vue 的 updatePageTitle 在路由变化时会再写一次默认 title ——
+       * 那个 switch 缺 ProductDetail 分支，会把这里的商品名覆盖掉，
+       * 所以那边也补了分支（见 App.vue）。
+       */
+      applyProductSeo(response.data.data)
     } else {
       product.value = null
     }
@@ -359,6 +374,26 @@ const loadProduct = async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+/**
+ * 用商品数据设置本页的 SEO 元信息（第 54 轮）。
+ *
+ * 标题 = `商品名 · 价格฿`（+ 站点名后缀）——
+ * 「商品名 + 价格」是电商长尾搜索的主要形态，不写等于放弃这批流量。
+ */
+const applyProductSeo = (p) => {
+  if (!p) return
+  const categoryName = p.category?.name || ''
+  const seo = buildProductSeo(p, categoryName)
+  if (!seo.title) return
+  setPageSeo({
+    title: seo.title,
+    description: seo.description,
+    image: seo.image,
+    path: seo.path,
+    type: 'product'
+  })
 }
 
 /**

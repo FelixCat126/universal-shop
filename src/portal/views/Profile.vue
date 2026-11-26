@@ -822,7 +822,7 @@
               <div class="w-full shrink-0 sm:w-[7rem]">
                 <CountrySelector
                   v-model="addressForm.contact_country_code"
-                  placeholder="选择国家"
+                  :placeholder="t('common.selectCountry')"
                   @country-change="handleAddressCountryChange"
                 />
               </div>
@@ -1047,7 +1047,7 @@ const formatAddress = (address) => {
     }
   }
   
-  return regionPart || '地址信息不完整'
+  return regionPart || t('common.incompleteAddress')
 }
 
 // 页面状态

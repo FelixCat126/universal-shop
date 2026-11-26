@@ -38,6 +38,8 @@ export default {
 
   // 通用
   common: {
+    noData: '暂无数据',
+    copySuccess: '复制成功',
     somethingWentWrong: '页面出了点问题',
     tryAgainHint: '刷新一下通常就能恢复。如果一直这样，请把下面的错误信息告诉我们。',
     reload: '刷新页面',
@@ -985,6 +987,7 @@ export default {
     },
     // 消息提示
     messages: {
+      loadFailed: '加载商品数据失败',
       addSuccess: '产品添加成功',
       updateSuccess: '产品更新成功',
       deleteSuccess: '产品已下架',
