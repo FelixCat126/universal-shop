@@ -203,13 +203,13 @@
           运营勾好一��单准备批量改状态，等 30 秒勾就没了（还以为是系统抽风）。
         -->
         <el-table-column type="selection" width="46" reserve-selection />
-        <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="140" align="center">
+        <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="128" align="center">
           <template #default="scope">
             <div class="order-no">{{ scope.row.order_no }}</div>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.user')" width="120" min-width="110">
+        <el-table-column :label="t('orders.user')" width="110" min-width="100">
           <template #default="scope">
             <div class="user-info">
               <div class="user-nickname">{{ scope.row.user?.nickname || t('common.unknown') }}</div>
@@ -218,7 +218,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.amount')" width="140" align="center">
+        <el-table-column :label="t('orders.amount')" width="132" align="center">
           <template #default="scope">
             <div class="amount">
               <template v-if="scope.row.payment_method === 'points'">
@@ -238,7 +238,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('common.paymentMethod')" width="105" align="center">
+        <el-table-column :label="t('common.paymentMethod')" width="96" align="center">
           <template #default="scope">
             <el-tag
               :type="scope.row.payment_method === 'cod' ? 'warning' : scope.row.payment_method === 'online' ? 'success' : 'info'"
@@ -249,7 +249,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.status')" width="110" align="center">
+        <el-table-column :label="t('orders.status')" width="100" align="center">
           <template #default="scope">
             <el-tag :type="getStatusTagType(scope.row.status)" size="small">
               {{ getStatusText(scope.row.status) }}
@@ -258,7 +258,7 @@
         </el-table-column>
 
 
-        <el-table-column :label="t('orders.recipientInfo')" width="145" min-width="135">
+        <el-table-column :label="t('orders.recipientInfo')" width="138" min-width="130">
           <template #default="scope">
             <div class="contact-info">
               <div class="contact-name">{{ scope.row.contact_name }}</div>
@@ -267,7 +267,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('orders.orderDate')" width="125" align="center">
+        <el-table-column :label="t('orders.orderDate')" width="120" align="center">
           <template #default="scope">
             <div class="created-time">{{ formatDate(scope.row.created_at) }}</div>
           </template>

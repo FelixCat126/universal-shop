@@ -134,9 +134,9 @@
             :empty-text="t('common.noData')">
         <!-- reserve-selection：刷新列表时保住勾选（同订单页的理由） -->
         <el-table-column type="selection" width="46" reserve-selection :selectable="row => !isDelisted(row)" />
-        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="id" label="ID" width="54" />
 
-        <el-table-column :label="t('products.image.productImage')" width="80" align="center">
+        <el-table-column :label="t('products.image.productImage')" width="72" align="center">
           <template #default="scope">
             <el-image
               :src="scope.row.image || defaultImage"
@@ -161,7 +161,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.name')" width="180" min-width="150">
+        <el-table-column :label="t('products.name')" min-width="150">
           <template #default="scope">
             <div class="product-name-container">
               <div class="product-name" :title="scope.row.name">{{ scope.row.name }}</div>
@@ -190,26 +190,26 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="category" :label="t('products.category')" width="95" min-width="85">
+        <el-table-column prop="category" :label="t('products.category')" width="88" min-width="80">
           <template #default="scope">
             <el-tag>{{ getCategoryLabel(scope.row) }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.shelfStatus')" width="100" min-width="90">
+        <el-table-column :label="t('products.shelfStatus')" width="86" min-width="80">
           <template #default="scope">
             <div class="shelf-status-cell">
               <el-tag v-if="isDelisted(scope.row)" type="info" size="small">{{ t('products.shelfDelisted') }}</el-tag>
               <template v-else>
                 <el-tag type="success" size="small">{{ t('products.shelfOn') }}</el-tag>
-                <el-tag
-                  :type="scope.row.status === 'active' ? 'primary' : 'warning'"
-                  size="small"
-                  class="shelf-status-second"
-                >
-                  {{ scope.row.status === 'active' ? t('products.saleActive') : t('products.saleInactive') }}
-                </el-tag>
-                <!-- 上/下架开关：以前只能看状态、没有任何地方能改（后端 update 也不认 status） -->
+                <!--
+                  上/下架开关：以前只能看状态、没有任何地方能改（后端 update 也不认 status）。
+
+                  第 58 轮：**去掉了原来那个"销售中/未销售"标签** ——
+                  它和开关表达的是**同一件事**（status === 'active'）：
+                  一个格子里把同一句话说两遍，运营看两遍才知道是不是一样的意思。
+                  开关本身就是状态（开=在售），标签只保留"已下架/在售"这个列表维度。
+                -->
                 <el-switch
                   :model-value="scope.row.status === 'active'"
                   :loading="statusToggling.has(scope.row.id)"
@@ -223,7 +223,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="price" :label="t('products.price')" width="115" min-width="105" align="right">
+        <el-table-column prop="price" :label="t('products.price')" width="108" min-width="100" align="right">
           <template #default="scope">
             <div class="price-container">
               <!-- 有折扣时显示折扣价 -->
@@ -240,9 +240,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="points" :label="t('products.points')" width="80" align="right" />
+        <el-table-column prop="points" :label="t('products.points')" width="72" align="right" />
 
-        <el-table-column prop="stock" :label="t('products.stock')" width="100" min-width="90">
+        <el-table-column prop="stock" :label="t('products.stock')" width="92" min-width="84">
           <template #default="scope">
             <div class="stock-info-inline">
               <span :class="{
@@ -272,13 +272,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('common.createTime')" width="105" min-width="95">
+        <el-table-column :label="t('common.createTime')" width="96" min-width="90">
           <template #default="scope">
             <span class="create-time">{{ formatDate(scope.row.created_at) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.actions')" width="110" align="center" fixed="right">
+        <el-table-column :label="t('products.actions')" width="100" align="center" fixed="right">
           <template #default="scope">
             <el-dropdown trigger="click" @command="(cmd) => handleProductAction(cmd, scope.row)">
               <el-button size="small">
