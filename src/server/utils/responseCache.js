@@ -34,12 +34,24 @@ let cacheGeneration = 0
 /** 等待在途写入的上限（毫秒）—— 不能无限等，否则在途写入堆积时会把请求拖死 */
 const PENDING_WAIT_TIMEOUT_MS = 500
 
-export function cacheGet ({ ttlMs = 30_000, keyFn } = {}) {
+/**
+ * @param {object} [opts]
+ * @param {number} [opts.ttlMs]
+ * @param {Function} [opts.keyFn]     自定义缓存键
+ * @param {Function} [opts.skipFn]    返回 true = **这次不缓存**（直接透传）
+ *
+ * skipFn 的用途：关键词搜索这类"键空间无界"的请求。
+ * 缓存键含 query → 每个关键词各占一条；搜的人一多就把缓存写满，
+ * 淘汰（FIFO）时把**热门列表**的缓存一起挤掉。
+ * 与其让噪声把热点挤走，不如搜索结果不缓存（走 trgm 索引，本来就快）。
+ */
+export function cacheGet ({ ttlMs = 30_000, keyFn, skipFn } = {}) {
   return async (req, res, next) => {
     try {
       if (req.method !== 'GET') return next()
       if (req.headers.authorization) return next() // 身份相关请求不缓存
       if (req.headers['session-id']) return next()
+      if (skipFn && skipFn(req)) return next()
 
       const key = keyFn ? keyFn(req) : `${req.method} ${req.originalUrl}`
       const hit = await cache.get(key)

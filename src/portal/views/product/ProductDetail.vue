@@ -43,7 +43,7 @@
               :src="product.image_url || defaultImage"
               :srcset="imageSrcSet(product.image_url)"
               :alt="getCurrentLanguageValue(product, 'name')"
-              custom-class="w-full h-96 object-cover rounded-lg"
+              custom-class="w-full h-full object-contain rounded-lg"
               sizes="(max-width: 1024px) 100vw, 50vw"
               loading="eager"
               fetchpriority="high"
@@ -97,11 +97,17 @@
             </div>
           </div>
 
-          <!-- 产品描述 -->
-          <div class="mt-6">
+          <!--
+            产品描述：**有内容才显示这一段**。
+
+            生产上 18 个商品里 17 个描述是空的（第 54 轮的内容资产缺口）。
+            原来空描述也渲染标题 → 客户看到一个"Product Description"标题
+            下面什么都没有，像是页面坏了。空着就不占位。
+          -->
+          <div v-if="hasDescription" class="mt-6">
             <h3 class="text-sm font-medium text-gray-900">{{ t('product.productDescription') }}</h3>
             <div class="mt-4 prose prose-sm text-gray-500">
-              <p>{{ getCurrentLanguageValue(product, 'description') }}</p>
+              <p>{{ productDescription }}</p>
             </div>
           </div>
 
@@ -318,6 +324,16 @@ const messageType = ref('success')
 const defaultImage = 'data:image/svg+xml,%3Csvg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg"%3E%3Crect width="400" height="400" fill="%23F3F4F6"/%3E%3Cpath d="M120 140c0-8.284 6.716-15 15-15h130c8.284 0 15 6.716 15 15v120c0 8.284-6.716 15-15 15H135c-8.284 0-15-6.716-15-15V140z" fill="%23D1D5DB"/%3E%3Ccircle cx="160" cy="170" r="15" fill="%23909090"/%3E%3Cpath d="M120 230l40-50 40 25 60-70 80 95V140H120v90z" fill="%23909090"/%3E%3Ctext x="200" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="%23666"%3E%E6%97%A0%E5%9B%BE%E7%89%87%3C/text%3E%3C/svg%3E'
 
 // 计算属性
+/**
+ * 商品描述（按当前语言取值）与"有没有描述"。
+ *
+ * 空描述不渲染标题 —— 见模板里的注释。
+ */
+const productDescription = computed(() =>
+  String(getCurrentLanguageValue(product.value, 'description') || '').trim()
+)
+const hasDescription = computed(() => productDescription.value !== '')
+
 const messageClass = computed(() => {
   switch (messageType.value) {
     case 'success':

@@ -343,7 +343,9 @@ class PartnerPortalController {
       const { count, rows } = await Product.findAndCountAll({
         where,
         paranoid: true,
-        order: [['created_at', 'DESC']],
+        // 第 56 轮：排序加 id 兜底 —— created_at 相同（同批导入）时顺序不确定，
+      // 翻页会出现重复/漏数据。
+      order: [['created_at', 'DESC'], ['id', 'DESC']],
         limit,
         offset,
         attributes

@@ -65,8 +65,27 @@ function urlEntry ({ loc, lastmod, changefreq, priority }) {
  * 只列**在售且有货**的商品：已下架/无货的商品页对搜索没有价值，
  * 列进去反而是"低质量页面"，会拉低整站评分。
  */
+/**
+ * sitemap 的进程内缓存（第 56 轮）。
+ *
+ * 之前每次请求都重跑一遍商品查询 + 重新序列化最多 4.5 万条 URL ——
+ * 爬虫是**高频**抓 sitemap 的，等于每个爬虫请求都打一次库。
+ *
+ * 用一个 { value, expiresAt } 就够：sitemap 只有一份，不按参数分。
+ * 1 小时的 TTL 与响应头里的 `Cache-Control: public, max-age=3600` 一致。
+ */
+let sitemapCache = null
+const SITEMAP_CACHE_MS = 60 * 60 * 1000
+
 router.get('/sitemap.xml', async (req, res) => {
   try {
+    if (sitemapCache && sitemapCache.expiresAt > Date.now()) {
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8')
+      res.setHeader('Cache-Control', 'public, max-age=3600')
+      res.setHeader('X-Sitemap-Cache', 'HIT')
+      return res.send(sitemapCache.value)
+    }
+
     const entries = []
 
     // 1) 首页
@@ -133,8 +152,10 @@ router.get('/sitemap.xml', async (req, res) => {
 ${entries.join('\n')}
 </urlset>
 `
+    sitemapCache = { value: xml, expiresAt: Date.now() + SITEMAP_CACHE_MS }
     res.setHeader('Content-Type', 'application/xml; charset=utf-8')
     res.setHeader('Cache-Control', 'public, max-age=3600')
+    res.setHeader('X-Sitemap-Cache', 'MISS')
     return res.send(xml)
   } catch (error) {
     logger.error('生成 sitemap 失败', { err: error?.message })

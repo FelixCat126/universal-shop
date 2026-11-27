@@ -17,7 +17,21 @@ const router = express.Router()
 // cacheGet 仅服务匿名前台流量（带 Authorization 的管理端请求自动旁路，不读缓存也不进缓存）；
 // 管理端写（create/update/delete/restore/adjustStock）在控制器内 clearResponseCache 立即失效；
 // 前台下单扣库存不主动清，公开读库存最多滞后到 TTL 结束——已确认的取舍
-router.get('/', cacheGet({ ttlMs: 20_000 }), optionalAuthenticateAdmin, ProductController.getProducts)
+/**
+ * 公开商品列表（第 56 轮）：
+ *   - 关键词搜索**不缓存**：缓存键含 query，每个关键词占一条，
+ *     搜索的人一多就把缓存写满、淘汰时把热门列表一起挤掉。
+ *   - 其余情况缓存 20s（写路径会 clearResponseCache）。
+ */
+router.get(
+  '/',
+  cacheGet({
+    ttlMs: 20_000,
+    skipFn: (req) => String(req.query?.name || '').trim() !== ''
+  }),
+  optionalAuthenticateAdmin,
+  ProductController.getProducts
+)
 // check-stock：公开批量查询，枚举限流 + joi 校验（productIds 1-200 个正整数），防枚举风暴
 router.post('/check-stock', enumerationLimiter, validate({ body: checkStockSchema }), ProductController.checkStock)
 

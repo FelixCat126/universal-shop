@@ -86,6 +86,32 @@ const Product = sequelize.define('Product', {
   deletedAt: 'deleted_at',
   comment: '产品信息表',
   indexes: [
+    /**
+     * 第 56 轮新增的复合索引（与迁移 021_products_list_indexes.js 一一对应）。
+     *
+     * 为什么需要：公开列表的过滤+排序是
+     *   WHERE status='active' AND deleted_at IS NULL [AND category_id=?]
+     *   ORDER BY created_at DESC, id DESC
+     * 之前只有单列索引（status / deleted_at / created_at 各自一个），
+     * 排序**用不上任何索引** → 每次翻页都要全量 Sort。
+     *
+     * 索引写成 (status, deleted_at, created_at, id)：
+     *   - 前两列是**等值**条件 → PG 能在索引里定位到一段区间
+     *   - 后两列是排序键 → 区间内天然有序，倒着扫就是 created_at DESC
+     *   - DESC/ASC 混排用普通 ASC 索引也能满足（PG 支持反向扫描）
+     */
+    {
+      fields: ['status', 'deleted_at', 'created_at', 'id'],
+      name: 'idx_products_public_list'
+    },
+    {
+      fields: ['category_id', 'status', 'deleted_at', 'created_at', 'id'],
+      name: 'idx_products_public_list_category'
+    },
+    {
+      fields: ['updated_at'],
+      name: 'idx_products_updated_at'
+    },
     // 商品分类索引（用于分类筛选）
     {
       fields: ['category_id'],

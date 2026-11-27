@@ -105,16 +105,66 @@ class ProductController {
         where.deleted_at = { [Op.ne]: null }
       }
 
-      // 管理端：先按是否已下架（在售优先），再按 status（active 优先），再按创建时间倒序
+      /**
+       * 排序（第 56 轮）：**必须带 id 兜底**。
+       *
+       * 为什么：`created_at` 是 timestamptz，而 PG 的 NOW() 取的是**事务开始时间**
+       * —— 同一批导入/同一事务里创建的多行商品，created_at 完全相同。
+       * 只按 created_at 排序时，这些行之间的先后是**不确定**的：
+       * 前台无限滚动翻页就会"同一件商品出现两次"或"某一件被跳过"。
+       *
+       * 加 id 作为最后一级排序键 → 顺序**全序且确定**，翻页不重不漏。
+       */
       const order = isAdmin
         ? [
             [sequelize.literal('(CASE WHEN deleted_at IS NULL THEN 0 ELSE 1 END)'), 'ASC'],
             [sequelize.literal("(CASE WHEN status = 'active' THEN 0 ELSE 1 END)"), 'ASC'],
-            ['created_at', 'DESC']
+            ['created_at', 'DESC'],
+            ['id', 'DESC']
           ]
-        : [['created_at', 'DESC']]
+        : [['created_at', 'DESC'], ['id', 'DESC']]
 
-      const { count, rows } = await Product.findAndCountAll({
+      /**
+       * 列表字段（第 56 轮）：公开列表**只取要用的列**。
+       *
+       * `description` 是无长度上限的 TEXT —— 之前列表接口整列带出去，
+       * 一条几 KB 的描述会在**每一个**列表响应里重复出现
+       * （首页 8 条、搜索每页 8 条，越翻越多）。
+       * 卡���上只显示两行（line-clamp-2），200 字足够 → 列表给摘要即可，
+       * 详情接口仍然是完整描述。
+       *
+       * 管理端列表**不动**：管理端的编辑弹窗直接用列表行回填表单
+       * （editProduct → Object.assign(productForm, {...product})），
+       * 少了 description 运营一打开编辑框就看到空的描述。
+       */
+      const listAttributes = isAdmin
+        ? undefined
+        : [
+            'id',
+            'name',
+            'name_th',
+            'alias',
+            'category_id',
+            'price',
+            'points',
+            'discount',
+            'stock',
+            'image',
+            'status',
+            'created_at',
+            // 摘要：LEFT 按**字符**截断（不是字节），中文不会被切坏
+            [sequelize.literal('LEFT("Product"."description", 200)'), 'description']
+          ]
+
+      /**
+       * 计数**不带 JOIN**（第 56 轮）。
+       *
+       * 之前用 findAndCountAll：count 那条 SQL 也 JOIN 了 product_categories
+       * —— 计数根本不需要分类名（多对一 LEFT JOIN 也不会增行），
+       * 那次 JOIN 是纯开销。拆成两次查询后，count 走 products 单表。
+       */
+      const count = await Product.count({ where, paranoid })
+      const rows = await Product.findAll({
         where,
         include: [
           {
@@ -124,6 +174,7 @@ class ProductController {
             required: false
           }
         ],
+        attributes: listAttributes,
         offset,
         limit,
         order,
@@ -265,23 +316,44 @@ class ProductController {
        * 现在一次往返就够了。
        */
       if (!req.admin && productData.category_id) {
+        /**
+         * 相关推荐（第 56 轮优化）：
+         *   - **去掉 JOIN**：推荐的 4 行与主商品**同分类**，分类名主查询已经拿到了
+         *     → 这次 product_categories JOIN 100% 冗余。
+         *   - **字段白名单**：推荐卡不显示描述，别把 TEXT 整列带出来。
+         *   - 排序加 id 兜底（同上：翻页/推荐顺序必须确定）。
+         */
         const relatedRows = await Product.findAll({
           where: {
             category_id: productData.category_id,
             status: 'active',
             id: { [Op.ne]: product.id }
           },
-          include: [{
-            model: ProductCategory,
-            as: 'productCategory',
-            attributes: ['id', 'name'],
-            required: false
-          }],
-          order: [['created_at', 'DESC']],
+          attributes: [
+            'id',
+            'name',
+            'name_th',
+            'alias',
+            'category_id',
+            'price',
+            'points',
+            'discount',
+            'stock',
+            'image',
+            'status',
+            'created_at'
+          ],
+          order: [['created_at', 'DESC'], ['id', 'DESC']],
           limit: 4,
           paranoid: true
         })
-        productData.related = relatedRows.map((row) => ProductController.toPublicProductRow(row))
+        productData.related = relatedRows.map((row) => {
+          const j = row.toJSON()
+          // 分类直接复用主商品的（同一分类，不必再查）
+          j.category = productData.category
+          if (j.image) j.image_url = j.image
+          return j
+        })
       }
 
       res.json({
