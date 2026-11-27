@@ -5333,6 +5333,7 @@ the "listen ... http2" directive is deprecated, use the "http2" directive instea
 | 创建时间列 | 1028→1124 **完整可见**，右侧固定「操作」列 1124→1224 ✓（原来只剩 17px） |
 | 门户各端 | 200，功能不变 ✓ |
 | 数据不变量 | 生产库 25 项全部通过 ✓ |
+| 改商品留痕 | 部署后实测一次改状态 → `operation_logs` 新增一条 `update_product`（resource=product, resource_id=1, 操作人 admin）✓ |
 
 回归：vitest **1462** / vue **207** / playwright **156** 全绿。
 
