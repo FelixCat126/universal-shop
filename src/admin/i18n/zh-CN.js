@@ -776,6 +776,7 @@ export default {
   // 订单管理页面
   orders: {
     bulkTrackingPlaceholder: '物流单号（每行一个，按表格从上到下与选中订单一一对应）',
+    bulkTrackingNone: '未填物流单号（{count} 单都会提交）—— 货代上门取件后才拿到单号时可以先提交，事后在订单里补',
     bulkTrackingMatched: '已填 {count} 个物流单号，与选中订单数一致',
     bulkTrackingMismatch: '需要 {need} 个物流单号（每行一个），当前填了 {got} 个',
     bulkTrackingEmpty: '（未填）',

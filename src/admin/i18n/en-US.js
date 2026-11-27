@@ -777,6 +777,7 @@ export default {
   // Order management
   orders: {
     bulkTrackingPlaceholder: 'Tracking numbers (one per line, matching the selected orders from top to bottom)',
+    bulkTrackingNone: 'No tracking numbers filled ({count} orders will be submitted) — fine when the courier number only arrives at pickup; add it to the order later',
     bulkTrackingMatched: '{count} tracking numbers filled, matches the number of selected orders',
     bulkTrackingMismatch: 'Need {need} tracking numbers (one per line), {got} filled',
     bulkTrackingEmpty: '(empty)',

@@ -796,15 +796,24 @@ const bulkNeedsTracking = computed(() =>
 )
 
 /**
- * 单号数量必须和选中订单数一致。
+ * 批量发货的"能不能提交"判定。
  *
- * 少了 → 有单没有单号（客户拿不到查询依据）；
- * 多了 → 多出来的单号会被丢掉（运营以为自己都填了）。
- * 两种都要**拦住**，不能"能提交就行"。
+ * **一个都不填 → 允许提交**：
+ * 货代上门取件才拿到单号是常态（尤其 COD），
+ * 先把单子标成"已发货"、单号后补，是真实存在的流程 ——
+ * 强制必填会把这个流程堵死。
+ *
+ * **填了一部分 → 拦住**：
+ * 这时"哪几单有单号"是**歧义的**（粘贴顺序和选中顺序不一定一致），
+ * 而发错包裹的代价很高 → 必须先让运营把数量填对。
+ *
+ * **正好填满 → 逐单应用**。
  */
 const bulkTrackingValid = computed(() => {
   if (!bulkNeedsTracking.value) return true
-  return bulkTrackingLines.value.length === bulkSelectedInViewOrder.value.length
+  const got = bulkTrackingLines.value.length
+  if (got === 0) return true
+  return got === bulkSelectedInViewOrder.value.length
 })
 
 /** 对应关系预览：第 N 行 → 哪一单 */
@@ -820,6 +829,7 @@ const bulkTrackingPreview = computed(() => {
 const bulkTrackingHint = computed(() => {
   const need = bulkSelectedInViewOrder.value.length
   const got = bulkTrackingLines.value.length
+  if (got === 0) return t('orders.bulkTrackingNone', { count: need })
   if (got === need) return t('orders.bulkTrackingMatched', { count: need })
   return t('orders.bulkTrackingMismatch', { need, got })
 })
@@ -1553,6 +1563,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   max-width: 100%;
+  /* 高度下限 24px：与 Element Plus small 按钮同规格（AD-4 门禁）——
+     21px 的按钮在触控屏上难点，运营一天要点几十次 */
+  min-height: 24px;
   background: none;
   border: none;
   padding: 2px 4px;

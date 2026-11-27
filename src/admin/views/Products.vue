@@ -212,20 +212,31 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('products.shelfStatus')" width="86" min-width="80">
+        <el-table-column :label="t('products.shelfStatus')" width="100" min-width="92">
           <template #default="scope">
             <div class="shelf-status-cell">
               <el-tag v-if="isDelisted(scope.row)" type="info" size="small">{{ t('products.shelfDelisted') }}</el-tag>
               <template v-else>
                 <el-tag type="success" size="small">{{ t('products.shelfOn') }}</el-tag>
                 <!--
-                  上/下架开关：以前只能看状态、没有任何地方能改（后端 update 也不认 status）。
+                  第 58 轮曾把这个「销售中/未销售」标签去掉，理由是"它和开关是同一件事"——
+                  **那个理由是错的**，第 61 轮被 AJ-2 护栏当场抓出来并已改回：
 
-                  第 58 轮：**去掉了原来那个"销售中/未销售"标签** ——
-                  它和开关表达的是**同一件事**（status === 'active'）：
-                  一个格子里把同一句话说两遍，运营看两遍才知道是不是一样的意思。
-                  开关本身就是状态（开=在售），标签只保留"已下架/在售"这个列表维度。
+                  这一格里有**两个维度**：
+                    · 「在售 / 已下架」= 是否还在列表里（deleted_at）
+                    · 「销售中 / 停售」  = 是否**可售**（status）
+                  而开关是**操作入口**（点了才改 status），不是状态显示。
+                  去掉状态标签后，「在售但停售」和「在售且销售中」在列表里长得一模一样 ——
+                  运营只能盯着那个小开关的开关状态猜。
                 -->
+                <el-tag
+                  :type="scope.row.status === 'active' ? 'primary' : 'warning'"
+                  size="small"
+                  class="shelf-status-second"
+                >
+                  {{ scope.row.status === 'active' ? t('products.saleActive') : t('products.saleInactive') }}
+                </el-tag>
+                <!-- 上/下架开关：以前只能看状态、没有任何地方能改（后端 update 也不认 status） -->
                 <el-switch
                   :model-value="scope.row.status === 'active'"
                   :loading="statusToggling.has(scope.row.id)"
