@@ -44,9 +44,39 @@ router.get('/export.csv', authenticateAdmin, requirePermission('products'), Prod
 router.get('/:id', cacheGet({ ttlMs: 15_000 }), optionalAuthenticateAdmin, ProductController.getProduct)
 
 // 写操作必须管理员鉴权 + products 权限（修复 P0 鉴权空洞）
-router.post('/', authenticateAdmin, requirePermission('products'), ProductController.createProduct)
-router.put('/:id', authenticateAdmin, requirePermission('products'), ProductController.updateProduct)
-router.delete('/:id', authenticateAdmin, requirePermission('products'), ProductController.deleteProduct)
+/**
+ * 单个商品的写操作也**挂操作日志**（第 60 轮补）。
+ *
+ * 之前只有**批量**那条挂了 logOperation：
+ *   POST /bulk → logOperation('bulk_update_product', 'product')
+ * 结果是：运营改一个商品的状态/名字/价格/删除，在管理端「操作日志」里**查不到**，
+ * 而批量改反而有记录 —— 恰好是"最常做的单条操作"没有留痕。
+ *
+ * 2026-11-27 把生产上那个名叫 "test" 的商品下架时，
+ * 就是靠这条路执行的（PUT /api/products/1），
+ * 结果 operation_logs 里**一条都没有** —— 谁改的、什么时候改的，查不到。
+ */
+router.post(
+  '/',
+  authenticateAdmin,
+  requirePermission('products'),
+  logOperation('create_product', 'product'),
+  ProductController.createProduct
+)
+router.put(
+  '/:id',
+  authenticateAdmin,
+  requirePermission('products'),
+  logOperation('update_product', 'product'),
+  ProductController.updateProduct
+)
+router.delete(
+  '/:id',
+  authenticateAdmin,
+  requirePermission('products'),
+  logOperation('delete_product', 'product'),
+  ProductController.deleteProduct
+)
 // 批量操作：上下架 / 删除（一次最多 200 个）
 router.post('/bulk', authenticateAdmin, requirePermission('products'), logOperation('bulk_update_product', 'product'), ProductController.bulkUpdate)
 /**
