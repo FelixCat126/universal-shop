@@ -175,11 +175,43 @@
               size="small"
               type="primary"
               :loading="bulkActing"
-              :disabled="!bulkStatus"
+              :disabled="!bulkStatus || !bulkTrackingValid"
               @click="applyBulkStatus"
             >
               {{ t('orders.bulkApply') }}
             </el-button>
+            <!--
+              批量发货时**逐单填物流单号**（第 61 轮）。
+
+              为什么不能只填一个：一个包裹一个单号 ——
+              批量发 5 单，物流会回 5 个单号。
+              原来批量只能带**一个**单号整批覆盖，结果只有两种坏结局：
+              ① 整批留空 → 客户收到的"已发货"通知里没有单号；
+              ② 整批填同一个 → 5 单共用一个单号，客户查不到自己的包裹。
+
+              这里让运营**按行粘贴**（快递单号一般是一列一列复制出来的），
+              并把"第几行 → 哪一单"**显式列出来**——
+              发错包裹的代价很高，对应关系不能靠运营自己数。
+            -->
+            <div v-if="bulkNeedsTracking" class="bulk-tracking">
+              <el-input
+                v-model="bulkTrackingText"
+                type="textarea"
+                :rows="3"
+                :placeholder="t('orders.bulkTrackingPlaceholder')"
+                class="bulk-tracking__input"
+              />
+              <p class="bulk-tracking__hint" :class="{ 'is-error': bulkTrackingLines.length > 0 && !bulkTrackingValid }">
+                {{ bulkTrackingHint }}
+              </p>
+              <ul v-if="bulkTrackingPreview.length" class="bulk-tracking__preview">
+                <li v-for="p in bulkTrackingPreview" :key="p.id">
+                  <span class="bulk-tracking__no">{{ p.order_no }}</span>
+                  <span class="bulk-tracking__arrow">←</span>
+                  <span class="bulk-tracking__tn">{{ p.tracking_number || t('orders.bulkTrackingEmpty') }}</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <el-table
@@ -738,10 +770,71 @@ const onSelectionChange = (rows) => {
   }
 }
 
+/**
+ * 批量发货时的物流单号（第 61 轮）。
+ *
+ * 粘贴的是**快递系统导出的一列单号**（一单一个），所以按行对应选中订单。
+ * 对应关系要**显式列出来**：发错包裹没法挽回。
+ */
+const bulkTrackingText = ref('')
+
+/** 选中订单在**表格里的顺序**（= 运营看到的顺序） */
+const bulkSelectedInViewOrder = computed(() => {
+  const ids = new Set(selectedOrderIds.value)
+  return orders.value.filter(o => ids.has(o.id))
+})
+
+/** 粘进来的单号（按行，去掉空行） */
+const bulkTrackingLines = computed(() =>
+  bulkTrackingText.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+)
+
+/** 需要填物流单号的状态：发货之后的那些 */
+const BULK_TRACKING_STATUSES = ['shipped', 'delivered', 'completed']
+const bulkNeedsTracking = computed(() =>
+  Boolean(bulkStatus.value) && BULK_TRACKING_STATUSES.includes(bulkStatus.value)
+)
+
+/**
+ * 单号数量必须和选中订单数一致。
+ *
+ * 少了 → 有单没有单号（客户拿不到查询依据）；
+ * 多了 → 多出来的单号会被丢掉（运营以为自己都填了）。
+ * 两种都要**拦住**，不能"能提交就行"。
+ */
+const bulkTrackingValid = computed(() => {
+  if (!bulkNeedsTracking.value) return true
+  return bulkTrackingLines.value.length === bulkSelectedInViewOrder.value.length
+})
+
+/** 对应关系预览：第 N 行 → 哪一单 */
+const bulkTrackingPreview = computed(() => {
+  const list = bulkSelectedInViewOrder.value
+  return list.map((o, i) => ({
+    id: o.id,
+    order_no: o.order_no,
+    tracking_number: bulkTrackingLines.value[i] || ''
+  }))
+})
+
+const bulkTrackingHint = computed(() => {
+  const need = bulkSelectedInViewOrder.value.length
+  const got = bulkTrackingLines.value.length
+  if (got === need) return t('orders.bulkTrackingMatched', { count: need })
+  return t('orders.bulkTrackingMismatch', { need, got })
+})
+
 const applyBulkStatus = async () => {
   const ids = [...selectedOrderIds.value]
   if (!ids.length || !bulkStatus.value || bulkActing.value) {
     if (!ids.length) ElMessage.warning(t('orders.bulkNoSelection'))
+    return
+  }
+  if (!bulkTrackingValid.value) {
+    ElMessage.warning(t('orders.bulkTrackingMismatch', {
+      need: bulkSelectedInViewOrder.value.length,
+      got: bulkTrackingLines.value.length
+    }))
     return
   }
   const status = bulkStatus.value
@@ -757,7 +850,12 @@ const applyBulkStatus = async () => {
 
   bulkActing.value = true
   try {
-    const res = await bulkUpdateOrderStatus(ids, status)
+    // 逐单带物流单号（按 id 指定，不靠顺序）
+    const assignments = bulkNeedsTracking.value
+      ? bulkTrackingPreview.value.map(p => ({ id: p.id, tracking_number: p.tracking_number }))
+      : undefined
+
+    const res = await bulkUpdateOrderStatus(ids, status, assignments ? { assignments } : undefined)
     const payload = res?.data
     if (!payload?.success) {
       ElMessage.error(payload?.message || t('common.error'))
@@ -1385,6 +1483,48 @@ onUnmounted(() => {
 
 .order-table .el-table__cell {
   padding: 12px 8px;
+}
+
+/* 批量发货的物流单号区（第 61 轮） */
+.bulk-tracking {
+  flex-basis: 100%;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #dcdfe6;
+}
+
+.bulk-tracking__input {
+  width: 100%;
+}
+
+.bulk-tracking__hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #909399;
+}
+
+.bulk-tracking__hint.is-error {
+  color: #f56c6c;
+}
+
+.bulk-tracking__preview {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #606266;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.bulk-tracking__no {
+  font-family: 'Monaco', 'Consolas', monospace;
+  color: #409eff;
+  margin-right: 6px;
+}
+
+.bulk-tracking__arrow {
+  margin-right: 6px;
+  color: #c0c4cc;
 }
 
 .order-table .el-table__body td {

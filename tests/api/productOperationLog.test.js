@@ -27,7 +27,13 @@ import { TestHelpers } from '../helpers/test-helpers.js'
 
 const models = () => TestDatabase.getSequelize().models
 
-/** 操作日志里的相关记录 */
+/**
+ * 操作日志里的相关记录。
+ *
+ * ⚠️ **日志是 fire-and-forget 写的**（logOperation 用 setImmediate 落库，
+ * 响应先返回、日志后写），所以查一次可能查不到 ——
+ * 全量并发跑时尤其容易飘。必须**轮询等它落地**。
+ */
 async function operationLogs (action) {
   const { OperationLog } = models()
   const rows = await OperationLog.findAll({
@@ -35,6 +41,17 @@ async function operationLogs (action) {
     order: [['created_at', 'DESC']]
   })
   return rows
+}
+
+/** 等操作日志落库（最多等 3 秒） */
+async function waitForOperationLogs (action, { timeoutMs = 3000 } = {}) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const rows = await operationLogs(action)
+    if (rows.length) return rows
+    if (Date.now() > deadline) return []
+    await new Promise(r => setTimeout(r, 40))
+  }
 }
 
 describe('商品写操作留痕', () => {
@@ -58,7 +75,7 @@ describe('商品写操作留痕', () => {
       .send({ status: 'inactive' })
     expect(res.status).toBe(200)
 
-    const logs = await operationLogs('update_product')
+    const logs = await waitForOperationLogs('update_product')
     expect(logs.length, '改商品必须在操作日志里留痕').toBeGreaterThan(0)
     const row = logs.find(l => String(l.resource_id) === String(product.id))
     expect(row, '操作日志里应有这条商品的记录').toBeTruthy()
@@ -82,7 +99,7 @@ describe('商品写操作留痕', () => {
       })
     expect(res.status).toBe(201)
 
-    const logs = await operationLogs('create_product')
+    const logs = await waitForOperationLogs('create_product')
     expect(logs.length, '建商品必须在操作日志里留痕').toBeGreaterThan(0)
   })
 
@@ -97,7 +114,7 @@ describe('商品写操作留痕', () => {
       .set('Authorization', `Bearer ${adminToken}`)
     expect(res.status).toBe(200)
 
-    const logs = await operationLogs('delete_product')
+    const logs = await waitForOperationLogs('delete_product')
     expect(logs.length, '删商品必须在操作日志里留痕').toBeGreaterThan(0)
   })
 })

@@ -776,6 +776,10 @@ export default {
 
   // Order management
   orders: {
+    bulkTrackingPlaceholder: 'Tracking numbers (one per line, matching the selected orders from top to bottom)',
+    bulkTrackingMatched: '{count} tracking numbers filled, matches the number of selected orders',
+    bulkTrackingMismatch: 'Need {need} tracking numbers (one per line), {got} filled',
+    bulkTrackingEmpty: '(empty)',
     copied: 'Copied to clipboard',
     copyOrderNo: 'Click to copy order number',
     copyTrackingNo: 'Click to copy tracking number',

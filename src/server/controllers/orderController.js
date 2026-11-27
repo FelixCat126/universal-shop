@@ -2057,7 +2057,7 @@ class OrderController {
    */
   static async bulkUpdateOrderStatus (req, res) {
     try {
-      const { ids, status, tracking_number, admin_note } = req.body || {}
+      const { ids, status, tracking_number, admin_note, assignments } = req.body || {}
       const BULK_MAX = 200
 
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -2075,6 +2075,27 @@ class OrderController {
       const idList = [...new Set(ids.map(v => parseInt(v, 10)).filter(v => Number.isInteger(v) && v > 0))]
       if (idList.length === 0) {
         return res.status(400).json({ success: false, message: '无效的订单 ID' })
+      }
+
+      /**
+       * 每单各自的物流单号（第 61 轮）。
+       *
+       * 为什么需要：一个包裹一个单号 —— 批量发 5 单，物流会回 5 个单号，
+       * **一个都不该一样**。而原来批量只能带**一个** tracking_number 整批覆盖，
+       * 于是运营要么整批留空（客户收到的"已发货"通知里没有单号），
+       * 要么整批填同一个（5 单共用一个单号，客户查不到自己的包裹）。
+       *
+       * assignments 形如 [{ id, tracking_number }]，**按 id 指定**，
+       * 不依赖顺序 —— 顺序错位会发货错包裹，这种错不能靠"对齐"来防。
+       */
+      const assignMap = new Map()
+      if (Array.isArray(assignments)) {
+        for (const a of assignments) {
+          const aid = parseInt(a?.id, 10)
+          if (!Number.isInteger(aid) || aid <= 0) continue
+          const tn = a?.tracking_number == null ? null : String(a.tracking_number).trim().slice(0, 64)
+          assignMap.set(aid, tn || null)
+        }
       }
 
       /**
@@ -2188,7 +2209,10 @@ class OrderController {
             }
 
             const patch = { status }
-            if (tracking_number !== undefined) {
+            if (assignMap.has(order.id)) {
+              // 这一单有**自己的**物流单号 → 用它（优先于整批的单号）
+              patch.tracking_number = assignMap.get(order.id)
+            } else if (tracking_number !== undefined) {
               const tn = tracking_number == null ? null : String(tracking_number).trim().slice(0, 64)
               patch.tracking_number = tn || null
             }
