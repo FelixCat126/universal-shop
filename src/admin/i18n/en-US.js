@@ -352,6 +352,23 @@ export default {
 
   // System configuration
   systemConfig: {
+    smsNotify: 'SMS notifications',
+    smsNotifySubtitle: 'Tell customers by SMS when their order ships, arrives, or an after-sales request is decided',
+    smsNotifyOn: 'Enabled',
+    smsNotifyOff: 'Disabled',
+    smsNotifyEvents: 'Events to send',
+    smsNotifyTips: 'Check the events to send. With none checked the default set is used (order shipped, after-sales decision). To send nothing at all, turn the switch off above. The password-reset code is not affected by this switch (it is part of the reset flow — without SMS the password cannot be reset).',
+    smsEffectiveNow: 'Actually being sent now',
+    smsEffectiveNone: '(none)',
+    smsEnvOverride: 'The business-SMS master switch is taken over by the server environment variable SMS_BUSINESS_ENABLED — the switch on this page has no effect.',
+    smsChannelMissing: 'No SMS channel configured yet (SMS_WEBHOOK_URL is empty) — even with the switch on nothing can be sent. Configure the channel in the server environment first.',
+    smsEventOrderShipped: 'Order shipped',
+    smsEventOrderDelivered: 'Order delivered / completed',
+    smsEventOrderCancelled: 'Order cancelled',
+    smsEventAfterSale: 'After-sales decision',
+    saveSmsNotify: 'Save SMS settings',
+    smsNotifySaved: 'SMS settings saved',
+    smsNotifySaveFailed: 'Failed to save SMS settings',
     partnerMoq: 'Partner minimum order quantity',
     partnerMoqSubtitle: 'Minimum quantity and step for wholesale orders',
     partnerMoqUnit: 'Minimum quantity',
@@ -434,6 +451,8 @@ export default {
       qrDisplay: '• QR code will be displayed in a popup when user selects "Online Payment"'
     },
     messages: {
+      smsNotifySaved: 'SMS settings saved',
+      smsNotifySaveFailed: 'Failed to save SMS settings',
       partnerMoqSaveSuccess: 'Minimum order quantity saved',
       partnerMoqSaveFailed: 'Failed to save the minimum order quantity',
       uploadSuccess: 'Upload successful',

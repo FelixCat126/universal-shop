@@ -1,4 +1,5 @@
 import SystemConfig from '../models/SystemConfig.js'
+import { getBusinessSmsPolicy, isSmsChannelConfigured } from '../services/smsService.js'
 import { formatAmount } from '../../shared/money.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { normalizeExchangeRates, FX_KEYS } from '../utils/exchangeRates.js'
@@ -190,10 +191,34 @@ class SystemConfigController {
   static async getAllConfigs(req, res) {
     try {
       const configs = await SystemConfig.getAllConfigs()
-      
+
+      /**
+       * 短信状态（第 55 轮）：管理端要知道**真实生效**的策略，
+       * 而不是自己按"我拨的开关"去猜。
+       *
+       * 背景：环境变量 `SMS_BUSINESS_ENABLED` 会**盖过**系统配置。
+       * 运营在页面上把开关拨开、点了保存，短信一条没发，
+       * 页面却显示"已开启" —— 用户只能报"短信开关坏了"。
+       * 这里把实际生效的开关、事件集、以及"是否被 env 接管"一并返回，
+       * 页面才能说实话。
+       */
+      const smsPolicy = await getBusinessSmsPolicy()
+      const smsEnvOverride = String(process.env.SMS_BUSINESS_ENABLED || '').trim() !== ''
+
       res.json({
         success: true,
-        data: configs
+        data: {
+          ...configs,
+          /** 短信通道是否已配置（环境变量） */
+          sms_configured: isSmsChannelConfigured(),
+          /** 实际生效的短信策略 */
+          sms_policy: {
+            enabled: smsPolicy.enabled,
+            events: smsPolicy.events,
+            /** 总开关被服务器环境变量接管 —— 页面上的开关不生效 */
+            env_override: smsEnvOverride
+          }
+        }
       })
     } catch (error) {
       logger.error('获取系统配置失败', { err: error?.message, stack: error?.stack })

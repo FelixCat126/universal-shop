@@ -17,6 +17,7 @@ import { grantRegisterGiftCoupons } from '../services/couponService.js'
 import { thbToBillingAmount, normalizeCheckoutCurrency } from '../utils/exchangeRates.js'
 import * as pointsService from '../services/pointsService.js'
 import { notifyUser, notifyUsers } from '../services/notificationService.js'
+import { isSmsChannelConfigured, sendSms, SMS_EVENTS, getBusinessSmsPolicy } from '../services/smsService.js'
 import { priceOrder, getPointsEarnRate, calcPointsEarn, loadNormalizedExchangeRates, PRICING_ENGINE_VERSION } from '../services/pricingEngine.js'
 import { applyCreatedBetween } from '../utils/dateFilters.js'
 import { getBusinessTimezone, startOfBusinessDay } from '../utils/businessTimezone.js'
@@ -2218,8 +2219,14 @@ class OrderController {
        *
        * ⚠️ 必须**一次查完**而不是逐单查：逐单查会让 N 单 = N 次额外查询
        * （bulkCancelResources 门禁实测 10 单就多 10 条 → 查询数从 80 涨到 98）。
+       *
+       * 站内通知与短信**共用同一批订单数据**（一次 findAll）——
+       * 两边各查一次就多一条查询，而批量操作的查询数是有门禁的。
        */
-      await notifyOrderStatusChangedBatch(result.changed || [], status)
+      const notified = await notifyOrderStatusChangedBatch(result.changed || [], status)
+
+      /** 短信（第 55 轮）：批量改状态同样要通知（复用上面查到的订单，不重复查） */
+      await sendOrderStatusSmsBatch(result.changed || [], status, notified?.orders)
 
       const skippedCount = result.skipped.length
       return res.json({
@@ -2363,6 +2370,9 @@ class OrderController {
        * 放在事务 commit **之后**：通知失败绝不能影响业务（notifyUser 内部吞异常）。
        */
       await notifyOrderStatusChanged(result.orderId, status)
+
+      /** 短信（第 55 轮）：泰国场景短信是刚需 —— 用户得知道货发出去了 */
+      await sendOrderStatusSms(result.orderId, status)
 
       // 返回更新后的订单（含 items）
       const updatedOrder = await Order.findByPk(result.orderId, {
@@ -2625,6 +2635,122 @@ class OrderController {
 }
 
 /**
+ * 订单状态 → 短信事件（只发用户真正关心的几档）
+ *
+ * 状态机：pending(待支付) → paid(已支付) → shipping(备货中) → shipped(已发货)
+ *        → delivered(已送达) → completed(已完成)，cancelled 为终态。
+ *
+ * 为什么 `shipping`（备货中）**不发**：货还没交给快递，
+ * 说"已发货"是骗用户。等 `shipped`（已发货 + 记了物流单号）再发。
+ *
+ * 为什么 `shipped` 对应"已发货"而不是"已送达"：
+ * 已发货 = 包裹交给快递（用户最想知道的是"什么时候到、运单号多少"）；
+ * 已送达 = 客户已签收（delivered / completed 才是这一档）。
+ * 写反了的话，用户收到的第一条短信就是"您的订单已送达"—— 而包裹还在路上。
+ */
+const ORDER_SMS_EVENT_BY_STATUS = {
+  shipped: SMS_EVENTS.ORDER_SHIPPED,
+  delivered: SMS_EVENTS.ORDER_DELIVERED,
+  completed: SMS_EVENTS.ORDER_DELIVERED,
+  cancelled: SMS_EVENTS.ORDER_CANCELLED
+}
+
+/**
+ * 订单状态变更 → 短信（第 55 轮）
+ *
+ * 只发**收件人真正关心**的几档：发货 / 送达 / 取消。
+ * 中间状态（paid 等）不发 —— 那是系统内部状态，用户不需要知道。
+ *
+ * 两道闸（都在 smsService 里）：
+ *   - 业务短信总开关 + 事件白名单（运营可调）
+ *   - 同号码同模板的冷却（订单状态连跳时不刷屏、也不烧钱）
+ *
+ * 失败**不影响**业务：sendSms 内部吞异常并留痕。
+ */
+async function sendOrderStatusSms (orderId, status) {
+  try {
+    const event = ORDER_SMS_EVENT_BY_STATUS[status]
+    if (!event) return
+
+    // 通道没配 → 一条也发不出去，连策略都不用读（省一次查询）
+    if (!isSmsChannelConfigured()) return
+
+    const { enabled, events } = await getBusinessSmsPolicy()
+    if (!enabled || !events.includes(event)) return
+
+    const order = await Order.findByPk(orderId, {
+      attributes: ['id', 'order_no', 'contact_name', 'contact_phone', 'tracking_number'],
+      paranoid: false
+    })
+    if (!order || !order.contact_phone) return
+
+    await sendSms({
+      phone: order.contact_phone,
+      template: event,
+      // dedupeKey = 订单号：同一订单的重复事件被冷却挡，
+      // 不同订单（哪怕同一号码、5 分钟内先后发货）互不影响。
+      dedupeKey: order.order_no,
+      vars: {
+        order_no: order.order_no,
+        contact_name: order.contact_name || '',
+        tracking_number: order.tracking_number || ''
+      }
+    })
+  } catch (error) {
+    // 双保险：sendSms 内部已吞过一次，这里再兜一层
+    logger.error('发订单状态短信失败（不影响业务）', { orderId, status, err: error?.message })
+  }
+}
+
+/**
+ * 批量订单状态变更 → 短信（第 55 轮）
+ *
+ * 一次查完所有订单（不是逐单查）—— 与站内通知的批量路径同一口径。
+ * 调用方把已查到的订单传进来时直接复用，不再查第二次。
+ */
+async function sendOrderStatusSmsBatch (orderIds, status, orders = null) {
+  try {
+    const event = ORDER_SMS_EVENT_BY_STATUS[status]
+    if (!event) return
+
+    const ids = (orderIds || []).map(Number).filter(Number.isInteger)
+    if (!ids.length) return
+
+    // 通道没配 → 一条也发不出去，连策略都不用读（省一次查询）
+    if (!isSmsChannelConfigured()) return
+
+    const { enabled, events } = await getBusinessSmsPolicy()
+    if (!enabled || !events.includes(event)) return
+
+    // 调用方传了订单就直接复用（站内通知刚查过同一批）——
+    // 批量操作的查询数有门禁，每条查询都要有理由。
+    const list = Array.isArray(orders) && orders.length
+      ? orders
+      : await Order.findAll({
+        where: { id: { [Op.in]: ids } },
+        attributes: ['id', 'order_no', 'contact_name', 'contact_phone', 'tracking_number'],
+        paranoid: false
+      })
+
+    for (const order of list) {
+      if (!order.contact_phone) continue
+      await sendSms({
+        phone: order.contact_phone,
+        template: event,
+        dedupeKey: order.order_no,
+        vars: {
+          order_no: order.order_no,
+          contact_name: order.contact_name || '',
+          tracking_number: order.tracking_number || ''
+        }
+      })
+    }
+  } catch (error) {
+    logger.error('批量发订单状态短信失败（不影响业务）', { count: orderIds?.length, status, err: error?.message })
+  }
+}
+
+/**
  * 批量订单状态变更 → 站内通知（第 54 轮）
  *
  * 一次查询拿全部订单，再批量写通知 —— 逐单查会让查询数随订单数线性膨胀。
@@ -2632,18 +2758,20 @@ class OrderController {
 async function notifyOrderStatusChangedBatch (orderIds, status) {
   try {
     const ids = (orderIds || []).map(Number).filter(Number.isInteger)
-    if (!ids.length) return
+    if (!ids.length) return null
 
     const NOTIFIABLE = new Set(['shipping', 'shipped', 'delivered', 'completed', 'cancelled'])
-    if (!NOTIFIABLE.has(status)) return
+    if (!NOTIFIABLE.has(status)) return null
 
     // 一次查完（不是 N 次）
     const orders = await Order.findAll({
       where: { id: { [Op.in]: ids } },
-      attributes: ['id', 'order_no', 'user_id', 'total_amount_thb', 'tracking_number'],
+      // 多取两列：短信那边要收件人姓名与手机号，复用同一批数据
+      attributes: ['id', 'order_no', 'user_id', 'total_amount_thb', 'tracking_number', 'contact_name', 'contact_phone'],
       paranoid: false
     })
 
+    // 短信那边复用这份订单（省一次查询）
     await notifyUsers({
       userIds: orders.map((o) => o.user_id).filter(Boolean),
       type: 'order_status',
@@ -2655,8 +2783,12 @@ async function notifyOrderStatusChangedBatch (orderIds, status) {
       },
       link: orders[0] ? `/portal/orders/${orders[0].id}` : null
     })
+
+    // 把查到的订单交回去：短信那边复用，省一次查询
+    return { orders }
   } catch (error) {
     logger.error('批量发订单状态通知失败（不影响业务）', { count: orderIds?.length, status, err: error?.message })
+    return null
   }
 }
 

@@ -81,8 +81,10 @@ describe('密码重置 OTP 服务', () => {
     expect(body.phone).toBe('812345678')
     expect(body.message).toContain('Universal Shop')
 
-    // 库里那条 OTP 的明文在 body 里，用它消费
-    const otp = /code is (\d{6})\./.exec(body.message)[1]
+    // 库里那条 OTP 的明文在 body 里，用它消费。
+    // 取验证码不能写死英文措辞：短信文案按区号选语言（+66 是泰语），
+    // 只认 "code is" 的话，泰国用户这条短信根本测不到。
+    const otp = /\b(\d{6})\b/.exec(body.message)[1]
     const consumed = await consumePasswordResetOtp('+66', '812345678', otp)
     expect(consumed).toBeTruthy()
     expect(consumed.userId).toBe(42)

@@ -280,6 +280,67 @@
         </div>
       </el-card>
 
+      <!--
+        短信通知（第 55 轮）
+
+        业务短信（下单后告知货已发出、售后结论等）的开关与事件白名单。
+        放在**系统配置**而不是只放 env：运营要能随时开关、
+        调整发哪些事件，**不用改配置、不用重启**。
+
+        密码重置的 OTP 不受这里的开关管 —— 那是流程的一部分，
+        没有短信就没法重置密码（生产环境会直接 503）。
+      -->
+      <el-card class="config-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3>{{ t('systemConfig.smsNotify') }}</h3>
+            <span class="card-subtitle">{{ t('systemConfig.smsNotifySubtitle') }}</span>
+          </div>
+        </template>
+        <div class="config-content">
+          <div class="sms-notify-section">
+            <el-switch
+              v-model="smsBusinessEnabled"
+              :disabled="smsEnvOverride"
+              :active-text="t('systemConfig.smsNotifyOn')"
+              :inactive-text="t('systemConfig.smsNotifyOff')"
+            />
+            <el-button
+              type="primary"
+              style="margin-left: 12px"
+              @click="saveSmsNotify"
+            >
+              {{ t('systemConfig.saveSmsNotify') }}
+            </el-button>
+          </div>
+
+          <div style="margin-top: 16px">
+            <span class="config-label">{{ t('systemConfig.smsNotifyEvents') }}</span>
+            <el-checkbox-group v-model="smsBusinessEvents" style="margin-top: 8px; display: block;">
+              <el-checkbox value="order_shipped">{{ t('systemConfig.smsEventOrderShipped') }}</el-checkbox>
+              <el-checkbox value="order_delivered">{{ t('systemConfig.smsEventOrderDelivered') }}</el-checkbox>
+              <el-checkbox value="order_cancelled">{{ t('systemConfig.smsEventOrderCancelled') }}</el-checkbox>
+              <el-checkbox value="after_sale_reviewed">{{ t('systemConfig.smsEventAfterSale') }}</el-checkbox>
+            </el-checkbox-group>
+          </div>
+
+          <!--
+            实际生效的事件：服务端算好的（含"留空 = 默认集"这条规则）。
+            页面显示"真正会发什么"，避免运营按勾选框猜。
+          -->
+          <p class="exchange-rate-tips" style="margin-top: 12px">
+            {{ t('systemConfig.smsEffectiveNow') }}：{{ smsEffectiveText }}
+          </p>
+          <p class="exchange-rate-tips" style="margin-top: 6px">{{ t('systemConfig.smsNotifyTips') }}</p>
+          <p v-if="smsEnvOverride" class="exchange-rate-tips" style="margin-top: 6px; color: #e6a23c">
+            {{ t('systemConfig.smsEnvOverride') }}
+          </p>
+          <p v-if="!smsChannelConfigured" class="exchange-rate-tips" style="margin-top: 6px; color: #e6a23c">
+            {{ t('systemConfig.smsChannelMissing') }}
+          </p>
+        </div>
+      </el-card>
+
       <!-- 业务时区：决定"今天 / 本地日历日"的边界（今日营收、趋势分桶、日期筛选） -->
       <el-card class="config-card" shadow="hover">
         <template #header>
@@ -324,7 +385,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -349,6 +410,15 @@ const exchangeRatesCny = ref(0)
 const exchangeRatesMyr = ref(0)
 const currencyCode = ref('THB')
 const pointsEarnRate = ref(0.01)
+
+// 短信通知（第 55 轮）
+const smsBusinessEnabled = ref(false)
+const smsBusinessEvents = ref([])
+const smsChannelConfigured = ref(false)
+/** 总开关是否被服务器环境变量接管（接管时页面上的开关不生效） */
+const smsEnvOverride = ref(false)
+/** 服务端算出来的"实际生效"事件集 */
+const smsEffectiveEvents = ref([])
 /** 合作方起订量（第 46 轮）：这两个键之前没有界面入口，只能改库 */
 const partnerMoqUnit = ref(50)
 
@@ -427,6 +497,17 @@ const loadConfigs = async () => {
         const moqUnit = parseInt(configs.partner_order_moq_unit?.value || '50', 10)
         partnerMoqUnit.value = Number.isFinite(moqUnit) && moqUnit >= 1 ? moqUnit : 50
         businessTimezone.value = configs.business_timezone?.value || 'Asia/Shanghai'
+        // 短信通知（第 55 轮）：开关 + 事件白名单
+        smsBusinessEnabled.value = String(configs.sms_business_enabled?.value ?? 'false') === 'true'
+        const evtRaw = String(configs.sms_business_events?.value || '')
+        smsBusinessEvents.value = evtRaw.split(',').map((e) => e.trim()).filter(Boolean)
+        // 通道是否已配（服务端从环境变量算的）
+        smsChannelConfigured.value = Boolean(configs.sms_configured)
+        // 实际生效的策略（服务端算，含"留空 = 默认集"规则）
+        smsEnvOverride.value = Boolean(configs.sms_policy?.env_override)
+        smsEffectiveEvents.value = Array.isArray(configs.sms_policy?.events)
+          ? configs.sms_policy.events
+          : []
       } else {
         ElMessage.error(data.message || t('systemConfig.messages.loadConfigFailed'))
       }
@@ -768,6 +849,70 @@ const savePartnerMoq = async () => {
     ElMessage.error(t('systemConfig.messages.partnerMoqSaveFailed'))
   }
 }
+
+/**
+ * 保存短信通知开关与事件白名单（第 55 轮）。
+ *
+ * 存成两条系统配置：
+ *   sms_business_enabled  'true' / 'false'
+ *   sms_business_events  'order_shipped,after_sale_reviewed'
+ *
+ * 服务端 `getBusinessSmsPolicy()` 读这两条（环境变量优先级更低），
+ * 所以运营在这里改完**立即生效**，不用重启服务。
+ */
+const saveSmsNotify = async () => {
+  try {
+    const post = (key, value, type, description) => adminStore.apiRequest('/api/system-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value, type, description })
+    })
+
+    const enabledRes = await post(
+      'sms_business_enabled',
+      smsBusinessEnabled.value ? 'true' : 'false',
+      'boolean',
+      '业务短信总开关（下单后告知发货/送达/售后结论）'
+    )
+    if (!enabledRes.ok) throw new Error('保存开关失败')
+
+    const eventsRes = await post(
+      'sms_business_events',
+      (smsBusinessEvents.value || []).join(','),
+      'text',
+      '业务短信事件白名单（逗号分隔）：order_shipped,order_delivered,order_cancelled,after_sale_reviewed'
+    )
+    if (!eventsRes.ok) throw new Error('保存事件失败')
+
+    ElMessage.success(t('systemConfig.messages.smsNotifySaved'))
+  } catch (error) {
+    console.error('保存短信通知配置失败:', error)
+    ElMessage.error(t('systemConfig.messages.smsNotifySaveFailed'))
+  }
+}
+
+/**
+ * "实际会发哪些事件"的可读文案。
+ *
+ * 直接显示服务端算好的结果，而不是按勾选框自己拼 ——
+ * 因为"全部不勾"并不等于"不发"（留空 = 默认集），
+ * 按勾选框拼出来的文案会跟真实行为对不上。
+ */
+const SMS_EVENT_LABEL_KEYS = {
+  order_shipped: 'systemConfig.smsEventOrderShipped',
+  order_delivered: 'systemConfig.smsEventOrderDelivered',
+  order_cancelled: 'systemConfig.smsEventOrderCancelled',
+  after_sale_reviewed: 'systemConfig.smsEventAfterSale'
+}
+
+const smsEffectiveText = computed(() => {
+  if (!smsBusinessEnabled.value) return t('systemConfig.smsEffectiveNone')
+  const labels = smsEffectiveEvents.value
+    .map((e) => SMS_EVENT_LABEL_KEYS[e])
+    .filter(Boolean)
+    .map((k) => t(k))
+  return labels.length ? labels.join('、') : t('systemConfig.smsEffectiveNone')
+})
 
 const saveBusinessTimezone = async () => {
   try {

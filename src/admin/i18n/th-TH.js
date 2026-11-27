@@ -352,6 +352,23 @@ export default {
 
   // 系统配置页面
   systemConfig: {
+    smsNotify: 'การแจ้งเตือนทาง SMS',
+    smsNotifySubtitle: 'แจ้งลูกค้าทาง SMS เมื่อคำสั่งซื้อจัดส่ง ส่งถึง หรือผลการพิจารณาหลังการขาย',
+    smsNotifyOn: 'เปิดใช้งาน',
+    smsNotifyOff: 'ปิดใช้งาน',
+    smsNotifyEvents: 'เหตุการณ์ที่จะส่ง',
+    smsNotifyTips: 'เลือกเหตุการณ์ที่จะส่ง หากไม่เลือกเลย ระบบจะใช้ชุดเริ่มต้น (คำสั่งซื้อจัดส่ง, ผลการพิจารณาหลังการขาย) หากไม่ต้องการส่งเลย ให้ปิดสวิตช์ด้านบน รหัสรีเซ็ตรหัสผ่านไม่ได้รับผลจากสวิตช์นี้ (เป็นส่วนหนึ่งของขั้นตอนการรีเซ็ต — ไม่มี SMS ก็รีเซ็ตไม่ได้)',
+    smsEffectiveNow: 'กำลังส่งจริงในขณะนี้',
+    smsEffectiveNone: '(ไม่มี)',
+    smsEnvOverride: 'สวิตช์หลักของ SMS ธุรกิจถูกควบคุมโดยตัวแปรสภาพแวดล้อม SMS_BUSINESS_ENABLED ของเซิร์ฟเวอร์ สวิตช์บนหน้านี้จึงไม่มีผล',
+    smsChannelMissing: 'ยังไม่ได้ตั้งค่าช่องทาง SMS (SMS_WEBHOOK_URL ว่างอยู่) — แม้เปิดสวิตช์แล้วก็ส่งไม่ออก กรุณาตั้งค่าช่องทางในตัวแปรสภาพแวดล้อมของเซิร์ฟเวอร์ก่อน',
+    smsEventOrderShipped: 'คำสั่งซื้อจัดส่ง',
+    smsEventOrderDelivered: 'คำสั่งซื้อส่งถึง / เสร็จสมบูรณ์',
+    smsEventOrderCancelled: 'คำสั่งซื้อถูกยกเลิก',
+    smsEventAfterSale: 'ผลการพิจารณาหลังการขาย',
+    saveSmsNotify: 'บันทึกการตั้งค่า SMS',
+    smsNotifySaved: 'บันทึกการตั้งค่า SMS แล้ว',
+    smsNotifySaveFailed: 'บันทึกการตั้งค่า SMS ไม่สำเร็จ',
     partnerMoq: 'จำนวนขั้นต่ำสำหรับคู่ค้า',
     partnerMoqSubtitle: 'จำนวนขั้นต่ำและขั้นตอนของคำสั่งซื้อส่ง',
     partnerMoqUnit: 'จำนวนขั้นต่ำ (ชิ้น)',
@@ -434,6 +451,8 @@ export default {
       qrDisplay: '• QR Code จะแสดงในป๊อปอัปเมื่อผู้ใช้เลือก "ชำระเงินออนไลน์"'
     },
     messages: {
+      smsNotifySaved: 'บันทึกการตั้งค่า SMS แล้ว',
+      smsNotifySaveFailed: 'บันทึกการตั้งค่า SMS ไม่สำเร็จ',
       partnerMoqSaveSuccess: 'บันทึกจำนวนขั้นต่ำแล้ว',
       partnerMoqSaveFailed: 'บันทึกจำนวนขั้นต่ำไม่สำเร็จ',
       uploadSuccess: 'อัปโหลดสำเร็จ',

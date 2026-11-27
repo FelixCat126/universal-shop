@@ -351,6 +351,23 @@ export default {
 
   // 系统配置页面
   systemConfig: {
+    smsNotify: '短信通知',
+    smsNotifySubtitle: '下单后用短信告知客户（发货 / 送达 / 售后结论）',
+    smsNotifyOn: '已开启',
+    smsNotifyOff: '已关闭',
+    smsNotifyEvents: '发送哪些事件',
+    smsNotifyTips: '勾选要发送的事件；一个都不勾 = 用默认集（订单发货、售后结论）。想一条都不发，请关闭上面的总开关。「忘记密码」的验证码不受这里的开关影响（那是重置流程的一部分，没有短信就无法重置密码）。',
+    smsEffectiveNow: '当前实际会发送',
+    smsEffectiveNone: '（无）',
+    smsEnvOverride: '业务短信总开关由服务器环境变量 SMS_BUSINESS_ENABLED 接管，页面上的开关不生效。',
+    smsChannelMissing: '短信通道尚未配置（SMS_WEBHOOK_URL 为空）—— 即使打开开关也发不出去，请先在服务器环境变量里配置通道地址。',
+    smsEventOrderShipped: '订单发货',
+    smsEventOrderDelivered: '订单送达 / 完成',
+    smsEventOrderCancelled: '订单取消',
+    smsEventAfterSale: '售后审核结论',
+    saveSmsNotify: '保存短信设置',
+    smsNotifySaved: '短信设置已保存',
+    smsNotifySaveFailed: '保存短信设置失败',
     partnerMoq: '合作方起订量',
     partnerMoqSubtitle: '批发订单的最小起订件数与数量步长',
     partnerMoqUnit: '起订量（件）',
@@ -433,6 +450,8 @@ export default {
       qrDisplay: '• 二维码将在用户选择"在线付款"时弹窗显示'
     },
     messages: {
+      smsNotifySaved: '短信设置已保存',
+      smsNotifySaveFailed: '保存短信设置失败',
       partnerMoqSaveSuccess: '起订量已保存',
       partnerMoqSaveFailed: '保存起订量失败',
       uploadSuccess: '上传成功',

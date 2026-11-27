@@ -115,6 +115,53 @@ SystemConfig.getConfig = async function(key, defaultValue = null) {
   }
 }
 
+/**
+ * 一次读多个配置键（**一条查询**）。
+ *
+ * 为什么需要：像短信策略那样要读两三个键时，
+ * 逐个 getConfig 就是 N 条查询 —— 批量操作里会顶破查询预算门禁。
+ *
+ * 不走 LRU 缓存（缓存是按键的，多键读取缓存化会让失效矩阵复杂化）。
+ * 解析规则与 getConfig / getAllConfigs 保持一致。
+ *
+ * @param {string[]} keys
+ * @returns {Promise<Record<string, unknown>>} 只含存在的键
+ */
+SystemConfig.getConfigs = async function(keys) {
+  const list = (Array.isArray(keys) ? keys : [keys]).filter(Boolean)
+  if (!list.length) return {}
+  try {
+    const configs = await this.findAll({
+      where: {
+        config_key: list,
+        is_active: true
+      }
+    })
+
+    const result = {}
+    configs.forEach(config => {
+      let value = config.config_value
+      switch (config.config_type) {
+        case 'json':
+          try {
+            value = JSON.parse(config.config_value)
+          } catch {
+            value = null
+          }
+          break
+        case 'boolean':
+          value = config.config_value === 'true'
+          break
+      }
+      result[config.config_key] = value
+    })
+    return result
+  } catch (error) {
+    logger.error('批量获取系统配置失败', { err: error?.message, stack: error?.stack })
+    return {}
+  }
+}
+
 // 静态方法：设置配置值
 SystemConfig.setConfig = async function(key, value, type = 'text', description = null) {
   try {

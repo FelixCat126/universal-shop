@@ -11,6 +11,7 @@ import { parseId } from '../utils/params.js'
 import { withDeadlockRetry } from '../utils/dbRetry.js'
 import { httpError } from '../utils/httpError.js'
 import { notifyUser } from '../services/notificationService.js'
+import { sendAfterSaleReviewedSms, getBusinessSmsPolicy, SMS_EVENTS } from '../services/smsService.js'
 
 const REQUESTABLE_STATUSES = ['paid', 'shipping', 'shipped', 'delivered', 'completed']
 
@@ -240,6 +241,13 @@ class AfterSaleController {
        */
       await notifyAfterSaleReviewed(result, status)
 
+      /**
+       * 短信通知（第 55 轮）：售后结论**必须**通知用户 ——
+       * 用户提了申请，除了站内信，更需要一条即时短信
+       * （"被驳回了"这种结论，站内信要刷新才看到）。
+       */
+      await notifyAfterSaleReviewedSms(result, status)
+
       return res.json({ success: true, message: '售后状态已更新', data: result })
     } catch (error) {
       // 事务在 withDeadlockRetry 内层已 rollback，这里不能再引用
@@ -252,6 +260,37 @@ class AfterSaleController {
 
 AfterSale.belongsTo(Order, { foreignKey: 'order_id', as: 'order' })
 Order.hasMany(AfterSale, { foreignKey: 'order_id', as: 'afterSales' })
+
+/**
+ * 售后审核结论 → 短信（第 55 轮）
+ *
+ * 失败不影响业务（sendSms 内部吞异常并留痕）。
+ */
+async function notifyAfterSaleReviewedSms (afterSale, status) {
+  try {
+    const { enabled, events } = await getBusinessSmsPolicy()
+    if (!enabled || !events.includes(SMS_EVENTS.AFTER_SALE_REVIEWED)) return
+
+    const order = afterSale?.order_id
+      ? await Order.findByPk(afterSale.order_id, {
+        attributes: ['id', 'order_no', 'contact_phone'],
+        paranoid: false
+      })
+      : null
+    if (!order || !order.contact_phone) return
+
+    await sendAfterSaleReviewedSms({
+      phone: order.contact_phone,
+      orderNo: order.order_no,
+      status,
+      // dedupeKey = 售后单 id：同一订单的两条售后申请是**两件事**，
+      // 冷却不该把第二条挡掉。
+      dedupeKey: String(afterSale?.id || '')
+    })
+  } catch (error) {
+    logger.error('发售后结论短信失败（不影响业务）', { afterSaleId: afterSale?.id, err: error?.message })
+  }
+}
 
 /**
  * 售后审核结论 → 站内通知（第 54 轮）
