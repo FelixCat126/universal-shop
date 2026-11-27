@@ -38,6 +38,22 @@
               <el-option :label="t('products.stockOptions.out')" value="out" />
             </el-select>
           </el-form-item>
+          <!--
+            内容完整度筛选（第 60 轮）：
+            第 54 轮给每行加了「缺泰文名/缺描述」标记，但**只能一行行看**。
+            运营真正的活是"把缺内容的商品补齐" —— 需要能**筛出来**一个个做。
+          -->
+          <el-form-item :label="t('products.contentFilter')">
+            <el-select
+              v-model="searchForm.content"
+              :placeholder="t('products.contentFilterPlaceholder')"
+              clearable
+              style="width: 160px"
+            >
+              <el-option :label="t('products.contentOptions.missingNameTh')" value="missing_name_th" />
+              <el-option :label="t('products.contentOptions.missingDescription')" value="missing_description" />
+            </el-select>
+          </el-form-item>
           <el-form-item :label="t('products.listingFilter')">
             <el-select
               v-model="searchForm.listingStatus"
@@ -580,7 +596,8 @@ export default {
       name: '',
       category_id: '',
       stockStatus: '',
-      listingStatus: ''
+      listingStatus: '',
+      content: ''   // 内容完整度筛选（第 60 轮）
   })
 
     // 产品表单
@@ -1177,7 +1194,8 @@ export default {
           name: searchForm.name,
           category_id: searchForm.category_id || undefined,
           stockStatus: searchForm.stockStatus,
-          listingStatus: searchForm.listingStatus || undefined
+          listingStatus: searchForm.listingStatus || undefined,
+          content: searchForm.content || undefined
         }
 
         const response = await productAPI.getProducts(params)
@@ -1208,7 +1226,7 @@ export default {
 
     // 监听搜索条件变化
     watch(
-      () => [searchForm.name, searchForm.category_id, searchForm.stockStatus, searchForm.listingStatus],
+      () => [searchForm.name, searchForm.category_id, searchForm.stockStatus, searchForm.listingStatus, searchForm.content],
       () => {
         clearTimeout(searchTimeout.value)
         searchTimeout.value = setTimeout(() => {

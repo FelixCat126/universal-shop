@@ -205,7 +205,20 @@
         <el-table-column type="selection" width="46" reserve-selection />
         <el-table-column prop="order_no" :label="t('orders.orderNumber')" width="128" align="center">
           <template #default="scope">
-            <div class="order-no">{{ scope.row.order_no }}</div>
+            <!--
+              订单号**点一下就复制**（第 60 轮）：
+              运营每天都要把订单号粘到快递系统下单，
+              而订单号是 22 位大小写混排 —— 手动框选很容易看错（O/0、l/1）。
+            -->
+            <button
+              type="button"
+              class="order-no copyable"
+              :title="t('orders.copyOrderNo')"
+              @click="copyOrderNo(scope.row.order_no)"
+            >
+              <span class="truncate">{{ scope.row.order_no }}</span>
+              <DocumentCopy class="copy-icon" />
+            </button>
           </template>
         </el-table-column>
 
@@ -405,7 +418,16 @@
                   </el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('orders.trackingNumber')">
-                  <span v-if="selectedOrder.tracking_number">{{ selectedOrder.tracking_number }}</span>
+                  <button
+                    v-if="selectedOrder.tracking_number"
+                    type="button"
+                    class="tracking-copy copyable"
+                    :title="t('orders.copyTrackingNo')"
+                    @click="copyOrderNo(selectedOrder.tracking_number)"
+                  >
+                    <span>{{ selectedOrder.tracking_number }}</span>
+                    <DocumentCopy class="copy-icon" />
+                  </button>
                   <span v-else class="text-gray-400">-</span>
                 </el-descriptions-item>
                 <el-descriptions-item :label="t('orders.shippedAt')">
@@ -575,11 +597,12 @@ import { formatAmount } from '../../shared/money.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
-import { Search, Refresh, Download, TrendCharts, SuccessFilled, Coin, Calendar, Document, User, Location, ShoppingBag, ChatLineRound, ArrowDown } from '@element-plus/icons-vue'
+import { DocumentCopy, Search, Refresh, Download, TrendCharts, SuccessFilled, Coin, Calendar, Document, User, Location, ShoppingBag, ChatLineRound, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useAutoRefresh } from '../composables/useAutoRefresh.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '../stores/admin.js'
+import { copyText } from '../utils/clipboard.js'
 import ExportTaskDialog from '../components/ExportTaskDialog.vue'
 import { updateOrderStatus, bulkUpdateOrderStatus } from '../api/orders.js'
 import config from '../../config/index.js'
@@ -612,6 +635,21 @@ const detailLoading = ref(false)
  * 但没有任何页面调用它，运营在后台无法发货/完成/取消订单。
  */
 const fulfillForm = reactive({ status: '', tracking_number: '', admin_note: '' })
+
+/**
+ * 复制订单号 / 物流单号（第 60 轮）。
+ *
+ * 成功给个「已复制」的提示；失败**也要**给提示 ——
+ * 静默失败会让运营以为复制了，然后拿着空单号去快递系统下单。
+ */
+const copyOrderNo = async (text) => {
+  const ok = await copyText(text)
+  if (ok) {
+    ElMessage.success(t('orders.copied'))
+  } else {
+    ElMessage.warning(t('orders.copyFailed'))
+  }
+}
 const fulfillSaving = ref(false)
 
 /** 订单状态机（与后端 ORDER_STATUS_TRANSITIONS 保持一致） */
@@ -1362,6 +1400,54 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/**
+ * 可复制的字段（第 60 轮）：点一下复制，鼠标悬停给个"能复制"的暗示。
+ *
+ * 做成 <button> 而不是 div：键盘能聚焦（Tab + Enter），
+ * 并且自带 aria 语义 —— 屏幕阅读器会念出"按钮"。
+ */
+.copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.copyable:hover {
+  background-color: #ecf5ff;
+}
+
+.copyable:focus-visible {
+  outline: 2px solid #409EFF;
+  outline-offset: 1px;
+}
+
+.copy-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.copyable:hover .copy-icon,
+.copyable:focus-visible .copy-icon {
+  opacity: 0.75;
+}
+
+.tracking-copy {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+  color: #303133;
 }
 
 .user-info {

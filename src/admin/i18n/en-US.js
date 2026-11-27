@@ -776,6 +776,10 @@ export default {
 
   // Order management
   orders: {
+    copied: 'Copied to clipboard',
+    copyOrderNo: 'Click to copy order number',
+    copyTrackingNo: 'Click to copy tracking number',
+    copyFailed: 'Copy failed, please select and copy manually',
     quickTo: "Mark as",
     quickConfirm: "Mark this order as \"{status}\"?",
     quickTitle: "Change order status",
@@ -915,6 +919,12 @@ export default {
     tip: 'Tip: export the CSV first to get your current data as a template, edit in Excel, then import it back.',
   },
   products: {
+    contentFilter: 'Content completeness',
+    contentFilterPlaceholder: 'All content',
+    contentOptions: {
+      missingNameTh: 'Missing Thai name',
+      missingDescription: 'Missing description'
+    },
     nameTh: 'Thai name',
     nameThHint: 'The name Thai customers see in the Thai interface. Leave empty to use the name above.',
     content: {

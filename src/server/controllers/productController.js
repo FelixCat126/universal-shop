@@ -32,7 +32,8 @@ class ProductController {
         category_id: categoryIdParam = '',
         category: categoryLegacy = '',
         stockStatus = '',
-        listingStatus = ''
+        listingStatus = '',
+        content = ''
       } = req.query
 
       // 公开接口：分页参数统一 clamp，防止负 offset / 超大 limit 打到数据库
@@ -97,6 +98,28 @@ class ProductController {
        */
       if (!isAdmin) {
         where.status = 'active'
+      }
+
+      /**
+       * 内容完整度筛选（第 60 轮，**仅管理端**）：
+       * missing_name_th / missing_description（逗号分隔 → 命中任一即算）。
+       *
+       * 为什么放在**服务端**而不是前端过滤：
+       * 前端过滤只能筛**当前这一页**（20 条）——
+       * 运营要补的是全部那些缺内容的商品，一页一页看是补不完的。
+       */
+      if (isAdmin && content) {
+        const contentClauses = []
+        String(content).split(',').map(c => c.trim()).filter(Boolean).forEach(c => {
+          if (c === 'missing_name_th') {
+            contentClauses.push({ [Op.or]: [{ name_th: null }, { name_th: '' }] })
+          } else if (c === 'missing_description') {
+            contentClauses.push({ [Op.or]: [{ description: null }, { description: '' }] })
+          }
+        })
+        if (contentClauses.length) {
+          where[Op.or] = contentClauses
+        }
       }
 
       if (isAdmin && listingStatus === 'on_shelf') {

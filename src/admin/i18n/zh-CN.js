@@ -775,6 +775,10 @@ export default {
 
   // 订单管理页面
   orders: {
+    copied: '已复制到剪贴板',
+    copyOrderNo: '点击复制订单号',
+    copyTrackingNo: '点击复制物流单号',
+    copyFailed: '复制失败，请手动选中复制',
     quickTo: "标记为",
     quickConfirm: "确认把该订单标记为「{status}」？",
     quickTitle: "改订单状态",
@@ -914,6 +918,12 @@ export default {
     tip: '建议先「导出 CSV」拿到当前数据作为模板，在 Excel 里改完再导回来。',
   },
   products: {
+    contentFilter: '内容完整度',
+    contentFilterPlaceholder: '全部内容',
+    contentOptions: {
+      missingNameTh: '缺泰文名',
+      missingDescription: '缺描述'
+    },
     nameTh: '泰文名',
     nameThHint: '泰国顾客在泰语界面上看到的名字。留空则显示上面的商品名称。',
     content: {

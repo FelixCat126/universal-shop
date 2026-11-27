@@ -776,6 +776,10 @@ export default {
 
   // 订单管理页面
   orders: {
+    copied: 'คัดลอกแล้ว',
+    copyOrderNo: 'คลิกเพื่อคัดลอกหมายเลขคำสั่งซื้อ',
+    copyTrackingNo: 'คลิกเพื่อคัดลอกเลขพัสดุ์',
+    copyFailed: 'คัดลอกไม่สำเร็จ กรุณาเลือกและคัดลอกเอง',
     quickTo: "ตั้งเป็น",
     quickConfirm: "ยืนยันการตั้งสถานะคำสั่งซื้อเป็น \"{status}\"?",
     quickTitle: "เปลี่ยนสถานะคำสั่งซื้อ",
@@ -915,6 +919,12 @@ export default {
     tip: 'แนะนำให้กด「ส่งออก CSV」เพื่อดูข้อมูลปัจจุบันเป็นแม่แบบ แก้ไขใน Excel แล้วนำเข้ากลับมา',
   },
   products: {
+    contentFilter: 'ความครบถ้วนของเนื้อหา',
+    contentFilterPlaceholder: 'ทั้งหมด',
+    contentOptions: {
+      missingNameTh: 'ไม่มีชื่อภาษาไทย',
+      missingDescription: 'ไม่มีคำอธิบาย'
+    },
     nameTh: 'ชื่อภาษาไทย',
     nameThHint: 'ชื่อที่ลูกค้าไทยเห็นในหน้าจอภาษาไทย หากเว้นว่างจะแสดงชื่อด้านบนแทน',
     content: {
