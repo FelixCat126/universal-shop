@@ -24,6 +24,7 @@
 import Product from '../models/Product.js'
 import ProductCategory from '../models/ProductCategory.js'
 import { sanitizeCell } from '../utils/sanitizeCell.js'
+import { Op } from 'sequelize'
 import { parseCsvTable, normalizeCsvHeaders } from '../utils/csvTable.js'
 import { resolveSafeUrl } from '../utils/remoteImageFetcher.js'
 import { downloadAndStoreImage } from './remoteImageService.js'
@@ -411,37 +412,86 @@ export async function importProductCsv (buffer, options = {}) {
 }
 
 /**
- * 导出当前商品为 CSV 文本。
+ * 每批取多少行。
+ *
+ * 用 keyset（id > 游标）而不是 OFFSET：OFFSET 到第 N 页要**扫描并丢弃**前 N 行，
+ * 导出到最后一页时总扫描量是 O(n²/2)；keyset 每批都是"接着上次继续"。
+ */
+const CSV_BATCH_SIZE = 500
+
+/**
+ * 把一行商品转成 CSV 行。
+ */
+function productCsvLine (p) {
+  const raw = p.toJSON()
+  return CSV_COLUMNS.map(col => {
+    switch (col) {
+      case 'id': return String(raw.id ?? '')
+      case 'name': return csvEscape(raw.name)
+      case 'name_th': return csvEscape(raw.name_th)
+      case 'category': return csvEscape(raw.productCategory?.name)
+      case 'price': return raw.price == null ? '' : String(raw.price)
+      case 'stock': return raw.stock == null ? '' : String(raw.stock)
+      case 'points': return raw.points == null ? '' : String(raw.points)
+      case 'description': return csvEscape(raw.description)
+      case 'image': return csvEscape(raw.image)
+      default: return ''
+    }
+  }).join(',')
+}
+
+/**
+ * 导出当前商品为 CSV 文本（一次性拼成整串）。
+ *
  * @returns {Promise<string>} CSV 文本（含 BOM —— Excel 打开中文不乱码）
+ *
+ * ⚠️ 大数据量请用 `streamProductsCsv()`：这个函数会把全部行**一次性装进内存**，
+ *    导出几万件商品时会顶出内存尖峰。它保留是因为测试与少数内部调用要用整串。
  */
 export async function exportProductsCsv () {
-  const products = await Product.findAll({
-    include: [{ model: ProductCategory, as: 'productCategory', attributes: ['id', 'name'], required: false }],
-    order: [['id', 'ASC']]
-  })
-
-  const header = CSV_COLUMNS.join(',')
-  const lines = [header]
-  for (const p of products) {
-    const raw = p.toJSON()
-    lines.push(CSV_COLUMNS.map(col => {
-      switch (col) {
-        case 'id': return String(raw.id ?? '')
-        case 'name': return csvEscape(raw.name)
-        case 'name_th': return csvEscape(raw.name_th)
-        case 'category': return csvEscape(raw.productCategory?.name)
-        case 'price': return raw.price == null ? '' : String(raw.price)
-        case 'stock': return raw.stock == null ? '' : String(raw.stock)
-        case 'points': return raw.points == null ? '' : String(raw.points)
-        case 'description': return csvEscape(raw.description)
-        case 'image': return csvEscape(raw.image)
-        default: return ''
-      }
-    }).join(','))
+  const chunks = []
+  for await (const chunk of streamProductsCsv()) {
+    chunks.push(chunk)
   }
+  return chunks.join('')
+}
 
+/**
+ * 流式导出商品 CSV（第 57 轮）。
+ *
+ * 为什么要流式：之前是"全表 findAll → 拼成一个巨型字符串 → 一次性返回"，
+ * 内存占用与商品数×描述长度成正比，几万件商品就能把 Node 进程顶到几百 MB。
+ * 现在按批取、按批吐，内存占用与**单批**成正比，与总量无关。
+ *
+ * 顺带把 OFFSET 翻页改成 keyset（id > 游标）：
+ * OFFSET 到最后一页要扫描并丢弃前面所有行，总扫描量 O(n²/2)。
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.batchSize]
+ * @param {Function} [opts.shouldStop] 返回 true = 客户端已断开，停止导出
+ */
+export async function * streamProductsCsv ({ batchSize = CSV_BATCH_SIZE, shouldStop } = {}) {
   // BOM：Excel 打开 UTF-8 CSV 不加 BOM 会把中文认成乱码
-  return '﻿' + lines.join('\r\n')
+  yield '﻿' + CSV_COLUMNS.join(',') + '\r\n'
+
+  let cursor = null
+  for (;;) {
+    if (shouldStop && shouldStop()) return
+
+    const products = await Product.findAll({
+      where: cursor ? { id: { [Op.gt]: cursor } } : {},
+      include: [{ model: ProductCategory, as: 'productCategory', attributes: ['id', 'name'], required: false }],
+      order: [['id', 'ASC']],
+      limit: batchSize
+    })
+    if (!products.length) return
+
+    const lines = products.map(productCsvLine)
+    yield lines.join('\r\n') + '\r\n'
+
+    cursor = products[products.length - 1].id
+    if (products.length < batchSize) return
+  }
 }
 
 /**

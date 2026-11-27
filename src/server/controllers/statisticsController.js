@@ -17,9 +17,27 @@ import { revenueStatusSql } from '../constants/revenueStatus.js'
  * 键含查询参数（当前端点无参数，保留扩展位）。
  * 测试环境旁路：测试库 beforeEach 清库，缓存会跨用例泄漏计数。
  */
-const comprehensiveCache = new LRUCache({ max: 50, ttl: 15_000 })
+/**
+ * 综合统计的缓存（第 57 轮）：改用 statsCache 里的统一桶 →
+ * 纳入**写时失效**（之前只受 TTL 约束，改了库存后它还返回旧数字，
+ * 而 overview 已经更新了 → 同一个数字两个端点两个答案）。
+ */
+const comprehensiveCache = {
+  get: (k) => statsCache.getCachedComprehensive(k),
+  set: (k, v) => statsCache.setCachedComprehensive(k, v)
+}
 /** 测试环境默认旁路缓存（测试库每个用例前清库，缓存会跨用例泄漏旧计数） */
-const isTestEnv = process.env.NODE_ENV === 'test' && process.env.STATS_CACHE_ENABLED !== '1'
+/**
+ * 测试环境是否**旁路缓存**（第 57 轮：改成运行时判断）。
+ *
+ * 之前是模块加载时算一次的常量 —— 于是"运行中把 STATS_CACHE_ENABLED 打开"
+ * 对这个控制器**不生效**，缓存行为的护栏根本测不出来
+ * （测缓存就必须能真的把缓存打开）。
+ *
+ * 与 utils/statsCache.js 的口径保持一致（那边本来就是运行时读环境变量）。
+ */
+const isTestEnv = () =>
+  process.env.NODE_ENV === 'test' && process.env.STATS_CACHE_ENABLED !== '1'
 /**
  * 总览统计的短缓存 —— 见 utils/statsCache.js。
  * 写时失效挂在模型层（订单/用户任何写入立刻清），不用在控制器里手写。
@@ -203,7 +221,7 @@ class StatisticsController {
         tz,
         ...Object.keys(req.query || {}).sort().map(k => [k, req.query[k]])
       ])
-      if (!isTestEnv) {
+      if (!isTestEnv()) {
         const cached = comprehensiveCache.get(cacheKey)
         if (cached) {
           return res.json({
@@ -225,7 +243,7 @@ class StatisticsController {
         orderTrend,
         userTrend
       }
-      if (!isTestEnv) comprehensiveCache.set(cacheKey, data)
+      if (!isTestEnv()) comprehensiveCache.set(cacheKey, data)
 
       res.json({
         success: true,
@@ -343,20 +361,25 @@ class StatisticsController {
           ],
           raw: true
         }),
-        // 低库存 + 缺货（一次扫 products）
-        Product.findOne({
-          attributes: [
-            [
-              sequelize.literal('COUNT(*) FILTER (WHERE stock > 0 AND stock <= 10)'),
-              'low'
-            ],
-            [
-              sequelize.literal('COUNT(*) FILTER (WHERE stock = 0)'),
-              'out'
-            ]
-          ],
-          raw: true
-        })
+        /**
+         * 低库存 + 缺货（第 57 轮）：**用 count() 而不是 COUNT(*) FILTER**。
+         *
+         * FILTER 聚合是"扫一遍全表再挑行" —— 商品上万后，
+         * 每 15 秒（缓存 TTL）就要全表扫一次，纯粹白烧。
+         *
+         * 改成两条 count：条件 `stock > 0 AND stock <= 10` / `stock = 0`
+         * 都能**直接命中 idx_product_stock 的索引区间** → 只扫相关行。
+         *
+         * 口径一个都没变（仍是全部商品，不区分 status），数字与之前逐项相等。
+         * 形状保持 { low, out }，调用方不用改。
+         */
+        (async () => {
+          const [low, out] = await Promise.all([
+            Product.count({ where: { stock: { [Op.gt]: 0, [Op.lte]: 10 } } }),
+            Product.count({ where: { stock: 0 } })
+          ])
+          return { low, out }
+        })()
       ])
     ])
 

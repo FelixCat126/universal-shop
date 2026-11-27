@@ -7,7 +7,7 @@ import multer from 'multer'
 import {
   previewProductCsv,
   importProductCsv,
-  exportProductsCsv,
+  streamProductsCsv,
   MAX_CSV_BYTES
 } from '../services/productCsvService.js'
 import { logger } from '../utils/logger.js'
@@ -109,16 +109,30 @@ export default class ProductCsvController {
    */
   static async exportProducts (req, res) {
     try {
-      const csv = await exportProductsCsv()
-      // 文件名用业务时区的日期（原来用 UTC 日期，凌晨导出得到的是'昨天'的文件名）
+      /**
+       * 流式导出（第 57 轮）：一批一批吐，内存占用与总量无关。
+       * 客户端中途断开（res.close）要**停下来** —— 不然会白跑一遍全表查询。
+       */
       const tz = await getBusinessTimezone()
       const filename = `products-${localDateKey(tz, new Date())}.csv`
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-      return res.send(csv)
-    } catch (e) {
-      logger.error('导出商品 CSV 失败', { err: e?.message, stack: e?.stack })
-      return res.status(500).json({ success: false, message: '导出失败' })
+
+      let closed = false
+      res.on('close', () => { closed = true })
+
+      for await (const chunk of streamProductsCsv({ shouldStop: () => closed })) {
+        if (closed) break
+        res.write(chunk)
+      }
+      if (!closed) res.end()
+      return
+    } catch (error) {
+      logger.error('导出商品 CSV 失败', { err: error?.message, stack: error?.stack })
+      if (!res.headersSent) {
+        return res.status(500).json({ success: false, message: '导出失败' })
+      }
+      return res.end()
     }
   }
 

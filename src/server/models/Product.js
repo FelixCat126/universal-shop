@@ -166,6 +166,6 @@ Product.belongsTo(ProductCategory, {
  * 运营刚调完库存就刷新面板，数字必须立刻变，
  * 否则会出现"卡上写着 3 个低库存，商品页里一个都没有"这种对不上的情况。
  */
-registerModelStatsInvalidation(Product)
+registerModelStatsInvalidation(Product, 'product')
 
 export default Product

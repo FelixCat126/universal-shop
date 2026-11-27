@@ -307,8 +307,13 @@ class PartnerPortalController {
       const name = req.query.name != null ? String(req.query.name).trim() : ''
       const categoryIdRaw = req.query.category_id != null ? String(req.query.category_id).trim() : ''
 
+      /**
+       * 字段白名单（第 57 轮）：**去掉 description** ——
+       * 合作方端（Shop/Orders）从头到尾没有用过商品描述，
+       * 而 description 是无长度上限的 TEXT，每页都整列带出去纯浪费。
+       */
       const attributes = [
-        'id', 'name', 'alias', 'description', 'price', 'discount', 'image', 'status', 'stock'
+        'id', 'name', 'alias', 'price', 'discount', 'image', 'status', 'stock'
       ]
 
       const discountPercent = req.partner.discount_percent

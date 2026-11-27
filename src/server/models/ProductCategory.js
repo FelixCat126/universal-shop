@@ -26,7 +26,19 @@ const ProductCategory = sequelize.define('ProductCategory', {
   timestamps: true,
   createdAt: 'created_at',
   updatedAt: 'updated_at',
-  comment: '商品类别表'
+  comment: '商品类别表',
+  /**
+   * 第 57 轮补声明：分类按 sort_order 排序（门户分类 Tab 的顺序），
+   * 之前索引只由迁移 016 建 —— 模型不声明的话，
+   * 用 sequelize.sync 建出来的库（测试库/新库）就没有这个索引，
+   * 与生产库不一致（生产是迁移建的）。
+   */
+  indexes: [
+    {
+      fields: ['sort_order'],
+      name: 'idx_product_category_sort_order'
+    }
+  ]
 })
 
 export default ProductCategory

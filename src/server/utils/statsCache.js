@@ -37,6 +37,17 @@ const orderStatsCache = new LRUCache({ max: 100, ttl: 15_000 })
  *   - 测试可以在运行中打开缓存，专门测缓存行为本身
  *   - 线上出问题时可以用环境变量临时关掉，不用改代码重新构建
  */
+/** 综合统计的缓存读写（第 57 轮） */
+export function getCachedComprehensive (key) {
+  if (!statsCacheEnabled()) return null
+  return comprehensiveCache.get(key) ?? null
+}
+
+export function setCachedComprehensive (key, value) {
+  if (!statsCacheEnabled()) return
+  comprehensiveCache.set(key, value)
+}
+
 export function statsCacheEnabled () {
   if (process.env.STATS_CACHE_ENABLED === '1') return true
   if (process.env.STATS_CACHE_ENABLED === '0') return false
@@ -68,14 +79,34 @@ export function setCachedOrderStats (key, value) {
 }
 
 /**
- * 清空统计缓存 —— 订单/用户发生任何写入时调用。
+ * 综合统计的缓存（第 57 轮挪到这里）。
+ *
+ * 之前它是 statisticsController 里自己 new 的 LRU，**只受 TTL 约束** ——
+ * 改了库存后 `/statistics/comprehensive` 仍返回旧的低库存数字，
+ * 而 `/statistics/overview` 已经更新了 → **同一个数字，两个端点两个答案**。
+ * 现在统一由写时失效覆盖。
+ */
+const comprehensiveCache = new LRUCache({ max: 50, ttl: 15_000 })
+
+/**
+ * 清空统计缓存。
+ *
+ * @param {string} [scope] 'all'（默认）/ 'product' / 'order'
  *
  * 直接清空（而不是逐键删）：订单筛选组合很多，逐键删要维护键的集合，
  * 漏一个键就会读到旧统计；全清的成本只是"下一次读重新算一次"，可接受。
+ *
+ * scope 的含义是"这次写入影响哪类口径"：
+ *   - 商品写入：只影响库存口径 → 清总览（含库存数）与商品桶，
+ *     **不清订单筛选统计**（改商品不会改营收）
+ *   - 订单/用户写入：清总览与订单桶
  */
-export function invalidateStatsCaches () {
+export function invalidateStatsCaches (scope = 'all') {
+  // 总览里含低库存/缺货数 → 任何写入都要清
   overviewCache.clear()
-  orderStatsCache.clear()
+  // 综合统计同理（含库存口径）
+  comprehensiveCache.clear()
+  if (scope === 'all' || scope === 'order') orderStatsCache.clear()
 }
 
 /**
@@ -94,9 +125,9 @@ export function invalidateStatsCaches () {
  *   instance.destroy→ afterDestroy
  *   Model.destroy   → afterBulkDestroy
  */
-export function registerModelStatsInvalidation (model) {
+export function registerModelStatsInvalidation (model, scope = 'all') {
   if (!model) return
-  const invalidate = () => invalidateStatsCaches()
+  const invalidate = () => invalidateStatsCaches(scope)
   for (const hook of [
     'afterCreate',
     'afterUpdate',

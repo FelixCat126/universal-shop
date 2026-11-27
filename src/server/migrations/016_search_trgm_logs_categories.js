@@ -34,6 +34,30 @@ export default {
       console.warn('⚠️  pg_trgm 扩展不可用，跳过日志/分类搜索索引（搜索将走全表扫描）')
       return 'skipped'
     }
+    /**
+     * 第 57 轮：**这些单列 btree 索引与 pg_trgm 无关**（清理任务按时间列扫、
+     * 分类按 sort_order 排），所以必须放在 trgm 检查**之前** ——
+     * 之前它们在 trgm 的 skip 分支之后，pg_trgm 不可用时会被一起丢掉，
+     * 分类排序就退化成全表扫。
+     */
+    // 清理任务按时间列扫描 → 补单列索引（复合索引的前缀用不上）
+    const btreeTargets = [
+      ['idx_point_transaction_created_at', 'point_transactions', 'created_at'],
+      ['idx_user_coupon_updated_at', 'user_coupons', 'updated_at'],
+      ['idx_user_coupon_expire_at', 'user_coupons', 'expire_at'],
+      ['idx_cart_updated_at', 'carts', 'updated_at'],
+      ['idx_product_category_sort_order', 'product_categories', 'sort_order'],
+      ['idx_user_point_balance_balance', 'user_point_balances', 'balance']
+    ]
+
+    for (const [indexName, table, column] of btreeTargets) {
+      await sequelize.query(
+        `CREATE INDEX IF NOT EXISTS ${indexName} ON ${table} (${column})`
+      ).catch((e) => {
+        console.warn(`⚠️  ${indexName} 创建失败：${e.message}`)
+      })
+    }
+
     const opclass = `"${schema}".gin_trgm_ops`
 
     // 前导通配符 LIKE（%kw%）→ 需要 trigram，普通 btree 用不上
@@ -59,24 +83,6 @@ export default {
            ON ${table} USING gin (${column} ${opclass})`
         )
       }
-    }
-
-    // 清理任务按时间列扫描 → 补单列索引（复合索引的前缀用不上）
-    const btreeTargets = [
-      ['idx_point_transaction_created_at', 'point_transactions', 'created_at'],
-      ['idx_user_coupon_updated_at', 'user_coupons', 'updated_at'],
-      ['idx_user_coupon_expire_at', 'user_coupons', 'expire_at'],
-      ['idx_cart_updated_at', 'carts', 'updated_at'],
-      ['idx_product_category_sort_order', 'product_categories', 'sort_order'],
-      ['idx_user_point_balance_balance', 'user_point_balances', 'balance']
-    ]
-
-    for (const [indexName, table, column] of btreeTargets) {
-      await sequelize.query(
-        `CREATE INDEX IF NOT EXISTS ${indexName} ON ${table} (${column})`
-      ).catch((e) => {
-        console.warn(`⚠️  ${indexName} 创建失败：${e.message}`)
-      })
     }
 
     for (const table of ['audit_logs', 'operation_logs', 'product_categories', 'users', 'point_transactions', 'user_coupons', 'carts', 'user_point_balances']) {
