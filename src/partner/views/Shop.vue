@@ -202,7 +202,7 @@
                     :min="moqU(line)"
                     :step="moqM(line)"
                     inputmode="numeric"
-                    class="w-full xs:w-28 rounded-lg border-gray-300 text-sm py-2 px-2 focus:border-primary-500 focus:ring-primary-500 touch-manipulation"
+                    class="w-full xs:w-28 rounded-lg border-gray-300 text-sm py-2.5 px-2 focus:border-primary-500 focus:ring-primary-500 touch-manipulation"
                     @change="chgQtyCommit(line)"
                   />
                   <button type="button" class="text-sm text-red-600 font-medium touch-manipulation px-2 min-h-[44px]" @click="partnerStore.removeFromCart(line.product_id)">

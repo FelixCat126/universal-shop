@@ -1,5 +1,6 @@
 <template>
   <div
+    data-testid="toast"
     :class="[
       'w-full sm:min-w-[20rem] max-w-md p-3 sm:p-4 rounded-lg shadow-strong border-l-4 backdrop-blur-sm',
       'transform transition-all duration-300 ease-in-out',
