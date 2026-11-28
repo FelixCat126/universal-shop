@@ -271,6 +271,52 @@ class ProductController {
     return data
   }
 
+  /**
+   * 内容完整度汇总（第 62 轮，**仅管理端**）。
+   *
+   * ## 为什么要有它
+   *
+   * 第 54 轮给每行加了「缺泰文名 / 缺描述」两个灰标签。生产上
+   * **18 个商品全部缺泰文名、16 个缺描述** → 每一行都挂着标签，
+   * 标签从"提示"变成了**噪音**，真正想找的那一行反而看不见了。
+   *
+   * 改成"**顶部一行汇总 + 点标签直接筛**"：
+   *   - 运营第一眼看到的是"还差多少"（而不是每行重复的标签）
+   *   - 想补就直接点那个数字 → 列表只剩要补的
+   *
+   * ## 为什么单独一个接口
+   *
+   * 汇总是**全量**口径（不受当前分页/筛选影响），列表接口只给当前页。
+   * 放进列表响应会让**每次翻页都多两次 COUNT**；
+   * 单独一个接口可以自己缓存（商品写操作会 clearResponseCache）。
+   */
+  static async getContentSummary (req, res) {
+    try {
+      // paranoid 默认 true → 软删商品本来就��计入 ✓（不用再手写 deleted_at 条件）
+      const [total, missingNameTh, missingDescription] = await Promise.all([
+        Product.count(),
+        Product.count({ where: { [Op.or]: [{ name_th: null }, { name_th: '' }] } }),
+        Product.count({ where: { [Op.or]: [{ description: null }, { description: '' }] } })
+      ])
+
+      res.json({
+        success: true,
+        data: {
+          total,
+          missingNameTh,
+          missingDescription
+        }
+      })
+    } catch (error) {
+      logger.error('获取内容完整度汇总失败', { err: error?.message, stack: error?.stack })
+      res.status(500).json({
+        success: false,
+        message: '获取内容完整度汇总失败',
+        code: 'INTERNAL_ERROR'
+      })
+    }
+  }
+
   // 获取单个产品
   static async getProduct(req, res) {
     try {

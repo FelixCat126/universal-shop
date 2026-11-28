@@ -924,6 +924,7 @@ export default {
     tip: 'Tip: export the CSV first to get your current data as a template, edit in Excel, then import it back.',
   },
   products: {
+    contentSummaryTotal: '{count} products in total',
     contentFilter: 'Content completeness',
     contentFilterPlaceholder: 'All content',
     contentOptions: {

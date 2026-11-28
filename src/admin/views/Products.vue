@@ -39,21 +39,10 @@
             </el-select>
           </el-form-item>
           <!--
-            内容完整度筛选（第 60 轮）：
-            第 54 轮给每行加了「缺泰文名/缺描述」标记，但**只能一行行看**。
-            运营真正的活是"把缺内容的商品补齐" —— 需要能**筛出来**一个个做。
+            内容完整度筛选（第 60 轮加的下拉）：第 62 轮被**表格上方的汇总条**取代 ——
+            同一个筛选给两个入口会让人怀疑"这两个是不是不一样的东西"。
+            汇总条既显示数量又能点，功能是它的超集。
           -->
-          <el-form-item :label="t('products.contentFilter')">
-            <el-select
-              v-model="searchForm.content"
-              :placeholder="t('products.contentFilterPlaceholder')"
-              clearable
-              style="width: 160px"
-            >
-              <el-option :label="t('products.contentOptions.missingNameTh')" value="missing_name_th" />
-              <el-option :label="t('products.contentOptions.missingDescription')" value="missing_description" />
-            </el-select>
-          </el-form-item>
           <el-form-item :label="t('products.listingFilter')">
             <el-select
               v-model="searchForm.listingStatus"
@@ -78,6 +67,39 @@
           </el-form-item>
         </el-form>
       </el-card>
+    </div>
+
+    <!--
+      内容完整度汇总（第 62 轮）：
+
+      「缺什么」从**每行两个标签**挪到这里 —— 因为生产上几乎每行都缺，
+      逐行重复就成了噪音。运营第一眼看到的是"还差多少"，
+      点一下那个数字就把列表筛成只剩要补的。
+    -->
+    <div v-if="contentSummary" class="content-summary-bar">
+      <span class="content-summary-bar__total">
+        {{ t('products.contentSummaryTotal', { count: contentSummary.total }) }}
+      </span>
+      <button
+        type="button"
+        class="content-chip"
+        :class="{ 'is-active': searchForm.content === 'missing_name_th' }"
+        :title="t('products.contentOptions.missingNameTh')"
+        @click="toggleContentFilter('missing_name_th')"
+      >
+        <span class="content-chip__label">{{ t('products.contentOptions.missingNameTh') }}</span>
+        <span class="content-chip__count">{{ contentSummary.missingNameTh }}</span>
+      </button>
+      <button
+        type="button"
+        class="content-chip"
+        :class="{ 'is-active': searchForm.content === 'missing_description' }"
+        :title="t('products.contentOptions.missingDescription')"
+        @click="toggleContentFilter('missing_description')"
+      >
+        <span class="content-chip__label">{{ t('products.contentOptions.missingDescription') }}</span>
+        <span class="content-chip__count">{{ contentSummary.missingDescription }}</span>
+      </button>
     </div>
 
     <div class="admin-module-toolbar">
@@ -182,26 +204,14 @@
             <div class="product-name-container">
               <div class="product-name" :title="scope.row.name">{{ scope.row.name }}</div>
               <!--
-                内容完整度标记（第 54 轮）
+                第 54 轮在这里给每行挂「缺泰文名 / 缺描述」两个灰标签，
+                第 62 轮**移到了表格上方的汇总条**（见 content-summary-bar）：
 
-                生产上 **18 个商品全部没有泰文名、16 个没有描述** ——
-                泰国用户在泰语界面看到的是中文/英文商品名，商品页也没有任何卖点。
-                运营此前**没有任何入口**知道哪些商品缺内容（只有 CSV 导入能填 name_th，
-                管理端表单连这个字段都没有）。
-
-                这里把"缺什么"直接标在列表上 → 运营一眼看到要补哪些。
+                生产上 18 个商品**全部**缺泰文名、16 个缺描述 →
+                每行都挂标签，标签就从"提示"变成了**噪音**，
+                真正要找的那一行反而被淹没了。
+                现在：第一眼看到"还差多少"，想补就点那个数字直接筛。
               -->
-              <div v-if="missingContent(scope.row).length" class="mt-1 flex flex-wrap gap-1">
-                <el-tag
-                  v-for="m in missingContent(scope.row)"
-                  :key="m"
-                  size="small"
-                  type="info"
-                  class="!h-5 !text-[10px] !leading-4 !px-1.5"
-                >
-                  {{ t(`products.content.${m}`) }}
-                </el-tag>
-              </div>
             </div>
           </template>
         </el-table-column>
@@ -602,6 +612,38 @@ export default {
 
 
     // 搜索表单
+    /**
+     * 内容完整度汇总（第 62 轮）。
+     *
+     * 全量口径（不受分页/筛选影响）→ 单独一个接口，不混进列表响应
+     * （列表每翻一页都多两次 COUNT 不划算）。
+     */
+    const contentSummary = ref(null)
+
+    const loadContentSummary = async () => {
+      try {
+        const res = await productAPI.getContentSummary()
+        if (res?.data?.success) {
+          contentSummary.value = res.data.data
+        }
+      } catch (error) {
+        // 汇总条挂了就挂了，不影响列表本身
+        console.error('加载内容完整度汇总失败:', error)
+      }
+    }
+
+    /**
+     * 点汇总条上的数字 → 切到那个筛选（再点一次取消）。
+     *
+     * 用 searchForm 走**持久化筛选**：运营离开再回来，筛选还在
+     * （usePersistentFilters 负责存取）。
+     */
+    const toggleContentFilter = (value) => {
+      searchForm.content = searchForm.content === value ? '' : value
+      currentPage.value = 1
+      loadProducts()
+    }
+
     const searchForm = usePersistentFilters('products', {
 
       name: '',
@@ -682,21 +724,6 @@ export default {
       const c = row.category
       if (c && typeof c === 'object' && c.name) return c.name
       return '-'
-    }
-
-    /**
-     * 这个商品缺哪些内容（第 54 轮）。
-     *
-     * 缺泰文名 → 泰国顾客看到的是中文/英文名；
-     * 缺描述 → 商品详情页没有任何卖点（对 SEO 也同样不利）。
-     *
-     * @returns {string[]} 缺失项的 i18n key 片段（空数组 = 完整）
-     */
-    const missingContent = (row) => {
-      const out = []
-      if (!row?.name_th) out.push('missingNameTh')
-      if (!row?.description) out.push('missingDescription')
-      return out
     }
 
     // 计算折扣价格
@@ -1267,6 +1294,8 @@ export default {
       }
       await loadCategoryOptions()
       await loadProducts()
+      // 内容完整度汇总（第 62 轮）：与列表并行拉，不阻塞首屏表格
+      loadContentSummary()
     })
 
     return {
@@ -1289,10 +1318,11 @@ export default {
       productRules,
       categoryOptions,
       filteredProducts,
+      contentSummary,        // 内容完整度汇总（第 62 轮）
       
       // 方法
       getCategoryLabel,
-      missingContent,   // 内容完整度标记（第 54 轮）
+      toggleContentFilter,   // 点汇总条上的数字 → 切筛选（第 62 轮）
       getDiscountPrice,
       formatDate,
       isDelisted,
@@ -1457,6 +1487,63 @@ export default {
 .error-text {
   font-size: 10px;
   margin-top: 2px;
+}
+
+/**
+ * 内容完整度汇总条（第 62 轮）。
+ *
+ * 为什么从"每行两个标签"挪到这里：生产上几乎每行都缺 → 逐行重复就成了噪音。
+ * 现在第一眼看到"还差多少"，点那个数字就把列表筛成只剩要补的。
+ */
+.content-summary-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+}
+
+.content-summary-bar__total {
+  font-size: 13px;
+  color: #606266;
+}
+
+.content-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #606266;
+  background: #f4f4f5;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.content-chip:hover {
+  color: #409eff;
+  border-color: #c6e2ff;
+}
+
+.content-chip.is-active {
+  color: #fff;
+  background: #409eff;
+}
+
+.content-chip__count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.content-chip.is-active .content-chip__count {
+  color: #fff;
 }
 
 .product-name-container {

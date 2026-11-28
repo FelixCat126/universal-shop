@@ -63,6 +63,15 @@ export const productAPI = {
     return api.get('/products', { params })
   },
 
+  /**
+   * 内容完整度汇总（第 62 轮）。
+   *
+   * 全量口径（不受分页/筛选影响）：总数 / 缺泰文名数 / 缺描述数。
+   */
+  getContentSummary () {
+    return api.get('/products/content-summary')
+  },
+
   // 获取单个产品
   getProduct(id) {
     return api.get(`/products/${id}`)

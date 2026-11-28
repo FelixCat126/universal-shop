@@ -17164,6 +17164,62 @@
         "x-generated-from": "express-route-table"
       }
     },
+    "/api/products/content-summary": {
+      "get": {
+        "summary": "GET /api/products/content-summary",
+        "tags": [
+          "商品"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或凭证失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-schema": "unknown",
+        "x-generated-from": "express-route-table"
+      }
+    },
     "/api/products/export.csv": {
       "get": {
         "summary": "GET /api/products/export.csv",

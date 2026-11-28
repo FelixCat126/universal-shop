@@ -923,6 +923,7 @@ export default {
     tip: '建议先「导出 CSV」拿到当前数据作为模板，在 Excel 里改完再导回来。',
   },
   products: {
+    contentSummaryTotal: '共 {count} 个商品',
     contentFilter: '内容完整度',
     contentFilterPlaceholder: '全部内容',
     contentOptions: {

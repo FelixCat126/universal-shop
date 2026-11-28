@@ -32,6 +32,18 @@ router.get(
   optionalAuthenticateAdmin,
   ProductController.getProducts
 )
+/**
+ * 内容完整度汇总（第 62 轮，**仅管理端**）。
+ *
+ * ⚠️ 必须排在 `/:id` **之前** —— 否则会被当成 id=content-summary 的商品详情。
+ */
+router.get(
+  '/content-summary',
+  authenticateAdmin,
+  requirePermission('products'),
+  cacheGet({ ttlMs: 20_000 }),
+  ProductController.getContentSummary
+)
 // check-stock：公开批量查询，枚举限流 + joi 校验（productIds 1-200 个正整数），防枚举风暴
 router.post('/check-stock', enumerationLimiter, validate({ body: checkStockSchema }), ProductController.checkStock)
 

@@ -924,6 +924,7 @@ export default {
     tip: 'แนะนำให้กด「ส่งออก CSV」เพื่อดูข้อมูลปัจจุบันเป็นแม่แบบ แก้ไขใน Excel แล้วนำเข้ากลับมา',
   },
   products: {
+    contentSummaryTotal: 'ทั้งหมด {count} รายการ',
     contentFilter: 'ความครบถ้วนของเนื้อหา',
     contentFilterPlaceholder: 'ทั้งหมด',
     contentOptions: {
