@@ -123,9 +123,11 @@ export const productAPI = {
   /**
    * 导出当前商品为 CSV。
    * 用 blob 下载（不是普通 axios 的 json）—— 服务端返回的是文件不是 JSON。
+   *
+   * @param {object} [params] 当前筛选条件（第 63 轮：导出与列表同一口径）
    */
-  exportCsv() {
-    return api.get('/products/export.csv', { responseType: 'blob' })
+  exportCsv(params = {}) {
+    return api.get('/products/export.csv', { params, responseType: 'blob' })
   }
 }
 

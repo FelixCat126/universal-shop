@@ -1146,14 +1146,25 @@ export default {
     }
 
     /**
-     * 导出 CSV。
+     * 导出 CSV（**按当前筛选条件**，第 63 轮）。
      *
      * 用 blob 下载（服务端返回的是文件不是 JSON）——
      * 导出后可以在 Excel 里改，再从「导入 CSV」导回来（带 id 的行 = 更新）。
+     *
+     * 为什么要带筛选：之前导出**永远给全部商品**，
+     * 于是"点汇总条上的「缺泰文名 17」→ 导出待补清单 → 在 Excel 里补 → 导回"
+     * 这条闭环走不通（导出的是全部，运营得自己删行）。
+     * 现在导出与列表**同一套口径**。
      */
     const exportCsv = async () => {
       try {
-        const res = await productAPI.exportCsv()
+        const res = await productAPI.exportCsv({
+          name: searchForm.name || undefined,
+          category_id: searchForm.category_id || undefined,
+          stockStatus: searchForm.stockStatus || undefined,
+          listingStatus: searchForm.listingStatus || undefined,
+          content: searchForm.content || undefined
+        })
         const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')

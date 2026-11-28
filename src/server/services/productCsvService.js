@@ -448,9 +448,9 @@ function productCsvLine (p) {
  * ⚠️ 大数据量请用 `streamProductsCsv()`：这个函数会把全部行**一次性装进内存**，
  *    导出几万件商品时会顶出内存尖峰。它保留是因为测试与少数内部调用要用整串。
  */
-export async function exportProductsCsv () {
+export async function exportProductsCsv ({ where = {}, paranoid = true } = {}) {
   const chunks = []
-  for await (const chunk of streamProductsCsv()) {
+  for await (const chunk of streamProductsCsv({ where, paranoid })) {
     chunks.push(chunk)
   }
   return chunks.join('')
@@ -469,8 +469,9 @@ export async function exportProductsCsv () {
  * @param {object} [opts]
  * @param {number} [opts.batchSize]
  * @param {Function} [opts.shouldStop] 返回 true = 客户端已断开，停止导出
+ * @param {object} [opts.where] 导出范围（与列表同一套筛选条件，第 63 轮）
  */
-export async function * streamProductsCsv ({ batchSize = CSV_BATCH_SIZE, shouldStop } = {}) {
+export async function * streamProductsCsv ({ batchSize = CSV_BATCH_SIZE, shouldStop, where = {}, paranoid = true } = {}) {
   // BOM：Excel 打开 UTF-8 CSV 不加 BOM 会把中文认成乱码
   yield '﻿' + CSV_COLUMNS.join(',') + '\r\n'
 
@@ -479,10 +480,15 @@ export async function * streamProductsCsv ({ batchSize = CSV_BATCH_SIZE, shouldS
     if (shouldStop && shouldStop()) return
 
     const products = await Product.findAll({
-      where: cursor ? { id: { [Op.gt]: cursor } } : {},
+      // where = 列表筛选（与列表接口同一口径）+ keyset 游标
+      where: {
+        ...where,
+        ...(cursor ? { id: { [Op.gt]: cursor } } : {})
+      },
       include: [{ model: ProductCategory, as: 'productCategory', attributes: ['id', 'name'], required: false }],
       order: [['id', 'ASC']],
-      limit: batchSize
+      limit: batchSize,
+      paranoid
     })
     if (!products.length) return
 

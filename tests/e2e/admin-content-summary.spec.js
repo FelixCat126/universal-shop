@@ -31,9 +31,29 @@ async function loginAdmin (page) {
   }, token)
 }
 
+
+/**
+ * 清理自己造的数据。
+ *
+ * 为什么必须清理：这些用例**造了商品**，而所有 e2e 用例共用同一个库与同一个首页。
+ * 首页按 created_at 倒序、每页 8 条 —— 多造几个商品就会把基线商品**挤出第一屏**，
+ * `storefrontFirstPaint` 的 SF-1（"首页应保留第一个分类的商品"）就会挂。
+ *
+ * 所以：造完必须删（软删即可 —— 软删的商品不在公开列表里，首页第一屏就复原了）。
+ */
+async function cleanupProducts (request, ids, token) {
+  for (const id of ids) {
+    // 必须带管理员 token —— 匿名删商品是 401，删不掉就等于没清理
+    await request.delete(`/api/products/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).catch(() => {})
+  }
+}
+
 test.describe('内容完整度汇总条', () => {
-  test('CS-A/CS-B/CS-C 汇总条显示数量、点数字直接筛、每行不再挂标签', async ({ page }) => {
+  test('CS-A/CS-B/CS-C 汇总条显示数量、点数字直接筛、每行不再挂标签', async ({ page, request }) => {
     await loginAdmin(page)
+    const createdIds = []
 
     // 先造一个**缺泰文名**的商品（name_th 不给 → null）
     const cats = await page.request.get('/api/product-categories')
@@ -53,8 +73,11 @@ test.describe('内容完整度汇总条', () => {
       }
     })
     expect(created.status(), `造商品失败：${created.status()}`).toBe(201)
-    const productName = (await created.json()).data.name
+    const createdBody = await created.json()
+    createdIds.push(createdBody.data.id)
+    const productName = createdBody.data.name
 
+    try {
     await page.goto('/admin/products')
     const bar = page.locator('.content-summary-bar')
     await expect(bar, '表格上方应有内容完整度汇总条').toBeVisible({ timeout: 20_000 })
@@ -84,5 +107,8 @@ test.describe('内容完整度汇总条', () => {
     await chip.click()
     await page.waitForTimeout(1500)
     await expect(chip).not.toHaveClass(/is-active/)
+    } finally {
+      await cleanupProducts(request, createdIds, adminToken)
+    }
   })
 })

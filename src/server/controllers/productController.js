@@ -23,110 +23,138 @@ const PRODUCT_STATUS_VALUES = ['active', 'inactive']
 
 const MAX_PRODUCT_POINTS = 400000
 
+/**
+ * 商品列表的**筛选条件**（第 63 轮抽成共用函数）。
+ *
+ * ## 为什么抽出来
+ *
+ * 列表接口和 **CSV 导出**必须用**同一套口径**：
+ * 运营在列表里筛出「缺泰文名的 17 个」，点导出拿到的也应该是那 17 个 ——
+ * 否则"导出待补清单 → 在 Excel 里补 → 导回来"这条闭环根本走不通
+ * （导出给的是全部商品，运营得自己删行）。
+ *
+ * 之前两边各写各的：导出**完全不看筛选**，永远导出全部商品。
+ * 这种"两处口径各写各的"必然漂移 —— 抽成一处，漂移就没了。
+ *
+ * @param {object} query  请求 query（name / category_id / category / stockStatus / listingStatus / content）
+ * @param {object} opts   { isAdmin }
+ * @returns {object} Sequelize where
+ */
+export function buildProductListWhere (query = {}, { isAdmin = false } = {}) {
+  const {
+    name = '',
+    category_id: categoryIdParam = '',
+    category: categoryLegacy = '',
+    stockStatus = '',
+    listingStatus = '',
+    content = ''
+  } = query || {}
+
+  const where = {}
+
+  const categoryKey = categoryIdParam !== '' && categoryIdParam != null
+    ? categoryIdParam
+    : categoryLegacy
+  if (categoryKey !== '' && categoryKey != null) {
+    const cid = parseInt(String(categoryKey), 10)
+    if (!Number.isNaN(cid)) {
+      where.category_id = cid
+    }
+  }
+
+  /**
+   * 名称搜索：中文名 / 泰文名 / **别名**。
+   *
+   * 别名之前不参与搜索 —— 但运营是可以给商品填别名的（管理端有"产品别名"字段），
+   * 填了别名客户却搜不到，等于白填（别名最常见的用途就是记客户口头叫法、
+   * 拼音、其它语言的叫法）。
+   */
+  if (name) {
+    const like = { [Op.like]: likeContains(name) }
+    where[Op.or] = [
+      { name: like },
+      { name_th: like },
+      { alias: like }
+    ]
+  }
+
+  // 库存状态筛选
+  if (stockStatus) {
+    switch (stockStatus) {
+      case 'normal':
+        where.stock = { [Op.gt]: 10 }
+        break
+      case 'low':
+        where.stock = { [Op.and]: [{ [Op.gt]: 0 }, { [Op.lte]: 10 }] }
+        break
+      case 'out':
+        where.stock = 0
+        break
+    }
+  }
+
+  /**
+   * 第 43 轮：**公开接口只给可售商品**（status = 'active'）。
+   *
+   * 之前公开列表/搜索完全不看 status → 运营下架（inactive）的商品
+   * 照样出现在商城首页和搜索结果里，用户点进去能看到、能加购，
+   * 到下单才被拦（400「商品已下架」）——
+   * 三个接口对"什么算可售"口径不一致，于是出现"能看见却买不了"。
+   *
+   * 管理端**不受影响**：运营必须看得到下架商品才能检查/恢复它。
+   */
+  if (!isAdmin) {
+    where.status = 'active'
+  }
+
+  /**
+   * 内容完整度筛选（第 60 轮，**仅管理端**）：
+   * missing_name_th / missing_description（逗号分隔 → 命中任一即算）。
+   *
+   * 为什么放在**服务端**而不是前端过滤：
+   * 前端过滤只能筛**当前这一页**（20 条）——
+   * 运营要补的是全部那些缺内容的商品，一页一页看是补不完的。
+   */
+  if (isAdmin && content) {
+    const contentClauses = []
+    String(content).split(',').map(c => c.trim()).filter(Boolean).forEach(c => {
+      if (c === 'missing_name_th') {
+        contentClauses.push({ [Op.or]: [{ name_th: null }, { name_th: '' }] })
+      } else if (c === 'missing_description') {
+        contentClauses.push({ [Op.or]: [{ description: null }, { description: '' }] })
+      }
+    })
+    if (contentClauses.length) {
+      where[Op.or] = contentClauses
+    }
+  }
+
+  // 管理端的"上架中 / 已下架"筛选
+  if (isAdmin && listingStatus === 'on_shelf') {
+    where.deleted_at = { [Op.is]: null }
+  } else if (isAdmin && listingStatus === 'delisted') {
+    where.deleted_at = { [Op.ne]: null }
+  }
+
+  return where
+}
+
 class ProductController {
   // 获取所有产品（分页和搜索）
   static async getProducts(req, res) {
     try {
-      const {
-        name = '',
-        category_id: categoryIdParam = '',
-        category: categoryLegacy = '',
-        stockStatus = '',
-        listingStatus = '',
-        content = ''
-      } = req.query
-
       // 公开接口：分页参数统一 clamp，防止负 offset / 超大 limit 打到数据库
       const { page, pageSize, limit, offset } = resolvePagination(req.query, { maxPageSize: 100 })
-
-      // 构建查询条件
-      const where = {}
-
-      const categoryKey = categoryIdParam !== '' && categoryIdParam != null
-        ? categoryIdParam
-        : categoryLegacy
-      if (categoryKey !== '' && categoryKey != null) {
-        const cid = parseInt(String(categoryKey), 10)
-        if (!Number.isNaN(cid)) {
-          where.category_id = cid
-        }
-      }
-
-      /**
-       * 名称搜索：中文名 / 泰文名 / **别名**。
-       *
-       * 别名之前不参与搜索 —— 但运营是可以给商品填别名的（管理端有"产品别名"字段），
-       * 填了别名客户却搜不到，等于白填（别名最常见的用途就是记客户口头叫法、
-       * 拼音、其它语言的叫法）。
-       */
-      if (name) {
-        const like = { [Op.like]: likeContains(name) }
-        where[Op.or] = [
-          { name: like },
-          { name_th: like },
-          { alias: like }
-        ]
-      }
-
-      // 库存状态筛选
-      if (stockStatus) {
-        switch (stockStatus) {
-          case 'normal':
-            where.stock = { [Op.gt]: 10 }
-            break
-          case 'low':
-            where.stock = { [Op.and]: [{ [Op.gt]: 0 }, { [Op.lte]: 10 }] }
-            break
-          case 'out':
-            where.stock = 0
-            break
-        }
-      }
 
       const isAdmin = !!req.admin
       const paranoid = !isAdmin
 
       /**
-       * 第 43 轮：**公开接口只给可售商品**（status = 'active'）。
-       *
-       * 之前公开列表/搜索完全不看 status → 运营下架（inactive）的商品
-       * 照样出现在商城首页和搜索结果里，用户点进去能看到、能加购，
-       * 到下单才被拦（400「商品已下架」）——
-       * 三个接口对"什么算可售"口径不一致，于是出现"能看见却买不了"。
-       *
-       * 管理端**不受影响**：运营必须看得到下架商品才能检查/恢复它。
+       * 筛选条件走**共用函数**（第 63 轮）：
+       * 列表与 CSV 导出必须是同一套口径，否则"筛出待补清单 → 导出 → 补完导回"
+       * 这条闭环走不通（导出给的是全部商品，运营得自己删行）。
        */
-      if (!isAdmin) {
-        where.status = 'active'
-      }
-
-      /**
-       * 内容完整度筛选（第 60 轮，**仅管理端**）：
-       * missing_name_th / missing_description（逗号分隔 → 命中任一即算）。
-       *
-       * 为什么放在**服务端**而不是前端过滤：
-       * 前端过滤只能筛**当前这一页**（20 条）——
-       * 运营要补的是全部那些缺内容的商品，一页一页看是补不完的。
-       */
-      if (isAdmin && content) {
-        const contentClauses = []
-        String(content).split(',').map(c => c.trim()).filter(Boolean).forEach(c => {
-          if (c === 'missing_name_th') {
-            contentClauses.push({ [Op.or]: [{ name_th: null }, { name_th: '' }] })
-          } else if (c === 'missing_description') {
-            contentClauses.push({ [Op.or]: [{ description: null }, { description: '' }] })
-          }
-        })
-        if (contentClauses.length) {
-          where[Op.or] = contentClauses
-        }
-      }
-
-      if (isAdmin && listingStatus === 'on_shelf') {
-        where.deleted_at = { [Op.is]: null }
-      } else if (isAdmin && listingStatus === 'delisted') {
-        where.deleted_at = { [Op.ne]: null }
-      }
+      const where = buildProductListWhere(req.query, { isAdmin })
 
       /**
        * 排序（第 56 轮）：**必须带 id 兜底**。

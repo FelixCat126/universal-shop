@@ -11,6 +11,7 @@ import {
   MAX_CSV_BYTES
 } from '../services/productCsvService.js'
 import { logger } from '../utils/logger.js'
+import { buildProductListWhere } from './productController.js'
 import { ApiError } from '../middlewares/errorHandler.js'
 import { clearResponseCache } from '../utils/responseCache.js'
 import { getBusinessTimezone, localDateKey } from '../utils/businessTimezone.js'
@@ -118,10 +119,25 @@ export default class ProductCsvController {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
 
+      /**
+       * 导出**按当前筛选条件**（第 63 轮）。
+       *
+       * 之前导出**完全不看筛选**，永远给全部商品 —— 于是：
+       *   运营筛出「缺泰文名的 17 个」→ 点导出 → 拿到 18 条全部商品
+       *   → 他得自己删行才能当"待补清单"用。
+       *
+       * 现在与列表**同一套口径**（buildProductListWhere）：
+       * "筛出待补 → 导出 → 在 Excel 里补 name_th/描述 → 从导入 CSV 导回（带 id = 更新）"
+       * 这条闭环这才走得通。
+       */
+      const where = buildProductListWhere(req.query, { isAdmin: true })
+
       let closed = false
       res.on('close', () => { closed = true })
 
-      for await (const chunk of streamProductsCsv({ shouldStop: () => closed })) {
+      // paranoid: false —— 与管理端列表**同一口径**（列表能看到已下架的商品，
+      // 导出也就要能看到，否则"导出 == 列表"这句话是假的）
+      for await (const chunk of streamProductsCsv({ shouldStop: () => closed, where, paranoid: false })) {
         if (closed) break
         res.write(chunk)
       }
