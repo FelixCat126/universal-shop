@@ -41,9 +41,12 @@ test.describe('Portal 登录用户下单', () => {
     await expect(page.getByText('E2E 测试商品').first()).toBeVisible({ timeout: 20_000 })
     await page.getByText('E2E 测试商品').first().click()
     await expect(page).toHaveURL(/\/products\/\d+/, { timeout: 20_000 })
+  // ⚠️ 第 64 轮：详情页在**手机端**多了一个固定购买栏，
+  // 同一组按钮在页面上存在两份（一份 hidden）→ 定位要**只取可见的那个**，
+  // 否则 strict mode 会因为"命中两个"而报错（点到的还是 hidden 的那个）。
     // 用 data-testid 精确定位**主商品**的按钮：
   // 详情页底部还有「相关推荐」，每个推荐也带一个同名按钮 → 按名字找会命中多个
-  await page.getByTestId('product-buy-now').click()
+  await page.getByTestId('product-buy-now').filter({ visible: true }).click()
     await expect(page).toHaveURL(/\/checkout/, { timeout: 20_000 })
 
     // 登录用户结算走地址簿：选中预置的默认地址（否则提交按钮是禁用的）

@@ -184,7 +184,21 @@
     <div class="route-stage">
       <router-view v-slot="{ Component, route }">
         <Transition name="page-fade">
-          <component :is="Component" :key="route.path" class="page-shell" />
+          <!--
+            第 64 轮：**class 挂在包裹层上**，不挂在路由组件上。
+
+            为什么：Vue 的"属性透传"只在组件**单根**时自动生效。
+            详情页有多个根（页头 / 加载中 / 有商品 / 没找到 / 相关推荐 /
+            图片模态框 / 消息提示），于是 `class="page-shell"` **落不到页面上** ——
+            连带 `.page-shell { background-color; min-height: 60vh }` 也没生效
+            （页面少了一层底色与最小高度）。
+
+            挂到包裹层上就与"页面是几根"无关了 ✓
+            （key 挪到包裹层，路由切换的进出场动画照旧）。
+          -->
+          <div :key="route.path" class="page-shell">
+            <component :is="Component" />
+          </div>
         </Transition>
       </router-view>
     </div>

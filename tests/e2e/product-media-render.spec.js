@@ -116,7 +116,7 @@ async function cardGeometries (page) {
 /** 详情页主图的几何 */
 async function heroGeometry (page) {
   return page.evaluate(() => {
-    const img = document.querySelector('.page-shell img')
+    const img = document.querySelector('[data-testid="product-detail-content"] img')
     if (!img) return null
     const frame = img.parentElement
     return {
@@ -225,9 +225,11 @@ test.describe('商品图片渲染', () => {
     try {
       await serveFixtureImage(page)
       await page.goto(`/portal/products/${product.id}`)
-      await page.waitForSelector('.page-shell img')
+      // 用稳定的 data-testid，而不是 .page-shell ——
+      // 详情页是多根组件，class 透传不到它身上（Vue 只在单根时透传）
+      await page.waitForSelector('[data-testid="product-detail-content"] img')
       await page.waitForFunction(() => {
-        const img = document.querySelector('.page-shell img')
+        const img = document.querySelector('[data-testid="product-detail-content"] img')
         return img && img.complete && img.naturalWidth > 0
       }, null, { timeout: 15_000 }).catch(() => {})
 
@@ -260,7 +262,7 @@ test.describe('商品图片渲染', () => {
 
       // 有描述 → 标题必须在（否则运营写了描述也看不见）
       await page.goto(`/portal/products/${withDesc.id}`)
-      await page.waitForSelector('.page-shell')
+      await page.waitForSelector('[data-testid="product-detail-content"]')
       await expect(
         heading.first(),
         '有描述时必须显示描述标题'
@@ -268,7 +270,7 @@ test.describe('商品图片渲染', () => {
 
       // 空描述 → 标题必须不出现（空标题下面什么都没有，像是页面坏了）
       await page.goto(`/portal/products/${withoutDesc.id}`)
-      await page.waitForSelector('.page-shell')
+      await page.waitForSelector('[data-testid="product-detail-content"]')
       // 等接口回来（标题是数据到位后才渲染的）
       await page.waitForTimeout(1200)
       await expect(

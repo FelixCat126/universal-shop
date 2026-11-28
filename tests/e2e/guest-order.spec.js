@@ -21,7 +21,7 @@ async function openCheckout (page) {
   await expect(page).toHaveURL(/\/products\/\d+/)
   // 用 data-testid 精确定位**主商品**的按钮：
   // 详情页底部还有「相关推荐」，每个推荐也带一个同名按钮 → 按名字找会命中多个
-  await page.getByTestId('product-buy-now').click()
+  await page.getByTestId('product-buy-now').filter({ visible: true }).click()
   await expect(page).toHaveURL(/\/checkout/)
 }
 

@@ -72,7 +72,9 @@ test('EF-1 导出 CSV 按当前筛选（点汇总条 → 导出 → 拿到的是
         category_id: cat.id,
         price: 66,
         stock: 3,
-        status: 'active'
+        // 下架：这样它**不会**进首页第一屏（首页只展示在售商品），
+        // 不会把基线商品挤出去 → storefrontFirstPaint 的 SF-1 不受影响
+        status: 'inactive'
       }
     })
     expect(created.status(), `造商品失败：${created.status()}`).toBe(201)

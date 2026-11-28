@@ -27,7 +27,8 @@
       v-motion
       :initial="reducedMotion ? undefined : { opacity: 0, y: 12 }"
       :enter="reducedMotion ? undefined : { opacity: 1, y: 0, transition: softSpring }"
-      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+      data-testid="product-detail-content"
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8"
     >
       <div class="lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
         <!-- 产品图片区域 -->
@@ -136,11 +137,23 @@
               </div>
             </div>
 
-            <!-- 操作按钮（加 ripple + pop） -->
+            <!--
+              操作按钮（加 ripple + pop）
+
+              第 64 轮：手机端**保留**这一组按钮，同时新增页面底部的**固定购买栏**
+              （见模板末尾）作为快捷入口。
+
+              为什么保留而不是隐藏：
+              固定栏在 Cookie 告知横幅显示时是**让位**的（横幅会盖住它）——
+              如果页内按钮也跟着隐藏，客户在关掉横幅之前就**一个都点不到**，
+              等于"不读告知就不许买"，这对一个只是"告知我们用了本地存储"
+              的横幅来说太过了。页内按钮留着，客户往下滑也能买。
+            -->
             <div class="flex space-x-4">
               <button
                 @click="handleAddToCart"
                 :disabled="addingToCart"
+                data-testid="product-add-to-cart"
                 class="ui-btn-ripple flex-1 bg-blue-600 border border-transparent rounded-md py-3 px-8 flex items-center justify-center text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ShoppingCartIcon v-if="!addingToCart" class="h-5 w-5 mr-2" />
@@ -261,10 +274,62 @@
       </div>
     </Transition>
   </div>
+    <!--
+      手机端**固定购买栏**（第 64 轮）
+
+      ## 为什么
+      手机流量占这个商城的大头，而"加入购物车 / 立即购买"在页面里排得很靠后
+      （图片 → 名称 → 价格 → 库存 → 描述 → 数量 → 按钮）——
+      客户要滚过一整屏才够得着按钮，**转化就在这一屏丢掉了**。
+
+      固定栏保证：无论描述多长、价格区多高，**购买按钮永远在拇指下**。
+
+      ## 细节
+      - 只在手机端出现（`lg:hidden`），桌面端仍用页面里的按钮（两栏布局不需要）
+      - `env(safe-area-inset-bottom)`：iPhone 底部有条指示条，按钮不能被压住
+      - 层级 z-30 < CookieBanner 的 z-40：同意横幅要先被看到（法律要求），关掉后固定栏才"接管"底部
+      - 按钮用**同一个 testid**（页内的那组在手机端是 hidden）→ e2e 定位不会撞车
+    -->
+    <div
+      v-if="product && product.stock > 0 && !cookieBannerVisible"
+      class="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur px-4 pt-2 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]"
+      :style="{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }"
+    >
+      <div class="flex items-center gap-3">
+        <div class="shrink-0 leading-tight">
+          <p class="text-[11px] text-gray-500">{{ t('product.productPrice') }}</p>
+          <p class="text-sm font-bold text-blue-600">
+            {{ portalCurrency.formatThb(getDiscountPrice(product)) }}
+            <span v-if="quantity > 1" class="text-gray-500">×{{ quantity }}</span>
+          </p>
+        </div>
+        <button
+          @click="handleAddToCart"
+          :disabled="addingToCart"
+          data-testid="product-add-to-cart-bar"
+          class="ui-btn-ripple flex-1 min-h-[44px] bg-blue-600 border border-transparent rounded-md px-3 flex items-center justify-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <ShoppingCartIcon v-if="!addingToCart" class="h-4 w-4 mr-1.5" />
+          <div v-else class="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white mr-1.5"></div>
+          {{ addingToCart ? t('product.addingToCart') : t('product.addToCart') }}
+        </button>
+        <button
+          @click="handleBuyNow"
+          :disabled="buyingNow"
+          data-testid="product-buy-now-bar"
+          class="ui-btn-ripple flex-1 min-h-[44px] bg-orange-600 border border-transparent rounded-md px-3 flex items-center justify-center text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <div v-if="buyingNow" class="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white mr-1.5"></div>
+          {{ buyingNow ? t('product.processing') : t('product.buyNow') }}
+        </button>
+      </div>
+    </div>
+
+
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { formatAmount } from '../../../shared/money.js'
 /**
  * v-motion 指令**按需引入**（不全局注册 → 动画库只跟着本页的 chunk 走）。
@@ -296,10 +361,30 @@ import ImageFade from '../../components/ui/ImageFade.vue'
 import { imageSrcSet } from '../../../utils/imageVariants.js'
 import { setPageSeo, buildProductSeo } from '../../utils/seo.js'
 import getCurrentLanguageValue from '../../utils/language.js'
+import { hasCookieConsent, onCookieConsentAccepted } from '../../utils/consent.js'
 import { softSpring, subtleSpring } from '../../composables/useSpring.js'
 import { useReducedMotion } from '../../composables/useReducedMotion.js'
 
 const portalCurrency = usePortalCurrencyStore()
+
+/**
+ * Cookie 告知横幅是不是正显示着（第 64 轮）。
+ *
+ * 横幅是 fixed bottom、手机端固定购买栏也是 fixed bottom ——
+ * 两个叠在一起时横幅会把购买栏**盖住**，客户点不到「加入购物车」。
+ * 所以横幅在的时候购买栏**让位**（不是抢 z-index：
+ * 抢了会把横幅上的「我知道了」盖住，法律要求的告知入口就没了）。
+ */
+const cookieBannerVisible = ref(!hasCookieConsent())
+let stopConsentListener = null
+onMounted(() => {
+  stopConsentListener = onCookieConsentAccepted(() => {
+    cookieBannerVisible.value = false
+  })
+})
+onUnmounted(() => {
+  if (stopConsentListener) stopConsentListener()
+})
 const reducedMotion = useReducedMotion()
 
 // 路由和状态

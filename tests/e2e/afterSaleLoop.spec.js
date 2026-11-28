@@ -47,7 +47,7 @@ async function placeOrder (page) {
   await expect(page.getByText('E2E 测试商品').first()).toBeVisible({ timeout: 20_000 })
   await page.getByText('E2E 测试商品').first().click()
   await expect(page).toHaveURL(/\/products\/\d+/, { timeout: 20_000 })
-  await page.getByTestId('product-buy-now').click()
+  await page.getByTestId('product-buy-now').filter({ visible: true }).click()
   await expect(page).toHaveURL(/\/checkout/, { timeout: 20_000 })
   const addressCard = page.getByText('E2E 登录用户').first()
   await expect(addressCard).toBeVisible({ timeout: 20_000 })

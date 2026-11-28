@@ -64,7 +64,7 @@ async function addToCart (page) {
   await expect(page.getByText('E2E 测试商品').first()).toBeVisible({ timeout: 20_000 })
   await page.getByText('E2E 测试商品').first().click()
   await expect(page).toHaveURL(/\/products\/\d+/, { timeout: 20_000 })
-  await page.getByRole('button', { name: /加入购物车|Add to cart/i }).first().click()
+  await page.getByRole('button', { name: /加入购物车|Add to cart/i }).filter({ visible: true }).first().click()
   await expect(page.getByText(/已加入|加入成功|Added/i).first()).toBeVisible({ timeout: 15_000 })
 }
 

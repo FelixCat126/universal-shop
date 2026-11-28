@@ -69,7 +69,9 @@ test.describe('内容完整度汇总条', () => {
         category_id: cat.id,
         price: 88,
         stock: 5,
-        status: 'active'
+        // 下架：这样它**不会**进首页第一屏（首页只展示在售商品），
+        // 不会把基线商品挤出去 → storefrontFirstPaint 的 SF-1 不受影响
+        status: 'inactive'
       }
     })
     expect(created.status(), `造商品失败：${created.status()}`).toBe(201)

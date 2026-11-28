@@ -44,39 +44,19 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { hasCookieConsent, recordCookieConsent } from '../utils/consent.js'
 
 const { t } = useI18n()
 
-/** 同意状态落盘的键（与全站其它 localStorage 用法一致） */
-const CONSENT_KEY = 'cookie_consent_at'
-
 const visible = ref(false)
 
-/**
- * 读取已保存的同意状态。
- *
- * 存的是**时间戳**而不是布尔 —— 万一以后要改横幅文案或新增用途，
- * "什么时候同意的"比"同不同意过"更有用（GDPR 要求可证明同意时点）。
- */
-function readConsent () {
-  try {
-    return localStorage.getItem(CONSENT_KEY)
-  } catch {
-    // 隐私模式 / 禁用存储 → 当作未同意，横幅会一直显示（这是安全侧的行为）
-    return null
-  }
-}
-
 function accept () {
-  try {
-    localStorage.setItem(CONSENT_KEY, new Date().toISOString())
-  } catch {
-    // 存不了也不该阻断用户（横幅只是告知）
-  }
+  // 记录同意 + 广播（第 64 轮：手机端固定购买栏要知道横幅让位了）
+  recordCookieConsent()
   visible.value = false
 }
 
 onMounted(() => {
-  visible.value = !readConsent()
+  visible.value = !hasCookieConsent()
 })
 </script>
